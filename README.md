@@ -2,6 +2,15 @@
 
 > 👉 **在线版已上线：[exprtrain.online](https://exprtrain.online)**，无需安装，打开浏览器即用。支持中英双语。
 
+## 项目文档
+
+- [需求基线](docs/requirements/requirements.md)
+- [架构入口](docs/architecture/README.md)
+- [当前架构（As-Is）](docs/architecture/current.md)
+- [目标架构（To-Be）](docs/architecture/target.md)
+- [架构决策记录（ADR）](docs/architecture/adr/README.md)
+- [开发路线图](docs/roadmap.md)
+
 一个帮你训练口语表达精准度的本地桌面应用。实时语音识别 → 词库匹配 → AI反馈，全程离线+本地处理。
 
 ## 功能
