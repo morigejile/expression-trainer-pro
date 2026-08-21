@@ -1,8 +1,8 @@
 # 开发与可复现安装基线
 
-> 状态：Phase 0 Verified Baseline
+> 状态：Phase 1 / T-01 Verified Baseline
 > 验证日期：2026-08-22
-> 验证分支：`chore/reproducible-build`；Phase 0 实现基线：`b16a1d0bf799887cf7ece1283d73463961346030`
+> 验证分支：`test/minimal-test-baseline`；基于 `468421675f230393a0eb59ac21e7589e94efbcb8`
 
 ## 1. 已验证开发环境
 
@@ -47,6 +47,9 @@ npm ci
 # JavaScript 语法基线
 npm run check
 
+# Node 内置测试入口
+npm test
+
 # 普通启动
 npm start
 
@@ -54,7 +57,7 @@ npm start
 npm run dev
 ```
 
-- `npm test`：**TBD**，由 Roadmap Phase 1 / T-01 建立；当前阶段不伪造测试入口。
+- `npm test` 使用 Node 内置 `node:test`，不引入额外测试框架。T-01 当前只验证无需 Electron、ASR 模型、麦克风或网络的核心 CommonJS 模块入口；词库业务行为由 T-02 覆盖，不在本任务提前实现。
 - Forge `package`/`make`：**TBD**，由 Roadmap Phase 5 / PKG-02 建立。
 
 ## 4. 当前模型准备方式
@@ -72,7 +75,7 @@ models/sherpa-onnx-streaming-paraformer-bilingual-zh-en/
 
 ## 5. 本阶段验证边界
 
-已验证：依赖清单/lockfile 一致、两次 clean install、安装脚本审批、JavaScript 语法检查、Electron 二进制可执行、桌面窗口启动 smoke、文档相对链接。
+已验证：依赖清单/lockfile 一致、两次 clean install、安装脚本审批、JavaScript 语法检查、Electron 二进制可执行、桌面窗口启动 smoke、文档相对链接。T-01 另在 Node 22.23.0/npm 12.0.2 下完成一次 `npm ci`，随后 `npm test` 运行 1 项模块入口 smoke 且通过，`npm run check` 继续通过。
 
 未验证：真实麦克风、ASR 模型、LLM 网络请求、macOS/Linux、Forge 制品、安装/升级/卸载。不得据此宣称三平台同等级支持。
 

@@ -80,6 +80,12 @@ flowchart LR
 | T-07 | P1 | 最小 smoke | 覆盖 Electron 启动、页面加载、设置窗口、粘贴分析；ASR 用 Fake Provider，不把大模型放入普通单测 | T-01～T-03 | 每次变更能发现启动/Preload 契约回归 |
 | T-08 | P0 | Electron 安全升级 spike | 基于 `npm audit` 结果评估从 Electron 33 升级到受支持版本；不得使用 `npm audit fix --force`，逐项验证 native Sherpa、Preload/IPC、窗口与后续 Forge 兼容性 | T-01,T-07 | audit 风险关闭或有明确接受/缓解记录；升级前后 smoke 证据完整 |
 
+#### Phase 1 执行记录（2026-08-22）
+
+| ID | 状态 | Owner | 证据 |
+|---|---|---|---|
+| T-01 | Completed | Codex + maintainer | 使用 Node 内置 `node:test` 建立 `npm test`；Node 22.23.0/npm 12.0.2 下 `npm ci`、1 项模块入口 smoke、`npm run check` 均成功；不需要 ASR 模型、麦克风或网络，未引入新依赖 |
+
 ### Phase 2 — ASR Benchmark 与技术 spike
 
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |

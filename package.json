@@ -15,6 +15,7 @@
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
+    "test": "node --test",
     "check": "node --check main.js && node --check preload.js && node --check lib/ai-feedback.js && node --check lib/asr.js && node --check lib/lexicon.js && node --check lib/prompts.js && node --check src/app.js && node --check src/settings.js"
   },
   "keywords": ["expression", "training", "speech", "asr", "chinese"],
