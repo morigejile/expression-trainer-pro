@@ -2,8 +2,8 @@
 
 > 方法：arc42-lite + C4（Context/Container）+ ADR  
 > 状态：Draft Baseline  
-> 基线日期：2026-08-19
-> 源码基线：`morigejile/expression-trainer-pro`，本地 `main@f925434`
+> 基线日期：2026-08-22
+> 源码基线：`morigejile/expression-trainer-pro`，Phase 0 实现 `b16a1d0bf799887cf7ece1283d73463961346030`（本地 `chore/reproducible-build`）
 
 ## 1. 如何阅读
 

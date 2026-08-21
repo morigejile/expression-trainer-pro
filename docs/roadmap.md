@@ -1,8 +1,8 @@
 # Expression Trainer TODO / Roadmap
 
-> 状态：Proposed execution baseline  
-> 基线日期：2026-08-19  
-> 源码：`morigejile/expression-trainer-pro`，本地 `main@f925434`
+> 状态：Active execution baseline
+> 基线日期：2026-08-22
+> 源码：`morigejile/expression-trainer-pro`；Phase 0 实现基线：`b16a1d0bf799887cf7ece1283d73463961346030`（本地 `chore/reproducible-build`）
 
 ## 1. 目标与排序原则
 
@@ -24,7 +24,7 @@
 - **P1**：目标架构和可发布版本所必需。
 - **P2**：建立稳定发布后再做的增强。
 - 每个阶段保持应用可运行；不同时重写 UI、Audio、ASR、模型和打包。
-- 当前 `package-lock.json` 的未提交修改属于既存工作，任何提交/还原均由仓库负责人确认；本路线图不替用户处理该改动。
+- 原有 `package-lock.json` 清理属于既存工作，已由仓库负责人确认并纳入 Phase 0；后续不得把不相关改动夹带进同一提交。
 
 ## 2. 依赖关系
 
@@ -53,8 +53,19 @@ flowchart LR
 | B-02 | P0 | 保护并解释当前工作树 | 记录 `git status`；确认 `package-lock.json` 删除陈旧 `node-microphone` 是期望改动，不还原、不夹带其他修改 | B-01 | 负责人确认改动归属；后续工作基于干净分支/副本 |
 | B-03 | P0 | 固定开发环境 | 在干净 clone/worktree 记录 Node/npm/OS；选择与 Electron 33、Sherpa 和 Forge 兼容的 Node LTS 后写入 `engines`/开发说明（版本以实测为准） | B-02 | 新环境不靠全局包即可安装；版本记录可复制 |
 | B-04 | P0 | 使依赖可复现 | 先在干净副本运行 `npm ci`；若失败，解释并只更新 lock；核心运行时依赖采用受控升级，不在本任务中盲目升到 latest | B-03 | `package.json`/lock 一致；连续两次干净安装结果一致 |
-| B-05 | P0 | 依赖/死代码清点 | 用 import 搜索 + 启动 smoke 确认 `node-microphone`、未用 `session` import、无生产者的 `asr-result` listener、未引用 `tiered-lexicon.json`；确认后逐项删除 | B-04 | 每个删除有搜索/测试证据；功能不变 |
+| B-05 | P0 | 依赖/死代码清点 | 用 import 搜索 + 启动 smoke 确认后删除 `node-microphone`、未用 `session` import 和无生产者的 `asr-result` listener；`tiered-lexicon.json` 经维护者确认保留为未启用候选数据 | B-04 | 每个删除有搜索/测试证据；候选数据状态明确；功能不变 |
 | B-06 | P1 | 补最小开发说明 | 记录 setup、模型手工准备（现状）、start/dev/check/test 命令和已验证平台；纠正 README 的 30/50 字与“全程离线”表述 | B-04 | 新维护者在 30 分钟内按文档启动或得到明确缺失模型提示 |
+
+#### Phase 0 执行记录（2026-08-21～2026-08-22）
+
+| ID | 状态 | Owner | 证据 |
+|---|---|---|---|
+| B-01 | Completed | Codex + maintainer | `docs/` 相对链接全部解析；源码路径、分支基线与 TBD 已更新 |
+| B-02 | Completed | maintainer | 已明确确认原有 `package-lock.json` 清理归属，并纳入 `chore/reproducible-build` |
+| B-03 | Completed | Codex | Windows NT 10.0.26200.0 x64、Node 22.23.0、npm 12.0.2 已实测并写入 `.nvmrc`/`engines`/开发说明 |
+| B-04 | Completed | Codex | 两次 clean `npm ci` 成功且安装树/Electron hash 一致；空 Electron 下载缓存探测在 GitHub 下载阶段等待约 10 分钟后中止，作为非阻塞 Runtime-TBD 保留 |
+| B-05 | Completed | Codex + maintainer | 搜索、语法检查与启动 smoke 后删除 `node-microphone` lock 条目、未用 `session` import 和孤立 `asr-result` bridge；恢复并保留未引用的 `tiered-lexicon.json`，明确暂不启用 |
+| B-06 | Completed | Codex | 新增 `docs/development.md`；README 改为 `npm ci`、30 字触发、可选联网和实测平台口径 |
 
 ### Phase 1 — 最小测试与高风险缺陷
 
@@ -67,6 +78,7 @@ flowchart LR
 | T-05 | P0 | 封堵 HTML 注入 | 用 text node/安全高亮 token 渲染 ASR 和粘贴文本；LLM Markdown 使用严格允许列表或纯文本，不直接信任 HTML | T-01 | `<img onerror>`、`<script>`、事件属性测试均不执行 |
 | T-06 | P1 | LLM 请求可控 | 给 fetch 增加 AbortController 超时、会话取消、响应结构验证和脱敏错误；本地分析不依赖 LLM 成功 | T-01 | 超时/限流/无 Key/坏 JSON 有稳定错误且不覆盖本地结果 |
 | T-07 | P1 | 最小 smoke | 覆盖 Electron 启动、页面加载、设置窗口、粘贴分析；ASR 用 Fake Provider，不把大模型放入普通单测 | T-01～T-03 | 每次变更能发现启动/Preload 契约回归 |
+| T-08 | P0 | Electron 安全升级 spike | 基于 `npm audit` 结果评估从 Electron 33 升级到受支持版本；不得使用 `npm audit fix --force`，逐项验证 native Sherpa、Preload/IPC、窗口与后续 Forge 兼容性 | T-01,T-07 | audit 风险关闭或有明确接受/缓解记录；升级前后 smoke 证据完整 |
 
 ### Phase 2 — ASR Benchmark 与技术 spike
 

@@ -10,25 +10,30 @@
 - [目标架构（To-Be）](docs/architecture/target.md)
 - [架构决策记录（ADR）](docs/architecture/adr/README.md)
 - [开发路线图](docs/roadmap.md)
+- [开发与可复现安装](docs/development.md)
 
-一个帮你训练口语表达精准度的本地桌面应用。实时语音识别 → 词库匹配 → AI反馈，全程离线+本地处理。
+一个帮你训练口语表达精准度的本地桌面应用。实时语音识别与词库分析在本地完成；AI 反馈是可选能力，除 Ollama 外通常需要网络。
 
 ## 功能
 
 - 🎤 **实时语音识别**：基于 Sherpa-ONNX，完全离线，中文优化
 - 📝 **全屏字幕显示**：黑底大字，实时显示你说的每一句话
 - 🔍 **词库分析**：自动检测填充词、犹豫词、笼统词，给出精准替代
-- 🤖 **AI反馈**：支持 Groq/OpenAI/DeepSeek/Ollama 多后端
+- 🤖 **AI反馈**：支持 OpenAI、DeepSeek、Ollama 与自定义 OpenAI-compatible 后端
 - 📊 **分析报告**：6维度深度分析（逻辑/直接性/填充词/密度/词汇/亮点）
 
 ## 安装
 
 ### 1. 克隆项目 & 安装依赖
 
-```bash
-cd expression-trainer
-npm install
+```powershell
+cd expression-trainer-pro
+node --version  # 期望 22.23.x
+npm --version   # 期望 12.0.x
+npm ci
 ```
+
+完整的版本、install-script 策略、验证证据与 TBD 见[开发与可复现安装](docs/development.md)。
 
 ### 2. 下载语音识别模型
 
@@ -78,7 +83,7 @@ npm start
 1. **点击「开始录制」** → 对着麦克风说话
 2. **实时字幕**会在屏幕中央显示你说的内容
 3. **左侧面板**实时统计填充词/犹豫词/笼统词
-4. **右侧面板**每50字会给出AI实时反馈
+4. **右侧面板**每新增约30字会给出AI实时反馈
 5. **说完后点击「结束」** → 可以点「生成报告」获取完整分析
 
 ## 字幕颜色含义
@@ -121,6 +126,9 @@ npm start
 ## 开发
 
 ```bash
+# JavaScript语法检查
+npm run check
+
 # 开发模式（带DevTools）
 npm run dev
 
@@ -139,16 +147,21 @@ npm run dev
 │   ├── ai-feedback.js   # AI反馈
 │   └── prompts.js       # Prompt模板
 ├── data/
-│   └── emotion-lexicon.json
+│   ├── emotion-lexicon.json
+│   └── tiered-lexicon.json # 候选分层词库，当前未启用
 └── models/              # Sherpa-ONNX模型（需下载）
 ```
 
+`tiered-lexicon.json` 作为候选数据资产保留；其 schema 与当前分析器不同，必须在独立测试任务中设计合并规则后才能启用。
+
 ## 系统要求
 
-- macOS 12+ / Windows 10+ / Linux
-- Node.js 18+
+- 已验证开发基线：Windows NT 10.0.26200.0 x64
+- Node.js 22.23.x、npm 12.0.x
 - 麦克风权限
 - （可选）网络连接（用于AI反馈，词库分析可离线）
+
+macOS/Linux 与正式最低 Windows 版本尚无 CI/制品证据，支持等级为 **TBD**。
 
 ## License
 
