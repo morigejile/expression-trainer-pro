@@ -16,12 +16,6 @@ contextBridge.exposeInMainWorld('api', {
   initASR: () => ipcRenderer.invoke('init-asr'),
   feedAudio: (samples) => ipcRenderer.invoke('feed-audio', Array.from(samples)),
   stopASR: () => ipcRenderer.invoke('stop-asr'),
-  onASRResult: (callback) => {
-    ipcRenderer.on('asr-result', (event, data) => callback(data));
-  },
-  removeASRListener: () => {
-    ipcRenderer.removeAllListeners('asr-result');
-  },
 
   // 词库分析
   analyzeText: (text) => ipcRenderer.invoke('analyze-text', text),

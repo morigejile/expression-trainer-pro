@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { initASR, feedAudio, stopRecognition } = require('./lib/asr');
