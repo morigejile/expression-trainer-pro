@@ -3,7 +3,7 @@
 > 状态：Proposed  
 > 基线日期：2026-08-19  
 > 目标：在保持功能闭环的前提下降低总体维护、依赖、跨平台安装和升级复杂度
-> 当前源码基线：`fxy2311-youyou/expression-trainer`，本地 `main@f925434`
+> 当前源码基线：`morigejile/expression-trainer-pro`，本地 `main@f925434`
 
 ## 1. 范围与设计约束
 

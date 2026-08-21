@@ -3,7 +3,7 @@
 > 方法：arc42-lite + C4（Context/Container）+ ADR  
 > 状态：Draft Baseline  
 > 基线日期：2026-08-19
-> 源码基线：`fxy2311-youyou/expression-trainer`，本地 `main@f925434`
+> 源码基线：`morigejile/expression-trainer-pro`，本地 `main@f925434`
 
 ## 1. 如何阅读
 

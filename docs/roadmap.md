@@ -2,7 +2,7 @@
 
 > 状态：Proposed execution baseline  
 > 基线日期：2026-08-19  
-> 源码：`fxy2311-youyou/expression-trainer`，本地 `main@f925434`
+> 源码：`morigejile/expression-trainer-pro`，本地 `main@f925434`
 
 ## 1. 目标与排序原则
 

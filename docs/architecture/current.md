@@ -2,12 +2,12 @@
 
 > 状态：Verified from Source（尚未完成运行验收）  
 > 基线日期：2026-08-19  
-> 仓库：`https://github.com/fxy2311-youyou/expression-trainer.git`  
+> 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
 > 描述对象：本地 `main@f925434`；工作树已有一项未提交修改：`package-lock.json`
 
 ## 1. 证据边界
 
-本文件静态检查了 `D:\expression-trainer\expression-trainer` 的源码、README、依赖清单和 Git 状态。尚未启动 GUI、连接麦克风、下载模型或请求真实 LLM，因此“代码存在”与“运行通过”严格区分。
+本文件静态检查了 `D:\Codex_projects\expression-trainer` 的源码、README、依赖清单和 Git 状态。尚未启动 GUI、连接麦克风、下载模型或请求真实 LLM，因此“代码存在”与“运行通过”严格区分。
 
 | 标记 | 含义 |
 |---|---|
