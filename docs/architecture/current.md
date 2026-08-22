@@ -1,13 +1,13 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron Smoke（尚未完成真实设备/模型运行验收）
-> 基线日期：2026-08-22
+> 状态：Verified from Source + Electron 43 Smoke（尚未完成真实设备/模型运行验收）
+> 基线日期：2026-08-23
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
-> 描述对象：截至 Phase 1 / T-07 集成状态；基于完整 T-03 提交 `99f4707187b1fa16e46b194b34cae5c6b362206e`
+> 描述对象：截至 Phase 1 / T-08 状态；基于 T-04～T-07 集成提交 `33a6ee59c321f613d66357bff4ead09835387010` 的受控升级
 
 ## 1. 证据边界
 
-本文件检查了独立集成 worktree 的源码、README、依赖清单和 Git 状态，并完成依赖安装、语法检查、Node 测试与自动化 Electron smoke。smoke 实际加载 Main、Preload、主页面和设置页，通过真实 IPC 验证 Fake ASR、协调式 Fake LLM 与粘贴分析；尚未连接麦克风、加载 ASR 模型或请求真实 LLM，因此“smoke 通过”与“完整运行通过”严格区分。
+本文件检查了独立 T-08 worktree 的源码、README、依赖清单和 Git 状态，并完成依赖安装、语法检查、Node 测试、自动化 Electron smoke、Electron runtime 中的 Sherpa native require 与正常非 smoke 启动。smoke 实际加载 Main、Preload、主页面和设置页，通过真实 IPC 验证 Fake ASR、协调式 Fake LLM 与粘贴分析；尚未连接麦克风、初始化/运行真实 ASR 模型或请求真实 LLM，因此“native require / smoke 通过”与“完整识别运行通过”严格区分。
 
 | 标记 | 含义 |
 |---|---|
@@ -54,7 +54,7 @@ smoke/electron-smoke-runner.js  Electron 内 smoke 驱动与 Fake ASR/LLM
 | 区域 | 当前选择 | 证据/备注 |
 |---|---|---|
 | 应用 | `expression-trainer` / product `宇宙无敌表达训练` / `1.0.0` | `package.json`；版本与 README/代码注释的 V2 口径未治理 |
-| 桌面运行时 | Electron `^33.0.0` | 当前 lock 与 `node_modules` 为 33.4.11；正式构建仍需记录 Node/npm/OS |
+| 桌面运行时 | Electron `43.4.1`（精确版本） | 当前 lock 与 `node_modules` 一致；Windows x64 实测内置 Node 24.18.1、Chromium 150.0.7871.224、modules ABI 148、N-API 10 |
 | UI | 原生 HTML/CSS/JavaScript | 无 bundler/前端框架 |
 | 音频 | Renderer 中 `getUserMedia` + `AudioContext({sampleRate:16000})` | `src/app.js` |
 | 音频节点 | `createScriptProcessor(4096, 1, 1)` | 已废弃 API；无显式 resampler |
@@ -67,7 +67,7 @@ smoke/electron-smoke-runner.js  Electron 内 smoke 驱动与 Fake ASR/LLM
 | 输出 | Clipboard + Electron Save Dialog + Markdown | 原文与报告 |
 | 构建/测试 | scripts 为 `start`、`dev`、`test`、`check` | `node:test` 覆盖模块入口、词库、设置迁移、尾部文本、安全渲染、LLM 请求控制和真实 Electron smoke；LLM 单测使用 fake fetch，smoke 使用 Fake ASR/LLM；无 build/package/CI 配置 |
 
-开发基线已固定为 Node 22.23.x/npm 12.0.x，并只记录 Windows NT 10.0.26200.0 x64 的本轮验证；macOS/Linux 与正式最低 Windows 版本没有 CI、打包配置或制品测试证明。
+开发工具基线固定为 Node 22.23.x/npm 12.0.x，与 Electron 内置 Node 24.18.1 明确区分。本轮只验证 Windows NT 10.0.26200.0 x64；Electron 38 起的 macOS 12+ 下限、Linux GTK/Wayland 和正式最低 Windows 版本仍没有 CI、打包配置或制品测试证明。
 
 ## 4. C4 Level 2：当前容器/运行边界
 
@@ -265,7 +265,7 @@ Settings/Prompt Renderer
 - `models/` 仅跟踪 `.gitkeep`；README 要求用户手工下载和解压模型。
 - 无安装包、签名、公证、自动更新、升级/卸载数据保留测试或正式支持矩阵。
 - 原有 `package-lock.json` 清理已由负责人确认纳入 Phase 0；陈旧 `node-microphone` 条目已删除，lockfile 与 `package.json` 一致。
-- 开发基线为 Node 22.23.0/npm 12.0.2；连续两次 clean `npm ci` 的安装树和 Electron 二进制 hash 一致。两次均使用已校验的官方 Electron 下载缓存；2026-08-22 的空缓存网络探测在 GitHub 下载阶段等待约 10 分钟后中止，仍为非阻塞 Runtime-TBD。
+- 开发基线为 Node 22.23.0/npm 12.0.2。T-08 的 Electron 43.4.1 JS 依赖经 clean `npm ci` 安装；Electron 42+ 改为首次 CLI 调用时下载 binary，本轮首次 43.4.1 下载成功，后续 clean install 从官方校验缓存恢复相同 executable（SHA-256 `E885FFC2A09DAB4C14DE706E3662A5929D1E65EA4EA347C56FD0964640EB923B`）。显式清空所有 npm/Electron 缓存后的复跑仍为 Runtime-TBD。
 
 ## 8. 已确认技术债与风险
 
@@ -287,7 +287,7 @@ Settings/Prompt Renderer
 | TD-14 | README 与实现漂移风险 | 用户预期错误 | Phase 0 已修正触发字数、联网边界和平台口径 | 后续行为变更同步 README 与架构文档 |
 | TD-15 | 未启用候选词库容易被误认为运行时数据 | 维护者可能误删或直接接入不兼容 schema | `tiered-lexicon.json` 无 import，Phase 0 决定保留 | 明确标记未启用；在 T-01/T-02 后以独立任务设计 schema、合并规则和测试 |
 | TD-16 | 版本口径不一致 | 发布历史和兼容性不清 | package 1.0.0、代码 V2、历史提交 v1.1 | SemVer + CHANGELOG + release policy |
-| TD-17 | Electron 33 依赖树存在已知安全告警 | `npm audit` 汇总为 `electron` 与传递依赖 `extract-zip` 两个 high 风险节点 | 2026-08-22，Node 22.23.0/npm 12.0.2；`boolean@3.2.0` 仅废弃且未被列为漏洞 | T-01/T-07 后执行受控 Electron 大版本升级，不运行 `npm audit fix --force` |
+| TD-17 | **T-08 已关闭当前告警**：Electron 33.4.11 依赖树的两个 high 节点已通过升级到受支持的 43.4.1 移除 | 当前 `npm audit --json` 为 0；旧 `extract-zip@2.0.1`、`boolean` 与旧下载栈已从 lockfile 删除 | 2026-08-23，Node 22.23.0/npm 12.0.2；升级前 `2 high / 0 critical`，升级后 0；未使用 `npm audit fix --force` | OPS-03 持续受控升级；每次验证 native load、smoke 与发布制品 |
 
 ## 9. 当前架构评价
 
@@ -313,9 +313,9 @@ Settings/Prompt Renderer
 
 ## 10. 仍需运行验证
 
-1. 在空 Electron 下载缓存的独立环境复跑 `npm ci`；当前已验证两次 clean `node_modules` 安装，但使用了经过 SHA-256 校验的缓存。
+1. 在显式清空 npm 与 Electron 下载缓存的独立环境复跑 Electron 43 首次 CLI 下载；当前首次 43.4.1 下载和后续校验缓存恢复均成功。
 2. 验证当前模型下载源、大小、hash、许可证和三个文件的兼容性。
-3. 自动 Electron smoke 已覆盖 BrowserWindow、Preload、设置页和粘贴分析；真实设置文件持久化、报告保存对话框和人工交互仍需运行验证。
+3. 自动 Electron smoke 已覆盖 BrowserWindow、16 项 Preload API、设置页、Fake ASR/Fake LLM 和粘贴分析；正常非 smoke 入口已在 Windows x64 保持 5 秒存活并加载真实 Sherpa 模块。真实设置文件持久化、报告保存对话框、真实模型/麦克风和人工交互仍需运行验证。
 4. 在 44.1/48 kHz 设备记录 `audioContext.sampleRate` 与 ASR 接收时序。
 5. profile TD-01～TD-04 的 Main 延迟、GC、CPU、RAM 和队列。
 6. 在目标 macOS/Linux/Windows 版本验证安装与运行；在证据前继续保持 TBD，不作支持承诺。

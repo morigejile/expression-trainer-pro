@@ -1,21 +1,21 @@
 # 开发与可复现安装基线
 
-> 状态：Phase 1 / T-04～T-07 Integrated Baseline
-> 验证日期：2026-08-22
-> 验证分支：`codex/integration/phase1-t04-t07`；基于完整 T-03 提交 `99f4707187b1fa16e46b194b34cae5c6b362206e`
+> 状态：Phase 1 / T-08 Electron Security Upgrade Verified
+> 验证日期：2026-08-23
+> 验证分支：`codex/security/electron-upgrade-spike`；基于 T-04～T-07 精确集成提交 `33a6ee59c321f613d66357bff4ead09835387010`
 
 ## 1. 已验证开发环境
 
 | 项目 | 已验证值 |
 |---|---|
 | 主仓库 | `D:\Codex_projects\expression-trainer-pro` |
-| 集成 worktree | `D:\Codex_projects\expression-trainer-pro-phase1-integration` |
+| T-08 worktree | `D:\Codex_projects\expression-trainer-pro-t08` |
 | Node/npm 目录 | `C:\Users\mr\AppData\Local\hermes\node\` |
 | OS | Windows NT `10.0.26200.0`，x64；产品名称因当前查询权限不足为 **TBD** |
 | Node.js | `22.23.0`，由 `.nvmrc` 与 `package.json#engines` 约束 |
 | npm | `12.0.2`，由 `packageManager` 与 `package.json#engines` 约束 |
 | 本机运行时路径 | `C:\Users\mr\AppData\Local\hermes\node\node.exe`；npm 为同目录的 `npm.cmd` |
-| Electron | lockfile 固定 `33.4.11` |
+| Electron | `43.4.1`（精确版本）；内置 Node `24.18.1`、Chromium `150.0.7871.224`、Node modules ABI `148`、N-API `10` |
 | sherpa-onnx-node | lockfile 固定 `1.13.3` |
 
 Node 22/npm 12 是本阶段实测基线，不代表 Electron 内置的 Node 运行时版本。升级 Node、npm、Electron 或 Sherpa 应作为受控变更重新执行本页验证。
@@ -48,7 +48,16 @@ $expressionTrainerRuntime = 'C:\Users\mr\AppData\Local\hermes\node'
 npm ci
 ```
 
-不要用 `npm install` 代替基线安装。项目只批准 `electron@33.4.11` 的 install script，并通过 `.npmrc` 让未审查的新增 install script 直接失败。Electron 首次安装会从官方发布源下载二进制，网络较慢时 postinstall 可能长时间没有输出。
+不要用 `npm install` 代替基线安装。`package.json#allowScripts` 已与精确版本同步为 `electron@43.4.1`，但 Electron 43 的 npm 包本身不再声明 install script：`npm ci` 安装完整依赖树和 Electron 的 JS wrapper，但不下载 Electron executable；首次执行 Electron CLI 时才从官方发布源按需下载并按包内 checksums 校验二进制。网络较慢时首次执行可能长时间只有 `Downloading Electron binary...`。
+
+T-08 在 2026-08-23 使用 Hermes Node `22.23.0` / npm `12.0.2` 从升级后的 lockfile 执行干净 `npm ci`，得到一致安装树：
+
+- `node_modules/.package-lock.json` SHA-256：`70B26817D8E5409E35600F348B33640BC4B08E56636C6312F661C5088DEE2487`
+- `node_modules/electron/dist/electron.exe` SHA-256：`E885FFC2A09DAB4C14DE706E3662A5929D1E65EA4EA347C56FD0964640EB923B`
+- Electron `43.4.1`、sherpa-onnx-node `1.13.3`、`@electron-internal/extract-zip@1.0.5`
+- 首次 Electron CLI 调用完成官方二进制下载；后续 clean `npm ci` 后从官方校验缓存恢复同一版本
+
+以下记录保留为 Phase 0 / Electron 33 的历史安装证据，不代表当前安装树：
 
 本阶段连续两次删除并重建 `node_modules` 的 `npm ci` 均成功，结果一致：
 
@@ -56,7 +65,7 @@ npm ci
 - `node_modules/electron/dist/electron.exe` SHA-256：`1925F358E7F0E9675A5AC4198FB076613F0DB318DA56D388799A97BE74A5B19C`
 - 两次安装都得到 Electron `33.4.11` 与 sherpa-onnx-node `1.13.3`
 
-证据边界：上述两次 clean install 使用了已按 Electron 包内固定 SHA-256 校验的本地下载缓存。2026-08-22 又使用独立 npm 缓存和空 Electron 下载缓存执行 `npm ci`；普通依赖安装完成后，进程在 `electron/install.js` 的 GitHub 下载连接上等待约 10 分钟仍未完成，随后被人工中止且未留下项目进程。完全空网络缓存安装仍为 **Runtime-TBD**，但官方 ZIP 可下载且 SHA-256 校验通过；该网络条件不阻塞 lockfile/安装树可复现性结论。
+历史证据边界：上述两次 Electron 33 clean install 使用了已按 Electron 包内固定 SHA-256 校验的本地下载缓存。2026-08-22 又使用独立 npm 缓存和空 Electron 下载缓存执行 `npm ci`；普通依赖安装完成后，进程在 `electron/install.js` 的 GitHub 下载连接上等待约 10 分钟仍未完成，随后被人工中止且未留下项目进程。Electron 43 已改为首次 CLI 调用时下载，T-08 的首次 43.4.1 下载成功；显式清空所有 npm/Electron 缓存后的复跑仍为 **Runtime-TBD**。
 
 ## 3. 开发命令
 
@@ -76,7 +85,17 @@ npm run dev
 
 - `npm test` 使用 Node 内置 `node:test`，不引入额外测试框架。T-01 验证无需 Electron、ASR 模型、麦克风或网络的核心 CommonJS 模块入口；T-02 锁定 `lib/lexicon.js` 的确定性行为；T-03 覆盖设置默认值、旧扁平配置迁移、缺失 provider、损坏 JSON、未知 provider 字段保留和 `schemaVersion: 1`；T-04 与集成回归覆盖 stop final 文本合并、endpoint/stop 去重、空 final 不变、尾部分析完成后再结束 stop、分析失败时仍完成 stop 生命周期，以及合并结果进入 transcript、分析统计和后续报告；T-05 覆盖恶意 HTML 保持为文本、中文高亮 token、LLM 报告允许列表和 playground 输入转义；T-06 使用 fake fetch 覆盖 LLM 成功、无 Key、429/HTTP 错误、坏 JSON、异常响应、超时、取消、Main 协调层与 Renderer 代际双层迟到结果抑制，以及敏感错误脱敏；T-07 启动真实 Electron executable，覆盖 Main/Preload、主页面、设置页和粘贴分析。词库位置是分词后的 token 索引，不是原始字符偏移；密度仍是当前实现基线，不代表产品定义已经最终冻结。
 - T-07 仅在显式 `--smoke-test` 参数下使用 smoke-only Fake ASR/LLM。Fake LLM 实现最终的请求协调器契约；测试使用临时 `userData`，不加载 `lib/asr.js`、`lib/ai-feedback.js` 或 Sherpa 模型，不请求麦克风或网络；正常 `npm start` 不启用该入口。子进程有 30 秒边界超时、唯一成功标记、失败 stdout/stderr 和超时进程树清理。
-- Forge `package`/`make`：**TBD**，由 Roadmap Phase 5 / PKG-02 建立。
+- T-08 在 Electron 43.4.1 下保持 50 项测试全部通过；真实 Electron smoke 继续覆盖含 `cancelLLMRequests` 的 16 项 `window.api`、设置窗口、粘贴分析、Fake ASR/Fake LLM。正常非 smoke 入口在 Windows x64 隐藏启动 5 秒保持存活，并加载真实 `lib/asr.js`，随后按精确根 PID 树清理。
+- Forge `package`/`make`：**TBD**，由 Roadmap Phase 5 / PKG-02 建立。Forge 会从本地 Electron 依赖确定 runtime 并通过 `@electron/rebuild` 处理 native 模块，但 Sherpa 的 rebuild、共享库、ASAR unpack 和最终制品仍须实测；T-08 不新增 Forge 配置。
+
+### 3.1 Electron 43 选择与兼容性结论
+
+- 2026-08-23 查询 npm Registry 时，`latest` 与 `43-x-y` 都是稳定版 `43.4.1`；44 只有 alpha/beta。Electron 官方只支持最新三个稳定 major，官方日程列出的 43 系列 EOL 为 2027-01-05，因此选择 43.4.1，而不是已 EOL 的 33～40 或预发布的 44。
+- Electron 34～43 的官方 breaking-change 清单未移除或改变本项目使用的 `BrowserWindow` 构造、`preload` 路径、`contextBridge.exposeInMainWorld`、`ipcMain.handle` / `ipcRenderer.invoke`、`Menu.buildFromTemplate`、`app.whenReady` 或窗口生命周期。Electron 34 在 Windows 全屏时隐藏菜单栏；本项目不自动进入全屏。Electron 43 的 Linux 圆角/Window Controls Overlay 和默认下载目录变化也不影响当前显式保存路径。
+- 最低平台边界发生变化：Electron 38 起要求 macOS 12 或更高；Windows 仍为 Windows 10 或更高。T-08 只在 Windows NT `10.0.26200.0` x64 实测，产品名称未在本轮确认；Linux 发行版/GTK/Wayland 与 macOS 仍为 Runtime-TBD。
+- Electron 42 起取消 npm `postinstall` 下载，首次 CLI 调用才下载 binary；当前 `allowScripts` 精确条目保留以与依赖版本一致，但 Electron 43 没有 install script 可审批。
+- BrowserWindow 仍显式使用 `contextIsolation: true`、`nodeIntegration: false` 和项目 preload；升级没有扩大 Renderer 权限。smoke 的 Fake ASR/Fake LLM 仍仅由 `--smoke-test` 启用。
+- 官方资料：[支持策略](https://www.electronjs.org/docs/latest/tutorial/electron-timelines)、[发布日程](https://releases.electronjs.org/schedule)、[breaking changes](https://www.electronjs.org/docs/latest/breaking-changes)、[Forge 配置与 native rebuild](https://www.electronforge.io/config/configuration)。
 
 ## 4. 当前模型准备方式
 
@@ -93,9 +112,9 @@ models/sherpa-onnx-streaming-paraformer-bilingual-zh-en/
 
 ## 5. 本阶段验证边界
 
-已验证：依赖清单/lockfile 一致、两次 clean install、安装脚本审批、JavaScript 语法检查、Electron 二进制可执行和文档相对链接。T-01 建立 1 项模块入口 smoke；T-02 增加 5 项确定性词库测试；T-03 增加 6 项纯设置迁移测试；T-04 与集成修复合计 8 项 Renderer transcript/stop final/迟到结果/异常生命周期回归测试；T-05 增加 4 项安全渲染测试；T-06 增加 25 项 LLM 请求控制测试；T-07 增加 1 项自动化 Electron smoke，实际加载主页面与设置页并通过真实 Preload/IPC 完成 Fake ASR、协调式 Fake LLM 和粘贴分析。集成后的完整测试集为 50 项，`npm ci`、`npm test` 与 `npm run check` 均通过。
+已验证：依赖清单/lockfile 一致、干净安装、JavaScript 语法检查、Electron 二进制可执行和文档相对链接。T-01 建立 1 项模块入口 smoke；T-02 增加 5 项确定性词库测试；T-03 增加 6 项纯设置迁移测试；T-04 与集成修复合计 8 项 Renderer transcript/stop final/迟到结果/异常生命周期回归测试；T-05 增加 4 项安全渲染测试；T-06 增加 25 项 LLM 请求控制测试；T-07 增加 1 项自动化 Electron smoke，实际加载主页面与设置页并通过真实 Preload/IPC 完成 Fake ASR、协调式 Fake LLM 和粘贴分析。T-08 将 Electron 33.4.11 受控升级到 43.4.1：升级前后完整测试集均为 50/50，`npm ci`、`npm test` 与 `npm run check` 均通过；Electron 内置 Node 24.18.1 / ABI 148 直接 `require('sherpa-onnx-node')` 成功，正常非 smoke 入口 5 秒存活。
 
-未验证：真实麦克风、ASR 模型、LLM 网络请求、macOS/Linux、Forge 制品、安装/升级/卸载。不得据此宣称三平台同等级支持。
+未验证：真实麦克风、真实 ASR 模型初始化/推理、LLM 网络请求、macOS/Linux、Forge 制品、安装/升级/卸载。不得据此宣称真实识别或三平台同等级支持。
 
 ## 6. 安全渲染基线
 
@@ -106,9 +125,9 @@ models/sherpa-onnx-streaming-paraformer-bilingual-zh-en/
 
 ## 7. 已知依赖风险
 
-2026-08-22 使用 Node 22.23.0/npm 12.0.2 运行 `npm audit`，汇总为两个 high 风险依赖节点：直接开发依赖 `electron@33.4.11` 与其传递依赖 `extract-zip`。audit 给出的自动修复目标跨越 Electron 大版本，因此本基线不运行 `npm audit fix --force`；升级安排见 Roadmap T-08。
+2026-08-22 的 Electron 33.4.11 基线 `npm audit` 为 `2 high / 0 critical`：直接开发依赖 `electron` 与传递依赖 `extract-zip@2.0.1`。T-08 未运行 `npm audit fix --force`，而是将 Electron 精确升级到受支持的 43.4.1；2026-08-23 干净安装后的 `npm audit --json` 为 `0` 个漏洞。
 
-安装日志中的 `boolean@3.2.0` 废弃警告来自 `electron → @electron/get → global-agent/roarr`，属于 dev/optional 下载工具链；当前 audit 没有将 `boolean` 列为漏洞。废弃仍表示它不再受维护，应通过 Electron 受控升级间接移除，而不是在根项目强行 override。
+旧 `extract-zip@2.0.1`、`boolean@3.2.0`、`global-agent/roarr` 与旧下载栈已随 Electron 升级从 lockfile 删除；Electron 43 使用 `@electron-internal/extract-zip@1.0.5` 与 `@electron/get@5.1.0`。没有根级 override，也没有升级 sherpa-onnx-node。
 
 ## 8. Git 提交说明约定
 

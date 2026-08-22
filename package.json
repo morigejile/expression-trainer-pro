@@ -10,7 +10,7 @@
     "npm": ">=12.0.2 <13"
   },
   "allowScripts": {
-    "electron@33.4.11": true
+    "electron@43.4.1": true
   },
   "scripts": {
     "start": "electron .",
@@ -22,7 +22,7 @@
   "author": "sisi",
   "license": "MIT",
   "devDependencies": {
-    "electron": "^33.0.0"
+    "electron": "43.4.1"
   },
   "dependencies": {
     "sherpa-onnx-node": "^1.10.0"

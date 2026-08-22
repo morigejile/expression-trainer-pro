@@ -80,7 +80,7 @@ flowchart LR
 | T-07 | P1 | 最小 smoke | 覆盖 Electron 启动、页面加载、设置窗口、粘贴分析；ASR 用 Fake Provider，不把大模型放入普通单测 | T-01～T-03 | 每次变更能发现启动/Preload 契约回归 |
 | T-08 | P0 | Electron 安全升级 spike | 基于 `npm audit` 结果评估从 Electron 33 升级到受支持版本；不得使用 `npm audit fix --force`，逐项验证 native Sherpa、Preload/IPC、窗口与后续 Forge 兼容性 | T-01,T-07 | audit 风险关闭或有明确接受/缓解记录；升级前后 smoke 证据完整 |
 
-#### Phase 1 执行记录（2026-08-22）
+#### Phase 1 执行记录（2026-08-22～2026-08-23）
 
 | ID | 状态 | Owner | 证据 |
 |---|---|---|---|
@@ -91,6 +91,7 @@ flowchart LR
 | T-05 | Completed | Codex + maintainer | ASR final、粘贴文本和 LLM 报告改为 text node/受控 token/严格允许列表渲染；4 项测试覆盖 `<script>`、`<img onerror>`、事件属性、中文高亮和报告格式；Node 22.23.0/npm 12.0.2 下 `npm test`、`npm run check` 通过，无模型、麦克风、网络或新依赖 |
 | T-06 | Completed | Codex + maintainer | 为原生 fetch 增加 10/15/60 秒超时、AbortSignal、按 Renderer/请求类型取消和迟到结果抑制；25 项 fake-fetch 测试覆盖无 Key、429、HTTP 错误、超时、取消、坏 JSON、异常响应与敏感错误脱敏，本地分析输入不被 LLM 失败修改；Renderer 代际校验继续抑制已越过 IPC 的旧 feedback/report 结果 |
 | T-07 | Completed | Codex + maintainer | Node `node:test` 启动 Electron 33.4.11 的真实 executable，加载 Main/Preload/主页面/设置页，验证含 `cancelLLMRequests` 的 16 项 `window.api` 能力、Fake ASR init/feed/stop、协调式 Fake LLM、设置窗口和粘贴分析；隔离临时 `userData`，具备 30 秒进程超时、成功标记、失败日志和进程树清理；T-04～T-07 集成及审查修复后完整测试集为 50 项 |
+| T-08 | Completed | Codex + maintainer | 从精确集成基线 `33a6ee5` 将 Electron 33.4.11 受控升级到当前稳定且受支持的 43.4.1；官方日程显示 43 系列 EOL 为 2027-01-05，44 当时仍为预发布。升级前 audit 为 `2 high / 0 critical`，升级后为 0；旧 `extract-zip@2.0.1` 与 `boolean` 下载栈移除。Electron 43.4.1 内置 Node 24.18.1、Chromium 150.0.7871.224、modules ABI 148，Windows x64 下直接加载 sherpa-onnx-node 1.13.3 成功；正常非 smoke 入口 5 秒存活，50/50 与真实 Electron smoke、Preload/IPC、安全边界均通过。真实模型/麦克风、macOS/Linux 和 Forge 制品仍未验证 |
 
 ### Phase 2 — ASR Benchmark 与技术 spike
 
