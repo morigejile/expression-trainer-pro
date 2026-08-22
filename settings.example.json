@@ -1,4 +1,5 @@
 {
+  "schemaVersion": 1,
   "provider": "deepseek",
   "providers": {
     "openai": {
@@ -16,7 +17,8 @@
     "custom": {
       "apiKey": "",
       "baseUrl": "https://api.example.com/v1",
-      "model": ""
+      "model": "",
+      "customModel": ""
     }
   }
 }

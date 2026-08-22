@@ -3,7 +3,7 @@
 > 状态：Verified from Source（尚未完成运行验收）  
 > 基线日期：2026-08-22
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
-> 描述对象：Phase 0 实现 `b16a1d0bf799887cf7ece1283d73463961346030`（本地 `chore/reproducible-build`）；已确认并纳入原有 `package-lock.json` 清理
+> 描述对象：截至 Phase 1 / T-03；基于 T-02 提交 `34cf3c0f77895baa22f004d82fac511f2e63b6cd`
 
 ## 1. 证据边界
 
@@ -27,6 +27,7 @@ lib/asr.js                      Sherpa + Paraformer 具体集成
 lib/lexicon.js                  本地确定性文本分析
 lib/ai-feedback.js              多 LLM 后端 fetch
 lib/prompts.js                  实时反馈/报告 prompt
+lib/settings-config.js          设置默认值、解析和 schema 迁移纯函数
 data/*.json                     词库数据
 package.json / package-lock.json
 ```
@@ -59,9 +60,9 @@ package.json / package-lock.json
 | ASR 模型 | `sherpa-onnx-streaming-paraformer-bilingual-zh-en` | 固定目录；INT8 encoder/decoder + tokens；模型未纳入 Git |
 | 本地分析 | `lib/lexicon.js` + `data/emotion-lexicon.json` | 最大正向词表匹配；`tiered-lexicon.json` 保留为未启用候选数据，不参与运行时分析 |
 | LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；无超时/AbortController |
-| 设置 | `userData/settings.json`、`userData/custom-prompt.json` | 同步 JSON 文件；API Key 明文；有旧扁平结构迁移 |
+| 设置 | `userData/settings.json`、`userData/custom-prompt.json` | settings schema version 1；纯函数迁移旧扁平结构；文件同步写入且 API Key 明文 |
 | 输出 | Clipboard + Electron Save Dialog + Markdown | 原文与报告 |
-| 构建/测试 | scripts 为 `start`、`dev`、`check` | `check` 使用 Node 语法检查；无 test/build/package/CI 配置 |
+| 构建/测试 | scripts 为 `start`、`dev`、`test`、`check` | `node:test` 覆盖模块入口、词库和设置迁移；无 build/package/CI 配置 |
 
 开发基线已固定为 Node 22.23.x/npm 12.0.x，并只记录 Windows NT 10.0.26200.0 x64 的本轮验证；macOS/Linux 与正式最低 Windows 版本没有 CI、打包配置或制品测试证明。
 
@@ -129,6 +130,7 @@ Main 既是 Electron 控制面，又直接执行同步 ASR decode、词库分析
 
 - 创建主窗口、设置 modal 和 Prompt 编辑窗口；设置应用菜单和生命周期。
 - 同步读写 `settings.json` 与 `custom-prompt.json`。
+- 通过 `lib/settings-config.js` 规范化设置、迁移 schema；损坏的 settings JSON 回退默认配置且不自动覆盖原文件。
 - 在启动时同步加载词库。
 - 注册所有 IPC handlers。
 - `init-asr`、`feed-audio`、`stop-asr` 直接调用 `lib/asr.js`；ASR 完全位于 Main。
@@ -176,14 +178,15 @@ UI 的 `highlightText` 另有一套硬编码词表/正则，与 `lib/lexicon.js`
 `settings.json` 位于 Electron `userData`，当前 schema 是：
 
 ```text
+schemaVersion: 1
 provider
 providers.openai     { apiKey, model }
 providers.deepseek   { apiKey, model }
 providers.ollama     { ollamaUrl, model }
-providers.custom     { apiKey, baseUrl, model/customModel }
+providers.custom     { apiKey, baseUrl, model, customModel }
 ```
 
-旧版扁平字段在加载时迁移为 per-provider 结构，但没有显式 `schemaVersion`。API Key 明文保存。`custom-prompt.json` 保存 goals、customRules、styleRef、customWords。训练文本、统计和报告仅在 Renderer 内存中，除非用户手动复制/保存。
+旧版扁平字段和缺失 provider 字段在加载时迁移为 schema version 1；损坏 JSON 使用默认配置运行并保留原文件，未知 provider 配置块不会在规范化时被删除。API Key 仍为明文，文件写入仍为同步且非原子；这些风险留给 R-09。`custom-prompt.json` 保存 goals、customRules、styleRef、customWords。训练文本、统计和报告仅在 Renderer 内存中，除非用户手动复制/保存。
 
 ## 6. 当前关键数据流
 
@@ -243,7 +246,7 @@ Settings/Prompt Renderer
 
 ## 7. 部署与安装现状
 
-- `package.json` 有 `start`、`dev`、`check`；无 test/build/package/make/publish scripts。
+- `package.json` 有 `start`、`dev`、`test`、`check`；无 build/package/make/publish scripts。
 - 没有 Electron Forge/electron-builder 配置，没有 GitHub Actions。
 - `models/` 仅跟踪 `.gitkeep`；README 要求用户手工下载和解压模型。
 - 无安装包、签名、公证、自动更新、升级/卸载数据保留测试或正式支持矩阵。
@@ -261,8 +264,8 @@ Settings/Prompt Renderer
 | TD-05 | 全局单例 ASR + 模型/路径/参数写死 | 替换、测试、并发和恢复困难 | 源码确认 | 先抽轻量契约，保留现有行为 |
 | TD-06 | 模型完全手工管理 | 首次安装、升级、校验和支持成本高 | README/models 确认 | Model Manager + hash + 原子安装 |
 | TD-07 | 停止时 finalText 被忽略 | 尾部语音丢失，报告不完整 | 源码确认 | session/去重测试并合并 stop 结果 |
-| TD-08 | 仅有语法检查和启动 smoke，无测试、CI、打包脚本 | 仍无法证明重构、跨平台或发布可用 | 仓库与 Phase 0 验证 | 最小 Node test + smoke + Forge |
-| TD-09 | API Key 明文保存、无 schemaVersion | 凭据暴露与升级迁移风险 | 源码确认 | 权限/凭据策略 ADR，版本化配置 |
+| TD-08 | 已有最小 Node 单元测试，但无 Electron 自动化 smoke、CI 和打包脚本 | 仍无法证明窗口/Preload 回归、跨平台或发布可用 | T-01～T-03 测试基线与仓库配置 | T-07 建 smoke，后续接 CI 与 Forge |
+| TD-09 | API Key 明文保存、设置同步且非原子写入 | 凭据暴露；写入中断可能损坏设置 | 源码确认；schema version 1 和损坏 JSON 运行回退已由 T-03 建立 | R-09 处理原子写、脱敏日志，并评估凭据策略 |
 | TD-10 | IPC payload 无校验 | 大 payload、类型错误或不可信输入影响 Main | 源码确认 | 每个 channel 限定类型/长度/session |
 | TD-11 | ASR/粘贴/LLM 文本进入 `innerHTML` 未统一转义 | HTML 注入/XSS，尤其粘贴文本和远程 LLM 输出 | 源码确认 | DOM text nodes/允许列表 sanitizer + 测试 |
 | TD-12 | LLM fetch 无 timeout/cancel/schema 验证 | 请求悬挂、迟到反馈、异常响应导致错误 | 源码确认 | AbortController、session、响应验证 |

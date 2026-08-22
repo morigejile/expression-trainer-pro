@@ -4,6 +4,12 @@ const fs = require('fs');
 const { initASR, feedAudio, stopRecognition } = require('./lib/asr');
 const { loadLexicon, analyzeText } = require('./lib/lexicon');
 const { sendFeedback, sendReport, testConnection } = require('./lib/ai-feedback');
+const {
+  createDefaultSettings,
+  normalizeSettings,
+  parseSettingsJson,
+  getCurrentProviderSettings
+} = require('./lib/settings-config');
 
 // 覆盖应用显示名称（菜单栏、Dock、任务栏、窗口标题）
 app.setName('宇宙无敌表达训练');
@@ -30,14 +36,6 @@ function saveCustomPrompt(data) {
   fs.writeFileSync(getCustomPromptPath(), JSON.stringify(data, null, 2));
 }
 
-// 各 Provider 的默认配置
-const DEFAULT_PROVIDER_CONFIGS = {
-  openai: { apiKey: '', model: 'gpt-4o-mini' },
-  deepseek: { apiKey: '', model: 'deepseek-chat' },
-  ollama: { ollamaUrl: 'http://localhost:11434', model: 'qwen2.5:7b' },
-  custom: { apiKey: '', baseUrl: '', model: '' }
-};
-
 // 设置文件路径
 function getSettingsPath() {
   return path.join(app.getPath('userData'), 'settings.json');
@@ -46,53 +44,22 @@ function getSettingsPath() {
 function loadSettings() {
   const settingsPath = getSettingsPath();
   if (fs.existsSync(settingsPath)) {
-    const raw = JSON.parse(fs.readFileSync(settingsPath, 'utf-8'));
-    // 兼容旧版扁平结构 → 迁移到 per-provider 结构
-    if (!raw.providers) {
-      const migrated = {
-        provider: raw.provider || 'deepseek',
-        providers: {
-          openai: { ...DEFAULT_PROVIDER_CONFIGS.openai },
-          deepseek: { ...DEFAULT_PROVIDER_CONFIGS.deepseek },
-          ollama: { ...DEFAULT_PROVIDER_CONFIGS.ollama },
-          custom: { ...DEFAULT_PROVIDER_CONFIGS.custom }
-        }
-      };
-      // 将旧字段迁移到对应 provider
-      const p = migrated.provider;
-      if (raw.apiKey) migrated.providers[p].apiKey = raw.apiKey;
-      if (raw.model) migrated.providers[p].model = raw.model;
-      if (raw.ollamaUrl) migrated.providers.ollama.ollamaUrl = raw.ollamaUrl;
-      if (raw.customEndpoint) migrated.providers.custom.baseUrl = raw.customEndpoint;
-      if (raw.customModel) migrated.providers.custom.model = raw.customModel;
-      saveSettings(migrated);
-      return migrated;
+    const parsed = parseSettingsJson(fs.readFileSync(settingsPath, 'utf-8'));
+    if (parsed.error) {
+      console.warn('[设置] settings.json 无法解析，使用默认配置并保留原文件');
+      return parsed.settings;
     }
-    // 确保每个 provider 都有完整的默认字段
-    for (const key of Object.keys(DEFAULT_PROVIDER_CONFIGS)) {
-      if (!raw.providers[key]) {
-        raw.providers[key] = { ...DEFAULT_PROVIDER_CONFIGS[key] };
-      } else {
-        raw.providers[key] = { ...DEFAULT_PROVIDER_CONFIGS[key], ...raw.providers[key] };
-      }
+    if (parsed.shouldPersist) {
+      saveSettings(parsed.settings);
     }
-    return raw;
+    return parsed.settings;
   }
-  return {
-    provider: 'deepseek',
-    providers: JSON.parse(JSON.stringify(DEFAULT_PROVIDER_CONFIGS))
-  };
+  return createDefaultSettings();
 }
 
 function saveSettings(settings) {
   const settingsPath = getSettingsPath();
-  fs.writeFileSync(settingsPath, JSON.stringify(settings, null, 2));
-}
-
-/** 获取当前选中 provider 的配置 */
-function getCurrentProviderSettings(settings) {
-  const config = settings.providers[settings.provider];
-  return config || DEFAULT_PROVIDER_CONFIGS[settings.provider] || {};
+  fs.writeFileSync(settingsPath, JSON.stringify(normalizeSettings(settings), null, 2));
 }
 
 function createMainWindow() {

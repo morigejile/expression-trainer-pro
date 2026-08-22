@@ -86,6 +86,7 @@ flowchart LR
 |---|---|---|---|
 | T-01 | Completed | Codex + maintainer | 使用 Node 内置 `node:test` 建立 `npm test`；Node 22.23.0/npm 12.0.2 下 `npm ci`、1 项模块入口 smoke、`npm run check` 均成功；不需要 ASR 模型、麦克风或网络，未引入新依赖 |
 | T-02 | Completed | Codex + maintainer | 为 `lib/lexicon.js` 增加 5 项确定性测试，覆盖空输入、分类、token 位置、情绪元数据、密度和建议阈值；未修改生产实现或启用候选词库 |
+| T-03 | Completed | Codex + maintainer | 将设置默认值、解析、schema 迁移和当前 provider 选择抽到纯模块；6 项测试覆盖旧扁平配置、缺失 provider、损坏 JSON、字段保留和 `schemaVersion: 1`，损坏文件不自动覆盖 |
 
 ### Phase 2 — ASR Benchmark 与技术 spike
 
@@ -122,7 +123,7 @@ flowchart LR
 | R-06 | P0 | ASR 移出 Main | 按 ADR-0006 实现独立执行单元；Main 只管理生命周期、路由和退出 | R-01,R-02,R-05 | 强制退出可恢复；Main/UI 响应门槛通过 |
 | R-07 | P1 | 实现轻量 Model Manager | 版本化 registry、HTTPS、SHA-256、临时下载/解压、原子激活、上一版本回退；模型存 userData 子目录 | D-02,R-01 | 中断/hash 错/磁盘不足不破坏现有模型 |
 | R-08 | P1 | 切换默认模型 | 用 registry 配置新模型，保留当前 Paraformer 为受控回退/迁移路径；不把多模型复杂度暴露给普通用户 | R-06,R-07,D-02 | 端到端结果与 benchmark 版本一致 |
-| R-09 | P1 | 收敛设置/规则/日志 | 加 schemaVersion、原子写、脱敏日志；评估系统凭据库的收益与 native 成本后再决定 Key 存储 | T-03,R-07 | 升级保留配置；日志不含 Key/完整敏感文本 |
+| R-09 | P1 | 收敛设置/规则/日志 | 演进 schemaVersion、增加原子写和脱敏日志；评估系统凭据库的收益与 native 成本后再决定 Key 存储 | T-03,R-07 | 升级保留配置；日志不含 Key/完整敏感文本 |
 
 ### Phase 5 — Electron Forge 打包与发布
 
