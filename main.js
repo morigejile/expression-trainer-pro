@@ -1,21 +1,32 @@
 const { app, BrowserWindow, ipcMain, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
-const { initASR, feedAudio, stopRecognition } = require('./lib/asr');
 const { loadLexicon, analyzeText } = require('./lib/lexicon');
-const {
-  createRequestCoordinator,
-  runCoordinatedRequest,
-  sendFeedback,
-  sendReport,
-  testConnection
-} = require('./lib/ai-feedback');
 const {
   createDefaultSettings,
   normalizeSettings,
   parseSettingsJson,
   getCurrentProviderSettings
 } = require('./lib/settings-config');
+
+const isSmokeTest = process.argv.includes('--smoke-test');
+const smokeTest = isSmokeTest ? require('./smoke/electron-smoke-runner') : null;
+const { initASR, feedAudio, stopRecognition } = isSmokeTest
+  ? smokeTest.fakeAsr
+  : require('./lib/asr');
+const {
+  createRequestCoordinator,
+  runCoordinatedRequest,
+  sendFeedback,
+  sendReport,
+  testConnection
+} = isSmokeTest
+  ? smokeTest.fakeLlm
+  : require('./lib/ai-feedback');
+
+if (smokeTest) {
+  smokeTest.configureApp(app);
+}
 
 // 覆盖应用显示名称（菜单栏、Dock、任务栏、窗口标题）
 app.setName('宇宙无敌表达训练');
@@ -89,6 +100,8 @@ function createMainWindow() {
   mainWindow.on('closed', () => {
     mainWindow = null;
   });
+
+  return mainWindow;
 }
 
 function createPromptEditorWindow() {
@@ -181,7 +194,15 @@ app.whenReady().then(() => {
   // 加载词库
   loadLexicon();
 
-  createMainWindow();
+  const createdMainWindow = createMainWindow();
+
+  if (smokeTest) {
+    smokeTest.run({ app, BrowserWindow, mainWindow: createdMainWindow }).catch(error => {
+      console.error('[electron-smoke] FAILED');
+      console.error(error && error.stack ? error.stack : error);
+      app.exit(1);
+    });
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) {

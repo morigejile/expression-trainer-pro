@@ -1,13 +1,13 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source（尚未完成运行验收）  
+> 状态：Verified from Source + Electron Smoke（尚未完成真实设备/模型运行验收）
 > 基线日期：2026-08-22
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
-> 描述对象：截至 Phase 1 / T-06 集成状态；基于完整 T-03 提交 `99f4707187b1fa16e46b194b34cae5c6b362206e`
+> 描述对象：截至 Phase 1 / T-07 集成状态；基于完整 T-03 提交 `99f4707187b1fa16e46b194b34cae5c6b362206e`
 
 ## 1. 证据边界
 
-本文件检查了 `D:\Codex_projects\expression-trainer-pro` 的源码、README、依赖清单和 Git 状态，并完成依赖安装、语法检查与桌面启动 smoke。尚未连接麦克风、加载 ASR 模型或请求真实 LLM，因此“代码存在”“启动通过”与“完整运行通过”严格区分。
+本文件检查了独立集成 worktree 的源码、README、依赖清单和 Git 状态，并完成依赖安装、语法检查、Node 测试与自动化 Electron smoke。smoke 实际加载 Main、Preload、主页面和设置页，通过真实 IPC 验证 Fake ASR、协调式 Fake LLM 与粘贴分析；尚未连接麦克风、加载 ASR 模型或请求真实 LLM，因此“smoke 通过”与“完整运行通过”严格区分。
 
 | 标记 | 含义 |
 |---|---|
@@ -31,6 +31,8 @@ lib/prompts.js                  实时反馈/报告 prompt
 lib/settings-config.js          设置默认值、解析和 schema 迁移纯函数
 data/*.json                     词库数据
 package.json / package-lock.json
+test/electron-smoke.test.js      Node 测试父进程、超时、日志和清理
+smoke/electron-smoke-runner.js  Electron 内 smoke 驱动与 Fake ASR/LLM
 ```
 
 ## 2. 当前目标与范围
@@ -63,7 +65,7 @@ package.json / package-lock.json
 | LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接/实时/报告分别为 10/15/60 秒超时，并支持 AbortSignal、按 Renderer 取消和异常响应验证 |
 | 设置 | `userData/settings.json`、`userData/custom-prompt.json` | settings schema version 1；纯函数迁移旧扁平结构；文件同步写入且 API Key 明文 |
 | 输出 | Clipboard + Electron Save Dialog + Markdown | 原文与报告 |
-| 构建/测试 | scripts 为 `start`、`dev`、`test`、`check` | `node:test` 覆盖模块入口、词库、设置迁移、尾部文本、安全渲染和 LLM 请求控制；LLM 测试全部使用 fake fetch；无 build/package/CI 配置 |
+| 构建/测试 | scripts 为 `start`、`dev`、`test`、`check` | `node:test` 覆盖模块入口、词库、设置迁移、尾部文本、安全渲染、LLM 请求控制和真实 Electron smoke；LLM 单测使用 fake fetch，smoke 使用 Fake ASR/LLM；无 build/package/CI 配置 |
 
 开发基线已固定为 Node 22.23.x/npm 12.0.x，并只记录 Windows NT 10.0.26200.0 x64 的本轮验证；macOS/Linux 与正式最低 Windows 版本没有 CI、打包配置或制品测试证明。
 
@@ -135,6 +137,7 @@ Main 既是 Electron 控制面，又直接执行同步 ASR decode、词库分析
 - 通过 `lib/settings-config.js` 规范化设置、迁移 schema；损坏的 settings JSON 回退默认配置且不自动覆盖原文件。
 - 在启动时同步加载词库。
 - 注册所有 IPC handlers。
+- 仅在显式 `--smoke-test` 参数下，从 smoke-only runner 注入 Fake ASR/LLM、使用测试提供的临时 `userData` 并自动驱动/退出；正常启动仍加载真实 ASR/LLM 模块。
 - `init-asr`、`feed-audio`、`stop-asr` 直接调用 `lib/asr.js`；ASR 完全位于 Main。
 - `analyze-text` 在 Main 中执行本地分析。
 - `get-realtime-feedback`、`get-final-report` 和连接测试在 Main 中发起受超时约束的 fetch；同一 Renderer 的同类新请求会取消旧请求，显式取消可终止该 Renderer 的全部 LLM 请求。
@@ -275,10 +278,10 @@ Settings/Prompt Renderer
 | TD-05 | 全局单例 ASR + 模型/路径/参数写死 | 替换、测试、并发和恢复困难 | 源码确认 | 先抽轻量契约，保留现有行为 |
 | TD-06 | 模型完全手工管理 | 首次安装、升级、校验和支持成本高 | README/models 确认 | Model Manager + hash + 原子安装 |
 | TD-07 | **T-04 已缓解**：停止时 finalText 经最小去重路径合并 | 未形成 endpoint 的尾部语音进入字幕、统计、分析和报告；完整 ASR session 协议仍待 R-02 | `mergeFinalText()` 与 4 项 transcript 回归测试 | R-02 增加完整 sessionId/sequence 协议与 stop 竞态覆盖 |
-| TD-08 | 已有 Node 单元测试，但无 Electron 自动化 smoke、CI 和打包脚本 | 仍无法证明窗口/Preload 回归、跨平台或发布可用 | T-01～T-06 测试基线、仓库配置 | T-07 建 smoke，后续接 CI 与 Forge |
+| TD-08 | 已有 Node 测试和 Electron 自动化 smoke，但无 CI 和打包脚本 | 已可发现启动、页面、Preload/IPC、设置窗口和粘贴分析回归；仍无法证明跨平台或发布制品可用 | T-01～T-07 集成测试基线、仓库配置 | 后续接 CI 与 Forge，并在目标平台运行 smoke |
 | TD-09 | API Key 明文保存、设置同步且非原子写入 | 凭据暴露；写入中断可能损坏设置 | 源码确认；schema version 1 和损坏 JSON 运行回退已由 T-03 建立 | R-09 处理原子写、脱敏日志，并评估凭据策略 |
 | TD-10 | IPC payload 无校验 | 大 payload、类型错误或不可信输入影响 Main | 源码确认 | 每个 channel 限定类型/长度/session |
-| TD-11 | **T-05 已缓解**：ASR/粘贴文本使用受控 DOM token，LLM 报告使用严格允许列表，错误使用纯文本；playground 用户输入先转义 | 主应用不再从不可信文本创建标签或事件属性；playground 剩余 `innerHTML` 仅消费静态模板和文件内硬编码数据 | `src/safe-rendering.js`、4 项安全渲染测试、`src/app.js` 无 `innerHTML` | T-07 增加 Electron 页面级 smoke；后续若词库改为外部数据，继续按不可信输入处理 |
+| TD-11 | **T-05 已缓解**：ASR/粘贴文本使用受控 DOM token，LLM 报告使用严格允许列表，错误使用纯文本；playground 用户输入先转义 | 主应用不再从不可信文本创建标签或事件属性；playground 剩余 `innerHTML` 仅消费静态模板和文件内硬编码数据 | `src/safe-rendering.js`、4 项安全渲染测试、T-07 页面级 smoke、`src/app.js` 无 `innerHTML` | 后续若词库改为外部数据，继续按不可信输入处理 |
 | TD-12 | LLM fetch 控制风险已由 T-06 缓解；仍无自动重试 | 请求已有超时、取消、迟到抑制、结构验证和脱敏错误；瞬时失败仍需用户重试 | T-06 fake-fetch 测试与源码确认 | 保留错误契约回归测试；是否重试需单独产品策略，不在请求层盲目加入 |
 | TD-13 | UI 高亮词表与 lexicon 规则重复 | 显示和统计不一致 | 源码确认 | 统一由分析结果驱动高亮或共享规则 |
 | TD-14 | README 与实现漂移风险 | 用户预期错误 | Phase 0 已修正触发字数、联网边界和平台口径 | 后续行为变更同步 README 与架构文档 |
@@ -312,7 +315,7 @@ Settings/Prompt Renderer
 
 1. 在空 Electron 下载缓存的独立环境复跑 `npm ci`；当前已验证两次 clean `node_modules` 安装，但使用了经过 SHA-256 校验的缓存。
 2. 验证当前模型下载源、大小、hash、许可证和三个文件的兼容性。
-3. 启动应用并检查 BrowserWindow、设置迁移、粘贴分析和报告保存。
+3. 自动 Electron smoke 已覆盖 BrowserWindow、Preload、设置页和粘贴分析；真实设置文件持久化、报告保存对话框和人工交互仍需运行验证。
 4. 在 44.1/48 kHz 设备记录 `audioContext.sampleRate` 与 ASR 接收时序。
 5. profile TD-01～TD-04 的 Main 延迟、GC、CPU、RAM 和队列。
 6. 在目标 macOS/Linux/Windows 版本验证安装与运行；在证据前继续保持 TBD，不作支持承诺。

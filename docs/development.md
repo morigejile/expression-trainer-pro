@@ -1,6 +1,6 @@
 # 开发与可复现安装基线
 
-> 状态：Phase 1 / T-04～T-06 Integrated Baseline
+> 状态：Phase 1 / T-04～T-07 Integrated Baseline
 > 验证日期：2026-08-22
 > 验证分支：`codex/integration/phase1-t04-t07`；基于完整 T-03 提交 `99f4707187b1fa16e46b194b34cae5c6b362206e`
 
@@ -74,7 +74,8 @@ npm start
 npm run dev
 ```
 
-- `npm test` 使用 Node 内置 `node:test`，不引入额外测试框架。T-01 验证无需 Electron、ASR 模型、麦克风或网络的核心 CommonJS 模块入口；T-02 锁定 `lib/lexicon.js` 的确定性行为；T-03 覆盖设置默认值、旧扁平配置迁移、缺失 provider、损坏 JSON、未知 provider 字段保留和 `schemaVersion: 1`；T-04 覆盖 stop final 文本合并、endpoint/stop 去重、空 final 不变，以及合并结果进入 transcript、分析统计和后续报告；T-05 覆盖恶意 HTML 保持为文本、中文高亮 token、LLM 报告允许列表和 playground 输入转义；T-06 使用 fake fetch 覆盖 LLM 成功、无 Key、429/HTTP 错误、坏 JSON、异常响应、超时、取消、迟到结果抑制和敏感错误脱敏，测试不会访问真实服务。词库位置是分词后的 token 索引，不是原始字符偏移；密度仍是当前实现基线，不代表产品定义已经最终冻结。
+- `npm test` 使用 Node 内置 `node:test`，不引入额外测试框架。T-01 验证无需 Electron、ASR 模型、麦克风或网络的核心 CommonJS 模块入口；T-02 锁定 `lib/lexicon.js` 的确定性行为；T-03 覆盖设置默认值、旧扁平配置迁移、缺失 provider、损坏 JSON、未知 provider 字段保留和 `schemaVersion: 1`；T-04 覆盖 stop final 文本合并、endpoint/stop 去重、空 final 不变，以及合并结果进入 transcript、分析统计和后续报告；T-05 覆盖恶意 HTML 保持为文本、中文高亮 token、LLM 报告允许列表和 playground 输入转义；T-06 使用 fake fetch 覆盖 LLM 成功、无 Key、429/HTTP 错误、坏 JSON、异常响应、超时、取消、迟到结果抑制和敏感错误脱敏；T-07 启动真实 Electron executable，覆盖 Main/Preload、主页面、设置页和粘贴分析。词库位置是分词后的 token 索引，不是原始字符偏移；密度仍是当前实现基线，不代表产品定义已经最终冻结。
+- T-07 仅在显式 `--smoke-test` 参数下使用 smoke-only Fake ASR/LLM。Fake LLM 实现最终的请求协调器契约；测试使用临时 `userData`，不加载 `lib/asr.js`、`lib/ai-feedback.js` 或 Sherpa 模型，不请求麦克风或网络；正常 `npm start` 不启用该入口。子进程有 30 秒边界超时、唯一成功标记、失败 stdout/stderr 和超时进程树清理。
 - Forge `package`/`make`：**TBD**，由 Roadmap Phase 5 / PKG-02 建立。
 
 ## 4. 当前模型准备方式
@@ -92,7 +93,7 @@ models/sherpa-onnx-streaming-paraformer-bilingual-zh-en/
 
 ## 5. 本阶段验证边界
 
-已验证：依赖清单/lockfile 一致、两次 clean install、安装脚本审批、JavaScript 语法检查、Electron 二进制可执行、桌面窗口启动 smoke、文档相对链接。T-01 另在 Node 22.23.0/npm 12.0.2 下完成一次 `npm ci`，随后 `npm test` 运行 1 项模块入口 smoke 且通过，`npm run check` 继续通过。T-02 增加 5 项确定性词库测试；T-03 增加 6 项纯设置迁移测试；T-04 增加 4 项 Renderer transcript/stop final 回归测试；T-05 增加 4 项安全渲染测试；T-06 增加 25 项 LLM 请求控制测试。集成后的完整测试集为 45 项；测试不需要真实 ASR 模型、麦克风或网络，LLM 测试强制使用 fake fetch。
+已验证：依赖清单/lockfile 一致、两次 clean install、安装脚本审批、JavaScript 语法检查、Electron 二进制可执行和文档相对链接。T-01 建立 1 项模块入口 smoke；T-02 增加 5 项确定性词库测试；T-03 增加 6 项纯设置迁移测试；T-04 增加 4 项 Renderer transcript/stop final 回归测试；T-05 增加 4 项安全渲染测试；T-06 增加 25 项 LLM 请求控制测试；T-07 增加 1 项自动化 Electron smoke，实际加载主页面与设置页并通过真实 Preload/IPC 完成 Fake ASR、协调式 Fake LLM 和粘贴分析。集成后的完整测试集为 46 项，`npm ci`、`npm test` 与 `npm run check` 均通过。
 
 未验证：真实麦克风、ASR 模型、LLM 网络请求、macOS/Linux、Forge 制品、安装/升级/卸载。不得据此宣称三平台同等级支持。
 
@@ -108,3 +109,18 @@ models/sherpa-onnx-streaming-paraformer-bilingual-zh-en/
 2026-08-22 使用 Node 22.23.0/npm 12.0.2 运行 `npm audit`，汇总为两个 high 风险依赖节点：直接开发依赖 `electron@33.4.11` 与其传递依赖 `extract-zip`。audit 给出的自动修复目标跨越 Electron 大版本，因此本基线不运行 `npm audit fix --force`；升级安排见 Roadmap T-08。
 
 安装日志中的 `boolean@3.2.0` 废弃警告来自 `electron → @electron/get → global-agent/roarr`，属于 dev/optional 下载工具链；当前 audit 没有将 `boolean` 列为漏洞。废弃仍表示它不再受维护，应通过 Electron 受控升级间接移除，而不是在根项目强行 override。
+
+## 8. Git 提交说明约定
+
+每次创建 Git commit 时，提交说明必须同时包含：
+
+1. 一行简洁的英文提交标题；推荐使用 Conventional Commits 风格。
+2. 标题后的简短中文正文，说明本次提交的主要内容和范围。
+
+示例：
+
+```text
+test: add minimal Electron smoke coverage
+
+新增最小 Electron smoke，覆盖应用启动、Preload 契约、设置窗口和粘贴分析，并使用 Fake ASR/LLM 隔离外部依赖。
+```
