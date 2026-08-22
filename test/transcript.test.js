@@ -15,7 +15,12 @@ function createClassList() {
 }
 
 function createElement() {
-  return { classList: createClassList(), textContent: '' };
+  return {
+    classList: createClassList(),
+    style: {},
+    textContent: '',
+    replaceChildren() {}
+  };
 }
 
 function createTrainer() {
@@ -68,6 +73,7 @@ test('stop final text is appended exactly once', () => {
 
 test('stop final text reaches transcript, analysis, and the next report', async (t) => {
   let reportPayload;
+  global.document = { createElement };
   global.window = {
     api: {
       stopASR: async () => ({ success: true, finalText: '尾部文本' }),
@@ -83,7 +89,10 @@ test('stop final text reaches transcript, analysis, and the next report', async 
       }
     }
   };
-  t.after(() => { delete global.window; });
+  t.after(() => {
+    delete global.document;
+    delete global.window;
+  });
   const trainer = createTrainer();
 
   await trainer.stopRecording();

@@ -3,7 +3,7 @@
 > 状态：Verified from Source（尚未完成运行验收）  
 > 基线日期：2026-08-22
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
-> 描述对象：截至 Phase 1 / T-03；基于 T-02 提交 `34cf3c0f77895baa22f004d82fac511f2e63b6cd`
+> 描述对象：截至 Phase 1 / T-05；基于完整 T-03 提交 `99f4707187b1fa16e46b194b34cae5c6b362206e`
 
 ## 1. 证据边界
 
@@ -21,6 +21,7 @@
 main.js                         Electron Main、窗口、设置、IPC、ASR/分析/LLM 调度
 preload.js                      contextBridge API
 src/index.html / app.js         主 UI、录音、训练状态和展示
+src/safe-rendering.js           安全高亮 token、DOM 渲染、报告允许列表和 HTML 转义
 src/settings.html / settings.js LLM 设置
 src/prompt-editor.html          自定义训练规则
 lib/asr.js                      Sherpa + Paraformer 具体集成
@@ -62,7 +63,7 @@ package.json / package-lock.json
 | LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；无超时/AbortController |
 | 设置 | `userData/settings.json`、`userData/custom-prompt.json` | settings schema version 1；纯函数迁移旧扁平结构；文件同步写入且 API Key 明文 |
 | 输出 | Clipboard + Electron Save Dialog + Markdown | 原文与报告 |
-| 构建/测试 | scripts 为 `start`、`dev`、`test`、`check` | `node:test` 覆盖模块入口、词库和设置迁移；无 build/package/CI 配置 |
+| 构建/测试 | scripts 为 `start`、`dev`、`test`、`check` | `node:test` 覆盖模块入口、词库、设置迁移和安全渲染；无 build/package/CI 配置 |
 
 开发基线已固定为 Node 22.23.x/npm 12.0.x，并只记录 Windows NT 10.0.26200.0 x64 的本轮验证；macOS/Linux 与正式最低 Windows 版本没有 CI、打包配置或制品测试证明。
 
@@ -111,8 +112,9 @@ Main 既是 Electron 控制面，又直接执行同步 ASR decode、词库分析
 - 创建 16 kHz 意图的 AudioContext 和 4096 帧 ScriptProcessor。
 - 在每个 `onaudioprocess` 中等待一次 `feedAudio` invoke；暂停仅跳过 feed，MediaStream/AudioContext 仍运行。
 - endpoint/final 文本追加到 `fullText`，逐句做本地分析；每新增约 30 字触发一次 LLM 实时反馈。
-- 展示 partial 临时字幕；final 字幕高亮词语。
+- 展示 partial 临时字幕；final 与粘贴字幕通过 text node 和受控 `span` token 高亮词语，不解析输入中的 HTML。
 - 支持粘贴逐字稿、生成报告、复制/保存原文和报告、清空当前内存状态。
+- LLM 报告只渲染标题、加粗、行内代码、引用、普通行和换行等严格允许列表；LLM/HTTP 错误作为纯文本显示。
 
 当前没有显式 session ID 或训练状态机。连续调用、迟到异步反馈、stop 与 pending feed 的竞态依赖 UI 按钮和事件时序。
 
@@ -162,7 +164,7 @@ Main 既是 Electron 控制面，又直接执行同步 ASR decode、词库分析
 - `density`；
 - 替代和提醒 suggestions。
 
-UI 的 `highlightText` 另有一套硬编码词表/正则，与 `lib/lexicon.js` 不完全同源，存在规则漂移风险。`data/tiered-lexicon.json` 当前未发现 import；它使用分层替代词 schema，与运行时 `emotion-lexicon.json` 不兼容，按维护者决定保留为未启用候选数据。启用前必须单独设计合并规则并建立行为测试。
+UI 通过 `src/safe-rendering.js` 的 `renderHighlightedText` 使用另一套硬编码词表/正则生成受控高亮 token；它与 `lib/lexicon.js` 不完全同源，仍存在规则漂移风险。`data/tiered-lexicon.json` 当前未发现 import；它使用分层替代词 schema，与运行时 `emotion-lexicon.json` 不兼容，按维护者决定保留为未启用候选数据。启用前必须单独设计合并规则并建立行为测试。
 
 ### 5.6 LLM / `lib/ai-feedback.js`、`lib/prompts.js`
 
@@ -230,7 +232,7 @@ endpoint/final sentence
 → get-realtime-feedback invoke → Main fetch → 右侧反馈
 
 停止/粘贴完成后用户点击生成报告
-→ fullText + stats → Main fetch → Renderer innerHTML 格式化 → 可保存 Markdown
+→ fullText + stats → Main fetch → Renderer 受控 Markdown token/DOM 渲染 → 可保存 Markdown
 ```
 
 Phase 0 已把 README 的反馈触发口径改为源码实际的约 30 字，并明确本地 ASR/词库与可选联网 LLM 的边界。
@@ -264,10 +266,10 @@ Settings/Prompt Renderer
 | TD-05 | 全局单例 ASR + 模型/路径/参数写死 | 替换、测试、并发和恢复困难 | 源码确认 | 先抽轻量契约，保留现有行为 |
 | TD-06 | 模型完全手工管理 | 首次安装、升级、校验和支持成本高 | README/models 确认 | Model Manager + hash + 原子安装 |
 | TD-07 | 停止时 finalText 被忽略 | 尾部语音丢失，报告不完整 | 源码确认 | session/去重测试并合并 stop 结果 |
-| TD-08 | 已有最小 Node 单元测试，但无 Electron 自动化 smoke、CI 和打包脚本 | 仍无法证明窗口/Preload 回归、跨平台或发布可用 | T-01～T-03 测试基线与仓库配置 | T-07 建 smoke，后续接 CI 与 Forge |
+| TD-08 | 已有 Node 单元测试，但无 Electron 自动化 smoke、CI 和打包脚本 | 仍无法证明窗口/Preload 回归、跨平台或发布可用 | T-01～T-03 与 T-05 测试基线、仓库配置 | T-07 建 smoke，后续接 CI 与 Forge |
 | TD-09 | API Key 明文保存、设置同步且非原子写入 | 凭据暴露；写入中断可能损坏设置 | 源码确认；schema version 1 和损坏 JSON 运行回退已由 T-03 建立 | R-09 处理原子写、脱敏日志，并评估凭据策略 |
 | TD-10 | IPC payload 无校验 | 大 payload、类型错误或不可信输入影响 Main | 源码确认 | 每个 channel 限定类型/长度/session |
-| TD-11 | ASR/粘贴/LLM 文本进入 `innerHTML` 未统一转义 | HTML 注入/XSS，尤其粘贴文本和远程 LLM 输出 | 源码确认 | DOM text nodes/允许列表 sanitizer + 测试 |
+| TD-11 | **T-05 已缓解**：ASR/粘贴文本使用受控 DOM token，LLM 报告使用严格允许列表，错误使用纯文本；playground 用户输入先转义 | 主应用不再从不可信文本创建标签或事件属性；playground 剩余 `innerHTML` 仅消费静态模板和文件内硬编码数据 | `src/safe-rendering.js`、4 项安全渲染测试、`src/app.js` 无 `innerHTML` | T-07 增加 Electron 页面级 smoke；后续若词库改为外部数据，继续按不可信输入处理 |
 | TD-12 | LLM fetch 无 timeout/cancel/schema 验证 | 请求悬挂、迟到反馈、异常响应导致错误 | 源码确认 | AbortController、session、响应验证 |
 | TD-13 | UI 高亮词表与 lexicon 规则重复 | 显示和统计不一致 | 源码确认 | 统一由分析结果驱动高亮或共享规则 |
 | TD-14 | README 与实现漂移风险 | 用户预期错误 | Phase 0 已修正触发字数、联网边界和平台口径 | 后续行为变更同步 README 与架构文档 |
