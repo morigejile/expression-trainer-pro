@@ -89,6 +89,7 @@ flowchart LR
 | T-03 | Completed | Codex + maintainer | 将设置默认值、解析、schema 迁移和当前 provider 选择抽到纯模块；6 项测试覆盖旧扁平配置、缺失 provider、损坏 JSON、字段保留和 `schemaVersion: 1`，损坏文件不自动覆盖 |
 | T-04 | Completed | Codex + maintainer | Renderer 合并 `stopASR().finalText`，endpoint 与 stop final 共用最小去重路径；4 项测试覆盖单次合并、重复 final、空 final、统计和后续报告，完整 16 项测试及 `npm run check` 在 Node 22.23.0/npm 12.0.2 下通过，无需模型、麦克风或网络 |
 | T-05 | Completed | Codex + maintainer | ASR final、粘贴文本和 LLM 报告改为 text node/受控 token/严格允许列表渲染；4 项测试覆盖 `<script>`、`<img onerror>`、事件属性、中文高亮和报告格式；Node 22.23.0/npm 12.0.2 下 `npm test`、`npm run check` 通过，无模型、麦克风、网络或新依赖 |
+| T-06 | Completed | Codex + maintainer | 为原生 fetch 增加 10/15/60 秒超时、AbortSignal、按 Renderer/请求类型取消和迟到结果抑制；25 项 fake-fetch 测试覆盖无 Key、429、HTTP 错误、超时、取消、坏 JSON、异常响应与敏感错误脱敏，本地分析输入不被 LLM 失败修改；与 T-04/T-05 集成后的 45 项测试及 `npm run check` 通过 |
 
 ### Phase 2 — ASR Benchmark 与技术 spike
 

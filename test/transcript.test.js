@@ -77,6 +77,7 @@ test('stop final text reaches transcript, analysis, and the next report', async 
   global.window = {
     api: {
       stopASR: async () => ({ success: true, finalText: '尾部文本' }),
+      cancelLLMRequests: async () => ({ success: true }),
       analyzeText: async () => ({
         totalWords: 4,
         fillers: [],
@@ -110,6 +111,7 @@ test('an endpoint final and the matching stop final update state only once', asy
   global.window = {
     api: {
       stopASR: async () => ({ success: true, finalText: '尾部文本' }),
+      cancelLLMRequests: async () => ({ success: true }),
       analyzeText: async () => ({
         totalWords: 4,
         fillers: [],
@@ -135,6 +137,7 @@ test('blank stop final text leaves transcript state unchanged', async (t) => {
   global.window = {
     api: {
       stopASR: async () => ({ success: true, finalText: ' \n\t ' }),
+      cancelLLMRequests: async () => ({ success: true }),
       analyzeText: async () => {
         throw new Error('blank final text must not be analyzed');
       }
