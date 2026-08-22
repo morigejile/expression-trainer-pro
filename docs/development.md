@@ -1,8 +1,8 @@
 # 开发与可复现安装基线
 
-> 状态：Phase 1 / T-01 Verified Baseline
+> 状态：Phase 1 / T-02 Verified Baseline
 > 验证日期：2026-08-22
-> 验证分支：`test/minimal-test-baseline`；基于 `468421675f230393a0eb59ac21e7589e94efbcb8`
+> 验证分支：`test/lexicon-deterministic-behavior`；基于 T-01 提交 `45ab1d38418b6c7b8468779fbd05ffcb121783fe`
 
 ## 1. 已验证开发环境
 
@@ -57,7 +57,7 @@ npm start
 npm run dev
 ```
 
-- `npm test` 使用 Node 内置 `node:test`，不引入额外测试框架。T-01 当前只验证无需 Electron、ASR 模型、麦克风或网络的核心 CommonJS 模块入口；词库业务行为由 T-02 覆盖，不在本任务提前实现。
+- `npm test` 使用 Node 内置 `node:test`，不引入额外测试框架。T-01 验证无需 Electron、ASR 模型、麦克风或网络的核心 CommonJS 模块入口；T-02 锁定 `lib/lexicon.js` 的空输入、分类、token 位置、情绪元数据、密度和建议阈值。位置是分词后的 token 索引，不是原始字符偏移；密度仍是当前实现基线，不代表产品定义已经最终冻结。
 - Forge `package`/`make`：**TBD**，由 Roadmap Phase 5 / PKG-02 建立。
 
 ## 4. 当前模型准备方式
@@ -75,7 +75,7 @@ models/sherpa-onnx-streaming-paraformer-bilingual-zh-en/
 
 ## 5. 本阶段验证边界
 
-已验证：依赖清单/lockfile 一致、两次 clean install、安装脚本审批、JavaScript 语法检查、Electron 二进制可执行、桌面窗口启动 smoke、文档相对链接。T-01 另在 Node 22.23.0/npm 12.0.2 下完成一次 `npm ci`，随后 `npm test` 运行 1 项模块入口 smoke 且通过，`npm run check` 继续通过。
+已验证：依赖清单/lockfile 一致、两次 clean install、安装脚本审批、JavaScript 语法检查、Electron 二进制可执行、桌面窗口启动 smoke、文档相对链接。T-01 另在 Node 22.23.0/npm 12.0.2 下完成一次 `npm ci`，随后 `npm test` 运行 1 项模块入口 smoke 且通过，`npm run check` 继续通过。T-02 增加 5 项确定性词库测试，完整测试集为 6 项，且不需要真实 ASR 模型、麦克风或网络。
 
 未验证：真实麦克风、ASR 模型、LLM 网络请求、macOS/Linux、Forge 制品、安装/升级/卸载。不得据此宣称三平台同等级支持。
 

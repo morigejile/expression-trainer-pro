@@ -85,6 +85,7 @@ flowchart LR
 | ID | 状态 | Owner | 证据 |
 |---|---|---|---|
 | T-01 | Completed | Codex + maintainer | 使用 Node 内置 `node:test` 建立 `npm test`；Node 22.23.0/npm 12.0.2 下 `npm ci`、1 项模块入口 smoke、`npm run check` 均成功；不需要 ASR 模型、麦克风或网络，未引入新依赖 |
+| T-02 | Completed | Codex + maintainer | 为 `lib/lexicon.js` 增加 5 项确定性测试，覆盖空输入、分类、token 位置、情绪元数据、密度和建议阈值；未修改生产实现或启用候选词库 |
 
 ### Phase 2 — ASR Benchmark 与技术 spike
 
