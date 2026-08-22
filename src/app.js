@@ -1,5 +1,7 @@
 // 宇宙无敌表达训练系统 V2
 
+const { renderHighlightedText, renderReportContent } = window.SafeRendering;
+
 class ExpressionTrainer {
   constructor() {
     this.isRecording = false;
@@ -106,7 +108,7 @@ class ExpressionTrainer {
     this.fullText = '';
     this.sentences = [];
     this.resetStats();
-    this.subtitleContainer.innerHTML = '';
+    this.subtitleContainer.replaceChildren();
 
     // UI
     this.btnStart.classList.add('hidden');
@@ -194,7 +196,7 @@ class ExpressionTrainer {
       // 新行
       const line = document.createElement('div');
       line.className = 'subtitle-line';
-      line.innerHTML = this.highlightText(currentText);
+      renderHighlightedText(line, currentText);
       this.subtitleContainer.appendChild(line);
     } else {
       let interim = this.subtitleContainer.querySelector('.interim-line');
@@ -208,19 +210,6 @@ class ExpressionTrainer {
 
     // 自动滚到底
     this.subtitleScroll.scrollTop = this.subtitleScroll.scrollHeight;
-  }
-
-  highlightText(text) {
-    let result = text;
-    const vagueWords = ['开心','难过','害怕','生气','不舒服','很好','很多','很快','很大','很小','好看','不好','喜欢','讨厌','觉得','想想'];
-    vagueWords.forEach(w => {
-      result = result.replace(new RegExp(w, 'g'), `<span class="vague">${w}</span>`);
-    });
-    const fillerPatterns = /(嗯|啊|呃|额|那个|就是|然后|这个|对吧|是吧|反正|基本上)/g;
-    result = result.replace(fillerPatterns, '<span class="filler">$1</span>');
-    const hedgePatterns = /(可能|也许|大概|应该|我觉得|好像|似乎|或许|不一定|差不多|感觉)/g;
-    result = result.replace(hedgePatterns, '<span class="hedge">$1</span>');
-    return result;
   }
 
   // ===== 分析 =====
@@ -307,7 +296,12 @@ class ExpressionTrainer {
   // ===== 报告 =====
 
   async generateReport() {
-    this.reportBody.innerHTML = '<p style="text-align:center;color:#666;padding:40px;">正在生成报告...</p>';
+    const loading = document.createElement('p');
+    loading.style.textAlign = 'center';
+    loading.style.color = '#666';
+    loading.style.padding = '40px';
+    loading.textContent = '正在生成报告...';
+    this.reportBody.replaceChildren(loading);
     this.reportModal.classList.remove('hidden');
 
     const result = await window.api.getFinalReport({
@@ -319,31 +313,35 @@ class ExpressionTrainer {
       this.lastReport = result.report;
       this.renderReport(result.report);
     } else {
-      this.reportBody.innerHTML = `<p style="color:#ff6b6b;">生成失败: ${result.error}</p>`;
+      const error = document.createElement('p');
+      error.style.color = '#ff6b6b';
+      error.textContent = `生成失败: ${result.error}`;
+      this.reportBody.replaceChildren(error);
     }
   }
 
   renderReport(report) {
-    let html = report
-      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
-      .replace(/\|(.+)\|/g, (match) => {
-        // 简单表格支持
-        return match;
-      })
-      .replace(/\n/g, '<br>');
+    const actions = document.createElement('div');
+    actions.style.textAlign = 'right';
+    actions.style.marginBottom = '12px';
 
-    this.reportBody.innerHTML = `
-      <div style="text-align:right;margin-bottom:12px;">
-        <button id="btn-save-report" style="background:#E5007E;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:12px;cursor:pointer;">💾 保存为 Markdown</button>
-      </div>
-      ${html}
-    `;
+    const saveButton = document.createElement('button');
+    saveButton.id = 'btn-save-report';
+    saveButton.style.background = '#E5007E';
+    saveButton.style.color = '#fff';
+    saveButton.style.border = 'none';
+    saveButton.style.borderRadius = '6px';
+    saveButton.style.padding = '8px 14px';
+    saveButton.style.fontSize = '12px';
+    saveButton.style.cursor = 'pointer';
+    saveButton.textContent = '💾 保存为 Markdown';
+    saveButton.addEventListener('click', () => this.saveReport());
+    actions.appendChild(saveButton);
 
-    document.getElementById('btn-save-report').addEventListener('click', () => this.saveReport());
+    const reportContent = document.createElement('div');
+    reportContent.className = 'report-content';
+    renderReportContent(reportContent, report);
+    this.reportBody.replaceChildren(actions, reportContent);
   }
 
   async saveReport() {
@@ -381,7 +379,7 @@ class ExpressionTrainer {
   resetStats() {
     this.stats = { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 0, duration: 0 };
     this.updateStatsDisplay();
-    this.feedbackContent.innerHTML = '';
+    this.feedbackContent.replaceChildren();
   }
 
   showError(msg) {
@@ -425,8 +423,11 @@ class ExpressionTrainer {
     this.fullText = '';
     this.sentences = [];
     this.lastReport = '';
-    this.subtitleContainer.innerHTML = '<div class="subtitle-line hint">点击下方按钮开始说话</div>';
-    this.feedbackContent.innerHTML = '';
+    const hint = document.createElement('div');
+    hint.className = 'subtitle-line hint';
+    hint.textContent = '点击下方按钮开始说话';
+    this.subtitleContainer.replaceChildren(hint);
+    this.feedbackContent.replaceChildren();
     this.resetStats();
     this.timer.textContent = '00:00';
     this.timer.classList.remove('active');
@@ -452,7 +453,7 @@ class ExpressionTrainer {
     this.pasteModal.classList.add('hidden');
 
     // 把文本显示到字幕区（高亮标记）
-    this.subtitleContainer.innerHTML = '';
+    this.subtitleContainer.replaceChildren();
     this.fullText = text;
     this.resetStats();
 
@@ -463,7 +464,7 @@ class ExpressionTrainer {
     for (const sentence of sentences) {
       const line = document.createElement('div');
       line.className = 'subtitle-line';
-      line.innerHTML = this.highlightText(sentence.trim());
+      renderHighlightedText(line, sentence.trim());
       this.subtitleContainer.appendChild(line);
 
       // 词库分析
