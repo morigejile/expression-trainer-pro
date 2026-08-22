@@ -1,5 +1,19 @@
 // 宇宙无敌表达训练系统 V2
 
+function mergeFinalText(fullText, finalText) {
+  const currentText = typeof fullText === 'string' ? fullText : '';
+  const candidateText = typeof finalText === 'string' ? finalText.trim() : '';
+
+  if (!candidateText || currentText.endsWith(candidateText)) {
+    return { fullText: currentText, appendedText: '' };
+  }
+
+  return {
+    fullText: currentText + candidateText,
+    appendedText: candidateText
+  };
+}
+
 class ExpressionTrainer {
   constructor() {
     this.isRecording = false;
@@ -140,7 +154,10 @@ class ExpressionTrainer {
     if (this.audioProcessor) { this.audioProcessor.disconnect(); this.audioProcessor = null; }
     if (this.audioContext) { this.audioContext.close(); this.audioContext = null; }
     if (this.mediaStream) { this.mediaStream.getTracks().forEach(t => t.stop()); this.mediaStream = null; }
-    await window.api.stopASR();
+    const stopResult = await window.api.stopASR();
+    if (stopResult && stopResult.success && stopResult.finalText) {
+      this.handleASRResult({ text: stopResult.finalText, isFinal: true });
+    }
     this.isRecording = false;
     this.isPaused = false;
 
@@ -168,8 +185,12 @@ class ExpressionTrainer {
 
   handleASRResult({ text, isFinal }) {
     if (isFinal) {
+      const merged = mergeFinalText(this.fullText, text);
+      if (!merged.appendedText) return;
+
+      text = merged.appendedText;
+      this.fullText = merged.fullText;
       this.sentences.push(text);
-      this.fullText += text;
       this.analyzeCurrentSentence(text);
 
       // 每30字触发一次AI反馈（语境化精准词建议）
@@ -490,4 +511,10 @@ class ExpressionTrainer {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => { new ExpressionTrainer(); });
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { mergeFinalText, ExpressionTrainer };
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => { new ExpressionTrainer(); });
+}
