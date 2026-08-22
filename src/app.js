@@ -74,6 +74,7 @@ class ExpressionTrainer {
   // ===== 录制控制 =====
 
   async startRecording() {
+    await window.api.cancelLLMRequests();
     const initResult = await window.api.initASR();
     if (!initResult.success) {
       this.showError(`语音识别启动失败: ${initResult.error}`);
@@ -141,6 +142,7 @@ class ExpressionTrainer {
     if (this.audioContext) { this.audioContext.close(); this.audioContext = null; }
     if (this.mediaStream) { this.mediaStream.getTracks().forEach(t => t.stop()); this.mediaStream = null; }
     await window.api.stopASR();
+    await window.api.cancelLLMRequests();
     this.isRecording = false;
     this.isPaused = false;
 
@@ -422,6 +424,7 @@ class ExpressionTrainer {
   }
 
   clearAll() {
+    window.api.cancelLLMRequests();
     this.fullText = '';
     this.sentences = [];
     this.lastReport = '';
@@ -447,6 +450,8 @@ class ExpressionTrainer {
   async analyzePastedText() {
     const text = this.pasteTextarea.value.trim();
     if (!text) return;
+
+    await window.api.cancelLLMRequests();
 
     // 关闭粘贴弹窗
     this.pasteModal.classList.add('hidden');

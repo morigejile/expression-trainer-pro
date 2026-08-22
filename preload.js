@@ -24,6 +24,7 @@ contextBridge.exposeInMainWorld('api', {
   getRealtimeFeedback: (text) => ipcRenderer.invoke('get-realtime-feedback', text),
   getFinalReport: (data) => ipcRenderer.invoke('get-final-report', data),
   testLLMConnection: (settings) => ipcRenderer.invoke('test-llm-connection', settings),
+  cancelLLMRequests: () => ipcRenderer.invoke('cancel-llm-requests'),
 
   // 文件保存
   saveFile: (content, filename) => ipcRenderer.invoke('save-file', content, filename),

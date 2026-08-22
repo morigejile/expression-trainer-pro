@@ -3,7 +3,7 @@
 > 状态：Verified from Source（尚未完成运行验收）  
 > 基线日期：2026-08-22
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
-> 描述对象：截至 Phase 1 / T-03；基于 T-02 提交 `34cf3c0f77895baa22f004d82fac511f2e63b6cd`
+> 描述对象：Phase 1 / T-03 完整基线 + T-06；基于 T-03 修复提交 `99f4707187b1fa16e46b194b34cae5c6b362206e`，不包含并行的 T-04/T-05/T-07
 
 ## 1. 证据边界
 
@@ -59,10 +59,10 @@ package.json / package-lock.json
 | ASR 引擎 | `sherpa-onnx-node` `^1.10.0` | 当前 lock 与 `node_modules` 为 1.13.3；Main 中加载 |
 | ASR 模型 | `sherpa-onnx-streaming-paraformer-bilingual-zh-en` | 固定目录；INT8 encoder/decoder + tokens；模型未纳入 Git |
 | 本地分析 | `lib/lexicon.js` + `data/emotion-lexicon.json` | 最大正向词表匹配；`tiered-lexicon.json` 保留为未启用候选数据，不参与运行时分析 |
-| LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；无超时/AbortController |
+| LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接/实时/报告分别为 10/15/60 秒超时，并支持 AbortSignal、按 Renderer 取消和异常响应验证 |
 | 设置 | `userData/settings.json`、`userData/custom-prompt.json` | settings schema version 1；纯函数迁移旧扁平结构；文件同步写入且 API Key 明文 |
 | 输出 | Clipboard + Electron Save Dialog + Markdown | 原文与报告 |
-| 构建/测试 | scripts 为 `start`、`dev`、`test`、`check` | `node:test` 覆盖模块入口、词库和设置迁移；无 build/package/CI 配置 |
+| 构建/测试 | scripts 为 `start`、`dev`、`test`、`check` | `node:test` 覆盖模块入口、词库、设置迁移和 LLM 请求控制；LLM 测试全部使用 fake fetch；无 build/package/CI 配置 |
 
 开发基线已固定为 Node 22.23.x/npm 12.0.x，并只记录 Windows NT 10.0.26200.0 x64 的本轮验证；macOS/Linux 与正式最低 Windows 版本没有 CI、打包配置或制品测试证明。
 
@@ -114,7 +114,7 @@ Main 既是 Electron 控制面，又直接执行同步 ASR decode、词库分析
 - 展示 partial 临时字幕；final 字幕高亮词语。
 - 支持粘贴逐字稿、生成报告、复制/保存原文和报告、清空当前内存状态。
 
-当前没有显式 session ID 或训练状态机。连续调用、迟到异步反馈、stop 与 pending feed 的竞态依赖 UI 按钮和事件时序。
+当前没有完整的训练 session ID 或状态机。T-06 已在 LLM 边界按 Renderer 和请求类型管理 pending 请求，并在开始、停止、粘贴替换和清空时取消该 Renderer 的 LLM 请求；ASR 的 stop 与 pending feed 竞态仍依赖 UI 按钮和事件时序。
 
 ### 5.2 Preload / `preload.js`
 
@@ -123,7 +123,7 @@ Main 既是 Electron 控制面，又直接执行同步 ASR decode、词库分析
 关键事实：
 
 - `feedAudio` 在 Preload 中执行 `Array.from(samples)`，再 `ipcRenderer.invoke('feed-audio', ...)`。
-- 暴露的 `onASRResult/removeASRListener` 监听 `asr-result`，但 Main 没有发现对应 `webContents.send`，属于疑似死接口。
+- LLM API 暴露反馈、报告、连接测试和显式取消；取消只作用于当前 Renderer 的 pending LLM 请求。
 - Preload 和 Main 对 settings、文本、filename、音频数组等 payload 没有 schema/大小校验。
 
 ### 5.3 Main / `main.js`
@@ -135,10 +135,10 @@ Main 既是 Electron 控制面，又直接执行同步 ASR decode、词库分析
 - 注册所有 IPC handlers。
 - `init-asr`、`feed-audio`、`stop-asr` 直接调用 `lib/asr.js`；ASR 完全位于 Main。
 - `analyze-text` 在 Main 中执行本地分析。
-- `get-realtime-feedback`、`get-final-report` 和连接测试在 Main 中发起 fetch。
+- `get-realtime-feedback`、`get-final-report` 和连接测试在 Main 中发起受超时约束的 fetch；同一 Renderer 的同类新请求会取消旧请求，显式取消可终止该 Renderer 的全部 LLM 请求。
 - `save-file` 通过系统对话框把 Markdown 写到用户选择的位置。
 
-`session` 被 import 但未使用；文件读写使用同步 API。它们不是首要性能瓶颈，但反映了 Main 职责持续累积。
+设置和 Prompt 文件读写仍使用同步 API。它不是当前首要性能瓶颈，但反映了 Main 职责持续累积。
 
 ### 5.4 ASR / `lib/asr.js`
 
@@ -171,7 +171,13 @@ UI 的 `highlightText` 另有一套硬编码词表/正则，与 `lib/lexicon.js`
 - 实时反馈 max_tokens 150；最终报告 8192；temperature 0.7。
 - 自定义训练目标/规则/风格/口癖被附加到 prompt。
 
-没有请求超时、取消、重试或响应 schema 防御；错误响应 body 被拼入错误消息。设置保存后才测试连接，测试失败不会回滚刚保存的配置。
+T-06 后的请求边界具有以下事实：
+
+- 连接测试、实时反馈、最终报告的超时分别为 10、15、60 秒，并把 AbortSignal 传给原生 `fetch`；
+- 同一 Renderer 的同类新请求会取消旧请求，会话边界可显式取消全部 pending LLM 请求；协调层在取消后抑制不配合 AbortSignal 的迟到结果；
+- 无 Key、429、其他 HTTP 错误、超时、取消、坏 JSON，以及缺失 `choices[0].message.content` 均返回稳定错误；
+- 不读取或透传 HTTP 错误正文，未知 fetch 异常被泛化，避免错误信息泄露 API Key、Authorization 或完整敏感响应；
+- 没有自动重试。设置保存后才测试连接，测试失败不会回滚刚保存的配置。
 
 ### 5.7 设置与数据
 
@@ -227,11 +233,13 @@ Renderer 断开/关闭音频资源
 endpoint/final sentence
 → analyze-text invoke → Main lexicon → stats/建议
 → 累计文本较上次反馈增加 >=30 字
-→ get-realtime-feedback invoke → Main fetch → 右侧反馈
+→ get-realtime-feedback invoke → Main 受控 fetch → 成功时更新右侧反馈
 
 停止/粘贴完成后用户点击生成报告
 → fullText + stats → Main fetch → Renderer innerHTML 格式化 → 可保存 Markdown
 ```
+
+LLM 失败只返回安全的 `{success:false,error}`，不会修改本地词库结果；粘贴模式在请求 LLM 前完成本地分析，实时模式的分析 IPC 与 LLM IPC 也彼此独立。
 
 Phase 0 已把 README 的反馈触发口径改为源码实际的约 30 字，并明确本地 ASR/词库与可选联网 LLM 的边界。
 
@@ -268,7 +276,7 @@ Settings/Prompt Renderer
 | TD-09 | API Key 明文保存、设置同步且非原子写入 | 凭据暴露；写入中断可能损坏设置 | 源码确认；schema version 1 和损坏 JSON 运行回退已由 T-03 建立 | R-09 处理原子写、脱敏日志，并评估凭据策略 |
 | TD-10 | IPC payload 无校验 | 大 payload、类型错误或不可信输入影响 Main | 源码确认 | 每个 channel 限定类型/长度/session |
 | TD-11 | ASR/粘贴/LLM 文本进入 `innerHTML` 未统一转义 | HTML 注入/XSS，尤其粘贴文本和远程 LLM 输出 | 源码确认 | DOM text nodes/允许列表 sanitizer + 测试 |
-| TD-12 | LLM fetch 无 timeout/cancel/schema 验证 | 请求悬挂、迟到反馈、异常响应导致错误 | 源码确认 | AbortController、session、响应验证 |
+| TD-12 | LLM fetch 控制风险已由 T-06 缓解；仍无自动重试 | 请求已有超时、取消、迟到抑制、结构验证和脱敏错误；瞬时失败仍需用户重试 | T-06 fake-fetch 测试与源码确认 | 保留错误契约回归测试；是否重试需单独产品策略，不在请求层盲目加入 |
 | TD-13 | UI 高亮词表与 lexicon 规则重复 | 显示和统计不一致 | 源码确认 | 统一由分析结果驱动高亮或共享规则 |
 | TD-14 | README 与实现漂移风险 | 用户预期错误 | Phase 0 已修正触发字数、联网边界和平台口径 | 后续行为变更同步 README 与架构文档 |
 | TD-15 | 未启用候选词库容易被误认为运行时数据 | 维护者可能误删或直接接入不兼容 schema | `tiered-lexicon.json` 无 import，Phase 0 决定保留 | 明确标记未启用；在 T-01/T-02 后以独立任务设计 schema、合并规则和测试 |

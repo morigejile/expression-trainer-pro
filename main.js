@@ -3,7 +3,13 @@ const path = require('path');
 const fs = require('fs');
 const { initASR, feedAudio, stopRecognition } = require('./lib/asr');
 const { loadLexicon, analyzeText } = require('./lib/lexicon');
-const { sendFeedback, sendReport, testConnection } = require('./lib/ai-feedback');
+const {
+  createRequestCoordinator,
+  runCoordinatedRequest,
+  sendFeedback,
+  sendReport,
+  testConnection
+} = require('./lib/ai-feedback');
 const {
   createDefaultSettings,
   normalizeSettings,
@@ -18,6 +24,7 @@ let mainWindow;
 let settingsWindow;
 let promptEditorWindow;
 let asrReady = false;
+const llmRequests = createRequestCoordinator();
 
 // Custom prompt 文件路径
 function getCustomPromptPath() {
@@ -252,7 +259,20 @@ ipcMain.handle('stop-asr', () => {
 // LLM 连通性测试
 ipcMain.handle('test-llm-connection', async (event, settings) => {
   const providerConfig = getCurrentProviderSettings(settings);
-  return await testConnection({ ...settings, ...providerConfig });
+  const request = llmRequests.begin(event.sender.id, 'connection');
+  try {
+    return await testConnection(
+      { ...settings, ...providerConfig },
+      { signal: request.signal }
+    );
+  } finally {
+    request.finish();
+  }
+});
+
+ipcMain.handle('cancel-llm-requests', (event) => {
+  llmRequests.cancelAll(event.sender.id);
+  return { success: true };
 });
 
 // 词库分析
@@ -281,22 +301,35 @@ ipcMain.handle('get-realtime-feedback', async (event, text) => {
   const settings = loadSettings();
   const providerConfig = getCurrentProviderSettings(settings);
   const customPrompt = loadCustomPrompt();
-  try {
-    const feedback = await sendFeedback(text, { ...settings, ...providerConfig }, customPrompt);
-    return { success: true, feedback };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return runCoordinatedRequest(
+    llmRequests,
+    event.sender.id,
+    'realtime',
+    'feedback',
+    (signal) => sendFeedback(
+      text,
+      { ...settings, ...providerConfig },
+      customPrompt,
+      { signal }
+    )
+  );
 });
 
 ipcMain.handle('get-final-report', async (event, { fullText, stats }) => {
   const settings = loadSettings();
   const providerConfig = getCurrentProviderSettings(settings);
   const customPrompt = loadCustomPrompt();
-  try {
-    const report = await sendReport(fullText, stats, { ...settings, ...providerConfig }, customPrompt);
-    return { success: true, report };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+  return runCoordinatedRequest(
+    llmRequests,
+    event.sender.id,
+    'report',
+    'report',
+    (signal) => sendReport(
+      fullText,
+      stats,
+      { ...settings, ...providerConfig },
+      customPrompt,
+      { signal }
+    )
+  );
 });
