@@ -87,6 +87,7 @@ flowchart LR
 | T-01 | Completed | Codex + maintainer | 使用 Node 内置 `node:test` 建立 `npm test`；Node 22.23.0/npm 12.0.2 下 `npm ci`、1 项模块入口 smoke、`npm run check` 均成功；不需要 ASR 模型、麦克风或网络，未引入新依赖 |
 | T-02 | Completed | Codex + maintainer | 为 `lib/lexicon.js` 增加 5 项确定性测试，覆盖空输入、分类、token 位置、情绪元数据、密度和建议阈值；未修改生产实现或启用候选词库 |
 | T-03 | Completed | Codex + maintainer | 将设置默认值、解析、schema 迁移和当前 provider 选择抽到纯模块；6 项测试覆盖旧扁平配置、缺失 provider、损坏 JSON、字段保留和 `schemaVersion: 1`，损坏文件不自动覆盖 |
+| T-04 | Completed | Codex + maintainer | Renderer 合并 `stopASR().finalText`，endpoint 与 stop final 共用最小去重路径；4 项测试覆盖单次合并、重复 final、空 final、统计和后续报告，完整 16 项测试及 `npm run check` 在 Node 22.23.0/npm 12.0.2 下通过，无需模型、麦克风或网络 |
 
 ### Phase 2 — ASR Benchmark 与技术 spike
 
