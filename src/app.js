@@ -32,6 +32,7 @@ class ExpressionTrainer {
     this.stats = { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 0, duration: 0 };
     this.lastFeedbackText = '';
     this.lastReport = '';
+    this.llmGeneration = 0;
 
     this.initElements();
     this.bindEvents();
@@ -93,6 +94,7 @@ class ExpressionTrainer {
   // ===== 录制控制 =====
 
   async startRecording() {
+    this.advanceLLMGeneration();
     await window.api.cancelLLMRequests();
     const initResult = await window.api.initASR();
     if (!initResult.success) {
@@ -125,6 +127,7 @@ class ExpressionTrainer {
     this.pausedTime = 0;
     this.fullText = '';
     this.sentences = [];
+    this.lastFeedbackText = '';
     this.resetStats();
     this.subtitleContainer.replaceChildren();
 
@@ -157,40 +160,57 @@ class ExpressionTrainer {
   }
 
   async stopRecording() {
+    this.advanceLLMGeneration();
     if (this.audioProcessor) { this.audioProcessor.disconnect(); this.audioProcessor = null; }
     if (this.audioContext) { this.audioContext.close(); this.audioContext = null; }
     if (this.mediaStream) { this.mediaStream.getTracks().forEach(t => t.stop()); this.mediaStream = null; }
-    const stopResult = await window.api.stopASR();
-    if (stopResult && stopResult.success && stopResult.finalText) {
-      this.handleASRResult({ text: stopResult.finalText, isFinal: true });
-    }
-    await window.api.cancelLLMRequests();
-    this.isRecording = false;
-    this.isPaused = false;
+    try {
+      const stopResult = await window.api.stopASR();
+      if (stopResult && stopResult.success && stopResult.finalText) {
+        try {
+          await this.handleASRResult({ text: stopResult.finalText, isFinal: true });
+        } catch (error) {
+          this.showError(`尾部文本分析失败: ${error.message}`);
+        }
+      }
+    } catch (error) {
+      this.showError(`语音识别停止失败: ${error.message}`);
+    } finally {
+      this.advanceLLMGeneration();
+      try {
+        await window.api.cancelLLMRequests();
+      } catch (error) {
+        this.showError(`取消大模型请求失败: ${error.message}`);
+      } finally {
+        this.isRecording = false;
+        this.isPaused = false;
 
-    clearInterval(this.timerInterval);
-    let totalPaused = this.pausedTime;
-    if (this.pauseStart) totalPaused += Date.now() - this.pauseStart;
-    this.stats.duration = Math.floor((Date.now() - this.startTime - totalPaused) / 1000);
+        clearInterval(this.timerInterval);
+        let totalPaused = this.pausedTime;
+        if (this.pauseStart) totalPaused += Date.now() - this.pauseStart;
+        this.stats.duration = Math.floor((Date.now() - this.startTime - totalPaused) / 1000);
 
-    // UI：显示生成报告按钮，可翻阅字幕
-    this.btnStop.classList.add('hidden');
-    this.btnPause.classList.add('hidden');
-    this.btnResume.classList.add('hidden');
-    this.btnStart.classList.remove('hidden');
-    this.timer.classList.remove('active');
+        // UI：显示生成报告按钮，可翻阅字幕
+        this.btnStop.classList.add('hidden');
+        this.btnPause.classList.add('hidden');
+        this.btnResume.classList.add('hidden');
+        this.btnStart.classList.remove('hidden');
+        this.timer.classList.remove('active');
 
-    if (this.fullText.trim()) {
-      this.btnReport.classList.remove('hidden');
-      this.btnCopyText.classList.remove('hidden');
-      this.btnSaveText.classList.remove('hidden');
-      this.btnClear.classList.remove('hidden');
+        if (this.fullText.trim()) {
+          this.btnReport.classList.remove('hidden');
+          this.btnCopyText.classList.remove('hidden');
+          this.btnSaveText.classList.remove('hidden');
+          this.btnClear.classList.remove('hidden');
+        }
+      }
     }
   }
 
   // ===== ASR结果处理 =====
 
   handleASRResult({ text, isFinal }) {
+    let analysisPromise;
     if (isFinal) {
       const merged = mergeFinalText(this.fullText, text);
       if (!merged.appendedText) return;
@@ -198,7 +218,7 @@ class ExpressionTrainer {
       text = merged.appendedText;
       this.fullText = merged.fullText;
       this.sentences.push(text);
-      this.analyzeCurrentSentence(text);
+      analysisPromise = this.analyzeCurrentSentence(text);
 
       // 每30字触发一次AI反馈（语境化精准词建议）
       if (this.fullText.length - this.lastFeedbackText.length >= 30) {
@@ -206,6 +226,7 @@ class ExpressionTrainer {
       }
     }
     this.renderSubtitle(text, isFinal);
+    return analysisPromise;
   }
 
   renderSubtitle(currentText, isFinal) {
@@ -281,8 +302,10 @@ class ExpressionTrainer {
   // ===== 实时反馈 =====
 
   async requestRealtimeFeedback() {
+    const generation = this.llmGeneration;
     this.lastFeedbackText = this.fullText;
     const result = await window.api.getRealtimeFeedback(this.fullText);
+    if (generation !== this.llmGeneration) return;
     if (result.success && result.feedback) {
       const lines = result.feedback.split('\n').filter(l => l.trim());
       lines.forEach(line => {
@@ -322,6 +345,7 @@ class ExpressionTrainer {
   // ===== 报告 =====
 
   async generateReport() {
+    const generation = this.llmGeneration;
     const loading = document.createElement('p');
     loading.style.textAlign = 'center';
     loading.style.color = '#666';
@@ -335,6 +359,7 @@ class ExpressionTrainer {
       stats: this.stats
     });
 
+    if (generation !== this.llmGeneration) return;
     if (result.success) {
       this.lastReport = result.report;
       this.renderReport(result.report);
@@ -408,6 +433,11 @@ class ExpressionTrainer {
     this.feedbackContent.replaceChildren();
   }
 
+  advanceLLMGeneration() {
+    this.llmGeneration = (this.llmGeneration ?? 0) + 1;
+    return this.llmGeneration;
+  }
+
   showError(msg) {
     const line = document.createElement('div');
     line.className = 'subtitle-line';
@@ -446,9 +476,11 @@ class ExpressionTrainer {
   }
 
   clearAll() {
+    this.advanceLLMGeneration();
     window.api.cancelLLMRequests();
     this.fullText = '';
     this.sentences = [];
+    this.lastFeedbackText = '';
     this.lastReport = '';
     const hint = document.createElement('div');
     hint.className = 'subtitle-line hint';
@@ -476,6 +508,7 @@ class ExpressionTrainer {
     const text = this.pasteTextarea.value.trim();
     if (!text) return;
 
+    this.advanceLLMGeneration();
     await window.api.cancelLLMRequests();
 
     // 关闭粘贴弹窗
@@ -484,6 +517,7 @@ class ExpressionTrainer {
     // 把文本显示到字幕区（高亮标记）
     this.subtitleContainer.replaceChildren();
     this.fullText = text;
+    this.lastFeedbackText = '';
     this.resetStats();
 
     // 按句号/问号/感叹号/换行分句

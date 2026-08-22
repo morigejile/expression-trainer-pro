@@ -118,7 +118,7 @@ Main 既是 Electron 控制面，又直接执行同步 ASR decode、词库分析
 - 支持粘贴逐字稿、生成报告、复制/保存原文和报告、清空当前内存状态。
 - LLM 报告只渲染标题、加粗、行内代码、引用、普通行和换行等严格允许列表；LLM/HTTP 错误作为纯文本显示。
 
-当前没有完整的训练 session ID 或状态机。T-06 已在 LLM 边界按 Renderer 和请求类型管理 pending 请求，并在开始、停止、粘贴替换和清空时取消该 Renderer 的 LLM 请求；ASR 的 stop 与 pending feed 竞态仍依赖 UI 按钮和事件时序。
+当前没有完整的训练 session ID 或状态机。T-06 已在 LLM 边界按 Renderer 和请求类型管理 pending 请求，并在开始、停止、粘贴替换和清空时取消该 Renderer 的 LLM 请求；Renderer 同时递增 LLM 代际并忽略旧代际的 feedback/report，即使成功结果已经越过 IPC 也不会回填新会话。ASR 的 stop 与 pending feed 竞态仍依赖 UI 按钮和事件时序。
 
 ### 5.2 Preload / `preload.js`
 
@@ -156,7 +156,7 @@ Main 既是 Electron 控制面，又直接执行同步 ASR decode、词库分析
 
 `feedAudio` 总以 `sampleRate:16000` 调用 `acceptWaveform`，同步循环 decode，并返回 `{text,isFinal}`。`stopRecognition` 会 flush 并返回最后的未确认文本。
 
-T-04 后，`src/app.js` 会把 `{success, finalText}` 经 `mergeFinalText()` 去重后合并到当前 session；非空尾部文本进入逐字稿、分析统计和后续报告，空文本或与 endpoint 相同的文本不会重复更新状态。
+T-04 后，`src/app.js` 会把 `{success, finalText}` 经 `mergeFinalText()` 去重后合并到当前 session；非空尾部文本进入逐字稿、分析统计和后续报告，空文本或与 endpoint 相同的文本不会重复更新状态。集成修复还让 `stopRecording()` 等待尾部文本的本地分析完成，再结束 stop 并开放报告操作，避免报告文本与统计不同步；分析或取消失败会显示安全错误，但 `finally` 仍复位录音状态和 UI。
 
 ### 5.5 Lexicon / `lib/lexicon.js`
 
@@ -179,7 +179,7 @@ UI 通过 `src/safe-rendering.js` 的 `renderHighlightedText` 使用另一套硬
 T-06 后的请求边界具有以下事实：
 
 - 连接测试、实时反馈、最终报告的超时分别为 10、15、60 秒，并把 AbortSignal 传给原生 `fetch`；
-- 同一 Renderer 的同类新请求会取消旧请求，会话边界可显式取消全部 pending LLM 请求；协调层在取消后抑制不配合 AbortSignal 的迟到结果；
+- 同一 Renderer 的同类新请求会取消旧请求，会话边界可显式取消全部 pending LLM 请求；Main 协调层抑制不配合 AbortSignal 的迟到结果，Renderer 代际校验继续抑制取消前已完成 IPC 返回的旧结果；
 - 无 Key、429、其他 HTTP 错误、超时、取消、坏 JSON，以及缺失 `choices[0].message.content` 均返回稳定错误；
 - 不读取或透传 HTTP 错误正文，未知 fetch 异常被泛化，避免错误信息泄露 API Key、Authorization 或完整敏感响应；
 - 没有自动重试。设置保存后才测试连接，测试失败不会回滚刚保存的配置。
@@ -277,12 +277,12 @@ Settings/Prompt Renderer
 | TD-04 | 每块 Array.from + invoke + 重建 TypedArray | 复制、GC、IPC 延迟 | 源码确认 | profile 后改 TypedArray/MessagePort/有界流 |
 | TD-05 | 全局单例 ASR + 模型/路径/参数写死 | 替换、测试、并发和恢复困难 | 源码确认 | 先抽轻量契约，保留现有行为 |
 | TD-06 | 模型完全手工管理 | 首次安装、升级、校验和支持成本高 | README/models 确认 | Model Manager + hash + 原子安装 |
-| TD-07 | **T-04 已缓解**：停止时 finalText 经最小去重路径合并 | 未形成 endpoint 的尾部语音进入字幕、统计、分析和报告；完整 ASR session 协议仍待 R-02 | `mergeFinalText()` 与 4 项 transcript 回归测试 | R-02 增加完整 sessionId/sequence 协议与 stop 竞态覆盖 |
+| TD-07 | **T-04 已缓解**：停止时 finalText 经最小去重路径合并，stop 等待尾部分析并以 `finally` 收敛状态 | 未形成 endpoint 的尾部语音进入字幕、统计、分析和报告；分析失败仍结束录音；完整 ASR session 协议仍待 R-02 | `mergeFinalText()` 与 8 项 transcript/迟到结果/异常生命周期回归测试 | R-02 增加完整 sessionId/sequence 协议与 pending feed 竞态覆盖 |
 | TD-08 | 已有 Node 测试和 Electron 自动化 smoke，但无 CI 和打包脚本 | 已可发现启动、页面、Preload/IPC、设置窗口和粘贴分析回归；仍无法证明跨平台或发布制品可用 | T-01～T-07 集成测试基线、仓库配置 | 后续接 CI 与 Forge，并在目标平台运行 smoke |
 | TD-09 | API Key 明文保存、设置同步且非原子写入 | 凭据暴露；写入中断可能损坏设置 | 源码确认；schema version 1 和损坏 JSON 运行回退已由 T-03 建立 | R-09 处理原子写、脱敏日志，并评估凭据策略 |
 | TD-10 | IPC payload 无校验 | 大 payload、类型错误或不可信输入影响 Main | 源码确认 | 每个 channel 限定类型/长度/session |
 | TD-11 | **T-05 已缓解**：ASR/粘贴文本使用受控 DOM token，LLM 报告使用严格允许列表，错误使用纯文本；playground 用户输入先转义 | 主应用不再从不可信文本创建标签或事件属性；playground 剩余 `innerHTML` 仅消费静态模板和文件内硬编码数据 | `src/safe-rendering.js`、4 项安全渲染测试、T-07 页面级 smoke、`src/app.js` 无 `innerHTML` | 后续若词库改为外部数据，继续按不可信输入处理 |
-| TD-12 | LLM fetch 控制风险已由 T-06 缓解；仍无自动重试 | 请求已有超时、取消、迟到抑制、结构验证和脱敏错误；瞬时失败仍需用户重试 | T-06 fake-fetch 测试与源码确认 | 保留错误契约回归测试；是否重试需单独产品策略，不在请求层盲目加入 |
+| TD-12 | LLM fetch 控制风险已由 T-06 缓解；仍无自动重试 | 请求已有超时、取消、Main/Renderer 双层迟到抑制、结构验证和脱敏错误；瞬时失败仍需用户重试 | 25 项 fake-fetch 与 3 项 Renderer 竞态测试、源码确认 | 保留错误契约回归测试；是否重试需单独产品策略，不在请求层盲目加入 |
 | TD-13 | UI 高亮词表与 lexicon 规则重复 | 显示和统计不一致 | 源码确认 | 统一由分析结果驱动高亮或共享规则 |
 | TD-14 | README 与实现漂移风险 | 用户预期错误 | Phase 0 已修正触发字数、联网边界和平台口径 | 后续行为变更同步 README 与架构文档 |
 | TD-15 | 未启用候选词库容易被误认为运行时数据 | 维护者可能误删或直接接入不兼容 schema | `tiered-lexicon.json` 无 import，Phase 0 决定保留 | 明确标记未启用；在 T-01/T-02 后以独立任务设计 schema、合并规则和测试 |
