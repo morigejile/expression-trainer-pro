@@ -75,7 +75,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | ID | 类别 | 需求与验证方式 |
 |---|---|---|
 | NFR-01 | 可维护性 | 默认保持 Electron + 原生 JS/HTML/CSS + Sherpa-ONNX；只有能明确降低总代码、风险或长期成本时才增加依赖。依赖变更需 ADR 或变更说明。 |
-| NFR-02 | 可复现性 | 锁文件与 `package.json` 一致；固定 Node 22.23.x/npm 12.0.x，干净 `node_modules` 连续两次 `npm ci` 结果一致；当前 lock/安装树为 Electron 33.4.11、Sherpa 1.13.3。`npm test` 与 Forge 构建仍按 Roadmap 后续阶段建立。 |
+| NFR-02 | 可复现性 | 锁文件与 `package.json` 一致；固定开发工具 Node 22.23.x/npm 12.0.x；当前 lock/安装树为精确 Electron 43.4.1、Sherpa 1.13.3。Electron 43 首次 CLI 下载与 clean `npm ci` 后的校验缓存恢复均已实测；Forge 构建仍按 Roadmap Phase 5 建立。 |
 | NFR-03 | 响应性 | 录音和 ASR 期间 UI 与 Main 应保持可响应。定量预算在基线 benchmark 后确定，不虚构当前 p95 指标。 |
 | NFR-04 | 音频正确性 | 每个音频块携带或继承明确的采样率、声道和样本格式；重采样用自动化测试验证时长和频率行为。 |
 | NFR-05 | 性能 | 默认模型应在项目定义的最低支持设备上满足实时或近实时体验；阈值、设备和场景在 benchmark 方案中冻结。 |
@@ -122,13 +122,13 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 
 ## 9. 待确认事项
 
-1. 当前 `package.json` 为应用 `1.0.0`、Electron `^33.0.0`、sherpa-onnx-node `^1.10.0`；lock/安装树为 33.4.11/1.13.3，开发基线为 Node 22.23.0/npm 12.0.2。空 Electron 下载缓存的网络安装在当前网络下约 10 分钟未完成，仍为非阻塞 Runtime-TBD。
+1. 当前 `package.json` 为应用 `1.0.0`、Electron `43.4.1`（精确版本）、sherpa-onnx-node `^1.10.0`；lock/安装树为 43.4.1/1.13.3，开发基线为 Node 22.23.0/npm 12.0.2。Electron runtime 实测为 Node 24.18.1、Chromium 150.0.7871.224、modules ABI 148；显式清空所有 npm/Electron 缓存后的复跑仍为非阻塞 Runtime-TBD。
 2. README 已把 macOS/Linux 与正式最低 Windows 版本标为 TBD；正式支持等级仍需 CI/制品证据。
 3. Paraformer 模型归档的准确版本、文件 hash、大小和再分发许可证。
 4. 词库计数/密度是否属于产品认可的评分定义；训练历史目前不持久化，是否需要持久化待产品决定。
 5. 产品最低支持硬件及正式性能预算。
 6. 模型与 LLM 服务的许可证、分发与隐私告知要求。
-7. Electron 33 当前 audit 汇总包含 `electron` 与传递依赖 `extract-zip` 两个 high 风险节点；修复需要受控大版本升级。`boolean@3.2.0` 是未维护的 dev/optional 传递依赖，但当前 audit 未把它列为漏洞。
+7. T-08 已通过 Electron 43.4.1 受控升级关闭 Electron 33 基线的两个 high audit 节点；当前 audit 为 0。真实模型/麦克风、macOS/Linux 和 Forge 制品兼容性仍需后续验收。
 
 ## 10. 追踪关系
 

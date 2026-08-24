@@ -80,6 +80,19 @@ flowchart LR
 | T-07 | P1 | 最小 smoke | 覆盖 Electron 启动、页面加载、设置窗口、粘贴分析；ASR 用 Fake Provider，不把大模型放入普通单测 | T-01～T-03 | 每次变更能发现启动/Preload 契约回归 |
 | T-08 | P0 | Electron 安全升级 spike | 基于 `npm audit` 结果评估从 Electron 33 升级到受支持版本；不得使用 `npm audit fix --force`，逐项验证 native Sherpa、Preload/IPC、窗口与后续 Forge 兼容性 | T-01,T-07 | audit 风险关闭或有明确接受/缓解记录；升级前后 smoke 证据完整 |
 
+#### Phase 1 执行记录（2026-08-22～2026-08-23）
+
+| ID | 状态 | Owner | 证据 |
+|---|---|---|---|
+| T-01 | Completed | Codex + maintainer | 使用 Node 内置 `node:test` 建立 `npm test`；Node 22.23.0/npm 12.0.2 下 `npm ci`、1 项模块入口 smoke、`npm run check` 均成功；不需要 ASR 模型、麦克风或网络，未引入新依赖 |
+| T-02 | Completed | Codex + maintainer | 为 `lib/lexicon.js` 增加 5 项确定性测试，覆盖空输入、分类、token 位置、情绪元数据、密度和建议阈值；未修改生产实现或启用候选词库 |
+| T-03 | Completed | Codex + maintainer | 将设置默认值、解析、schema 迁移和当前 provider 选择抽到纯模块；6 项测试覆盖旧扁平配置、缺失 provider、损坏 JSON、字段保留和 `schemaVersion: 1`，损坏文件不自动覆盖 |
+| T-04 | Completed | Codex + maintainer | Renderer 合并 `stopASR().finalText`，endpoint 与 stop final 共用最小去重路径，并在 stop 返回前等待尾部分析完成；8 项集成测试覆盖单次合并、重复/空 final、统计、报告、分析失败生命周期和停止期间的迟到反馈抑制 |
+| T-05 | Completed | Codex + maintainer | ASR final、粘贴文本和 LLM 报告改为 text node/受控 token/严格允许列表渲染；4 项测试覆盖 `<script>`、`<img onerror>`、事件属性、中文高亮和报告格式；Node 22.23.0/npm 12.0.2 下 `npm test`、`npm run check` 通过，无模型、麦克风、网络或新依赖 |
+| T-06 | Completed | Codex + maintainer | 为原生 fetch 增加 10/15/60 秒超时、AbortSignal、按 Renderer/请求类型取消和迟到结果抑制；25 项 fake-fetch 测试覆盖无 Key、429、HTTP 错误、超时、取消、坏 JSON、异常响应与敏感错误脱敏，本地分析输入不被 LLM 失败修改；Renderer 代际校验继续抑制已越过 IPC 的旧 feedback/report 结果 |
+| T-07 | Completed | Codex + maintainer | Node `node:test` 启动 Electron 33.4.11 的真实 executable，加载 Main/Preload/主页面/设置页，验证含 `cancelLLMRequests` 的 16 项 `window.api` 能力、Fake ASR init/feed/stop、协调式 Fake LLM、设置窗口和粘贴分析；隔离临时 `userData`，具备 30 秒进程超时、成功标记、失败日志和进程树清理；T-04～T-07 集成及审查修复后完整测试集为 50 项 |
+| T-08 | Completed | Codex + maintainer | 从精确集成基线 `33a6ee5` 将 Electron 33.4.11 受控升级到当前稳定且受支持的 43.4.1；官方日程显示 43 系列 EOL 为 2027-01-05，44 当时仍为预发布。升级前 audit 为 `2 high / 0 critical`，升级后为 0；旧 `extract-zip@2.0.1` 与 `boolean` 下载栈移除。Electron 43.4.1 内置 Node 24.18.1、Chromium 150.0.7871.224、modules ABI 148，Windows x64 下直接加载 sherpa-onnx-node 1.13.3 成功；正常非 smoke 入口 5 秒存活，50/50 与真实 Electron smoke、Preload/IPC、安全边界均通过。真实模型/麦克风、macOS/Linux 和 Forge 制品仍未验证 |
+
 ### Phase 2 — ASR Benchmark 与技术 spike
 
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
@@ -115,7 +128,7 @@ flowchart LR
 | R-06 | P0 | ASR 移出 Main | 按 ADR-0006 实现独立执行单元；Main 只管理生命周期、路由和退出 | R-01,R-02,R-05 | 强制退出可恢复；Main/UI 响应门槛通过 |
 | R-07 | P1 | 实现轻量 Model Manager | 版本化 registry、HTTPS、SHA-256、临时下载/解压、原子激活、上一版本回退；模型存 userData 子目录 | D-02,R-01 | 中断/hash 错/磁盘不足不破坏现有模型 |
 | R-08 | P1 | 切换默认模型 | 用 registry 配置新模型，保留当前 Paraformer 为受控回退/迁移路径；不把多模型复杂度暴露给普通用户 | R-06,R-07,D-02 | 端到端结果与 benchmark 版本一致 |
-| R-09 | P1 | 收敛设置/规则/日志 | 加 schemaVersion、原子写、脱敏日志；评估系统凭据库的收益与 native 成本后再决定 Key 存储 | T-03,R-07 | 升级保留配置；日志不含 Key/完整敏感文本 |
+| R-09 | P1 | 收敛设置/规则/日志 | 演进 schemaVersion、增加原子写和脱敏日志；评估系统凭据库的收益与 native 成本后再决定 Key 存储 | T-03,R-07 | 升级保留配置；日志不含 Key/完整敏感文本 |
 
 ### Phase 5 — Electron Forge 打包与发布
 

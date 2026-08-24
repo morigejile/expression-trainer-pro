@@ -1,5 +1,24 @@
 // 宇宙无敌表达训练系统 V2
 
+function mergeFinalText(fullText, finalText) {
+  const currentText = typeof fullText === 'string' ? fullText : '';
+  const candidateText = typeof finalText === 'string' ? finalText.trim() : '';
+
+  if (!candidateText || currentText.endsWith(candidateText)) {
+    return { fullText: currentText, appendedText: '' };
+  }
+
+  return {
+    fullText: currentText + candidateText,
+    appendedText: candidateText
+  };
+}
+
+const SafeRendering = typeof module !== 'undefined' && module.exports
+  ? require('./safe-rendering')
+  : window.SafeRendering;
+const { renderHighlightedText, renderReportContent } = SafeRendering;
+
 class ExpressionTrainer {
   constructor() {
     this.isRecording = false;
@@ -13,6 +32,7 @@ class ExpressionTrainer {
     this.stats = { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 0, duration: 0 };
     this.lastFeedbackText = '';
     this.lastReport = '';
+    this.llmGeneration = 0;
 
     this.initElements();
     this.bindEvents();
@@ -74,6 +94,8 @@ class ExpressionTrainer {
   // ===== 录制控制 =====
 
   async startRecording() {
+    this.advanceLLMGeneration();
+    await window.api.cancelLLMRequests();
     const initResult = await window.api.initASR();
     if (!initResult.success) {
       this.showError(`语音识别启动失败: ${initResult.error}`);
@@ -105,8 +127,9 @@ class ExpressionTrainer {
     this.pausedTime = 0;
     this.fullText = '';
     this.sentences = [];
+    this.lastFeedbackText = '';
     this.resetStats();
-    this.subtitleContainer.innerHTML = '';
+    this.subtitleContainer.replaceChildren();
 
     // UI
     this.btnStart.classList.add('hidden');
@@ -137,40 +160,65 @@ class ExpressionTrainer {
   }
 
   async stopRecording() {
+    this.advanceLLMGeneration();
     if (this.audioProcessor) { this.audioProcessor.disconnect(); this.audioProcessor = null; }
     if (this.audioContext) { this.audioContext.close(); this.audioContext = null; }
     if (this.mediaStream) { this.mediaStream.getTracks().forEach(t => t.stop()); this.mediaStream = null; }
-    await window.api.stopASR();
-    this.isRecording = false;
-    this.isPaused = false;
+    try {
+      const stopResult = await window.api.stopASR();
+      if (stopResult && stopResult.success && stopResult.finalText) {
+        try {
+          await this.handleASRResult({ text: stopResult.finalText, isFinal: true });
+        } catch (error) {
+          this.showError(`尾部文本分析失败: ${error.message}`);
+        }
+      }
+    } catch (error) {
+      this.showError(`语音识别停止失败: ${error.message}`);
+    } finally {
+      this.advanceLLMGeneration();
+      try {
+        await window.api.cancelLLMRequests();
+      } catch (error) {
+        this.showError(`取消大模型请求失败: ${error.message}`);
+      } finally {
+        this.isRecording = false;
+        this.isPaused = false;
 
-    clearInterval(this.timerInterval);
-    let totalPaused = this.pausedTime;
-    if (this.pauseStart) totalPaused += Date.now() - this.pauseStart;
-    this.stats.duration = Math.floor((Date.now() - this.startTime - totalPaused) / 1000);
+        clearInterval(this.timerInterval);
+        let totalPaused = this.pausedTime;
+        if (this.pauseStart) totalPaused += Date.now() - this.pauseStart;
+        this.stats.duration = Math.floor((Date.now() - this.startTime - totalPaused) / 1000);
 
-    // UI：显示生成报告按钮，可翻阅字幕
-    this.btnStop.classList.add('hidden');
-    this.btnPause.classList.add('hidden');
-    this.btnResume.classList.add('hidden');
-    this.btnStart.classList.remove('hidden');
-    this.timer.classList.remove('active');
+        // UI：显示生成报告按钮，可翻阅字幕
+        this.btnStop.classList.add('hidden');
+        this.btnPause.classList.add('hidden');
+        this.btnResume.classList.add('hidden');
+        this.btnStart.classList.remove('hidden');
+        this.timer.classList.remove('active');
 
-    if (this.fullText.trim()) {
-      this.btnReport.classList.remove('hidden');
-      this.btnCopyText.classList.remove('hidden');
-      this.btnSaveText.classList.remove('hidden');
-      this.btnClear.classList.remove('hidden');
+        if (this.fullText.trim()) {
+          this.btnReport.classList.remove('hidden');
+          this.btnCopyText.classList.remove('hidden');
+          this.btnSaveText.classList.remove('hidden');
+          this.btnClear.classList.remove('hidden');
+        }
+      }
     }
   }
 
   // ===== ASR结果处理 =====
 
   handleASRResult({ text, isFinal }) {
+    let analysisPromise;
     if (isFinal) {
+      const merged = mergeFinalText(this.fullText, text);
+      if (!merged.appendedText) return;
+
+      text = merged.appendedText;
+      this.fullText = merged.fullText;
       this.sentences.push(text);
-      this.fullText += text;
-      this.analyzeCurrentSentence(text);
+      analysisPromise = this.analyzeCurrentSentence(text);
 
       // 每30字触发一次AI反馈（语境化精准词建议）
       if (this.fullText.length - this.lastFeedbackText.length >= 30) {
@@ -178,6 +226,7 @@ class ExpressionTrainer {
       }
     }
     this.renderSubtitle(text, isFinal);
+    return analysisPromise;
   }
 
   renderSubtitle(currentText, isFinal) {
@@ -194,7 +243,7 @@ class ExpressionTrainer {
       // 新行
       const line = document.createElement('div');
       line.className = 'subtitle-line';
-      line.innerHTML = this.highlightText(currentText);
+      renderHighlightedText(line, currentText);
       this.subtitleContainer.appendChild(line);
     } else {
       let interim = this.subtitleContainer.querySelector('.interim-line');
@@ -208,19 +257,6 @@ class ExpressionTrainer {
 
     // 自动滚到底
     this.subtitleScroll.scrollTop = this.subtitleScroll.scrollHeight;
-  }
-
-  highlightText(text) {
-    let result = text;
-    const vagueWords = ['开心','难过','害怕','生气','不舒服','很好','很多','很快','很大','很小','好看','不好','喜欢','讨厌','觉得','想想'];
-    vagueWords.forEach(w => {
-      result = result.replace(new RegExp(w, 'g'), `<span class="vague">${w}</span>`);
-    });
-    const fillerPatterns = /(嗯|啊|呃|额|那个|就是|然后|这个|对吧|是吧|反正|基本上)/g;
-    result = result.replace(fillerPatterns, '<span class="filler">$1</span>');
-    const hedgePatterns = /(可能|也许|大概|应该|我觉得|好像|似乎|或许|不一定|差不多|感觉)/g;
-    result = result.replace(hedgePatterns, '<span class="hedge">$1</span>');
-    return result;
   }
 
   // ===== 分析 =====
@@ -266,8 +302,10 @@ class ExpressionTrainer {
   // ===== 实时反馈 =====
 
   async requestRealtimeFeedback() {
+    const generation = this.llmGeneration;
     this.lastFeedbackText = this.fullText;
     const result = await window.api.getRealtimeFeedback(this.fullText);
+    if (generation !== this.llmGeneration) return;
     if (result.success && result.feedback) {
       const lines = result.feedback.split('\n').filter(l => l.trim());
       lines.forEach(line => {
@@ -307,7 +345,13 @@ class ExpressionTrainer {
   // ===== 报告 =====
 
   async generateReport() {
-    this.reportBody.innerHTML = '<p style="text-align:center;color:#666;padding:40px;">正在生成报告...</p>';
+    const generation = this.llmGeneration;
+    const loading = document.createElement('p');
+    loading.style.textAlign = 'center';
+    loading.style.color = '#666';
+    loading.style.padding = '40px';
+    loading.textContent = '正在生成报告...';
+    this.reportBody.replaceChildren(loading);
     this.reportModal.classList.remove('hidden');
 
     const result = await window.api.getFinalReport({
@@ -315,35 +359,40 @@ class ExpressionTrainer {
       stats: this.stats
     });
 
+    if (generation !== this.llmGeneration) return;
     if (result.success) {
       this.lastReport = result.report;
       this.renderReport(result.report);
     } else {
-      this.reportBody.innerHTML = `<p style="color:#ff6b6b;">生成失败: ${result.error}</p>`;
+      const error = document.createElement('p');
+      error.style.color = '#ff6b6b';
+      error.textContent = `生成失败: ${result.error}`;
+      this.reportBody.replaceChildren(error);
     }
   }
 
   renderReport(report) {
-    let html = report
-      .replace(/^### (.+)$/gm, '<h3>$1</h3>')
-      .replace(/^## (.+)$/gm, '<h2>$1</h2>')
-      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-      .replace(/`([^`]+)`/g, '<code>$1</code>')
-      .replace(/^> (.+)$/gm, '<blockquote>$1</blockquote>')
-      .replace(/\|(.+)\|/g, (match) => {
-        // 简单表格支持
-        return match;
-      })
-      .replace(/\n/g, '<br>');
+    const actions = document.createElement('div');
+    actions.style.textAlign = 'right';
+    actions.style.marginBottom = '12px';
 
-    this.reportBody.innerHTML = `
-      <div style="text-align:right;margin-bottom:12px;">
-        <button id="btn-save-report" style="background:#E5007E;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:12px;cursor:pointer;">💾 保存为 Markdown</button>
-      </div>
-      ${html}
-    `;
+    const saveButton = document.createElement('button');
+    saveButton.id = 'btn-save-report';
+    saveButton.style.background = '#E5007E';
+    saveButton.style.color = '#fff';
+    saveButton.style.border = 'none';
+    saveButton.style.borderRadius = '6px';
+    saveButton.style.padding = '8px 14px';
+    saveButton.style.fontSize = '12px';
+    saveButton.style.cursor = 'pointer';
+    saveButton.textContent = '💾 保存为 Markdown';
+    saveButton.addEventListener('click', () => this.saveReport());
+    actions.appendChild(saveButton);
 
-    document.getElementById('btn-save-report').addEventListener('click', () => this.saveReport());
+    const reportContent = document.createElement('div');
+    reportContent.className = 'report-content';
+    renderReportContent(reportContent, report);
+    this.reportBody.replaceChildren(actions, reportContent);
   }
 
   async saveReport() {
@@ -381,7 +430,12 @@ class ExpressionTrainer {
   resetStats() {
     this.stats = { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 0, duration: 0 };
     this.updateStatsDisplay();
-    this.feedbackContent.innerHTML = '';
+    this.feedbackContent.replaceChildren();
+  }
+
+  advanceLLMGeneration() {
+    this.llmGeneration = (this.llmGeneration ?? 0) + 1;
+    return this.llmGeneration;
   }
 
   showError(msg) {
@@ -422,11 +476,17 @@ class ExpressionTrainer {
   }
 
   clearAll() {
+    this.advanceLLMGeneration();
+    window.api.cancelLLMRequests();
     this.fullText = '';
     this.sentences = [];
+    this.lastFeedbackText = '';
     this.lastReport = '';
-    this.subtitleContainer.innerHTML = '<div class="subtitle-line hint">点击下方按钮开始说话</div>';
-    this.feedbackContent.innerHTML = '';
+    const hint = document.createElement('div');
+    hint.className = 'subtitle-line hint';
+    hint.textContent = '点击下方按钮开始说话';
+    this.subtitleContainer.replaceChildren(hint);
+    this.feedbackContent.replaceChildren();
     this.resetStats();
     this.timer.textContent = '00:00';
     this.timer.classList.remove('active');
@@ -448,12 +508,16 @@ class ExpressionTrainer {
     const text = this.pasteTextarea.value.trim();
     if (!text) return;
 
+    this.advanceLLMGeneration();
+    await window.api.cancelLLMRequests();
+
     // 关闭粘贴弹窗
     this.pasteModal.classList.add('hidden');
 
     // 把文本显示到字幕区（高亮标记）
-    this.subtitleContainer.innerHTML = '';
+    this.subtitleContainer.replaceChildren();
     this.fullText = text;
+    this.lastFeedbackText = '';
     this.resetStats();
 
     // 按句号/问号/感叹号/换行分句
@@ -463,7 +527,7 @@ class ExpressionTrainer {
     for (const sentence of sentences) {
       const line = document.createElement('div');
       line.className = 'subtitle-line';
-      line.innerHTML = this.highlightText(sentence.trim());
+      renderHighlightedText(line, sentence.trim());
       this.subtitleContainer.appendChild(line);
 
       // 词库分析
@@ -490,4 +554,10 @@ class ExpressionTrainer {
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => { new ExpressionTrainer(); });
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { mergeFinalText, ExpressionTrainer };
+}
+
+if (typeof document !== 'undefined') {
+  document.addEventListener('DOMContentLoaded', () => { new ExpressionTrainer(); });
+}
