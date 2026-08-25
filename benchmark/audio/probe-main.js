@@ -1,18 +1,25 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('node:path');
+const { pathToFileURL } = require('node:url');
 const { RESULT_MARKER, validateProbeResult } = require('./probe-result');
 const { selectProbeSession } = require('./probe-session');
+const { authorizeMediaRequest, blockUnexpectedNavigation, denyWindowOpen, isExpectedProbeFrame } = require('./probe-security');
+const { createProbeShutdownCoordinator } = require('./probe-shutdown');
 
 const RESULT_CHANNEL = 'audio-baseline:submit-result';
+const SHUTDOWN_ACK_CHANNEL = 'audio-baseline:cleanup-ack';
+const SHUTDOWN_REQUEST_CHANNEL = 'audio-baseline:shutdown-requested';
 const APP_TIMEOUT_MS = 55_000;
 let probeWindow;
 let probeSession;
 let completed = false;
 let timeout;
+let shutdownCoordinator;
 
 function clearProbeHandlers() {
   clearTimeout(timeout);
   ipcMain.removeHandler(RESULT_CHANNEL);
+  ipcMain.removeHandler(SHUTDOWN_ACK_CHANNEL);
   if (probeSession) {
     probeSession.setPermissionRequestHandler(null);
     probeSession.setPermissionCheckHandler(null);
@@ -22,8 +29,12 @@ function clearProbeHandlers() {
 
 function exitWithFailure(error) {
   console.error(error.stack || error.message || String(error));
-  clearProbeHandlers();
-  app.exit(1);
+  if (shutdownCoordinator) {
+    shutdownCoordinator.request(1);
+  } else {
+    clearProbeHandlers();
+    app.exit(1);
+  }
 }
 
 async function startProbe() {
@@ -39,34 +50,65 @@ async function startProbe() {
       preload: path.join(__dirname, 'probe-preload.js')
     }
   });
+  const expectedProbeUrl = pathToFileURL(path.join(__dirname, 'probe.html')).href;
   probeSession = selectProbeSession(probeWindow.webContents);
-  const isProbeWebContents = webContents => webContents === probeWindow.webContents;
-  const allowsMedia = (webContents, permission) => isProbeWebContents(webContents) && permission === 'media';
-  probeSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    callback(allowsMedia(webContents, permission));
+  const isProbeWebContents = webContents => isExpectedProbeFrame({
+    expectedWebContents: probeWindow.webContents,
+    webContents,
+    expectedUrl: expectedProbeUrl
   });
-  probeSession.setPermissionCheckHandler((webContents, permission) => allowsMedia(webContents, permission));
+  const allowsMedia = (webContents, permission, requestingUrl) => authorizeMediaRequest({
+    expectedWebContents: probeWindow.webContents,
+    webContents,
+    permission,
+    requestingUrl,
+    expectedUrl: expectedProbeUrl
+  });
+  probeWindow.webContents.on('will-navigate', (event, targetUrl) => {
+    blockUnexpectedNavigation(event, targetUrl, expectedProbeUrl);
+  });
+  probeWindow.webContents.setWindowOpenHandler(denyWindowOpen);
+  probeSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    callback(allowsMedia(webContents, permission, details?.requestingUrl ?? webContents.getURL()));
+  });
+  probeSession.setPermissionCheckHandler((webContents, permission, _requestingOrigin, details) => {
+    return allowsMedia(webContents, permission, details?.requestingUrl ?? webContents.getURL());
+  });
+
+  shutdownCoordinator = createProbeShutdownCoordinator({
+    sendShutdown: () => {
+      if (probeWindow && !probeWindow.isDestroyed()) {
+        probeWindow.webContents.send(SHUTDOWN_REQUEST_CHANNEL);
+      }
+    },
+    closeWindow: () => {
+      if (probeWindow && !probeWindow.isDestroyed()) probeWindow.close();
+    },
+    quit: exitCode => app.exit(exitCode),
+    cleanupHandlers: clearProbeHandlers,
+    setTimer,
+    clearTimer
+  });
 
   ipcMain.handle(RESULT_CHANNEL, (event, result) => {
     if (!isProbeWebContents(event.sender)) throw new Error('audio probe result came from an unknown renderer');
     const normalizedResult = validateProbeResult(result);
     completed = true;
     console.log(`${RESULT_MARKER} ${JSON.stringify(normalizedResult)}`);
-    setTimeout(() => {
-      clearProbeHandlers();
-      if (probeWindow && !probeWindow.isDestroyed()) probeWindow.close();
-      app.quit();
-    }, 0);
+    shutdownCoordinator.request(0);
+    return { accepted: true };
+  });
+  ipcMain.handle(SHUTDOWN_ACK_CHANNEL, event => {
+    if (!isProbeWebContents(event.sender)) throw new Error('audio probe cleanup acknowledgement came from an unknown renderer');
+    shutdownCoordinator.acknowledge();
     return { accepted: true };
   });
 
   probeWindow.once('closed', () => {
-    if (!completed) process.exitCode = 1;
-    clearProbeHandlers();
-    app.quit();
+    if (!shutdownCoordinator.isFinished()) shutdownCoordinator.request(completed ? 0 : 1);
   });
   timeout = setTimeout(() => exitWithFailure(new Error(`Audio baseline probe exceeded ${APP_TIMEOUT_MS}ms`)), APP_TIMEOUT_MS);
-  await probeWindow.loadFile(path.join(__dirname, 'probe.html'));
+  await probeWindow.loadURL(expectedProbeUrl);
 }
 
 startProbe().catch(exitWithFailure);

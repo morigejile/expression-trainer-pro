@@ -23,6 +23,18 @@ test('sine fixture has the requested sample count', () => {
   }).length, 44100);
 });
 
+test('sine fixture preserves the requested frequency and zero phase', () => {
+  const samples = createSineFixture({
+    sampleRateHz: 8000,
+    frequencyHz: 1000,
+    durationMs: 1
+  });
+
+  assert.ok(Math.abs(samples[0]) < 1e-7);
+  assert.ok(Math.abs(samples[2] - 1) < 1e-7);
+  assert.ok(Math.abs(samples[4]) < 1e-7);
+});
+
 test('4096-sample chunks retain their actual duration at 16, 44.1, and 48 kHz', () => {
   for (const [actualSampleRateHz, actualDurationMs] of [
     [16000, 256],

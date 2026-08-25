@@ -10,6 +10,21 @@ function setStatus(message) {
   document.getElementById('status').textContent = message;
 }
 
+function prepareShutdownAcknowledgement() {
+  window.audioBaseline.onShutdownRequested(async () => {
+    setStatus('Closing audio capture…');
+    try {
+      await closeCapture();
+    } finally {
+      try {
+        await window.audioBaseline.acknowledgeShutdown();
+      } catch (error) {
+        setStatus(`Cleanup acknowledgement failed: ${error.message}`);
+      }
+    }
+  });
+}
+
 async function hashLabel(label) {
   if (!label || !globalThis.crypto?.subtle) return null;
   const digest = await globalThis.crypto.subtle.digest('SHA-256', new TextEncoder().encode(label));
@@ -79,4 +94,5 @@ async function runProbe() {
 }
 
 window.addEventListener('beforeunload', () => { closeCapture(); });
+prepareShutdownAcknowledgement();
 runProbe();

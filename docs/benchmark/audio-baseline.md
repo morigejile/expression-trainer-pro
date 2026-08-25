@@ -1,7 +1,7 @@
 # BM-03 Audio Baseline
 
-> 状态：**Partial evidence — BM-03 未完成**  
-> 基线：`94e192d73c04ec36d5c4ad016e8e5daf1dc4670d`  
+> 状态：**Partial evidence — BM-03 未完成**
+> 基线：`94e192d73c04ec36d5c4ad016e8e5daf1dc4670d`
 > 实测运行时：Electron `43.4.1` / Windows `Win32` x64
 
 ## 已验证的合成基线
@@ -31,3 +31,7 @@
 ## 完成边界
 
 BM-03 仍缺少独立的真实 44.1 kHz 配置证据；因此不能标为 Completed，也不能据此关闭“实际采样率与声明率可能不一致”的跨设备风险。下一次采集应在另一个 44.1 kHz 系统格式或设备上运行同一 Probe，并保留同样的脱敏 JSON。
+
+## 清理边界
+
+Probe 正常完成、超时或主进程错误时，Main 先向唯一的本地 Probe renderer 发送关闭请求，renderer 关闭 MediaStream tracks、AudioContext 和处理节点后回传确认，随后 Main 关闭窗口并退出。若 renderer 已崩溃、未加载或无法在 1 秒内确认，Main 只能关闭窗口并强制退出；`run-probe.js` 的外层 60 秒超时还会在 Windows 对精确根 PID 执行 `taskkill /pid <pid> /T /F`。该平台级杀进程无法保证 renderer 的 JavaScript 清理回调执行，因此保留为不可避免的回退路径。

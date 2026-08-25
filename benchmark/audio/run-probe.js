@@ -4,11 +4,14 @@ const { RESULT_MARKER, parseProbeOutput } = require('./probe-result');
 
 const PROCESS_TIMEOUT_MS = 60_000;
 
-function stopProcessTree(child) {
+function stopProcessTree(child, {
+  platform = process.platform,
+  spawnSyncProcess = spawnSync
+} = {}) {
   if (!child || !child.pid || child.exitCode !== null) return;
 
-  if (process.platform === 'win32') {
-    const result = spawnSync('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
+  if (platform === 'win32') {
+    const result = spawnSyncProcess('taskkill', ['/pid', String(child.pid), '/T', '/F'], {
       stdio: 'ignore',
       windowsHide: true
     });
@@ -91,4 +94,4 @@ if (require.main === module) {
     });
 }
 
-module.exports = { PROCESS_TIMEOUT_MS, runProbe };
+module.exports = { PROCESS_TIMEOUT_MS, runProbe, stopProcessTree };
