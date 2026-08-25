@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://expression-trainer.local/schemas/benchmark-dataset-manifest-v1.json",
+  "title": "Expression Trainer benchmark dataset manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "datasetId", "datasetVersion", "samples"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "datasetId": { "type": "string", "minLength": 1 },
+    "datasetVersion": { "type": "string", "minLength": 1 },
+    "samples": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/sample" }
+    }
+  },
+  "$defs": {
+    "sample": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "audioFile", "sha256", "transcript", "locale", "tags", "sampleRateHz", "channels", "durationMs", "source"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "audioFile": { "type": "string", "minLength": 1 },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "transcript": { "type": "string", "minLength": 1 },
+        "locale": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$" },
+        "tags": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "enum": ["mandarin", "fast", "slow", "light-accent", "code-switch", "numbers-names", "light-noise"]
+          }
+        },
+        "sampleRateHz": { "type": "integer", "minimum": 8000, "maximum": 192000 },
+        "channels": { "type": "integer", "minimum": 1, "maximum": 2 },
+        "durationMs": { "type": "integer", "minimum": 1, "maximum": 600000 },
+        "source": { "$ref": "#/$defs/source" }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind", "license", "consent", "redistribution"],
+      "properties": {
+        "kind": { "enum": ["participant", "public-corpus", "synthetic"] },
+        "license": { "type": "string", "minLength": 1 },
+        "consent": { "enum": ["recorded", "dataset-license", "not-required"] },
+        "redistribution": { "enum": ["allowed", "metadata-only", "prohibited"] }
+      }
+    }
+  }
+}
