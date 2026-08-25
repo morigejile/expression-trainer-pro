@@ -86,10 +86,11 @@ async function reserveRunDirectory(runDir) {
   };
 }
 
-async function writeResults(runDir, samples, environment, { candidateFailures = [] } = {}) {
+async function writeResults(runDir, samples, environment, { candidateFailures = [], reservation = null } = {}) {
   if (!Array.isArray(samples)) throw new TypeError('samples must be an array');
   if (!Array.isArray(candidateFailures)) throw new TypeError('candidateFailures must be an array');
-  const reservation = await reserveRunDirectory(runDir);
+  if (reservation && reservation.runDir !== runDir) throw new TypeError('result reservation must match runDir');
+  const activeReservation = reservation || await reserveRunDirectory(runDir);
   const temporaryDir = path.join(runDir, `.staging-${process.pid}-${crypto.randomUUID()}`);
   const summary = summarizeSamples(samples);
   summary.candidateFailures = {
@@ -117,7 +118,7 @@ async function writeResults(runDir, samples, environment, { candidateFailures = 
     await fs.rm(temporaryDir, { recursive: true, force: true });
     throw error;
   }
-  return { runDir, summary };
+  return { runDir: activeReservation.runDir, summary };
 }
 
 module.exports = { METRIC_FIELDS, SUMMARY_CSV_COLUMNS, reserveRunDirectory, writeResults };

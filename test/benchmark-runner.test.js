@@ -152,6 +152,27 @@ test('dry run rejects an output-root junction that resolves inside the dataset',
   }
 });
 
+test('formal runner refuses a concurrent formal lock before adapter initialization', async () => {
+  const { runBenchmark } = require('../benchmark/run');
+  const { acquireFormalRunLock } = require('../benchmark/lib/output-root');
+  await withDataset(async ({ root, manifestPath, outputRoot }) => {
+    const release = await acquireFormalRunLock(outputRoot);
+    try {
+      await assert.rejects(runBenchmark({
+        manifestPath,
+        datasetRoot: root,
+        candidateId: 'fake',
+        outputRoot,
+        runId: 'locked-run',
+        formal: true,
+        allowDirty: true
+      }), /formal benchmark lock already exists/);
+    } finally {
+      await release();
+    }
+  });
+});
+
 test('runner records fake init, sample, timeout, and dispose failures with a nonzero result', async () => {
   const { runBenchmark } = require('../benchmark/run');
 

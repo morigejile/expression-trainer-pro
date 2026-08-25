@@ -7,7 +7,7 @@ const { calculateCer } = require('./lib/cer');
 const { loadDatasetManifest } = require('./lib/dataset-manifest');
 const { collectEnvironment } = require('./lib/environment');
 const { measureRun } = require('./lib/metrics');
-const { acquireFormalRunLock, prepareOutputRoot } = require('./lib/output-root');
+const { acquireFormalRunLock, prepareOutputRoot, reserveSafeRunDirectory } = require('./lib/output-root');
 const { writeResults } = require('./lib/results');
 const { normalizeTranscript } = require('./lib/transcript');
 
@@ -148,6 +148,7 @@ async function runBenchmark(options) {
   validateRunId(runId);
   const releaseFormalLock = formal ? await acquireFormalRunLock(canonicalOutputRoot) : null;
   try {
+    const reservation = await reserveSafeRunDirectory({ datasetRoot, outputRoot: canonicalOutputRoot, runId });
     const sampleRuns = manifest.samples.flatMap((sample) => Array.from({ length: repetitions }, (_, index) => ({ sample, repetition: index + 1 })));
     const records = [];
     const candidateFailures = [];
@@ -212,7 +213,7 @@ async function runBenchmark(options) {
       candidateConfig: adapter.config,
       modelFiles: adapter.modelFiles
     });
-    const output = await writeResults(path.join(canonicalOutputRoot, runId), records, environment, { candidateFailures });
+    const output = await writeResults(reservation.runDir, records, environment, { candidateFailures, reservation });
     return { ...output, exitCode: output.summary.failed > 0 || candidateFailures.length > 0 ? 1 : 0 };
   } finally {
     if (releaseFormalLock) await releaseFormalLock();

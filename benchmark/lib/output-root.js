@@ -1,5 +1,6 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const { reserveRunDirectory } = require('./results');
 
 function isPathInside(parent, child) {
   const relative = path.relative(parent, child);
@@ -39,6 +40,20 @@ async function prepareOutputRoot({ datasetRoot, outputRoot }) {
   return canonicalOutputRoot;
 }
 
+async function reserveSafeRunDirectory({ datasetRoot, outputRoot, runId }) {
+  const canonicalDatasetRoot = await fs.realpath(datasetRoot);
+  const canonicalOutputRoot = await fs.realpath(outputRoot);
+  if (isPathInside(canonicalDatasetRoot, canonicalOutputRoot)) {
+    throw new Error('outputRoot must not resolve inside datasetRoot');
+  }
+  const reservation = await reserveRunDirectory(path.join(canonicalOutputRoot, runId));
+  const canonicalRunDir = await fs.realpath(reservation.runDir);
+  if (isPathInside(canonicalDatasetRoot, canonicalRunDir) || !isPathInside(canonicalOutputRoot, canonicalRunDir)) {
+    throw new Error('reserved run directory escaped canonical outputRoot');
+  }
+  return { ...reservation, runDir: canonicalRunDir };
+}
+
 async function acquireFormalRunLock(outputRoot) {
   const lockPath = path.join(outputRoot, '.benchmark-formal.lock');
   let handle;
@@ -61,4 +76,4 @@ async function acquireFormalRunLock(outputRoot) {
   };
 }
 
-module.exports = { acquireFormalRunLock, canonicalizeWithExistingAncestor, isPathInside, prepareOutputRoot };
+module.exports = { acquireFormalRunLock, canonicalizeWithExistingAncestor, isPathInside, prepareOutputRoot, reserveSafeRunDirectory };

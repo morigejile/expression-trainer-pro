@@ -22,3 +22,22 @@ test('formal run lock excludes a concurrent runner and never reclaims a stale lo
     assert.equal(fs.readFileSync(staleLockPath, 'utf8'), '{"pid":999}');
   });
 });
+
+test('safe reservation rechecks an output root swapped into the dataset after preparation', async () => {
+  const { prepareOutputRoot, reserveSafeRunDirectory } = require('../benchmark/lib/output-root');
+  await withTempDirectory(async (directory) => {
+    const datasetRoot = path.join(directory, 'dataset');
+    const outputRoot = path.join(directory, 'output');
+    fs.mkdirSync(datasetRoot);
+    const canonicalOutputRoot = await prepareOutputRoot({ datasetRoot, outputRoot });
+
+    fs.rmSync(outputRoot, { recursive: true });
+    await fs.promises.symlink(datasetRoot, outputRoot, 'junction');
+
+    await assert.rejects(reserveSafeRunDirectory({
+      datasetRoot,
+      outputRoot: canonicalOutputRoot,
+      runId: 'run-1'
+    }), /outputRoot must not resolve inside datasetRoot/);
+  });
+});
