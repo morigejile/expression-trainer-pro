@@ -18,7 +18,7 @@ test('FLEURS intake inventory preserves relative paths and pending upstream-draf
       const number = index + 1;
       const fileName = `sample-${number}.wav`;
       fs.copyFileSync(syntheticWav, path.join(destination, fileName));
-      return `${number}\t${fileName}\t第${number}条上游原文。\t第${number}条规范文本。\tignored\t16000\tfemale`;
+      return `shared-sentence\t${fileName}\t第${number}条上游原文。\t第${number}条规范文本。\tignored\t16000\tfemale`;
     });
 
     const { createFleursIntakeInventory } = require('../benchmark/scripts/generate-fleurs-intake-inventory');
@@ -40,6 +40,7 @@ test('FLEURS intake inventory preserves relative paths and pending upstream-draf
 
     const expectedSha256 = crypto.createHash('sha256').update(fs.readFileSync(syntheticWav)).digest('hex');
     assert.equal(inventory.samples.length, 50);
+    assert.equal(inventory.samples[0].id, 'fleurs-cmn-hans-cn-dev-sample-1');
     assert.equal(inventory.samples[0].audioFile, 'fleurs-cmn-hans-cn-dev/audio/sample-1.wav');
     assert.equal(inventory.samples[0].sha256, expectedSha256);
     assert.equal(inventory.samples[0].transcript, '第1条规范文本。');

@@ -38,7 +38,6 @@ function isInside(root, candidate) {
 
 function parseFleursDevTsv(tsvText) {
   requiredString(tsvText, 'tsvText');
-  const ids = new Set();
   const files = new Set();
   return tsvText.split(/\r?\n/).filter((line) => line.trim() !== '').map((line, index) => {
     const fields = line.split('\t');
@@ -46,11 +45,10 @@ function parseFleursDevTsv(tsvText) {
     const id = requiredString(fields[0], `TSV row ${index + 1} id`);
     const fileName = requiredString(fields[1], `TSV row ${index + 1} file name`);
     const transcript = requiredString(fields[3], `TSV row ${index + 1} transcription`);
-    if (!/^[A-Za-z0-9._-]+$/.test(id) || ids.has(id)) throw new Error(`TSV row ${index + 1} has an unsafe or duplicate id`);
+    if (!/^[A-Za-z0-9._-]+$/.test(id)) throw new Error(`TSV row ${index + 1} has an unsafe id`);
     if (path.basename(fileName) !== fileName || fileName.includes('/') || fileName.includes('\\') || files.has(fileName)) {
       throw new Error(`TSV row ${index + 1} has an unsafe or duplicate audio file name`);
     }
-    ids.add(id);
     files.add(fileName);
     return { id, fileName, transcript };
   });
@@ -97,7 +95,7 @@ function createFleursIntakeInventory({ tsvText, datasetRoot, audioDirectory, max
     const bytes = fs.readFileSync(canonicalAudioPath);
     const audio = parsePcmWav(bytes);
     return {
-      id: `fleurs-cmn-hans-cn-dev-${record.id}`,
+      id: `fleurs-cmn-hans-cn-dev-${path.posix.parse(record.fileName).name}`,
       audioFile: relativeAudioFile,
       sha256: crypto.createHash('sha256').update(bytes).digest('hex'),
       sampleRateHz: audio.sampleRateHz,
