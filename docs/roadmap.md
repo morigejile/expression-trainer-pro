@@ -109,7 +109,7 @@ flowchart LR
 
 | ID | 状态 | Owner | 证据 |
 |---|---|---|---|
-| BM-01 | In Progress | Codex + maintainer | **Corrected Contract Gate** commit `f06a43bb2819aac07e4ecbd0ebd3fd27576e99e1`：schema 与 Node 内置 validator 校验 canonical realpath、descriptor recheck、RIFF/WAVE 16-bit PCM 元数据、固定 keys、来源/许可组合与 SHA-256；质量报告由独立 `MANIFEST_PATH` / `DATASET_ROOT` CLI 确定性生成。当前治理 manifest 为 `expression-zh-v1` / `0.1.0`，SHA-256 `1dadf62bace0cdd8961718b9dd9c50cb0bdb0136a8c08fb0ac480a8a8326b948`，0 条 / 0 ms，7 个分层均为 0。原始音频必须保留在 Git 外受控 dataset root；本轮没有获得授权真人录音、双人复核 ground truth 或许可样本，故不能 Completed。 |
+| BM-01 | In Progress | Codex + maintainer | **Corrected Contract Gate** commit `f06a43bb2819aac07e4ecbd0ebd3fd27576e99e1`：schema 与 Node 内置 validator 校验 canonical realpath、descriptor recheck、RIFF/WAVE 16-bit PCM 元数据、固定 keys、来源/许可组合与 SHA-256；质量报告由独立 `MANIFEST_PATH` / `DATASET_ROOT` CLI 确定性生成。当前治理 manifest 为 `expression-zh-v1` / `0.1.0`，SHA-256 `1dadf62bace0cdd8961718b9dd9c50cb0bdb0136a8c08fb0ac480a8a8326b948`，0 条 / 0 ms，7 个分层均为 0。另有 100 条官方 FLEURS 外部候选及 hash/PCM intake inventory，但均为 `pending` / `upstream-draft`，仅观察到普通话，不能计入治理样本或完成条件。原始音频必须保留在 Git 外受控 dataset root；尚未完成授权/归因复核、PII 筛查、独立首转写、第二人复核与标签复核，故不能 Completed。 |
 
 > FunASR-Nano、Whisper、WASM 可作为研究参考，但不阻塞首轮决策，也不进入默认运行依赖。
 

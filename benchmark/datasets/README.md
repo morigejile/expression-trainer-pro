@@ -29,3 +29,15 @@ See [SOURCES.md](SOURCES.md) for the current evidence-backed public-corpus
 acquisition boundary. It records candidate licensing and download constraints;
 it does not claim that any upstream transcript, metadata, or source record has
 completed the human-review gate.
+
+## External FLEURS candidate intake
+
+`benchmark/scripts/generate-fleurs-intake-inventory.js` creates an external
+candidate inventory from the official FLEURS `cmn_hans_cn` development TSV and
+a separately converted 16-bit PCM audio directory. It emits only relative
+audio paths and SHA-256 metadata, marks every record `upstream-draft` and
+`pending`, and intentionally identifies only the observed `mandarin` stratum.
+It is not a governed manifest and its records do not count toward the BM-01
+50–100 real-human, authorization, and independent-review gates. See
+[SOURCES.md](SOURCES.md) for the exact source revision, licence, checksums, and
+external-only reproduction inputs.

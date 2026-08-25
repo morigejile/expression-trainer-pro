@@ -7,8 +7,8 @@ sample a BM-01 ground-truth sample.
 ## Candidate: Google FLEURS Mandarin Chinese
 
 - Publisher-hosted dataset card: <https://huggingface.co/datasets/google/fleurs>
-- Original Google storage object:
-  <https://storage.googleapis.com/xtreme_translations/FLEURS102/cmn_hans_cn.tar.gz>
+- Original Google storage object (immutable generation `1650974174867084`):
+  <https://storage.googleapis.com/xtreme_translations/FLEURS102/cmn_hans_cn.tar.gz?generation=1650974174867084>
 - Dataset licence: [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/legalcode).
   Retain the required attribution when a subset is used.
 - Locale/configuration: `cmn_hans_cn` (Mandarin Chinese, Simplified, China).
@@ -19,43 +19,59 @@ sample a BM-01 ground-truth sample.
   The publisher lists it as 217 MB with SHA-256
   `3bc33212d5974eef7feb04bc4792458d6cd7e14ff10a1a24772f3c45ea87a822`.
 
-### 2026-08-25 acquisition decision
+### 2026-08-25 external candidate intake
 
-The original Google object responded with a fixed content length of
-`2,522,990,658` bytes.  That exceeds this benchmark's conservative 2 GB
-download cap, so it was not downloaded.  The bounded immutable development
-shard above is the sole approved alternative.  No proxy, mirror, archive
-slicing, account gate, or unofficial downloader may be used.
+The benchmark download cap was explicitly raised to 3 GB for this acquisition.
+The official immutable Google object was fetched only from the publisher URL
+with generation query `1650974174867084`.  It was accepted only after these
+independent checks:
 
-The following official-URL attempts produced no HTTP status and no local
-partial file, so no audio was acquired:
+- Exact bytes: `2,522,990,658`.
+- Publisher MD5: `cd39a9c9ac596fb561ad90353660889e`
+  (`zTmpyaxZb7VhrZA1NmCIng==`).
+- Locally calculated SHA-256:
+  `0b412f291a8790db9226a1d4b69f811d5ace99cffae2a3df994a15af335190f3`.
 
-```text
-curl.exe --fail --silent --show-error --location --head \
-  "https://huggingface.co/datasets/google/fleurs/resolve/4683b04/data/cmn_hans_cn/audio/dev.tar.gz?download=true"
-# curl: (28) Failed to connect to huggingface.co:443 after 21082 ms: Could not connect to server
+The external, non-Git intake contains the first 100 `dev.tsv` rows in source
+order.  Its 100 source WAVs were retained outside Git and separately converted
+to 16-bit PCM WAV before hashing and validation: the publisher files observed
+in this run were 16 kHz mono IEEE-float/32-bit WAV, which cannot enter the
+frozen BM-01 PCM contract directly.  The converted candidates total
+`38,461,560` bytes and `1,201,680` ms.  The external inventory SHA-256 is
+`463e8e34ccc7dc95a4d86cf823092460a890354fcd17de7109462f24355f3b6a`.
 
-curl.exe --fail --location --show-error --retry 2 --retry-all-errors --retry-delay 1 \
-  --connect-timeout 20 --continue-at - --output <external-staging>/incoming/fleurs-cmn_hans_cn-dev-4683b04.tar.gz.part \
-  "https://huggingface.co/datasets/google/fleurs/resolve/4683b04/data/cmn_hans_cn/audio/dev.tar.gz?download=true"
-# curl: (28) Connection timed out after 20014 milliseconds
-# Warning: Problem : timeout. Retrying in 1 second. 2 retries left.
+This is a candidate intake only.  All 100 records are `reviewStatus: "pending"`
+and `transcriptStatus: "upstream-draft"`; no upstream transcript is asserted
+to be human-reviewed ground truth.  Only `mandarin` is observed.  The
+fast, slow, light-accent, code-switch, numbers-names, and light-noise strata
+remain unobserved.
+
+No proxy, mirror, account-gate bypass, or unofficial downloader may be used.
+Do not commit audio, absolute paths, speaker metadata, raw upstream metadata,
+or the external intake inventory to this repository.
+
+### Reproduce external inventory
+
+Use a controlled external root, not a repository path.  Preserve the original
+files and write PCM derivatives to a separate relative directory.  The intake
+tool validates the resulting RIFF/WAVE PCM metadata and hashes before writing
+the inventory.
+
+```powershell
+$env:DATASET_ROOT = '<controlled external root>'
+New-Item -ItemType Directory -Path (Join-Path $env:DATASET_ROOT 'cmn_hans_cn/audio/dev-pcm16')
+Get-ChildItem (Join-Path $env:DATASET_ROOT 'cmn_hans_cn/audio/dev') -Filter *.wav | ForEach-Object {
+  ffmpeg -nostdin -v error -i $_.FullName -map 0:a:0 -c:a pcm_s16le (Join-Path $env:DATASET_ROOT "cmn_hans_cn/audio/dev-pcm16/$($_.Name)")
+}
+$env:FLEURS_TSV_PATH = Join-Path $env:DATASET_ROOT 'cmn_hans_cn/dev.tsv'
+$env:AUDIO_DIRECTORY = 'cmn_hans_cn/audio/dev-pcm16'
+$env:INVENTORY_PATH = Join-Path $env:DATASET_ROOT 'intake/fleurs-cmn-hans-cn-dev-candidates-v1.json'
+$env:MAX_SAMPLES = '100'
+$env:ARCHIVE_GENERATION = '1650974174867084'
+$env:ARCHIVE_SHA256 = '0b412f291a8790db9226a1d4b69f811d5ace99cffae2a3df994a15af335190f3'
+$env:ARCHIVE_BYTES = '2522990658'
+node benchmark/scripts/generate-fleurs-intake-inventory.js
 ```
-
-The staging check found the partial archive absent.  Do not retry through any
-non-official host.  A later retry may use only this exact immutable URL, resume
-option, expected SHA-256, and the external dataset root.
-
-Consequently the external BM-01 staging area intentionally has no downloaded
-audio, intake inventory, or governed manifest entries from FLEURS yet.
-
-### Permitted next attempt
-
-Before downloading the bounded shard, recheck the immutable revision, remote
-SHA-256, byte size, source URL, and licence evidence.  Keep the total download
-below 2 GB and use only the publisher-hosted endpoint.  Extract only
-de-identified audio into the external dataset root; do not commit audio,
-absolute paths, speaker metadata, or raw upstream metadata to this repository.
 
 Each extracted candidate must initially be tracked only in an external intake
 inventory with `reviewStatus: "pending"` and
