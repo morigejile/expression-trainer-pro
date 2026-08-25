@@ -135,7 +135,15 @@
 **Interfaces:**
 - Produces `validateAlias(alias): string`, `applyHumanTransition(state, event): ReviewState`, `appendAuditEvent({ auditRoot, event }): AuditEvent`, `commitTransition({ reviewRoot, state, event, expectedRevision }): ReviewState`, `verifyAuditChain(auditRoot): AuditVerification`, and `recoverBrokenCandidate({ reviewRoot, candidateId }): RecoveryRecord`.
 - Candidate actions are `record-primary-transcript`, `approve-secondary-transcript`, `approve-license`, `clear-pii`, and `set-final-tags`; each requires `{ actorAlias, actorRole, bindingSha256, candidateId }`.
-- Batch action `approve-policy` is separate and requires `{ actorAlias, actorRole, batchId, policySha256 }`; it rejects `candidateId` and `bindingSha256` and writes only batch/policy audit evidence.
+- Batch action `approve-policy` is separate and requires fixed action `approve-policy` plus `{ actorAlias, actorRole, batchId, policySha256, expectedRevision }`; it rejects `candidateId`, `bindingSha256`, and payload fields, serializes on a per-batch lock, and writes only batch/policy audit evidence.
+
+**Fail-closed recovery clarification:** `audit/audit.jsonl` remains the sole
+authorization chain. If it is broken, recovery quarantines affected candidate
+evidence and writes a fresh `unreviewed` state with no binding or approvals; it
+does not repair or continue the broken global chain, so review and export remain
+blocked until an operator establishes a new controlled review root. Candidate
+audit decisions contain only a transcript hash/length or other non-sensitive
+decision metadata; raw human transcript text is never stored in the audit log.
 
 - [ ] **Step 1: Write the failing test**
   Assert alias regex, equal secondary alias rejection, ordered candidate transition, batch policy event without candidate binding, stale revision, competing writers, prior-hash continuity, crash replay, broken-chain quarantine, and no approval transfer to a new chain.
