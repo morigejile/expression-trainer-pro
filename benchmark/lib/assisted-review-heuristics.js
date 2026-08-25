@@ -1,6 +1,5 @@
 'use strict';
 
-const crypto = require('node:crypto');
 const { canonicalJson, sha256Text } = require('./assisted-review-storage');
 const { normalizeUnicodeCerV1 } = require('./assisted-review-text');
 
@@ -12,6 +11,11 @@ const verifiedApprovals = new WeakSet();
 const BINDING_KEYS = [
   'schemaVersion', 'candidateId', 'audioFile', 'audioSha256', 'sampleRateHz', 'channels',
   'durationMs', 'intakeSha256', 'sourceRevision', 'upstreamDraftSha256', 'bindingSha256',
+];
+const PREDICTION_ROLES = [
+  'baseline-paraformer',
+  'candidate-zipformer',
+  'candidate-sensevoice-small',
 ];
 
 function isPlainObject(value) {
@@ -33,15 +37,11 @@ function validatePolicy(policy) {
   assertExactKeys(policy, ['schemaVersion', 'ruleVersion', 'thresholds'], 'policy');
   if (policy.schemaVersion !== 1 || policy.ruleVersion !== RULE_VERSION) throw new Error('policy version is unsupported');
   assertExactKeys(policy.thresholds, ['slowCps', 'fastCps', 'noise'], 'policy.thresholds');
-  assertFinite(policy.thresholds.slowCps, 'policy.thresholds.slowCps');
-  assertFinite(policy.thresholds.fastCps, 'policy.thresholds.fastCps');
-  if (policy.thresholds.slowCps < 0 || policy.thresholds.fastCps <= policy.thresholds.slowCps) throw new Error('policy CPS thresholds are invalid');
+  if (policy.thresholds.slowCps !== 2.5 || policy.thresholds.fastCps !== 6.5) throw new Error('policy CPS thresholds are frozen');
   const noise = policy.thresholds.noise;
   assertExactKeys(noise, ['windowMs', 'lowerPercentile', 'upperPercentile', 'minDb', 'maxDb'], 'policy.thresholds.noise');
-  if (noise.windowMs !== 20 || noise.lowerPercentile !== 0.1 || noise.upperPercentile !== 0.9) throw new Error('policy noise percentile definition is unsupported');
-  assertFinite(noise.minDb, 'policy.thresholds.noise.minDb');
-  assertFinite(noise.maxDb, 'policy.thresholds.noise.maxDb');
-  if (noise.minDb > noise.maxDb) throw new Error('policy noise bounds are invalid');
+  if (noise.windowMs !== 20 || noise.lowerPercentile !== 0.1 || noise.upperPercentile !== 0.9
+    || noise.minDb !== 12 || noise.maxDb !== 30) throw new Error('policy noise thresholds are frozen');
   return policy;
 }
 
@@ -69,9 +69,9 @@ function validatePcm(binding, pcmBytes) {
   return { sampleCount, samplesPerWindow, durationMs };
 }
 
-function sourceLocale(candidate) {
-  if (!isPlainObject(candidate)) return undefined;
-  return candidate.source?.locale ?? candidate.sourceLocale ?? candidate.inventoryLocale;
+function sourceEnvelope(candidate) {
+  if (!isPlainObject(candidate) || !isPlainObject(candidate.source)) return null;
+  return candidate.source;
 }
 
 function sampleTranscript(candidate) {
@@ -80,8 +80,17 @@ function sampleTranscript(candidate) {
   return typeof sample.transcript === 'string' ? sample.transcript : '';
 }
 
-function medoidText(comparison) {
-  if (!isPlainObject(comparison) || typeof comparison.medoidRawText !== 'string') throw new Error('comparison medoid text is required');
+function validateComparison(comparison, binding) {
+  if (!isPlainObject(comparison) || comparison.bindingSha256 !== binding.bindingSha256) throw new Error('comparison binding does not match candidate binding');
+  if (!Array.isArray(comparison.predictions) || comparison.predictions.length !== PREDICTION_ROLES.length) throw new Error('comparison must contain exactly three stable predictions');
+  const seenRoles = new Set();
+  for (const prediction of comparison.predictions) {
+    if (!isPlainObject(prediction) || !PREDICTION_ROLES.includes(prediction.role) || seenRoles.has(prediction.role)) throw new Error('comparison prediction role is invalid');
+    if (typeof prediction.rawText !== 'string') throw new Error('comparison prediction rawText is required');
+    seenRoles.add(prediction.role);
+  }
+  if (seenRoles.size !== PREDICTION_ROLES.length || PREDICTION_ROLES.some((role) => !seenRoles.has(role))) throw new Error('comparison prediction roles are incomplete');
+  if (typeof comparison.medoidRawText !== 'string') throw new Error('comparison medoid text is incomplete');
   return normalizeUnicodeCerV1(comparison.medoidRawText);
 }
 
@@ -168,10 +177,11 @@ function createSuggestions({ binding, candidate, comparison, pcmBytes, policy })
   assertBinding(binding);
   validatePolicy(policy);
   const pcm = validatePcm(binding, pcmBytes);
-  const normalizedMedoid = medoidText(comparison);
+  const normalizedMedoid = validateComparison(comparison, binding);
   const codePoints = Array.from(normalizedMedoid);
-  const explicitSourceLocale = sourceLocale(candidate);
-  const hasMandarin = explicitSourceLocale === 'cmn_hans_cn' && binding.sourceRevision.trim() !== '';
+  const source = sourceEnvelope(candidate);
+  const explicitSourceLocale = source?.locale;
+  const hasMandarin = explicitSourceLocale === 'cmn_hans_cn' && source.sourceRevision === binding.sourceRevision;
   const hanCount = Array.from(normalizedMedoid.matchAll(/\p{Script=Han}/gu)).length;
   const latinTokens = Array.from(normalizedMedoid.matchAll(/\p{Script=Latin}{2,}/gu)).map((match) => ({ start: match.index, end: match.index + match[0].length, count: Array.from(match[0]).length }));
   const arabicDigitRuns = Array.from(normalizedMedoid.matchAll(/[0-9]{2,}/gu)).map((match) => ({ start: match.index, end: match.index + match[0].length, count: match[0].length }));
@@ -187,15 +197,23 @@ function createSuggestions({ binding, candidate, comparison, pcmBytes, policy })
   const piiWarnings = dedupeWarnings(warningsInput.flatMap((text) => scanPiiWarnings(text)));
   const policyDigest = policySha256(policy);
   const suggestions = [
-    suggestion('mandarin', { sourceLocale: explicitSourceLocale ?? null, sourceRevisionPresent: binding.sourceRevision.trim() !== '' }, {}, hasMandarin),
+    suggestion('mandarin', { sourceLocale: explicitSourceLocale ?? null, sourceRevisionMatchesBinding: source?.sourceRevision === binding.sourceRevision }, {}, hasMandarin),
     suggestion('code-switch', { hanCodePointCount: hanCount, latinTokens }, { minimumHanCodePoints: 2, minimumLatinTokenCodePoints: 2 }, hanCount >= 2 && latinTokens.length > 0),
     suggestion('numbers-names', { arabicDigitRuns, chineseNumeralRuns }, { minimumRunLength: 2, chineseNumerals: '〇一二三四五六七八九十百千万亿' }, arabicDigitRuns.length > 0 || chineseNumeralRuns.length > 0),
     suggestion('slow', { comparisonCodePointCount: codePoints.length, durationSeconds, charactersPerSecond }, { threshold: policy.thresholds.slowCps, operator: '<=' }, charactersPerSecond <= policy.thresholds.slowCps, { exportEvidenceEligible: false }),
     suggestion('fast', { comparisonCodePointCount: codePoints.length, durationSeconds, charactersPerSecond }, { threshold: policy.thresholds.fastCps, operator: '>=' }, charactersPerSecond >= policy.thresholds.fastCps, { exportEvidenceEligible: false }),
     noiseSuggestion(pcmBytes, pcm.samplesPerWindow, policy),
     suggestion('light-accent', {}, {}, null, { humanOnly: true }),
-  ];
-  return { policySha256: policyDigest, ruleVersion: RULE_VERSION, suggestions, piiWarnings };
+  ].map((entry) => ({ ...entry, bindingSha256: binding.bindingSha256 }));
+  const record = {
+    schemaVersion: 1,
+    bindingSha256: binding.bindingSha256,
+    policySha256: policyDigest,
+    ruleVersion: RULE_VERSION,
+    suggestions,
+    piiWarnings,
+  };
+  return { ...record, recordSha256: sha256Text(canonicalJson(record)) };
 }
 
 function validatePolicyApproval({ policy, approval }) {

@@ -39,7 +39,15 @@ function noisePcm({ sampleRateHz = 16000, windows = 10, low = 1000, high = 10000
   return pcm16(Array.from({ length: windows * samplesPerWindow }, (_, index) => index < samplesPerWindow ? low : high));
 }
 
-function input({ medoidRawText = '你好ab12一二', pcmBytes = noisePcm(), sourceLocale = 'cmn_hans_cn', sampleLocale = 'zh-CN' } = {}) {
+function input({
+  medoidRawText = '你好ab12一二',
+  pcmBytes = noisePcm(),
+  sourceLocale = 'cmn_hans_cn',
+  sourceRevision = 'fleurs-revision-1',
+  sampleLocale = 'zh-CN',
+  comparisonBindingSha256 = 'a'.repeat(64),
+  predictions,
+} = {}) {
   return {
     binding: {
       schemaVersion: 1,
@@ -56,12 +64,13 @@ function input({ medoidRawText = '你好ab12一二', pcmBytes = noisePcm(), sour
     },
     candidate: {
       sample: { locale: sampleLocale, transcript: '上游草稿含13800138000' },
-      source: { locale: sourceLocale },
+      source: { locale: sourceLocale, sourceRevision },
       proposedHumanText: '请联系 test@example.com',
     },
     comparison: {
+      bindingSha256: comparisonBindingSha256,
       medoidRawText,
-      predictions: [
+      predictions: predictions ?? [
         { role: 'baseline-paraformer', rawText: 'https://example.test/a' },
         { role: 'candidate-zipformer', rawText: '11010519491231002X' },
         { role: 'candidate-sensevoice-small', rawText: '4111 1111 1111 1111; 12345678' },
@@ -82,10 +91,26 @@ test('policy schema and validator reject unknown or path-like policy values', ()
   assert.equal(policySchema.additionalProperties, false);
   assert.deepEqual(policySchema.required, ['schemaVersion', 'ruleVersion', 'thresholds']);
   assert.equal(policySchema.properties.thresholds.additionalProperties, false);
+  assert.equal(policySchema.properties.thresholds.properties.slowCps.const, 2.5);
+  assert.equal(policySchema.properties.thresholds.properties.fastCps.const, 6.5);
+  assert.equal(policySchema.properties.thresholds.properties.noise.properties.minDb.const, 12);
+  assert.equal(policySchema.properties.thresholds.properties.noise.properties.maxDb.const, 30);
   assert.throws(
     () => createSuggestions({ ...input(), policy: { ...POLICY, unexpected: true } }),
     /unknown|unsupported/i,
   );
+  const changedPolicies = [
+    { ...POLICY, thresholds: { ...POLICY.thresholds, slowCps: 2.6 } },
+    { ...POLICY, thresholds: { ...POLICY.thresholds, fastCps: 6.6 } },
+    { ...POLICY, thresholds: { ...POLICY.thresholds, noise: { ...POLICY.thresholds.noise, windowMs: 21 } } },
+    { ...POLICY, thresholds: { ...POLICY.thresholds, noise: { ...POLICY.thresholds.noise, lowerPercentile: 0.2 } } },
+    { ...POLICY, thresholds: { ...POLICY.thresholds, noise: { ...POLICY.thresholds.noise, upperPercentile: 0.8 } } },
+    { ...POLICY, thresholds: { ...POLICY.thresholds, noise: { ...POLICY.thresholds.noise, minDb: 13 } } },
+    { ...POLICY, thresholds: { ...POLICY.thresholds, noise: { ...POLICY.thresholds.noise, maxDb: 29 } } },
+  ];
+  for (const changedPolicy of changedPolicies) {
+    assert.throws(() => createSuggestions({ ...input(), policy: changedPolicy }), /frozen|unsupported|threshold/i);
+  }
 });
 
 test('suggestions require explicit source locale and retain evidence inputs without human approval fields', () => {
@@ -100,7 +125,7 @@ test('suggestions require explicit source locale and retain evidence inputs with
   assert.equal(codeSwitch.result, true);
   assert.equal(numbers.result, true);
   assert.deepEqual(accent, {
-    tag: 'light-accent', ruleVersion: 'assisted-review-heuristics-v1', inputs: {}, thresholds: {}, result: null, humanOnly: true, humanDecisionRequired: true,
+    tag: 'light-accent', ruleVersion: 'assisted-review-heuristics-v1', inputs: {}, thresholds: {}, result: null, humanOnly: true, humanDecisionRequired: true, bindingSha256: 'a'.repeat(64),
   });
   for (const item of record.suggestions) {
     assert.equal(item.ruleVersion, 'assisted-review-heuristics-v1');
@@ -108,6 +133,7 @@ test('suggestions require explicit source locale and retain evidence inputs with
     assert.equal(Object.hasOwn(item, 'approval'), false);
     assert.equal(Object.hasOwn(item, 'clearance'), false);
     assert.equal(Object.hasOwn(item, 'finalTags'), false);
+    assert.equal(item.bindingSha256, record.bindingSha256);
   }
   const noSourceLocaleInput = input();
   delete noSourceLocaleInput.candidate.source.locale;
@@ -115,6 +141,12 @@ test('suggestions require explicit source locale and retain evidence inputs with
   assert.equal(suggestion(noSourceLocale, 'mandarin').result, false);
   const zhCnOnly = createSuggestions(input({ sourceLocale: 'zh-CN' }));
   assert.equal(suggestion(zhCnOnly, 'mandarin').result, false);
+  const revisionMismatch = createSuggestions(input({ sourceRevision: 'different-revision' }));
+  assert.equal(suggestion(revisionMismatch, 'mandarin').result, false);
+  const forgedFallback = input({ sourceLocale: 'zh-CN' });
+  forgedFallback.candidate.sourceLocale = 'cmn_hans_cn';
+  forgedFallback.candidate.inventoryLocale = 'cmn_hans_cn';
+  assert.equal(suggestion(createSuggestions(forgedFallback), 'mandarin').result, false);
   assert.equal(suggestion(createSuggestions(input({ medoidRawText: '你ab' })), 'code-switch').result, false);
   assert.equal(suggestion(createSuggestions(input({ medoidRawText: '你好a' })), 'code-switch').result, false);
   assert.equal(suggestion(createSuggestions(input({ medoidRawText: '你好éé' })), 'code-switch').result, true);
@@ -123,6 +155,32 @@ test('suggestions require explicit source locale and retain evidence inputs with
   assert.equal(suggestion(createSuggestions(input({ medoidRawText: '你好12' })), 'numbers-names').result, true);
   assert.equal(suggestion(createSuggestions(input({ medoidRawText: '你好一' })), 'numbers-names').result, false);
   assert.equal(suggestion(createSuggestions(input({ medoidRawText: '你好一二' })), 'numbers-names').result, true);
+});
+
+test('suggestion evidence fails closed on comparison tampering and is self-hash-bound', () => {
+  const record = createSuggestions(input());
+  const base = { ...record };
+  delete base.recordSha256;
+  assert.deepEqual(Object.keys(base).sort(), ['bindingSha256', 'piiWarnings', 'policySha256', 'ruleVersion', 'schemaVersion', 'suggestions']);
+  assert.equal(record.schemaVersion, 1);
+  assert.equal(record.bindingSha256, 'a'.repeat(64));
+  assert.equal(record.recordSha256, sha256Text(canonicalJson(base)));
+  assert.throws(() => createSuggestions(input({ comparisonBindingSha256: 'b'.repeat(64) })), /binding/i);
+  const missingBinding = input();
+  delete missingBinding.comparison.bindingSha256;
+  assert.throws(() => createSuggestions(missingBinding), /binding/i);
+  assert.throws(() => createSuggestions(input({ predictions: input().comparison.predictions.slice(0, 2) })), /three|prediction/i);
+  assert.throws(() => createSuggestions(input({ predictions: [
+    { role: 'baseline-paraformer', rawText: 'a' },
+    { role: 'baseline-paraformer', rawText: 'b' },
+    { role: 'candidate-sensevoice-small', rawText: 'c' },
+  ] })), /role|prediction/i);
+  assert.throws(() => createSuggestions(input({ predictions: [
+    { role: 'baseline-paraformer', rawText: 'a' },
+    { role: 'candidate-zipformer' },
+    { role: 'candidate-sensevoice-small', rawText: 'c' },
+  ] })), /rawText|prediction/i);
+  assert.throws(() => createSuggestions(input({ medoidRawText: null })), /medoid|incomplete/i);
 });
 
 test('CPS and fixed-window noise suggestions honor inclusive boundaries and zero-energy diagnostics', () => {
