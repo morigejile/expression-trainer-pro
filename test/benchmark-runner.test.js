@@ -5,10 +5,31 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
+function createPcmWav({ sampleRateHz = 16000, channels = 1, durationMs = 1000 } = {}) {
+  const blockAlign = channels * 2;
+  const byteRate = sampleRateHz * blockAlign;
+  const dataBytes = (byteRate * durationMs) / 1000;
+  const wav = Buffer.alloc(44 + dataBytes);
+  wav.write('RIFF', 0, 4, 'ascii');
+  wav.writeUInt32LE(wav.length - 8, 4);
+  wav.write('WAVE', 8, 4, 'ascii');
+  wav.write('fmt ', 12, 4, 'ascii');
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(channels, 22);
+  wav.writeUInt32LE(sampleRateHz, 24);
+  wav.writeUInt32LE(byteRate, 28);
+  wav.writeUInt16LE(blockAlign, 32);
+  wav.writeUInt16LE(16, 34);
+  wav.write('data', 36, 4, 'ascii');
+  wav.writeUInt32LE(dataBytes, 40);
+  return wav;
+}
+
 function createDataset() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'expression-trainer-runner-'));
   const audioPath = path.join(root, 'audio.wav');
-  fs.writeFileSync(audioPath, 'fixture audio');
+  fs.writeFileSync(audioPath, createPcmWav());
   const manifestPath = path.join(root, 'manifest.json');
   fs.writeFileSync(manifestPath, JSON.stringify({
     schemaVersion: 1,
