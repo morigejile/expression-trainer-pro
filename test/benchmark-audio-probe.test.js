@@ -1,8 +1,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
-const { validateProbeResult, parseProbeOutput } = require('../benchmark/audio/probe-result');
+const { RESULT_MARKER, validateProbeResult, parseProbeOutput } = require('../benchmark/audio/probe-result');
 const { runProbe, stopProcessTree } = require('../benchmark/audio/run-probe');
+const { createAudioInputScanRequests } = require('../benchmark/audio/device-scan');
 const { selectProbeSession } = require('../benchmark/audio/probe-session');
 const {
   createMediaPermissionHandlers,
@@ -35,6 +36,120 @@ test('probe output parser returns only validated rate metadata', () => {
     'probe booted',
     `AUDIO_BASELINE_RESULT ${JSON.stringify(validProbeResult)}`
   ].join('\n')), validProbeResult);
+});
+
+test('probe result retains only hashed per-device 44.1 and 48 kHz scan metadata', () => {
+  const deviceScan = [
+    {
+      outcome: 'observed',
+      deviceIdHash: 'a'.repeat(64),
+      deviceLabelHash: 'b'.repeat(64),
+      requestedContextRateHz: 44100,
+      actualContextRateHz: 44100,
+      trackSampleRateHz: 44100,
+      trackChannelCount: 1,
+      bufferSampleRateHz: 44100,
+      bufferLength: 4096
+    },
+    {
+      outcome: 'unavailable',
+      deviceIdHash: 'c'.repeat(64),
+      deviceLabelHash: null,
+      requestedContextRateHz: 48000,
+      actualContextRateHz: null,
+      trackSampleRateHz: null,
+      trackChannelCount: null,
+      bufferSampleRateHz: null,
+      bufferLength: null
+    }
+  ];
+  const result = {
+    electron: '43.4.1',
+    platform: 'Win32',
+    arch: 'x64',
+    observedAt: '2026-08-25T00:00:00.000Z',
+    scanStatus: 'complete',
+    enumeratedAudioInputCount: 1,
+    deviceScan
+  };
+
+  assert.deepEqual(validateProbeResult(result), result);
+});
+
+test('probe result rejects a device scan with a raw identifier', () => {
+  assert.throws(() => validateProbeResult({
+    electron: '43.4.1',
+    platform: 'Win32',
+    arch: 'x64',
+    observedAt: '2026-08-25T00:00:00.000Z',
+    scanStatus: 'complete',
+    enumeratedAudioInputCount: 1,
+    deviceScan: [{
+      outcome: 'observed',
+      deviceIdHash: 'a'.repeat(64),
+      deviceLabelHash: 'b'.repeat(64),
+      deviceId: 'raw-device-id',
+      requestedContextRateHz: 44100,
+      actualContextRateHz: 44100,
+      trackSampleRateHz: 44100,
+      trackChannelCount: 1,
+      bufferSampleRateHz: 44100,
+      bufferLength: 4096
+    }]
+  }), /device scan entry has unexpected field deviceId/);
+});
+
+test('probe result records an all-unavailable device scan without inventing audio rates', () => {
+  const result = {
+    electron: '43.4.1',
+    platform: 'Win32',
+    arch: 'x64',
+    observedAt: '2026-08-25T00:00:00.000Z',
+    scanStatus: 'complete',
+    enumeratedAudioInputCount: 1,
+    deviceScan: [{
+      outcome: 'unavailable',
+      deviceIdHash: 'd'.repeat(64),
+      deviceLabelHash: null,
+      requestedContextRateHz: 44100,
+      actualContextRateHz: null,
+      trackSampleRateHz: null,
+      trackChannelCount: null,
+      bufferSampleRateHz: null,
+      bufferLength: null
+    }]
+  };
+
+  assert.deepEqual(validateProbeResult(result), result);
+});
+
+test('device scan plans exact 44.1 and 48 kHz attempts for every audio input only', () => {
+  assert.deepEqual(createAudioInputScanRequests([
+    { kind: 'audioinput', deviceId: 'mic-a' },
+    { kind: 'videoinput', deviceId: 'camera-a' },
+    { kind: 'audioinput', deviceId: 'mic-b' }
+  ]), [
+    {
+      deviceId: 'mic-a',
+      requestedContextRateHz: 44100,
+      constraints: { audio: { deviceId: { exact: 'mic-a' }, sampleRate: { exact: 44100 } } }
+    },
+    {
+      deviceId: 'mic-a',
+      requestedContextRateHz: 48000,
+      constraints: { audio: { deviceId: { exact: 'mic-a' }, sampleRate: { exact: 48000 } } }
+    },
+    {
+      deviceId: 'mic-b',
+      requestedContextRateHz: 44100,
+      constraints: { audio: { deviceId: { exact: 'mic-b' }, sampleRate: { exact: 44100 } } }
+    },
+    {
+      deviceId: 'mic-b',
+      requestedContextRateHz: 48000,
+      constraints: { audio: { deviceId: { exact: 'mic-b' }, sampleRate: { exact: 48000 } } }
+    }
+  ]);
 });
 
 test('probe uses the BrowserWindow session that owns the probe renderer', () => {
@@ -169,6 +284,22 @@ test('probe shutdown force-closes only after the acknowledgement timeout', () =>
   assert.deepEqual(events, ['request', 'clear-handlers', 'close-window', 'quit:1']);
 });
 
+test('probe shutdown coordinator uses runtime timers when no test timers are injected', async () => {
+  const events = [];
+  const shutdown = createProbeShutdownCoordinator({
+    sendShutdown: () => events.push('request'),
+    closeWindow: () => events.push('close-window'),
+    quit: code => events.push(`quit:${code}`),
+    cleanupHandlers: () => events.push('clear-handlers'),
+    acknowledgementTimeoutMs: 1
+  });
+
+  shutdown.request(0);
+  await new Promise(resolve => setTimeout(resolve, 10));
+
+  assert.deepEqual(events, ['request', 'clear-handlers', 'close-window', 'quit:0']);
+});
+
 test('probe runner kills the exact Windows process tree PID on timeout', () => {
   let taskkillCall;
   const child = { pid: 4321, exitCode: null, kill: () => assert.fail('taskkill should succeed') };
@@ -201,4 +332,44 @@ test('probe runner rejects a process that produces no evidence before its timeou
     spawnProcess: () => child,
     timeoutMs: 5
   }), /timed out after 5ms/);
+});
+
+test('probe runner forwards the isolated device-scan flag to Electron', async () => {
+  const child = new EventEmitter();
+  child.stdout = new EventEmitter();
+  child.stderr = new EventEmitter();
+  child.stdout.setEncoding = () => {};
+  child.stderr.setEncoding = () => {};
+  child.exitCode = null;
+  child.pid = 4321;
+  const scanResult = {
+    electron: '43.4.1',
+    platform: 'Win32',
+    arch: 'x64',
+    observedAt: '2026-08-25T00:00:00.000Z',
+    scanStatus: 'complete',
+    enumeratedAudioInputCount: 0,
+    deviceScan: []
+  };
+  let command;
+  let args;
+
+  const result = await runProbe({
+    electronExecutable: 'fake-electron',
+    scanDevices: true,
+    spawnProcess(executable, spawnArgs) {
+      command = executable;
+      args = spawnArgs;
+      queueMicrotask(() => {
+        child.stdout.emit('data', `${RESULT_MARKER} ${JSON.stringify(scanResult)}\n`);
+        child.exitCode = 0;
+        child.emit('close', 0, null);
+      });
+      return child;
+    }
+  });
+
+  assert.equal(command, 'fake-electron');
+  assert.deepEqual(args.slice(-1), ['--scan-devices']);
+  assert.deepEqual(result, scanResult);
 });

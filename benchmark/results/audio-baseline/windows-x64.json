@@ -24,8 +24,20 @@
       }
     }
   ],
+  "deviceScans": [
+    {
+      "electron": "43.4.1",
+      "platform": "Win32",
+      "arch": "x64",
+      "observedAt": "2026-08-25T10:38:10.301Z",
+      "scanStatus": "complete",
+      "enumeratedAudioInputCount": 0,
+      "deviceScan": []
+    }
+  ],
   "unverified": [
     "A separately configured 44.1 kHz device or system format has not been measured.",
+    "The metadata-only device scan completed after microphone permission but Electron enumerated zero audioinput devices, so no exact 44.1 or 48 kHz per-device attempt ran.",
     "This single Windows x64 observation does not establish macOS or Linux behavior.",
     "The probe measures rate metadata only; it does not initialize an ASR model or retain audio."
   ]

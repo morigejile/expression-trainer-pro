@@ -3,6 +3,7 @@ const path = require('node:path');
 const { RESULT_MARKER, parseProbeOutput } = require('./probe-result');
 
 const PROCESS_TIMEOUT_MS = 60_000;
+const DEVICE_SCAN_PROCESS_TIMEOUT_MS = 180_000;
 
 function stopProcessTree(child, {
   platform = process.platform,
@@ -33,10 +34,14 @@ function diagnostics(stdout, stderr, code, signal) {
 function runProbe({
   electronExecutable = require('electron'),
   spawnProcess = spawn,
-  timeoutMs = PROCESS_TIMEOUT_MS
+  scanDevices = false,
+  timeoutMs = scanDevices ? DEVICE_SCAN_PROCESS_TIMEOUT_MS : PROCESS_TIMEOUT_MS
 } = {}) {
   const projectRoot = path.resolve(__dirname, '..', '..');
-  const child = spawnProcess(electronExecutable, [path.join(__dirname, 'probe-main.js')], {
+  const child = spawnProcess(electronExecutable, [
+    path.join(__dirname, 'probe-main.js'),
+    ...(scanDevices ? ['--scan-devices'] : [])
+  ], {
     cwd: projectRoot,
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
@@ -84,7 +89,7 @@ function runProbe({
 }
 
 if (require.main === module) {
-  runProbe()
+  runProbe({ scanDevices: process.argv.includes('--scan-devices') })
     .then(result => {
       console.log(`${RESULT_MARKER} ${JSON.stringify(result)}`);
     })
@@ -94,4 +99,9 @@ if (require.main === module) {
     });
 }
 
-module.exports = { PROCESS_TIMEOUT_MS, runProbe, stopProcessTree };
+module.exports = {
+  DEVICE_SCAN_PROCESS_TIMEOUT_MS,
+  PROCESS_TIMEOUT_MS,
+  runProbe,
+  stopProcessTree
+};

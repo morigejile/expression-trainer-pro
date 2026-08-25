@@ -3,8 +3,8 @@ function createProbeShutdownCoordinator({
   closeWindow,
   quit,
   cleanupHandlers,
-  setTimer,
-  clearTimer,
+  setTimer = setTimeout,
+  clearTimer = clearTimeout,
   acknowledgementTimeoutMs = 1000
 }) {
   let timer;

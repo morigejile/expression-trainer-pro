@@ -10,6 +10,7 @@ const RESULT_CHANNEL = 'audio-baseline:submit-result';
 const SHUTDOWN_ACK_CHANNEL = 'audio-baseline:cleanup-ack';
 const SHUTDOWN_REQUEST_CHANNEL = 'audio-baseline:shutdown-requested';
 const APP_TIMEOUT_MS = 55_000;
+const DEVICE_SCAN_APP_TIMEOUT_MS = 175_000;
 let probeWindow;
 let probeSession;
 let completed = false;
@@ -50,7 +51,8 @@ async function startProbe() {
       preload: path.join(__dirname, 'probe-preload.js')
     }
   });
-  const expectedProbeUrl = pathToFileURL(path.join(__dirname, 'probe.html')).href;
+  const scanDevices = process.argv.includes('--scan-devices');
+  const expectedProbeUrl = `${pathToFileURL(path.join(__dirname, 'probe.html')).href}${scanDevices ? '?scan-devices=1' : ''}`;
   probeSession = selectProbeSession(probeWindow.webContents);
   const isProbeWebContents = webContents => isExpectedProbeFrame({
     expectedWebContents: probeWindow.webContents,
@@ -79,8 +81,8 @@ async function startProbe() {
     },
     quit: exitCode => app.exit(exitCode),
     cleanupHandlers: clearProbeHandlers,
-    setTimer,
-    clearTimer
+    setTimer: setTimeout,
+    clearTimer: clearTimeout
   });
 
   ipcMain.handle(RESULT_CHANNEL, (event, result) => {
@@ -100,7 +102,8 @@ async function startProbe() {
   probeWindow.once('closed', () => {
     if (!shutdownCoordinator.isFinished()) shutdownCoordinator.request(completed ? 0 : 1);
   });
-  timeout = setTimeout(() => exitWithFailure(new Error(`Audio baseline probe exceeded ${APP_TIMEOUT_MS}ms`)), APP_TIMEOUT_MS);
+  const timeoutMs = scanDevices ? DEVICE_SCAN_APP_TIMEOUT_MS : APP_TIMEOUT_MS;
+  timeout = setTimeout(() => exitWithFailure(new Error(`Audio baseline probe exceeded ${timeoutMs}ms`)), timeoutMs);
   await probeWindow.loadURL(expectedProbeUrl);
 }
 

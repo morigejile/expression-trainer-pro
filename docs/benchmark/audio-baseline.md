@@ -28,9 +28,19 @@
 
 结构化原始元数据位于 [`benchmark/results/audio-baseline/windows-x64.json`](../../benchmark/results/audio-baseline/windows-x64.json)。
 
+## 自动化设备扫描（2026-08-25）
+
+在同一台 Windows x64 / Electron 43.4.1 环境上，先成功复跑默认输入的元数据 Probe（48,000 Hz track、16,000 Hz context 与首个 buffer），随后运行：
+
+```powershell
+& 'C:\Users\mr\AppData\Local\hermes\node\node.exe' benchmark\audio\run-probe.js --scan-devices
+```
+
+扫描会在已获 `media` 权限后调用 `enumerateDevices()`，只为每个枚举出的 `audioinput` 生成精确 44,100 Hz 和 48,000 Hz 约束；每次仅读取首个 buffer 的率/长度并立即关闭 track、AudioContext 和节点。结果为 `scanStatus: complete`、`enumeratedAudioInputCount: 0`、`deviceScan: []`：当前 Electron 会话没有暴露可逐项尝试的 audioinput，因此没有产生 44.1/48 kHz 约束测量或原始设备标识。该扫描报告是可复现的“零枚举输入”边界，不是 44.1 kHz 设备证据。
+
 ## 完成边界
 
-BM-03 仍缺少独立的真实 44.1 kHz 配置证据；因此不能标为 Completed，也不能据此关闭“实际采样率与声明率可能不一致”的跨设备风险。下一次采集应在另一个 44.1 kHz 系统格式或设备上运行同一 Probe，并保留同样的脱敏 JSON。
+BM-03 仍缺少独立的真实 44.1 kHz 配置证据；因此不能标为 Completed，也不能据此关闭“实际采样率与声明率可能不一致”的跨设备风险。下一次采集需由人工接入或在 Windows 中选择可枚举的 44.1 kHz 输入设备/格式，然后运行同一 `--scan-devices` Probe，并保留同样的脱敏 JSON。
 
 ## 清理边界
 
