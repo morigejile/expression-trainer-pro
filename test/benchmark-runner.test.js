@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('node:crypto');
+const childProcess = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
@@ -25,6 +26,15 @@ function createPcmWav({ sampleRateHz = 16000, channels = 1, durationMs = 1000 } 
   wav.writeUInt32LE(dataBytes, 40);
   return wav;
 }
+
+test('benchmark CLI exits nonzero when argument validation fails', () => {
+  const result = childProcess.spawnSync(process.execPath, ['benchmark/run.js', '--unknown'], {
+    cwd: path.resolve(__dirname, '..'),
+    encoding: 'utf8'
+  });
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Benchmark failed: unknown argument: --unknown/);
+});
 
 function createDataset() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'expression-trainer-runner-'));

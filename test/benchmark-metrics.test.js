@@ -84,7 +84,73 @@ test('collectEnvironment rejects absolute model paths in persisted metadata', ()
       candidateId: 'fake',
       candidateVersion: '1.0.0',
       modelFiles: [{ path: modelPath, relativePath: modelPath }]
-    }), /relativePath must be relative/);
+    }), /must stay within its model root/);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('collectEnvironment captures this repository Git provenance when invoked from another directory', () => {
+  const { collectEnvironment } = require('../benchmark/lib/environment');
+  const originalDirectory = process.cwd();
+  const unrelatedDirectory = fs.mkdtempSync(path.join(os.tmpdir(), 'expression-trainer-unrelated-'));
+  try {
+    process.chdir(unrelatedDirectory);
+    const environment = collectEnvironment({ candidateId: 'fake', candidateVersion: '1.0.0' });
+    assert.equal(environment.git.status, 'ok');
+    assert.match(environment.git.commit, /^[a-f0-9]{40}$/);
+    assert.equal(typeof environment.git.dirty, 'boolean');
+  } finally {
+    process.chdir(originalDirectory);
+    fs.rmSync(unrelatedDirectory, { recursive: true, force: true });
+  }
+});
+
+test('collectEnvironment records unknown Git provenance conservatively outside a repository', () => {
+  const { collectEnvironment } = require('../benchmark/lib/environment');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'expression-trainer-no-git-'));
+  try {
+    const environment = collectEnvironment({
+      candidateId: 'fake',
+      candidateVersion: '1.0.0',
+      repositoryRoot: directory
+    });
+    assert.equal(environment.git.status, 'unknown');
+    assert.equal(environment.git.commit, null);
+    assert.equal(environment.git.dirty, null);
+    assert.match(environment.git.error, /git/);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('collectEnvironment allowlists public config and redacts secrets', () => {
+  const { collectEnvironment } = require('../benchmark/lib/environment');
+  const environment = collectEnvironment({
+    candidateId: 'fake',
+    candidateVersion: '1.0.0',
+    candidateConfig: { threads: 2, provider: 'cpu', apiKey: 'do-not-persist', unknownSetting: 'omit' }
+  });
+  assert.deepEqual(environment.candidate.config, { provider: 'cpu', threads: 2 });
+  assert.deepEqual(environment.candidate.redactedConfigKeys, ['apiKey']);
+});
+
+test('collectEnvironment rejects absolute and traversal model paths before persistence', () => {
+  const { collectEnvironment } = require('../benchmark/lib/environment');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'expression-trainer-model-'));
+  const modelPath = path.join(directory, 'model.onnx');
+  fs.writeFileSync(modelPath, 'model-bytes');
+  try {
+    assert.throws(() => collectEnvironment({
+      candidateId: 'fake',
+      candidateVersion: '1.0.0',
+      candidateConfig: { modelPath: 'foo/../../outside.onnx' }
+    }), /must stay within its model root/);
+    assert.throws(() => collectEnvironment({
+      candidateId: 'fake',
+      candidateVersion: '1.0.0',
+      modelFiles: [{ path: modelPath, relativePath: 'foo/../../outside.onnx' }]
+    }), /must stay within its model root/);
   } finally {
     fs.rmSync(directory, { recursive: true, force: true });
   }
