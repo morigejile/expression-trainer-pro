@@ -4,17 +4,18 @@ BM-02 提供独立的 Node CLI；它不调用生产 `lib/asr.js`、Audio、IPC�
 
 ```js
 createBenchmarkAdapter({ candidateId, candidateConfig })
-// -> { init(), transcribe(sample, { onPartial, onFinal }), dispose() }
+// -> { init(), transcribe(sample, { onPartial, onFinal }, { signal }), cancel({ reason, signal }), dispose() }
 ```
 
-每次正式运行读取 BM-01 manifest 和仓库外的 dataset root。结果目录必须不存在，写入在同级临时目录完成后才 rename，因此不会覆盖已有 run：
+每次正式运行读取 BM-01 manifest 和仓库外的 dataset root。结果目录必须不存在；先原子预留 run ID，再在其私有 staging 目录写入，因此不会覆盖已有 run：
 
 ```text
 <output-root>/<run-id>/
 ├── samples.jsonl       # 保留每个 sample/repetition，包括失败记录
 ├── summary.json        # 总计、数值统计和 tag 分层统计
 ├── summary.csv         # 固定 UTF-8 CSV 列：scope,tag,metric,count,missing,mean,median,p95
-└── environment.json    # Git、OS/硬件、runtime、threads、candidate/model file fingerprints
+├── environment.json    # Git、OS/硬件、runtime、threads、候选/model file fingerprints
+└── failures.jsonl      # init/dispose 等候选级失败；不改变 sample/repetition 分母
 ```
 
 ## 使用方式
@@ -32,7 +33,11 @@ node benchmark/run.js `
   --repetitions 3
 ```
 
-正式运行拒绝 dirty worktree、未知 candidate、非正 repetitions、缺失必需路径，以及位于 dataset root 内的 output root。`--dry-run` 只验证 manifest、candidate 和可选输出目录可写性，不初始化或运行模型。候选缺失 partial 时 `firstPartialMs` 保持 `null`，不会用 final latency 代替；空参考文本的 CER 为 `null` 并记录 invalid reference。
+正式运行拒绝 dirty worktree、未知 candidate、非正 repetitions、缺失必需路径，以及规范解析后位于 dataset root 内的 output root。即使 output root 尚不存在，也会先解析既有祖先；创建后及原子预留 run ID 前再次解析，因而 Windows junction/symlink 不能绕过该限制。每个非 dry-run 正式运行以 output root 内的 `.benchmark-formal.lock` 互斥；已有锁（包括 stale lock）一律拒绝，必须由操作人员先确认并显式清除。run ID 通过 `mkdir` 原子预留，结果只在预留目录内暂存后发布，绝不覆盖既有 run。
+
+超时会 abort `transcribe` 的 `AbortSignal`、等待 adapter `cancel()` 完成并屏蔽迟到回调，才开始下一条 repetition。候选 `init` 失败会将每个预期 sample 标记为 `not-run`，而 init/dispose 失败另写入 `failures.jsonl`；因此 `summary.total` 与 tag 分母始终等于 sample × repetitions。环境快照从此仓库根目录解析 Git；Git 失败为 `status: "unknown"`、`commit/dirty: null`，不会伪报 clean。持久化的候选配置仅允许 `provider`、`sampleRateHz`、`threads`，secret-like key 只记录名称，模型路径必须为规范的、未越界的相对路径。
+
+`--dry-run` 只验证 manifest、candidate 和可选输出目录的规范安全性，不初始化或运行模型。候选缺失 partial 时 `firstPartialMs` 保持 `null`，不会用 final latency 代替；空参考文本的 CER 为 `null` 并记录 invalid reference。
 
 ## 当前边界
 
