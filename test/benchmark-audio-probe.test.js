@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const { EventEmitter } = require('node:events');
 const { validateProbeResult, parseProbeOutput } = require('../benchmark/audio/probe-result');
 const { runProbe } = require('../benchmark/audio/run-probe');
+const { selectProbeSession } = require('../benchmark/audio/probe-session');
 
 const validProbeResult = {
   electron: '43.4.1',
@@ -28,6 +29,11 @@ test('probe output parser returns only validated rate metadata', () => {
     'probe booted',
     `AUDIO_BASELINE_RESULT ${JSON.stringify(validProbeResult)}`
   ].join('\n')), validProbeResult);
+});
+
+test('probe uses the BrowserWindow session that owns the probe renderer', () => {
+  const probeSession = { marker: 'probe-session' };
+  assert.equal(selectProbeSession({ session: probeSession }), probeSession);
 });
 
 test('probe runner rejects a process that produces no evidence before its timeout', async () => {

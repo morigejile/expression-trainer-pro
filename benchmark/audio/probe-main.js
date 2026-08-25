@@ -1,6 +1,7 @@
-const { app, BrowserWindow, ipcMain, session } = require('electron');
+const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('node:path');
 const { RESULT_MARKER, validateProbeResult } = require('./probe-result');
+const { selectProbeSession } = require('./probe-session');
 
 const RESULT_CHANNEL = 'audio-baseline:submit-result';
 const APP_TIMEOUT_MS = 55_000;
@@ -21,9 +22,8 @@ function clearProbeHandlers() {
 
 function exitWithFailure(error) {
   console.error(error.stack || error.message || String(error));
-  process.exitCode = 1;
   clearProbeHandlers();
-  app.quit();
+  app.exit(1);
 }
 
 async function startProbe() {
@@ -39,7 +39,7 @@ async function startProbe() {
       preload: path.join(__dirname, 'probe-preload.js')
     }
   });
-  probeSession = session.fromPartition(probeWindow.webContents.session.getPartition());
+  probeSession = selectProbeSession(probeWindow.webContents);
   const isProbeWebContents = webContents => webContents === probeWindow.webContents;
   const allowsMedia = (webContents, permission) => isProbeWebContents(webContents) && permission === 'media';
   probeSession.setPermissionRequestHandler((webContents, permission, callback) => {
