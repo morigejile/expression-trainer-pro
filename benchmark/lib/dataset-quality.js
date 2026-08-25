@@ -4,12 +4,20 @@ const REQUIRED_TAGS = [...ALLOWED_TAGS];
 const COMMON_SAMPLE_RATES = [16000, 44100, 48000];
 const REDISTRIBUTION_STATES = ['allowed', 'metadata-only', 'prohibited'];
 
+function increment(map, key) {
+  map.set(key, (map.get(key) || 0) + 1);
+}
+
+function toNullRecord(map) {
+  return Object.assign(Object.create(null), Object.fromEntries(map));
+}
+
 function summarizeDataset(manifest) {
   const samples = Array.isArray(manifest?.samples) ? manifest.samples : [];
   const tagCounts = Object.fromEntries(REQUIRED_TAGS.map((tag) => [tag, 0]));
   const sampleRateCounts = Object.fromEntries(COMMON_SAMPLE_RATES.map((sampleRate) => [String(sampleRate), 0]));
-  const licenseCounts = {};
-  const redistributionCounts = Object.fromEntries(REDISTRIBUTION_STATES.map((state) => [state, 0]));
+  const licenseCounts = new Map();
+  const redistributionCounts = new Map(REDISTRIBUTION_STATES.map((state) => [state, 0]));
   let totalDurationMs = 0;
   let minDurationMs = null;
   let maxDurationMs = null;
@@ -25,8 +33,8 @@ function summarizeDataset(manifest) {
 
     const sampleRate = String(sample.sampleRateHz);
     sampleRateCounts[sampleRate] = (sampleRateCounts[sampleRate] || 0) + 1;
-    licenseCounts[sample.source.license] = (licenseCounts[sample.source.license] || 0) + 1;
-    redistributionCounts[sample.source.redistribution] = (redistributionCounts[sample.source.redistribution] || 0) + 1;
+    increment(licenseCounts, sample.source.license);
+    increment(redistributionCounts, sample.source.redistribution);
   }
 
   const missingTags = REQUIRED_TAGS.filter((tag) => tagCounts[tag] === 0);
@@ -42,8 +50,8 @@ function summarizeDataset(manifest) {
     maxDurationMs,
     tagCounts,
     missingTags,
-    licenseCounts,
-    redistributionCounts,
+    licenseCounts: toNullRecord(licenseCounts),
+    redistributionCounts: toNullRecord(redistributionCounts),
     sampleRateCounts,
     isWithinTargetSampleCount: samples.length >= 50 && samples.length <= 100,
     limitations

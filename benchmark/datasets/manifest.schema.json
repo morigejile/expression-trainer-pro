@@ -7,8 +7,8 @@
   "required": ["schemaVersion", "datasetId", "datasetVersion", "samples"],
   "properties": {
     "schemaVersion": { "const": 1 },
-    "datasetId": { "type": "string", "minLength": 1 },
-    "datasetVersion": { "type": "string", "minLength": 1 },
+    "datasetId": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "datasetVersion": { "type": "string", "minLength": 1, "pattern": "\\S" },
     "samples": {
       "type": "array",
       "items": { "$ref": "#/$defs/sample" }
@@ -20,10 +20,10 @@
       "additionalProperties": false,
       "required": ["id", "audioFile", "sha256", "transcript", "locale", "tags", "sampleRateHz", "channels", "durationMs", "source"],
       "properties": {
-        "id": { "type": "string", "minLength": 1 },
-        "audioFile": { "type": "string", "minLength": 1 },
+        "id": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "audioFile": { "type": "string", "minLength": 1, "pattern": "\\S" },
         "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
-        "transcript": { "type": "string", "minLength": 1 },
+        "transcript": { "type": "string", "minLength": 1, "pattern": "\\S" },
         "locale": { "type": "string", "pattern": "^[a-z]{2,3}(-[A-Z]{2})?$" },
         "tags": {
           "type": "array",
@@ -45,10 +45,29 @@
       "required": ["kind", "license", "consent", "redistribution"],
       "properties": {
         "kind": { "enum": ["participant", "public-corpus", "synthetic"] },
-        "license": { "type": "string", "minLength": 1 },
+        "license": {
+          "anyOf": [
+            { "enum": ["Apache-2.0", "BSD-3-Clause", "CC0-1.0", "CC-BY-4.0", "CC-BY-SA-4.0", "MIT"] },
+            { "type": "string", "pattern": "^project-local:[a-z0-9][a-z0-9.-]*$" }
+          ]
+        },
         "consent": { "enum": ["recorded", "dataset-license", "not-required"] },
         "redistribution": { "enum": ["allowed", "metadata-only", "prohibited"] }
-      }
+      },
+      "allOf": [
+        {
+          "if": { "properties": { "kind": { "const": "synthetic" } } },
+          "then": { "properties": { "consent": { "const": "not-required" } } }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "participant" } } },
+          "then": { "properties": { "consent": { "const": "recorded" } } }
+        },
+        {
+          "if": { "properties": { "kind": { "const": "public-corpus" } } },
+          "then": { "properties": { "consent": { "const": "dataset-license" } } }
+        }
+      ]
     }
   }
 }
