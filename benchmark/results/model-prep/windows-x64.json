@@ -1,0 +1,18 @@
+{
+  "recordedAt": "2026-08-25T06:26:07.970Z",
+  "environment": {
+    "node": "22.23.0",
+    "modules": "127",
+    "arch": "x64",
+    "platform": "win32",
+    "sherpaVersion": "1.13.3"
+  },
+  "nativeAddon": {
+    "loaded": true,
+    "onlineRecognizerExport": "function",
+    "offlineRecognizerExport": "function"
+  },
+  "candidateInitializations": [],
+  "status": "blocked-awaiting-complete-hash-verified-model-artifacts",
+  "reason": "No candidate model archive was complete and hash-verified during this run; do not interpret native-addon loading as model initialization."
+}
