@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "status": "partial-evidence",
+  "environment": {
+    "electron": "43.4.1",
+    "platform": "Win32",
+    "arch": "x64"
+  },
+  "observations": [
+    {
+      "requestedContextRateHz": 16000,
+      "actualContextRateHz": 16000,
+      "trackSampleRateHz": 48000,
+      "trackChannelCount": 1,
+      "bufferSampleRateHz": 16000,
+      "bufferLength": 4096,
+      "observedAt": "2026-08-25T05:57:24.318Z",
+      "trackLabelHash": "cfa0c3cf8172396d8454564b5592331b26c770d106c6b9b9b3c2d5d2c92e4585",
+      "asrDeclaredSampleRateHz": 16000,
+      "chunkAnalysis": {
+        "actualDurationMs": 256,
+        "declaredDurationMs": 256,
+        "durationRatio": 1
+      }
+    }
+  ],
+  "unverified": [
+    "A separately configured 44.1 kHz device or system format has not been measured.",
+    "This single Windows x64 observation does not establish macOS or Linux behavior.",
+    "The probe measures rate metadata only; it does not initialize an ASR model or retain audio."
+  ]
+}

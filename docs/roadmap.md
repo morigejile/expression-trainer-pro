@@ -107,6 +107,12 @@ flowchart LR
 
 > FunASR-Nano、Whisper、WASM 可作为研究参考，但不阻塞首轮决策，也不进入默认运行依赖。
 
+#### Phase 2 执行记录
+
+| ID | 状态 | Owner | 证据 |
+|---|---|---|---|
+| BM-03 | In Progress | Codex + maintainer | 合成 16/44.1/48 kHz fixture 与独立 Electron probe 已建立。Windows x64 / Electron 43.4.1 的一条真实 48 kHz track 观察中，requested/actual AudioContext 与首个 buffer 均为 16 kHz，4096-sample chunk 实际/声明时长为 256/256 ms（1x）；结构化元数据见 `benchmark/results/audio-baseline/windows-x64.json`。独立 44.1 kHz 设备/系统格式尚未实测，故 BM-03 不得标记 Completed。 |
+
 ### Phase 3 — 冻结目标决策
 
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |

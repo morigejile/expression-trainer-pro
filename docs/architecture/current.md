@@ -7,7 +7,7 @@
 
 ## 1. 证据边界
 
-本文件检查了独立 T-08 worktree 的源码、README、依赖清单和 Git 状态，并完成依赖安装、语法检查、Node 测试、自动化 Electron smoke、Electron runtime 中的 Sherpa native require 与正常非 smoke 启动。smoke 实际加载 Main、Preload、主页面和设置页，通过真实 IPC 验证 Fake ASR、协调式 Fake LLM 与粘贴分析；尚未连接麦克风、初始化/运行真实 ASR 模型或请求真实 LLM，因此“native require / smoke 通过”与“完整识别运行通过”严格区分。
+本文件检查了独立 T-08 worktree 的源码、README、依赖清单和 Git 状态，并完成依赖安装、语法检查、Node 测试、自动化 Electron smoke、Electron runtime 中的 Sherpa native require 与正常非 smoke 启动。smoke 实际加载 Main、Preload、主页面和设置页，通过真实 IPC 验证 Fake ASR、协调式 Fake LLM 与粘贴分析。BM-03 后另有一条独立 Probe 的真实麦克风元数据观察（48 kHz track 设置、16 kHz 实际 context/buffer）；它不初始化或运行真实 ASR 模型，也不代表完整识别验收，因此“native require / smoke 通过”与“完整识别运行通过”严格区分。
 
 | 标记 | 含义 |
 |---|---|
@@ -218,7 +218,7 @@ getUserMedia({audio:true})
 → partial 或 endpoint/final UI
 ```
 
-源码没有显式 resampler，也没有检查 `audioContext.sampleRate` 是否实际为 16000。Chromium/OS 是否满足请求属于 Runtime-TBD；一旦实际值不是 16000，代码仍把样本声明为 16000。
+源码没有显式 resampler，也没有检查 `audioContext.sampleRate` 是否实际为 16000。BM-03 的一条 Windows x64 / Electron 43.4.1 真实观察中，48 kHz track 设置经 `AudioContext({sampleRate:16000})` 后的实际 context 与第一个 buffer 均为 16 kHz；这条 4096-sample chunk 与 ASR 的 16 kHz 声明一致。44.1 kHz 及其他设备/平台仍为 Runtime-TBD；若实际值不是 16000，代码仍会把样本声明为 16000。
 
 每个 4096 样本块都发生 TypedArray → 普通 Array → structured clone → TypedArray，并采用 request/response IPC。没有显式有界队列、背压或丢块指标。
 
@@ -273,7 +273,7 @@ Settings/Prompt Renderer
 |---|---|---|---|---|
 | TD-01 | ASR 在 Main 同步初始化/decode | Main 控制面阻塞；native 故障影响应用 | 源码确认 | event-loop 指标、故障注入后移出 Main |
 | TD-02 | `ScriptProcessorNode` | 废弃 API；音频依赖 Renderer 线程 | 源码确认 | AudioWorklet 对照测试 |
-| TD-03 | 无显式重采样且强制声明 16 kHz | 实际设备率不符时识别速度/准确率错误 | 源码确认风险 | 记录实际率，频率/时长 fixture |
+| TD-03 | 无显式重采样且强制声明 16 kHz | 实际设备率不符时识别速度/准确率错误 | 源码确认风险；一条 48 kHz track 的 Windows/Electron 观察中 context/buffer 仍为 16 kHz | 继续记录 44.1/48 kHz 实际率与频率/时长 fixture |
 | TD-04 | 每块 Array.from + invoke + 重建 TypedArray | 复制、GC、IPC 延迟 | 源码确认 | profile 后改 TypedArray/MessagePort/有界流 |
 | TD-05 | 全局单例 ASR + 模型/路径/参数写死 | 替换、测试、并发和恢复困难 | 源码确认 | 先抽轻量契约，保留现有行为 |
 | TD-06 | 模型完全手工管理 | 首次安装、升级、校验和支持成本高 | README/models 确认 | Model Manager + hash + 原子安装 |
@@ -315,7 +315,7 @@ Settings/Prompt Renderer
 
 1. 在显式清空 npm 与 Electron 下载缓存的独立环境复跑 Electron 43 首次 CLI 下载；当前首次 43.4.1 下载和后续校验缓存恢复均成功。
 2. 验证当前模型下载源、大小、hash、许可证和三个文件的兼容性。
-3. 自动 Electron smoke 已覆盖 BrowserWindow、16 项 Preload API、设置页、Fake ASR/Fake LLM 和粘贴分析；正常非 smoke 入口已在 Windows x64 保持 5 秒存活并加载真实 Sherpa 模块。真实设置文件持久化、报告保存对话框、真实模型/麦克风和人工交互仍需运行验证。
-4. 在 44.1/48 kHz 设备记录 `audioContext.sampleRate` 与 ASR 接收时序。
+3. 自动 Electron smoke 已覆盖 BrowserWindow、16 项 Preload API、设置页、Fake ASR/Fake LLM 和粘贴分析；正常非 smoke 入口已在 Windows x64 保持 5 秒存活并加载真实 Sherpa 模块。真实设置文件持久化、报告保存对话框、真实模型和完整人工交互仍需运行验证；BM-03 已有一条只采样率元数据的真实麦克风观察。
+4. 在独立 44.1 kHz 配置复跑 BM-03 Probe；不要把当前一条 48 kHz track 观察推广到其他设备或平台。
 5. profile TD-01～TD-04 的 Main 延迟、GC、CPU、RAM 和队列。
 6. 在目标 macOS/Linux/Windows 版本验证安装与运行；在证据前继续保持 TBD，不作支持承诺。
