@@ -14,7 +14,7 @@ const { buildTransition, renderText } = require('../benchmark/assisted-review/re
 const CANDIDATE_ID = 'fleurs-dev-candidate-01';
 const BINDING_SHA256 = 'a'.repeat(64);
 
-function wav({ sampleRateHz = 16000, channels = 1, samples = Buffer.alloc(0) } = {}) {
+function wav({ sampleRateHz = 16000, channels = 1, samples = Buffer.alloc(32) } = {}) {
   const byteRate = sampleRateHz * channels * 2;
   const bytes = Buffer.alloc(44 + samples.length);
   bytes.write('RIFF', 0, 'ascii');
@@ -63,7 +63,7 @@ async function makeServer(t, { tokenBytes = Buffer.alloc(32, 7), mutateStore, au
     candidateId: CANDIDATE_ID,
     binding: {
       candidateId: CANDIDATE_ID, bindingSha256: BINDING_SHA256, audioFile: 'audio.wav', audioSha256: sha256(audio),
-      sampleRateHz: 16000, channels: 1, durationMs: 0,
+      sampleRateHz: 16000, channels: 1, durationMs: 1,
     },
     transcript: '</script><img src=x onerror=1>',
     predictions: [{ rawText: '<b>hostile</b>' }], comparison: { bindingSha256: BINDING_SHA256 }, suggestions: {}, state: { revision: 0 },
@@ -229,4 +229,68 @@ test('review UI sends a primary transcript as exact client transition keys witho
   assert.deepEqual(buildTransition('record-primary-transcript', '人工转写🙂', 7), {
     action: 'record-primary-transcript', payload: { transcriptText: '人工转写🙂' }, expectedRevision: 7,
   });
+});
+
+test('mutation revalidates the current bound WAV before reaching either store commit', async (t) => {
+  const instance = await makeServer(t); const session = await login(instance); const body = transitionBody();
+  fs.writeFileSync(path.join(instance.root, 'audio.wav'), wav({ sampleRateHz: 8000 }));
+  const response = await request({ port: session.port, method: 'POST', pathname: `/api/candidates/${CANDIDATE_ID}/transitions`, headers: mutationHeaders(session, body), body });
+  assert.notEqual(response.status, 200); assert.equal(instance.calls.length, 0); securityHeaders(response);
+});
+
+test('expired session after slow body intake cannot commit', async (t) => {
+  const originalNow = Date.now; let now = 1000; Date.now = () => now;
+  try {
+    const instance = await makeServer(t); const session = await login(instance); const body = transitionBody();
+    const result = new Promise((resolve, reject) => {
+      const req = http.request({ host: '127.0.0.1', port: session.port, method: 'POST', path: `/api/candidates/${CANDIDATE_ID}/transitions`, headers: mutationHeaders(session, body) }, (res) => { const chunks = []; res.on('data', (chunk) => chunks.push(chunk)); res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks) })); });
+      req.on('error', reject); req.write(body.slice(0, 8)); setTimeout(() => { now += 301000; req.end(body.slice(8)); }, 30);
+    });
+    const response = await result;
+    assert.notEqual(response.status, 200); assert.equal(instance.calls.length, 0);
+  } finally { Date.now = originalNow; }
+});
+
+test('governed PCM limits apply to audio and transition reads', async (t) => {
+  const bad = wav({ sampleRateHz: 4000 });
+  const instance = await makeServer(t, { audio: bad }); const session = await login(instance); const body = transitionBody();
+  instance.candidate.binding.audioSha256 = sha256(bad); instance.candidate.binding.sampleRateHz = 4000;
+  const audio = await request({ port: session.port, pathname: `/api/candidates/${CANDIDATE_ID}/audio`, headers: { Host: host(session.port), Cookie: session.cookie } });
+  const transition = await request({ port: session.port, method: 'POST', pathname: `/api/candidates/${CANDIDATE_ID}/transitions`, headers: mutationHeaders(session, body), body });
+  assert.notEqual(audio.status, 200); assert.notEqual(transition.status, 200); assert.equal(instance.calls.length, 0);
+});
+
+test('strictly over-limit body and method matrix fail closed', async (t) => {
+  const instance = await makeServer(t); const session = await login(instance); const oversized = transitionBody({ payload: { transcriptText: 'x'.repeat(17000) } });
+  const response = await request({ port: session.port, method: 'POST', pathname: `/api/candidates/${CANDIDATE_ID}/transitions`, headers: mutationHeaders(session, oversized), body: oversized });
+  assert.equal(response.status, 400); assert.equal(instance.calls.length, 0);
+  for (const [method, pathname, allow] of [['POST', '/review', 'GET'], ['POST', `/api/candidates/${CANDIDATE_ID}`, 'GET'], ['GET', `/api/candidates/${CANDIDATE_ID}/transitions`, 'POST']]) {
+    const actual = await request({ port: session.port, method, pathname, headers: { Host: host(session.port), Cookie: session.cookie } });
+    assert.equal(actual.status, 405); assert.equal(actual.headers.allow, allow);
+  }
+  assert.equal((await request({ port: session.port, pathname: '/unknown', headers: { Host: host(session.port), Cookie: session.cookie } })).status, 404);
+});
+
+test('review UI builds exact schemas for every Task 5 action and marks light-accent rationale human-only', () => {
+  assert.deepEqual(buildTransition('approve-secondary-transcript', {}, 2), { action: 'approve-secondary-transcript', payload: {}, expectedRevision: 2 });
+  assert.deepEqual(buildTransition('approve-license', {}, 3), { action: 'approve-license', payload: { approved: true }, expectedRevision: 3 });
+  assert.deepEqual(buildTransition('clear-pii', {}, 4), { action: 'clear-pii', payload: { cleared: true }, expectedRevision: 4 });
+  assert.deepEqual(buildTransition('set-final-tags', { tags: ['mandarin', 'light-accent'], lightAccentRationale: 'human-only reason' }, 5), { action: 'set-final-tags', payload: { tags: ['mandarin', 'light-accent'], lightAccentRationale: 'human-only reason' }, expectedRevision: 5 });
+});
+
+test('shipped UI exposes fixed evidence nodes and has no unsafe candidate-text or remote dependency sink', () => {
+  const html = fs.readFileSync(path.join(__dirname, '..', 'benchmark', 'assisted-review', 'review-ui.html'), 'utf8');
+  const script = fs.readFileSync(path.join(__dirname, '..', 'benchmark', 'assisted-review', 'review-ui.js'), 'utf8');
+  for (const id of ['comparison-risk', 'suggestions', 'pii-warnings', 'approval-state', 'review-audio', 'action-input', 'tags-input', 'light-accent-rationale']) assert.match(html, new RegExp(`id="${id}"`));
+  assert.doesNotMatch(`${html}\n${script}`, /(?:innerHTML|outerHTML|insertAdjacentHTML|\beval\b|new Function|\bon[a-z]+\s*=|https?:\/\/)/i);
+});
+
+test('store read errors return a generic envelope without poisoning later requests', async (t) => {
+  const sentinel = 'TOKEN_PATH_TRANSCRIPT_SENTINEL';
+  const instance = await makeServer(t, { mutateStore(store) { const original = store.getCandidate; let fail = true; store.getCandidate = (id) => { if (fail) { fail = false; throw new Error(sentinel); } return original(id); }; } });
+  const session = await login(instance);
+  const failed = await request({ port: session.port, pathname: `/api/candidates/${CANDIDATE_ID}`, headers: { Host: host(session.port), Cookie: session.cookie } });
+  assert.equal(failed.status, 500); assert.equal(failed.body.toString('utf8').includes(sentinel), false);
+  const healthy = await request({ port: session.port, pathname: `/api/candidates/${CANDIDATE_ID}`, headers: { Host: host(session.port), Cookie: session.cookie } });
+  assert.equal(healthy.status, 200);
 });

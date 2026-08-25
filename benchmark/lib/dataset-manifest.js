@@ -180,6 +180,14 @@ function parsePcmWav(bytes) {
   };
 }
 
+function validateGovernedPcmMetadata(metadata) {
+  if (!isPlainObject(metadata)) fail('PCM metadata must be an object');
+  requireIntegerInRange(metadata.sampleRateHz, 'PCM sampleRateHz', AUDIO_SAMPLE_RATE_RANGE);
+  requireIntegerInRange(metadata.channels, 'PCM channels', AUDIO_CHANNEL_RANGE);
+  requireIntegerInRange(metadata.durationMs, 'PCM durationMs', AUDIO_DURATION_RANGE);
+  return metadata;
+}
+
 function validateSource(source) {
   assertExactObject(source, 'source', SOURCE_KEYS);
   requireString(source.kind, 'source.kind');
@@ -256,6 +264,7 @@ function loadDatasetManifest(manifestPath, options) {
 module.exports = {
   ALLOWED_TAGS,
   parsePcmWav,
+  validateGovernedPcmMetadata,
   validateDatasetManifest,
   loadDatasetManifest
 };

@@ -4,13 +4,14 @@ const crypto = require('node:crypto');
 const fs = require('node:fs');
 const http = require('node:http');
 const path = require('node:path');
-const { parsePcmWav } = require('./dataset-manifest');
+const { parsePcmWav, validateGovernedPcmMetadata } = require('./dataset-manifest');
 const { canonicalizeExternalRoot, readStableFile, resolveContained } = require('./assisted-review-storage');
 const { validateAlias } = require('./assisted-review-audit');
 
 const SESSION_MAX_AGE_SECONDS = 300;
 const MAX_BODY_BYTES = 16 * 1024;
 const MAX_TRANSCRIPT_CODE_POINTS = 4096;
+const MAX_AUDIO_BYTES = (192000 * 2 * 2 * 600) + 44;
 const OPAQUE_ID = /^[a-z0-9][a-z0-9-]{2,127}$/;
 const SHA256 = /^[a-f0-9]{64}$/;
 
@@ -91,17 +92,20 @@ function bindingFor(candidate, candidateId) {
     || typeof binding.audioFile !== 'string' || !Number.isInteger(binding.sampleRateHz) || !Number.isInteger(binding.channels) || !Number.isInteger(binding.durationMs)) {
     throw new Error('candidate binding is invalid');
   }
+  validateGovernedPcmMetadata(binding);
   return binding;
 }
 
 function readBoundAudio(datasetRoot, candidate, candidateId) {
   const binding = bindingFor(candidate, candidateId);
   const audioPath = resolveContained(datasetRoot, binding.audioFile, { mustExist: true });
+  if (fs.statSync(audioPath).size > MAX_AUDIO_BYTES) throw new Error('audio file is too large');
   const bytes = readStableFile(audioPath, datasetRoot);
   const recheckedBytes = readStableFile(audioPath, datasetRoot);
   if (!safeEqual(bytes, recheckedBytes)) throw new Error('audio changed while reading');
   if (!safeEqual(crypto.createHash('sha256').update(bytes).digest('hex'), binding.audioSha256)) throw new Error('audio hash changed');
   const metadata = parsePcmWav(bytes);
+  validateGovernedPcmMetadata(metadata);
   if (metadata.sampleRateHz !== binding.sampleRateHz || metadata.channels !== binding.channels || metadata.durationMs !== binding.durationMs) throw new Error('audio metadata changed');
   return bytes;
 }
@@ -135,10 +139,15 @@ function createReviewServer({ datasetRoot, reviewStore, tokenBytes = crypto.rand
     return encoded;
   }
 
-  const server = http.createServer(async (request, response) => {
+  const server = http.createServer(async (request, response) => { try {
     if (request.headers.host !== expectedHost) return writeError(response, 400);
     let url;
     try { url = new URL(request.url, `http://${expectedHost}`); } catch { return writeError(response, 400); }
+    const candidateId = candidateFromPath(url);
+    const audioId = candidateFromPath(url, '/audio');
+    const transitionId = candidateFromPath(url, '/transitions');
+    const allowedMethod = url.pathname === '/' || url.pathname === '/review' || url.pathname === '/review-ui.js' || candidateId || audioId ? 'GET' : transitionId ? 'POST' : null;
+    if (allowedMethod && request.method !== allowedMethod) return writeResponse(response, 405, JSON.stringify({ error: 'request-rejected' }), { Allow: allowedMethod, 'Content-Type': 'application/json; charset=utf-8' });
     if (request.method === 'GET' && url.pathname === '/') {
       const supplied = url.searchParams.get('token');
       if (tokenUsed || url.searchParams.size !== 1 || typeof supplied !== 'string' || !/^[a-f0-9]{64}$/.test(supplied) || !safeEqual(Buffer.from(supplied, 'hex'), exchangeToken)) return writeError(response, 404);
@@ -158,9 +167,6 @@ function createReviewServer({ datasetRoot, reviewStore, tokenBytes = crypto.rand
       const script = fs.readFileSync(path.join(__dirname, '..', 'assisted-review', 'review-ui.js'), 'utf8');
       return writeResponse(response, 200, script, { 'Content-Type': 'application/javascript; charset=utf-8' });
     }
-    const candidateId = candidateFromPath(url);
-    const audioId = candidateFromPath(url, '/audio');
-    const transitionId = candidateFromPath(url, '/transitions');
     if (request.method === 'GET' && candidateId) {
       if (url.search) return writeError(response, 404);
       if (!currentSession(request)) return writeError(response, 403);
@@ -189,6 +195,9 @@ function createReviewServer({ datasetRoot, reviewStore, tokenBytes = crypto.rand
       let binding;
       try { binding = bindingFor(candidate, transitionId); } catch { return writeError(response, 409); }
       try {
+        if (currentSession(request) !== session) return writeError(response, 403);
+        readBoundAudio(root, candidate, transitionId);
+        if (currentSession(request) !== session) return writeError(response, 403);
         let state;
         if (body.action === 'record-primary-transcript') {
           if (identity.role !== 'primary' || !hasExactKeys(body.payload, ['transcriptText']) || typeof body.payload.transcriptText !== 'string') return writeError(response, 400);
@@ -201,9 +210,16 @@ function createReviewServer({ datasetRoot, reviewStore, tokenBytes = crypto.rand
           };
           state = reviewStore.commitPrimaryTranscript({ candidateId: transitionId, bindingSha256: binding.bindingSha256, text, event });
         } else {
+          let payload = body.payload;
+          if (body.action === 'set-final-tags') {
+            if (!hasExactKeys(payload, ['tags', 'lightAccentRationale']) || !Array.isArray(payload.tags)) return writeError(response, 400);
+            const requiresRationale = payload.tags.includes('light-accent');
+            if (requiresRationale ? typeof payload.lightAccentRationale !== 'string' || payload.lightAccentRationale.trim() === '' : payload.lightAccentRationale !== null) return writeError(response, 400);
+            payload = { tags: payload.tags, lightAccentRationaleSha256: requiresRationale ? crypto.createHash('sha256').update(Buffer.from(payload.lightAccentRationale, 'utf8')).digest('hex') : null };
+          }
           const event = {
             actorAlias: identity.alias, actorRole: identity.role, bindingSha256: binding.bindingSha256, candidateId: transitionId,
-            action: body.action, payload: body.payload, expectedRevision: body.expectedRevision,
+            action: body.action, payload, expectedRevision: body.expectedRevision,
           };
           state = reviewStore.commitTransition({ state: candidate.state, event, expectedRevision: body.expectedRevision });
         }
@@ -212,6 +228,10 @@ function createReviewServer({ datasetRoot, reviewStore, tokenBytes = crypto.rand
     }
     if (request.method !== 'GET' && request.method !== 'POST') return writeError(response, 405);
     return writeError(response, 404);
+  } catch {
+    if (!response.headersSent) writeError(response, 500);
+    else response.destroy();
+  }
   });
 
   return new Promise((resolve, reject) => {

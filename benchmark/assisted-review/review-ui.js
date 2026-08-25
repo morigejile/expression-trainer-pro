@@ -5,15 +5,22 @@
     node.textContent = String(text);
   }
 
-  function appendTextItem(list, text) {
-    const item = document.createElement('li');
+  function appendTextItem(list, text, documentRef) {
+    const item = documentRef.createElement('li');
     renderText(item, text);
     list.append(item);
   }
 
-  function buildTransition(action, transcriptText, expectedRevision) {
-    if (action !== 'record-primary-transcript' || !Number.isInteger(expectedRevision) || expectedRevision < 0) throw new Error('invalid review transition');
-    return { action, payload: { transcriptText }, expectedRevision };
+  function buildTransition(action, values, expectedRevision) {
+    if (!Number.isInteger(expectedRevision) || expectedRevision < 0) throw new Error('invalid review transition');
+    const source = typeof values === 'string' ? { transcriptText: values } : values;
+    if (!source || typeof source !== 'object') throw new Error('invalid review transition');
+    if (action === 'record-primary-transcript') return { action, payload: { transcriptText: source.transcriptText }, expectedRevision };
+    if (action === 'approve-secondary-transcript') return { action, payload: {}, expectedRevision };
+    if (action === 'approve-license') return { action, payload: { approved: true }, expectedRevision };
+    if (action === 'clear-pii') return { action, payload: { cleared: true }, expectedRevision };
+    if (action === 'set-final-tags') return { action, payload: { tags: source.tags, lightAccentRationale: source.lightAccentRationale || null }, expectedRevision };
+    throw new Error('invalid review transition');
   }
 
   async function fetchCandidate(candidateId) {
@@ -22,13 +29,22 @@
     return response.json();
   }
 
-  function showCandidate(candidate) {
-    renderText(document.getElementById('candidate-id'), candidate.candidateId || '');
-    renderText(document.getElementById('upstream-transcript'), candidate.transcript || '');
-    renderText(document.getElementById('primary-transcript'), candidate.primaryTranscriptText || '');
-    const predictions = document.getElementById('predictions');
+  function showCandidate(candidate, documentRef = document) {
+    renderText(documentRef.getElementById('candidate-id'), candidate.candidateId || '');
+    renderText(documentRef.getElementById('upstream-transcript'), candidate.transcript || '');
+    renderText(documentRef.getElementById('primary-transcript'), candidate.primaryTranscriptText || '');
+    renderText(documentRef.getElementById('comparison-risk'), candidate.comparison && candidate.comparison.risk || '');
+    renderText(documentRef.getElementById('approval-state'), JSON.stringify(candidate.state || {}));
+    const audio = documentRef.getElementById('review-audio');
+    audio.src = `/api/candidates/${encodeURIComponent(candidate.candidateId || '')}/audio`;
+    const predictions = documentRef.getElementById('predictions');
     predictions.replaceChildren();
-    for (const prediction of Array.isArray(candidate.predictions) ? candidate.predictions : []) appendTextItem(predictions, prediction.rawText || '');
+    for (const prediction of Array.isArray(candidate.predictions) ? candidate.predictions : []) appendTextItem(predictions, prediction.rawText || '', documentRef);
+    const suggestions = documentRef.getElementById('suggestions'); suggestions.replaceChildren();
+    for (const suggestion of Array.isArray(candidate.suggestions && candidate.suggestions.suggestions) ? candidate.suggestions.suggestions : []) appendTextItem(suggestions, `${suggestion.label || suggestion.type || ''} (${suggestion.policyApproved ? 'approved' : 'unapproved'})`, documentRef);
+    const warnings = documentRef.getElementById('pii-warnings'); warnings.replaceChildren();
+    for (const warning of Array.isArray(candidate.suggestions && candidate.suggestions.piiWarnings) ? candidate.suggestions.piiWarnings : []) appendTextItem(warnings, warning.ruleId || '', documentRef);
+    const revision = documentRef.getElementById('expected-revision'); if (candidate.state && Number.isInteger(candidate.state.revision)) revision.value = String(candidate.state.revision);
   }
 
   function initializeReviewUi() {
@@ -50,12 +66,14 @@
       event.preventDefault();
       try {
         const candidateId = document.getElementById('candidate-id').textContent;
-        const body = buildTransition('record-primary-transcript', document.getElementById('transcript-input').value, Number(document.getElementById('expected-revision').value));
+        const action = document.getElementById('action-input').value;
+        const tags = document.getElementById('tags-input').value.split(',').map((tag) => tag.trim()).filter(Boolean);
+        const body = buildTransition(action, { transcriptText: document.getElementById('transcript-input').value, tags, lightAccentRationale: document.getElementById('light-accent-rationale').value || null }, Number(document.getElementById('expected-revision').value));
         const response = await fetch(`/api/candidates/${encodeURIComponent(candidateId)}/transitions`, {
           method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.body.dataset.csrf }, body: JSON.stringify(body)
         });
         if (!response.ok) throw new Error('transition unavailable');
-        renderText(status, 'Transcript recorded');
+        const state = await response.json(); document.getElementById('expected-revision').value = String(state.revision); renderText(status, 'Review action recorded');
       } catch {
         renderText(status, 'Transcript was not recorded');
       }

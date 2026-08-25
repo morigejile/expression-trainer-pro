@@ -30,11 +30,20 @@
       <h2 id="predictions-heading">Predictions</h2>
       <ul id="predictions"></ul>
     </section>
+    <section><h2>Comparison risk</h2><p id="comparison-risk"></p></section>
+    <section><h2>Suggestions</h2><ul id="suggestions"></ul></section>
+    <section><h2>PII warnings</h2><ul id="pii-warnings"></ul></section>
+    <section><h2>Approval state</h2><p id="approval-state"></p></section>
+    <audio id="review-audio" controls></audio>
     <section aria-labelledby="record-heading">
       <h2 id="record-heading">Record primary transcript</h2>
       <form id="transition-form">
+        <label for="action-input">Action</label>
+        <select id="action-input"><option>record-primary-transcript</option><option>approve-secondary-transcript</option><option>approve-license</option><option>clear-pii</option><option>set-final-tags</option></select>
         <label for="transcript-input">Transcript</label>
         <textarea id="transcript-input" required></textarea>
+        <label for="tags-input">Final tags</label><input id="tags-input">
+        <label for="light-accent-rationale">Light-accent rationale (human-only)</label><textarea id="light-accent-rationale"></textarea>
         <label for="expected-revision">Expected revision</label>
         <input id="expected-revision" type="number" min="0" value="0" required>
         <button type="submit">Record</button>
