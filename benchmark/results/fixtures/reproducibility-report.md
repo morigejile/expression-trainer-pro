@@ -4,14 +4,14 @@ Date: 2026-08-25. Runtime: Hermes Node `v22.23.0`; npm `12.0.2`; Windows NT `10.
 
 ## Repeated fixture runs
 
-Two consecutive formal runs used `benchmark/datasets/example/manifest.json`, dataset root `benchmark/datasets/example`, candidate `fake`, and `--repetitions 2`. Raw result directories were written outside Git under the controlled local output root `C:\Users\mr\AppData\Local\Temp\expression-trainer-bm02-evidence-20260825-fixed` so the repository remains free of machine-specific runtime results.
+Two consecutive formal runs used `benchmark/datasets/example/manifest.json`, dataset root `benchmark/datasets/example`, candidate `fake`, and `--repetitions 2`. Raw result directories were written outside Git under the controlled local output root `C:\Users\mr\AppData\Local\Temp\expression-trainer-bm02-evidence-20260825-round2` so the repository remains free of machine-specific runtime results.
 
 | Run | Exit | Total / failed | CER mean | Stable comparison |
 |---|---:|---:|---:|---|
-| `2026-08-25T07-50-06-803Z-fake` | 0 | 2 / 0 | 0 | Same sample order, transcript, hypothesis, distance, reference length, CER and tags |
-| `2026-08-25T07-50-24-082Z-fake` | 0 | 2 / 0 | 0 | Same summary schema and environment identity |
+| `2026-08-25T08-12-40-703Z-fake` | 0 | 2 / 0 | 0 | Same sample order, transcript, hypothesis, distance, reference length, CER and tags |
+| `2026-08-25T08-13-03-649Z-fake` | 0 | 2 / 0 | 0 | Same summary schema and environment identity |
 
-Both environments recorded clean fixed-code commit `81feade44b5105917874ad9c0098ee0d86b1eaf1`, Git provenance `status: "ok"`, the same Windows/CPU/RAM, Node `v22.23.0`, Sherpa `1.13.3`, fake adapter `1.0.0`, no model files, and no configured threads. The two full `samples.jsonl` byte hashes intentionally differ: each record includes measured wall-clock inference time, CPU use and peak RSS. Those measurements are expected to vary slightly; stable score and identity fields, schema and environment fields compared equal.
+Both environments recorded clean fixed-code commit `f9cd67863c8c3ffe6cb9feb935aac9a7980747b9`, Git provenance `status: "ok"`, the same Windows/CPU/RAM, Node `v22.23.0`, Sherpa `1.13.3`, fake adapter `1.0.0`, no model files, and no configured threads. The two full `samples.jsonl` byte hashes intentionally differ: each record includes measured wall-clock inference time, CPU use and peak RSS. Those measurements are expected to vary slightly; stable score and identity fields, schema and environment fields compared equal.
 
 ## Controlled failure injection
 
@@ -24,7 +24,7 @@ Each mode was run in a separate Node process against the same synthetic manifest
 | timeout | 1 | `sample timeout after 5ms` on the synthetic sample record |
 | dispose | 1 | `failures.jsonl` contains `fake dispose failure`; completed sample remains passed |
 
-This proves failed work is retained rather than silently excluded, while candidate-level failures remain outside the sample/repetition denominator. The result writer atomically reserves a previously nonexistent run directory, writes `samples.jsonl`, `summary.json`, `summary.csv`, `environment.json` and `failures.jsonl` through a private staging directory, and rejects any pre-existing run ID. Formal runs also hold an exclusive output-root lock; a concurrent or stale lock is rejected rather than reclaimed.
+This proves failed work is retained rather than silently excluded, while candidate-level failures remain outside the sample/repetition denominator. The failure-injection subprocess regression asserts actual process status `1` for all four modes. A separate injected staging-write failure proves no visible final run directory or reservation survives a failed write. The result writer atomically reserves the run ID with a private sentinel, writes all five artifacts to a sibling staging directory, and publishes only the complete directory with one same-parent rename. Formal runs also hold an exclusive output-root lock; a concurrent or stale lock is rejected rather than reclaimed.
 
 ## Dependency gate
 
