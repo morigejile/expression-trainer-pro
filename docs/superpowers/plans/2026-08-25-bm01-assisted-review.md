@@ -167,6 +167,19 @@ decision metadata; raw human transcript text is never stored in the audit log.
 - Consumes Tasks 1–5 through injected stores, including sealed prediction, comparison, and suggestion evidence.
 - Produces `createReviewServer({ datasetRoot, reviewStore, tokenBytes, port }): { url, close, server }` and `renderText(node, text): void`; routes: `GET /?token=`, `GET /review`, `GET /api/candidates/:id`, `GET /api/candidates/:id/audio`, `POST /api/candidates/:id/transitions`.
 
+`reviewStore.getSessionIdentity(): { alias, role }` is a required read-only
+constructor dependency. Each server instance binds exactly that pre-provisioned
+identity to its session and never accepts alias or role from a request body.
+
+For `record-primary-transcript`, the client submits raw `transcriptText` only.
+The server rejects empty or over-4,096-code-point text, computes its UTF-8
+SHA-256 and code-point length, and places only those derived fields in the
+Task 5 event. `reviewStore.commitPrimaryTranscript({ candidateId,
+bindingSha256, text, event })` must atomically persist the binding-scoped raw
+text before or with the Task 5 transition and return the resulting state;
+candidate reads expose that persisted primary text. The audit event and server
+errors/logs never contain the raw text. Other actions use `commitTransition`.
+
 - [ ] **Step 1: Write the failing test**
   Start port zero; assert `127.0.0.1`, single-use 256-bit exchange/redirect, cookie/CSRF/origin checks, opaque IDs, hostile transcript JSON, headers, contained audio, and role-checked forwarding. Import `renderText` with a fake node whose `innerHTML` setter throws; pass `<img src=x onerror=1>` and assert only its `textContent` changes.
 - [ ] **Step 2: Run test to verify it fails**

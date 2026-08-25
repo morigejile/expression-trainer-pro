@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Assisted review</title>
+</head>
+<body data-csrf="%%CSRF_TOKEN%%">
+  <main>
+    <h1>Assisted review</h1>
+    <form id="candidate-form">
+      <label for="candidate-input">Candidate ID</label>
+      <input id="candidate-input" name="candidate" autocomplete="off" required>
+      <button type="submit">Load</button>
+    </form>
+    <p id="status" role="status"></p>
+    <section aria-labelledby="candidate-heading">
+      <h2 id="candidate-heading">Candidate</h2>
+      <p id="candidate-id"></p>
+    </section>
+    <section aria-labelledby="transcript-heading">
+      <h2 id="transcript-heading">Upstream transcript</h2>
+      <p id="upstream-transcript"></p>
+    </section>
+    <section aria-labelledby="primary-heading">
+      <h2 id="primary-heading">Primary transcript</h2>
+      <p id="primary-transcript"></p>
+    </section>
+    <section aria-labelledby="predictions-heading">
+      <h2 id="predictions-heading">Predictions</h2>
+      <ul id="predictions"></ul>
+    </section>
+    <section aria-labelledby="record-heading">
+      <h2 id="record-heading">Record primary transcript</h2>
+      <form id="transition-form">
+        <label for="transcript-input">Transcript</label>
+        <textarea id="transcript-input" required></textarea>
+        <label for="expected-revision">Expected revision</label>
+        <input id="expected-revision" type="number" min="0" value="0" required>
+        <button type="submit">Record</button>
+      </form>
+    </section>
+  </main>
+  <script src="/review-ui.js"></script>
+</body>
+</html>
