@@ -86,8 +86,30 @@ test('result reservation atomically owns a run directory before artifacts are wr
   await withTempDirectory(async (directory) => {
     const runDir = path.join(directory, 'run-reserved');
     const reservation = await reserveRunDirectory(runDir);
-    assert.equal(fs.existsSync(runDir), true);
+    assert.equal(fs.existsSync(runDir), false);
     await assert.rejects(reserveRunDirectory(runDir), /already exists/);
     await reservation.release();
+    const retryReservation = await reserveRunDirectory(runDir);
+    await retryReservation.release();
+  });
+});
+
+test('writer leaves no visible final run directory or reservation when staging writes fail', async () => {
+  const { reserveRunDirectory, writeResults } = require('../benchmark/lib/results');
+  const originalWriteFile = fs.promises.writeFile;
+  await withTempDirectory(async (directory) => {
+    const runDir = path.join(directory, 'write-failure');
+    fs.promises.writeFile = async (filePath, ...rest) => {
+      if (filePath.endsWith('summary.json')) throw new Error('injected staging write failure');
+      return originalWriteFile(filePath, ...rest);
+    };
+    try {
+      await assert.rejects(writeResults(runDir, [makeSample()], {}), /injected staging write failure/);
+      assert.equal(fs.existsSync(runDir), false);
+      const retryReservation = await reserveRunDirectory(runDir);
+      await retryReservation.release();
+    } finally {
+      fs.promises.writeFile = originalWriteFile;
+    }
   });
 });

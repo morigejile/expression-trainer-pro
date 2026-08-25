@@ -1,22 +1,18 @@
-const childProcess = require('node:child_process');
 const path = require('node:path');
 const { performance } = require('node:perf_hooks');
 
 const { createBenchmarkAdapter } = require('./lib/adapter');
 const { calculateCer } = require('./lib/cer');
 const { loadDatasetManifest } = require('./lib/dataset-manifest');
-const { collectEnvironment } = require('./lib/environment');
+const { HARNESS_REPOSITORY_ROOT, collectEnvironment, collectGitProvenance } = require('./lib/environment');
 const { measureRun } = require('./lib/metrics');
 const { acquireFormalRunLock, prepareOutputRoot, reserveSafeRunDirectory } = require('./lib/output-root');
 const { writeResults } = require('./lib/results');
 const { normalizeTranscript } = require('./lib/transcript');
 
 function isWorktreeDirty() {
-  try {
-    return childProcess.execFileSync('git', ['status', '--porcelain'], { cwd: process.cwd(), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim() !== '';
-  } catch {
-    return true;
-  }
+  const provenance = collectGitProvenance(HARNESS_REPOSITORY_ROOT);
+  return provenance.status !== 'ok' || provenance.dirty;
 }
 
 function makeRunId(candidateId) {
@@ -147,8 +143,9 @@ async function runBenchmark(options) {
   if (formal && !allowDirty && isWorktreeDirty()) throw new Error('formal benchmark refuses a dirty worktree');
   validateRunId(runId);
   const releaseFormalLock = formal ? await acquireFormalRunLock(canonicalOutputRoot) : null;
+  let reservation;
   try {
-    const reservation = await reserveSafeRunDirectory({ datasetRoot, outputRoot: canonicalOutputRoot, runId });
+    reservation = await reserveSafeRunDirectory({ datasetRoot, outputRoot: canonicalOutputRoot, runId });
     const sampleRuns = manifest.samples.flatMap((sample) => Array.from({ length: repetitions }, (_, index) => ({ sample, repetition: index + 1 })));
     const records = [];
     const candidateFailures = [];
@@ -216,6 +213,7 @@ async function runBenchmark(options) {
     const output = await writeResults(reservation.runDir, records, environment, { candidateFailures, reservation });
     return { ...output, exitCode: output.summary.failed > 0 || candidateFailures.length > 0 ? 1 : 0 };
   } finally {
+    if (reservation) await reservation.release();
     if (releaseFormalLock) await releaseFormalLock();
   }
 }

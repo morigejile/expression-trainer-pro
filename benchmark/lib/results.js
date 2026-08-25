@@ -71,17 +71,32 @@ function buildSummaryCsv(summary) {
 
 async function reserveRunDirectory(runDir) {
   if (!path.isAbsolute(runDir)) throw new TypeError('runDir must be an absolute path');
-  await fs.mkdir(path.dirname(runDir), { recursive: true });
+  const parentDirectory = path.dirname(runDir);
+  const reservationDirectory = path.join(parentDirectory, '.benchmark-reservations');
+  const lockPath = path.join(reservationDirectory, `${path.basename(runDir)}.lock`);
+  await fs.mkdir(reservationDirectory, { recursive: true });
+  let handle;
   try {
-    await fs.mkdir(runDir);
+    handle = await fs.open(lockPath, 'wx');
   } catch (error) {
-    if (error.code === 'EEXIST') throw new Error(`Benchmark run directory already exists: ${runDir}`);
+    if (error.code === 'EEXIST') throw new Error(`Benchmark run directory already exists or is reserved: ${runDir}`);
     throw error;
+  }
+  try {
+    await fs.lstat(runDir);
+    throw new Error(`Benchmark run directory already exists or is reserved: ${runDir}`);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      await handle.close();
+      await fs.rm(lockPath, { force: true });
+      throw error;
+    }
   }
   return {
     runDir,
-    async release({ remove = false } = {}) {
-      if (remove) await fs.rm(runDir, { recursive: true, force: true });
+    async release() {
+      await handle.close();
+      await fs.rm(lockPath, { force: true });
     }
   };
 }
@@ -91,7 +106,7 @@ async function writeResults(runDir, samples, environment, { candidateFailures = 
   if (!Array.isArray(candidateFailures)) throw new TypeError('candidateFailures must be an array');
   if (reservation && reservation.runDir !== runDir) throw new TypeError('result reservation must match runDir');
   const activeReservation = reservation || await reserveRunDirectory(runDir);
-  const temporaryDir = path.join(runDir, `.staging-${process.pid}-${crypto.randomUUID()}`);
+  const temporaryDir = path.join(path.dirname(runDir), `.benchmark-staging-${path.basename(runDir)}-${process.pid}-${crypto.randomUUID()}`);
   const summary = summarizeSamples(samples);
   summary.candidateFailures = {
     total: candidateFailures.length,
@@ -106,17 +121,12 @@ async function writeResults(runDir, samples, environment, { candidateFailures = 
       fs.writeFile(path.join(temporaryDir, 'environment.json'), `${JSON.stringify(environment, null, 2)}\n`, 'utf8'),
       fs.writeFile(path.join(temporaryDir, 'failures.jsonl'), candidateFailures.map((failure) => JSON.stringify(failure)).join('\n') + (candidateFailures.length ? '\n' : ''), 'utf8')
     ]);
-    await Promise.all([
-      fs.rename(path.join(temporaryDir, 'samples.jsonl'), path.join(runDir, 'samples.jsonl')),
-      fs.rename(path.join(temporaryDir, 'summary.json'), path.join(runDir, 'summary.json')),
-      fs.rename(path.join(temporaryDir, 'summary.csv'), path.join(runDir, 'summary.csv')),
-      fs.rename(path.join(temporaryDir, 'environment.json'), path.join(runDir, 'environment.json')),
-      fs.rename(path.join(temporaryDir, 'failures.jsonl'), path.join(runDir, 'failures.jsonl'))
-    ]);
-    await fs.rm(temporaryDir, { recursive: true, force: true });
+    await fs.rename(temporaryDir, runDir);
   } catch (error) {
     await fs.rm(temporaryDir, { recursive: true, force: true });
     throw error;
+  } finally {
+    if (!reservation) await activeReservation.release();
   }
   return { runDir: activeReservation.runDir, summary };
 }

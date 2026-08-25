@@ -47,11 +47,7 @@ async function reserveSafeRunDirectory({ datasetRoot, outputRoot, runId }) {
     throw new Error('outputRoot must not resolve inside datasetRoot');
   }
   const reservation = await reserveRunDirectory(path.join(canonicalOutputRoot, runId));
-  const canonicalRunDir = await fs.realpath(reservation.runDir);
-  if (isPathInside(canonicalDatasetRoot, canonicalRunDir) || !isPathInside(canonicalOutputRoot, canonicalRunDir)) {
-    throw new Error('reserved run directory escaped canonical outputRoot');
-  }
-  return { ...reservation, runDir: canonicalRunDir };
+  return reservation;
 }
 
 async function acquireFormalRunLock(outputRoot) {

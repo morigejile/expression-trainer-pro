@@ -173,6 +173,32 @@ test('formal runner refuses a concurrent formal lock before adapter initializati
   });
 });
 
+test('formal runner rejects a dirty harness when invoked from an unrelated clean Git repository', async () => {
+  const { runBenchmark } = require('../benchmark/run');
+  const originalDirectory = process.cwd();
+  const unrelatedRepository = fs.mkdtempSync(path.join(os.tmpdir(), 'expression-trainer-clean-repository-'));
+  const dirtyMarker = path.join(__dirname, '..', '.benchmark-dirty-gate-test');
+  childProcess.execFileSync('git', ['init', '--quiet'], { cwd: unrelatedRepository });
+  fs.writeFileSync(dirtyMarker, 'temporary dirty harness marker');
+  try {
+    process.chdir(unrelatedRepository);
+    await withDataset(async ({ root, manifestPath, outputRoot }) => {
+      await assert.rejects(runBenchmark({
+        manifestPath,
+        datasetRoot: root,
+        candidateId: 'fake',
+        outputRoot,
+        runId: 'dirty-harness',
+        formal: true
+      }), /formal benchmark refuses a dirty worktree/);
+    });
+  } finally {
+    process.chdir(originalDirectory);
+    fs.rmSync(dirtyMarker, { force: true });
+    fs.rmSync(unrelatedRepository, { recursive: true, force: true });
+  }
+});
+
 test('runner records fake init, sample, timeout, and dispose failures with a nonzero result', async () => {
   const { runBenchmark } = require('../benchmark/run');
 
@@ -201,6 +227,39 @@ test('runner records fake init, sample, timeout, and dispose failures with a non
       }
     }
   });
+});
+
+test('failure-injection subprocesses exit nonzero for every fake candidate failure mode', () => {
+  const harnessRoot = path.resolve(__dirname, '..');
+  const outputRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'expression-trainer-subprocess-output-'));
+  const runScript = [
+    "const { runBenchmark } = require(process.argv[1]);",
+    'const options = JSON.parse(process.argv[2]);',
+    'runBenchmark(options).then(result => { process.stdout.write(JSON.stringify(result)); process.exitCode = result.exitCode; }).catch(error => { process.stderr.write(error.stack); process.exitCode = 2; });'
+  ].join(' ');
+  try {
+    for (const failureMode of ['init', 'sample', 'timeout', 'dispose']) {
+      const result = childProcess.spawnSync(process.execPath, [
+        '-e',
+        runScript,
+        path.join(harnessRoot, 'benchmark', 'run.js'),
+        JSON.stringify({
+          manifestPath: path.join(harnessRoot, 'benchmark', 'datasets', 'example', 'manifest.json'),
+          datasetRoot: path.join(harnessRoot, 'benchmark', 'datasets', 'example'),
+          candidateId: 'fake',
+          candidateConfig: { failureMode },
+          outputRoot,
+          runId: `subprocess-${failureMode}`,
+          sampleTimeoutMs: 5,
+          formal: false
+        })
+      ], { cwd: harnessRoot, encoding: 'utf8' });
+      assert.equal(result.status, 1, failureMode);
+      assert.match(result.stdout, /"exitCode":1/, failureMode);
+    }
+  } finally {
+    fs.rmSync(outputRoot, { recursive: true, force: true });
+  }
 });
 
 test('timeout aborts and settles transcription before the next repetition can start', async () => {

@@ -5,6 +5,8 @@ const os = require('node:os');
 const path = require('node:path');
 const { normalizeRelativeModelPath, persistedCandidateConfig } = require('./candidate-config');
 
+const HARNESS_REPOSITORY_ROOT = path.resolve(__dirname, '..', '..');
+
 function readGit(repositoryRoot, command) {
   try {
     return { value: childProcess.execFileSync('git', command, { cwd: repositoryRoot, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim() };
@@ -50,7 +52,7 @@ function getSherpaVersion() {
   }
 }
 
-function collectEnvironment({ candidateId, candidateVersion, candidateConfig, modelFiles = [], repositoryRoot = path.resolve(__dirname, '..', '..') }) {
+function collectEnvironment({ candidateId, candidateVersion, candidateConfig, modelFiles = [], repositoryRoot = HARNESS_REPOSITORY_ROOT }) {
   if (typeof candidateId !== 'string' || candidateId.trim() === '') throw new TypeError('candidateId must be a non-empty string');
   if (typeof candidateVersion !== 'string' || candidateVersion.trim() === '') throw new TypeError('candidateVersion must be a non-empty string');
   if (!Array.isArray(modelFiles)) throw new TypeError('modelFiles must be an array');
@@ -83,4 +85,4 @@ function collectEnvironment({ candidateId, candidateVersion, candidateConfig, mo
   };
 }
 
-module.exports = { collectEnvironment };
+module.exports = { HARNESS_REPOSITORY_ROOT, collectEnvironment, collectGitProvenance };
