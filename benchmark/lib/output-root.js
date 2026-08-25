@@ -40,6 +40,16 @@ async function prepareOutputRoot({ datasetRoot, outputRoot }) {
   return canonicalOutputRoot;
 }
 
+async function verifyLiveOutputRoot(canonicalDatasetRoot, canonicalOutputRoot) {
+  const liveOutputRoot = await fs.realpath(canonicalOutputRoot);
+  if (isPathInside(canonicalDatasetRoot, liveOutputRoot)) {
+    throw new Error('outputRoot must not resolve inside datasetRoot');
+  }
+  if (path.relative(canonicalOutputRoot, liveOutputRoot) !== '') {
+    throw new Error('outputRoot changed after canonicalization');
+  }
+}
+
 async function reserveSafeRunDirectory({ datasetRoot, outputRoot, runId }) {
   const canonicalDatasetRoot = await fs.realpath(datasetRoot);
   const canonicalOutputRoot = await fs.realpath(outputRoot);
@@ -47,7 +57,16 @@ async function reserveSafeRunDirectory({ datasetRoot, outputRoot, runId }) {
     throw new Error('outputRoot must not resolve inside datasetRoot');
   }
   const reservation = await reserveRunDirectory(path.join(canonicalOutputRoot, runId));
-  return reservation;
+  try {
+    await verifyLiveOutputRoot(canonicalDatasetRoot, canonicalOutputRoot);
+    return {
+      ...reservation,
+      verifyLiveOutputRoot: () => verifyLiveOutputRoot(canonicalDatasetRoot, canonicalOutputRoot)
+    };
+  } catch (error) {
+    await reservation.release();
+    throw error;
+  }
 }
 
 async function acquireFormalRunLock(outputRoot) {
@@ -72,4 +91,4 @@ async function acquireFormalRunLock(outputRoot) {
   };
 }
 
-module.exports = { acquireFormalRunLock, canonicalizeWithExistingAncestor, isPathInside, prepareOutputRoot, reserveSafeRunDirectory };
+module.exports = { acquireFormalRunLock, canonicalizeWithExistingAncestor, isPathInside, prepareOutputRoot, reserveSafeRunDirectory, verifyLiveOutputRoot };

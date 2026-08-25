@@ -113,3 +113,37 @@ test('writer leaves no visible final run directory or reservation when staging w
     }
   });
 });
+
+test('writer rejects a live output-root swap before directory publication', async () => {
+  const { prepareOutputRoot, reserveSafeRunDirectory } = require('../benchmark/lib/output-root');
+  const { writeResults } = require('../benchmark/lib/results');
+  const originalRealpath = fs.promises.realpath;
+  await withTempDirectory(async (directory) => {
+    const datasetRoot = path.join(directory, 'dataset');
+    const outputRoot = path.join(directory, 'output');
+    fs.mkdirSync(datasetRoot);
+    const canonicalOutputRoot = await prepareOutputRoot({ datasetRoot, outputRoot });
+    const reservation = await reserveSafeRunDirectory({
+      datasetRoot,
+      outputRoot: canonicalOutputRoot,
+      runId: 'publish-swap'
+    });
+    let armed = true;
+    fs.promises.realpath = async targetPath => {
+      if (armed && targetPath === canonicalOutputRoot) {
+        armed = false;
+        fs.rmSync(outputRoot, { recursive: true });
+        await fs.promises.symlink(datasetRoot, outputRoot, 'junction');
+      }
+      return originalRealpath(targetPath);
+    };
+    try {
+      await assert.rejects(writeResults(reservation.runDir, [makeSample()], {}, { reservation }), /outputRoot must not resolve inside datasetRoot/);
+      assert.equal(fs.existsSync(path.join(datasetRoot, 'publish-swap')), false);
+      assert.equal(fs.existsSync(path.join(datasetRoot, '.benchmark-reservations', 'publish-swap.lock')), false);
+    } finally {
+      fs.promises.realpath = originalRealpath;
+      await reservation.release();
+    }
+  });
+});

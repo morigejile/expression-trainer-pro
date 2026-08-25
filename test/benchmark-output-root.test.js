@@ -41,3 +41,34 @@ test('safe reservation rechecks an output root swapped into the dataset after pr
     }), /outputRoot must not resolve inside datasetRoot/);
   });
 });
+
+test('safe reservation rejects a live output-root swap while creating its sentinel', async () => {
+  const { prepareOutputRoot, reserveSafeRunDirectory } = require('../benchmark/lib/output-root');
+  const originalMkdir = fs.promises.mkdir;
+  await withTempDirectory(async (directory) => {
+    const datasetRoot = path.join(directory, 'dataset');
+    const outputRoot = path.join(directory, 'output');
+    fs.mkdirSync(datasetRoot);
+    const canonicalOutputRoot = await prepareOutputRoot({ datasetRoot, outputRoot });
+    let swapped = false;
+    fs.promises.mkdir = async (targetPath, ...rest) => {
+      if (!swapped && targetPath.endsWith('.benchmark-reservations')) {
+        swapped = true;
+        fs.rmSync(outputRoot, { recursive: true });
+        await fs.promises.symlink(datasetRoot, outputRoot, 'junction');
+      }
+      return originalMkdir(targetPath, ...rest);
+    };
+    try {
+      await assert.rejects(reserveSafeRunDirectory({
+        datasetRoot,
+        outputRoot: canonicalOutputRoot,
+        runId: 'sentinel-swap'
+      }), /outputRoot must not resolve inside datasetRoot/);
+      assert.equal(fs.existsSync(path.join(datasetRoot, 'sentinel-swap')), false);
+      assert.equal(fs.existsSync(path.join(datasetRoot, '.benchmark-reservations', 'sentinel-swap.lock')), false);
+    } finally {
+      fs.promises.mkdir = originalMkdir;
+    }
+  });
+});

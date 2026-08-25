@@ -121,6 +121,7 @@ async function writeResults(runDir, samples, environment, { candidateFailures = 
       fs.writeFile(path.join(temporaryDir, 'environment.json'), `${JSON.stringify(environment, null, 2)}\n`, 'utf8'),
       fs.writeFile(path.join(temporaryDir, 'failures.jsonl'), candidateFailures.map((failure) => JSON.stringify(failure)).join('\n') + (candidateFailures.length ? '\n' : ''), 'utf8')
     ]);
+    if (reservation?.verifyLiveOutputRoot) await reservation.verifyLiveOutputRoot();
     await fs.rename(temporaryDir, runDir);
   } catch (error) {
     await fs.rm(temporaryDir, { recursive: true, force: true });
