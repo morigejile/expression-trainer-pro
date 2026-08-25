@@ -97,13 +97,19 @@ flowchart LR
 
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
-| BM-01 | P0 | 建 benchmark 数据集 | 准备经授权、脱敏、人工校对的 50～100 条真实中文表达训练录音；按普通话/语速/轻口音/中英/数字专名/噪声分层 | T-01 | 每条有 ground truth、类别、来源/许可；数量不足时明确局限 |
+| BM-01 | P0 | 建 benchmark 数据集（In Progress） | 已建立版本化 manifest 契约、路径/哈希校验、质量汇总和无隐私合成示例；仍需准备经授权、脱敏、人工双人复核的 50～100 条真实中文表达训练录音，并按普通话/语速/轻口音/中英/数字专名/噪声分层 | T-01 | 每条有 ground truth、类别、来源/许可；数量不足时明确局限，不能标记 Completed |
 | BM-02 | P0 | 建可复跑 harness | 同一入口输出逐条与汇总 JSON/CSV：CER、首 partial、最终延迟、RTF、CPU、峰值 RAM、初始化、模型大小；记录硬件/OS/线程/版本 | BM-01 | 同设备重复运行差异可解释；原始结果可审计 |
 | BM-03 | P0 | 验证音频基线 | 用合成频率/时长 fixture 和真实 44.1/48 kHz 设备记录当前 AudioContext 实际率，证明当前链路是否误声明采样率 | T-01 | 得到可复现证据，不再只凭风险推断 |
 | BM-04 | P0 | 跑当前对照 | 冻结当前 Paraformer 归档、hash、许可证和配置，测 cold/warm 与真实流式路径 | BM-02,BM-03 | 完整原始结果和失败日志 |
 | BM-05 | P0 | 跑 Zipformer 候选 | 至少测试小型中文 streaming Zipformer；资源允许时加较大中文版本，使用同一 Sherpa/硬件规则 | BM-02 | 完整原始结果，不只记录公开榜单 |
 | BM-06 | P0 | 跑 SenseVoiceSmall | 使用 Sherpa-ONNX INT8，明确 VAD/utterance 方式；分别度量句级完成体验，不能伪装为 streaming partial | BM-02 | 与产品 UX 权重一致的结果 |
 | BM-07 | P1 | ASR 执行边界 spike | 用当前模型最小比较 utility/child process 与 worker thread：加载、feed、stop、退出、重启、打包路径、Main 延迟 | T-07,BM-04 | ADR-0006 所需数据齐全 |
+
+#### Phase 2 执行记录（2026-08-25）
+
+| ID | 状态 | Owner | 证据 |
+|---|---|---|---|
+| BM-01 | In Progress | Codex + maintainer | Contract Gate commit `0e5168d55201dee3496c35caec1570fea5548982`：schema、Node 内置 validator、路径/哈希/元数据测试、合成 1 kHz 示例。当前治理 manifest 为 `expression-zh-v1` / `0.1.0`，SHA-256 `1dadf62bace0cdd8961718b9dd9c50cb0bdb0136a8c08fb0ac480a8a8326b948`，0 条 / 0 ms，7 个分层均为 0。原始音频必须保留在 Git 外受控 dataset root；本轮没有获得授权真人录音、双人复核 ground truth 或许可样本，故不能 Completed。 |
 
 > FunASR-Nano、Whisper、WASM 可作为研究参考，但不阻塞首轮决策，也不进入默认运行依赖。
 

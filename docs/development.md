@@ -1,8 +1,8 @@
 # 开发与可复现安装基线
 
-> 状态：Phase 1 / T-08 Electron Security Upgrade Verified
-> 验证日期：2026-08-23
-> 验证分支：`codex/security/electron-upgrade-spike`；基于 T-04～T-07 精确集成提交 `33a6ee59c321f613d66357bff4ead09835387010`
+> 状态：Phase 2 / BM-01 Contract Gate Verified；真实语料治理仍为 In Progress
+> 验证日期：2026-08-25（T-08 Electron 证据保留其 2026-08-23 原始日期）
+> 验证分支：`codex/benchmark/bm01-dataset`；BM-01 基于精确基线 `94e192d73c04ec36d5c4ad016e8e5daf1dc4670d`
 
 ## 1. 已验证开发环境
 
@@ -109,6 +109,32 @@ models/sherpa-onnx-streaming-paraformer-bilingual-zh-en/
 ```
 
 没有模型时，应用窗口仍应能够启动；真实 ASR、麦克风采样率和模型兼容性验证为 **Runtime-TBD**。模型下载、版本、hash 与许可证治理由后续 Model Manager/benchmark 项目处理。
+
+## 4.1 BM-01 benchmark 数据集
+
+BM-01 的可提交 Contract Gate 位于 `benchmark/datasets/`：JSON Schema、Node 内置 validator、质量汇总、无真人的合成 1 kHz WAV 示例和脱敏 manifest。真实音频不进入 Git，必须保留在受控 dataset root；manifest 的 `audioFile` 永远是相对于该 root 的路径，不能写入开发机的绝对路径。
+
+当前治理 manifest：
+
+| 项目 | 值 |
+|---|---|
+| dataset ID / version | `expression-zh-v1` / `0.1.0` |
+| manifest SHA-256 | `1dadf62bace0cdd8961718b9dd9c50cb0bdb0136a8c08fb0ac480a8a8326b948` |
+| 样本 / 总时长 | `0` / `0 ms` |
+| 7 个目标分层 | 全部 `0` |
+| 许可证与再分发观察 | 无许可证样本；`allowed` / `metadata-only` / `prohibited` 均为 `0` |
+| 存储边界 | 原始音频在 Git 外的受控 dataset root；仓库仅保存脱敏 manifest 和报告 |
+
+合成示例只用于验证 WAV、相对路径和 SHA-256 契约，不计入 50–100 条经授权、脱敏、人工双人复核的真实语料完成标准。当前没有此类样本、许可状态或复核证据，BM-01 必须保持 **In Progress**。
+
+在受控 dataset root 已获批准且样本已完成治理后，可用下面的模式复核 manifest；不要把实际 root 写进文档、Git 或报告：
+
+```powershell
+$env:DATASET_ROOT = '<controlled dataset root outside this repository>'
+& 'C:\Users\mr\AppData\Local\hermes\node\node.exe' -e "const path=require('node:path'); const {loadDatasetManifest}=require('./benchmark/lib/dataset-manifest'); const {summarizeDataset}=require('./benchmark/lib/dataset-quality'); const manifest=loadDatasetManifest(path.join(process.env.DATASET_ROOT,'manifest.json'),{datasetRoot:process.env.DATASET_ROOT}); console.log(JSON.stringify(summarizeDataset(manifest),null,2));"
+```
+
+Set `DATASET_ROOT` only in the local controlled environment before running the command. The command validates every relative audio reference and SHA-256 before printing coverage, source boundaries, duration, and sample-rate counts.
 
 ## 5. 本阶段验证边界
 
