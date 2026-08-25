@@ -57,10 +57,11 @@ async function startProbe() {
     webContents,
     expectedUrl: expectedProbeUrl
   });
-  const allowsMedia = (webContents, permission, requestingUrl) => authorizeMediaRequest({
+  const allowsMedia = (webContents, permission, requestingOrigin, requestingUrl) => authorizeMediaRequest({
     expectedWebContents: probeWindow.webContents,
     webContents,
     permission,
+    requestingOrigin,
     requestingUrl,
     expectedUrl: expectedProbeUrl
   });
@@ -69,10 +70,10 @@ async function startProbe() {
   });
   probeWindow.webContents.setWindowOpenHandler(denyWindowOpen);
   probeSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
-    callback(allowsMedia(webContents, permission, details?.requestingUrl ?? webContents.getURL()));
+    callback(allowsMedia(webContents, permission, details?.requestingOrigin, details?.requestingUrl));
   });
-  probeSession.setPermissionCheckHandler((webContents, permission, _requestingOrigin, details) => {
-    return allowsMedia(webContents, permission, details?.requestingUrl ?? webContents.getURL());
+  probeSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
+    return allowsMedia(webContents, permission, requestingOrigin, details?.requestingUrl);
   });
 
   shutdownCoordinator = createProbeShutdownCoordinator({

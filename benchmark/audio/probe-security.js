@@ -5,8 +5,21 @@ function isExpectedProbeFrame({ expectedWebContents, webContents, expectedUrl })
     webContents.mainFrame?.url === expectedUrl;
 }
 
-function authorizeMediaRequest({ expectedWebContents, webContents, permission, requestingUrl, expectedUrl }) {
+function expectedRequestOrigin(expectedUrl) {
+  const url = new URL(expectedUrl);
+  return url.protocol === 'file:' ? 'file://' : url.origin;
+}
+
+function authorizeMediaRequest({
+  expectedWebContents,
+  webContents,
+  permission,
+  requestingOrigin,
+  requestingUrl,
+  expectedUrl
+}) {
   return permission === 'media' &&
+    requestingOrigin === expectedRequestOrigin(expectedUrl) &&
     requestingUrl === expectedUrl &&
     isExpectedProbeFrame({ expectedWebContents, webContents, expectedUrl });
 }
@@ -23,5 +36,6 @@ module.exports = {
   authorizeMediaRequest,
   blockUnexpectedNavigation,
   denyWindowOpen,
+  expectedRequestOrigin,
   isExpectedProbeFrame
 };

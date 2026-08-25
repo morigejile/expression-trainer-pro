@@ -53,6 +53,7 @@ test('probe grants media only to its expected local page and main frame', () => 
     expectedWebContents: probeWebContents,
     webContents: probeWebContents,
     permission: 'media',
+    requestingOrigin: 'file://',
     requestingUrl: expectedUrl,
     expectedUrl
   }), true);
@@ -60,6 +61,7 @@ test('probe grants media only to its expected local page and main frame', () => 
     expectedWebContents: probeWebContents,
     webContents: probeWebContents,
     permission: 'media',
+    requestingOrigin: 'file://',
     requestingUrl: 'file:///D:/benchmark/audio/other.html',
     expectedUrl
   }), false);
@@ -67,6 +69,23 @@ test('probe grants media only to its expected local page and main frame', () => 
     expectedWebContents: probeWebContents,
     webContents: { getURL: () => expectedUrl, mainFrame: { url: expectedUrl } },
     permission: 'media',
+    requestingOrigin: 'file://',
+    requestingUrl: expectedUrl,
+    expectedUrl
+  }), false);
+  assert.equal(authorizeMediaRequest({
+    expectedWebContents: probeWebContents,
+    webContents: probeWebContents,
+    permission: 'media',
+    requestingOrigin: undefined,
+    requestingUrl: expectedUrl,
+    expectedUrl
+  }), false);
+  assert.equal(authorizeMediaRequest({
+    expectedWebContents: probeWebContents,
+    webContents: probeWebContents,
+    permission: 'media',
+    requestingOrigin: 'https://untrusted.example',
     requestingUrl: expectedUrl,
     expectedUrl
   }), false);
