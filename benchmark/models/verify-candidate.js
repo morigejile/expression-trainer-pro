@@ -1,19 +1,9 @@
 const crypto = require('crypto');
 const fs = require('fs');
-const path = require('path');
 const { loadCandidateRegistry } = require('../lib/candidate-registry');
+const {resolveModelPath} = require('../lib/model-root');
 
-function resolveModelFile(modelRoot, relativePath) {
-  const root = path.resolve(modelRoot);
-  const target = path.resolve(root, relativePath);
-  const relative = path.relative(root, target);
-
-  if (relative === '' || relative.startsWith(`..${path.sep}`) || path.isAbsolute(relative)) {
-    throw new Error(`Model file escapes model root: ${relativePath}`);
-  }
-
-  return target;
-}
+function resolveModelFile(modelRoot, relativePath) { return resolveModelPath(modelRoot, relativePath); }
 
 function sha256File(filePath) {
   return new Promise((resolve, reject) => {
@@ -29,6 +19,12 @@ function sha256File(filePath) {
 async function verifyCandidate(candidate, modelRoot) {
   if (!candidate || typeof candidate.id !== 'string' || !Array.isArray(candidate.files)) {
     throw new Error('Candidate must include an id and files array');
+  }
+  if (candidate.status === 'pending') {
+    return {candidateId: candidate.id, status: 'pending', valid: false, pending: candidate.pending};
+  }
+  if (candidate.status !== 'verified') {
+    throw new Error(`Unsupported candidate status: ${candidate.status}`);
   }
   if (typeof modelRoot !== 'string' || modelRoot.length === 0) {
     throw new Error('modelRoot must be a non-empty string');
@@ -72,6 +68,7 @@ async function verifyCandidate(candidate, modelRoot) {
 
   return {
     candidateId: candidate.id,
+    status: 'verified',
     valid: true,
     files,
     totalBytes,
@@ -87,6 +84,7 @@ function parseArguments(argv) {
     if (!['--registry', '--candidate', '--model-root'].includes(option) || !value) {
       throw new Error('Usage: node verify-candidate.js --registry <file> --candidate <id> --model-root <dir>');
     }
+    if (values[option]) throw new Error(`duplicate option: ${option}`);
     values[option] = value;
   }
   if (!values['--registry'] || !values['--candidate'] || !values['--model-root']) {
