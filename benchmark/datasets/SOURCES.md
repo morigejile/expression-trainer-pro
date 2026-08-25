@@ -14,25 +14,46 @@ sample a BM-01 ground-truth sample.
 - Locale/configuration: `cmn_hans_cn` (Mandarin Chinese, Simplified, China).
   The publisher's card identifies 16 kHz audio and separate `train`,
   `validation`, and `test` splits.
+- Bounded immutable shard: [development audio at revision
+  `4683b04`](https://huggingface.co/datasets/google/fleurs/blob/4683b04/data/cmn_hans_cn/audio/dev.tar.gz).
+  The publisher lists it as 217 MB with SHA-256
+  `3bc33212d5974eef7feb04bc4792458d6cd7e14ff10a1a24772f3c45ea87a822`.
 
 ### 2026-08-25 acquisition decision
 
 The original Google object responded with a fixed content length of
 `2,522,990,658` bytes.  That exceeds this benchmark's conservative 2 GB
-download cap, so it was not downloaded.  The dataset card describes smaller
-split-level Parquet paths under `parquet-data/cmn_hans_cn/`, but the public
-Hugging Face endpoint was unreachable from this environment during the
-verification attempt.  No proxy, mirror, archive slicing, account gate, or
-unofficial downloader may be used to evade that limitation.
+download cap, so it was not downloaded.  The bounded immutable development
+shard above is the sole approved alternative.  No proxy, mirror, archive
+slicing, account gate, or unofficial downloader may be used.
+
+The following official-URL attempts produced no HTTP status and no local
+partial file, so no audio was acquired:
+
+```text
+curl.exe --fail --silent --show-error --location --head \
+  "https://huggingface.co/datasets/google/fleurs/resolve/4683b04/data/cmn_hans_cn/audio/dev.tar.gz?download=true"
+# curl: (28) Failed to connect to huggingface.co:443 after 21082 ms: Could not connect to server
+
+curl.exe --fail --location --show-error --retry 2 --retry-all-errors --retry-delay 1 \
+  --connect-timeout 20 --continue-at - --output <external-staging>/incoming/fleurs-cmn_hans_cn-dev-4683b04.tar.gz.part \
+  "https://huggingface.co/datasets/google/fleurs/resolve/4683b04/data/cmn_hans_cn/audio/dev.tar.gz?download=true"
+# curl: (28) Connection timed out after 20014 milliseconds
+# Warning: Problem : timeout. Retrying in 1 second. 2 retries left.
+```
+
+The staging check found the partial archive absent.  Do not retry through any
+non-official host.  A later retry may use only this exact immutable URL, resume
+option, expected SHA-256, and the external dataset root.
 
 Consequently the external BM-01 staging area intentionally has no downloaded
 audio, intake inventory, or governed manifest entries from FLEURS yet.
 
 ### Permitted next attempt
 
-Before downloading any split-level file, record its immutable revision, remote
-file SHA-256, byte size, source URL, and licence evidence.  Keep the total
-download below 2 GB and use only the publisher-hosted endpoint.  Extract only
+Before downloading the bounded shard, recheck the immutable revision, remote
+SHA-256, byte size, source URL, and licence evidence.  Keep the total download
+below 2 GB and use only the publisher-hosted endpoint.  Extract only
 de-identified audio into the external dataset root; do not commit audio,
 absolute paths, speaker metadata, or raw upstream metadata to this repository.
 
