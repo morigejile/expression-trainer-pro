@@ -6,25 +6,28 @@
       "displayName": "Paraformer bilingual Chinese-English control",
       "family": "paraformer",
       "mode": "streaming",
-      "status": "pending",
+      "status": "verified",
       "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-paraformer-bilingual-zh-en.tar.bz2",
-      "upstreamVersion": "asr-models release asset",
+      "upstreamVersion": "2024-03-10",
       "license": {
-        "model": { "status": "unresolved", "reason": "The incomplete official archive was rejected before its license could be inspected.", "source": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-paraformer/paraformer-models.html" },
+        "model": { "status": "unresolved", "reason": "Official Sherpa documentation identifies the upstream ModelScope conversion source, but no model or data redistribution grant was established in this run.", "source": "https://www.modelscope.cn/models/damo/speech_paraformer_asr_nat-zh-cn-16k-common-vocab8404-online/summary" },
         "code": { "spdx": "Apache-2.0", "location": "https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE" },
         "redistribution": "not-approved"
       },
       "evidence": {
-        "source": { "status": "verified", "checkedAt": "2026-08-25T00:00:00.000Z" },
-        "license": { "status": "unverified", "checkedAt": "2026-08-25T00:00:00.000Z" },
-        "files": { "status": "pending", "reason": "Official archive transfer was incomplete and rejected; no file hashes were recorded.", "verifiedAt": "2026-08-25T00:00:00.000Z" },
-        "nativeLoad": { "status": "pending", "reason": "No accepted model files are available for native initialization.", "recordedAt": "2026-08-25T00:00:00.000Z" }
+        "source": { "status": "verified", "checkedAt": "2026-08-25T10:00:00.000Z" },
+        "license": { "status": "unverified", "checkedAt": "2026-08-25T10:00:00.000Z" },
+        "files": { "status": "verified", "reason": "Complete official archive matched the 1,047,319,737-byte GitHub release size; extracted runtime files were SHA-256 verified locally.", "verifiedAt": "2026-08-25T10:00:00.000Z" },
+        "nativeLoad": { "status": "passed", "reason": "Sherpa-ONNX 1.13.3 native OnlineRecognizer initialization completed on Windows x64.", "recordedAt": "2026-08-25T10:00:00.000Z" }
       },
       "sampleRateHz": 16000,
       "numThreads": 2,
       "provider": "cpu",
-      "files": [],
-      "pending": { "reason": "Download integrity could not be established.", "missing": ["verified-files", "native-load", "model-license"] }
+      "files": [
+        { "relativePath": "sherpa-onnx-streaming-paraformer-bilingual-zh-en/encoder.int8.onnx", "sha256": "81a70226a8934e6ed92aa1d4fc486b428b5398e2f2619ed4897b7294cab90e9a", "bytes": 165462184, "role": "encoder" },
+        { "relativePath": "sherpa-onnx-streaming-paraformer-bilingual-zh-en/decoder.int8.onnx", "sha256": "f3cca9f77bb9d93c8fcbfb63ae617b6b1ee96818df3aa3b151c40658fe38594f", "bytes": 71664561, "role": "decoder" },
+        { "relativePath": "sherpa-onnx-streaming-paraformer-bilingual-zh-en/tokens.txt", "sha256": "59aba8873a2ed1e122c25fee421e25f283b63290efbde85c1f01a853d83cb6e6", "bytes": 75756, "role": "tokens" }
+      ]
     },
     {
       "id": "zipformer-small-ctc-zh-int8-2025-04-01",
@@ -59,25 +62,27 @@
       "displayName": "SenseVoiceSmall INT8 utterance candidate",
       "family": "sensevoice",
       "mode": "utterance",
-      "status": "pending",
-      "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2",
+      "status": "verified",
+      "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2",
       "upstreamVersion": "2024-07-17",
       "license": {
-        "model": { "status": "unresolved", "reason": "The official model archive was not downloaded, so its model-license evidence remains unresolved.", "source": "https://k2-fsa.github.io/sherpa/onnx/sense-voice/pretrained.html" },
+        "model": { "status": "unresolved", "reason": "The embedded LICENSE only refers to the FunASR repository; no model or data redistribution grant was established in this run.", "source": "https://github.com/modelscope/FunASR?tab=readme-ov-file#license" },
         "code": { "spdx": "Apache-2.0", "location": "https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE" },
         "redistribution": "not-approved"
       },
       "evidence": {
-        "source": { "status": "verified", "checkedAt": "2026-08-25T00:00:00.000Z" },
-        "license": { "status": "unverified", "checkedAt": "2026-08-25T00:00:00.000Z" },
-        "files": { "status": "pending", "reason": "The official archive was not downloaded; no file hashes were recorded.", "verifiedAt": "2026-08-25T00:00:00.000Z" },
-        "nativeLoad": { "status": "pending", "reason": "No local model files are available for offline utterance initialization.", "recordedAt": "2026-08-25T00:00:00.000Z" }
+        "source": { "status": "verified", "checkedAt": "2026-08-25T10:00:00.000Z" },
+        "license": { "status": "unverified", "checkedAt": "2026-08-25T10:00:00.000Z" },
+        "files": { "status": "verified", "reason": "Complete official archive matched the 163,002,883-byte GitHub release size and published SHA-256; extracted runtime files were SHA-256 verified locally.", "verifiedAt": "2026-08-25T10:00:00.000Z" },
+        "nativeLoad": { "status": "passed", "reason": "Sherpa-ONNX 1.13.3 native OfflineRecognizer initialization completed on Windows x64.", "recordedAt": "2026-08-25T10:00:00.000Z" }
       },
       "sampleRateHz": 16000,
       "numThreads": 2,
       "provider": "cpu",
-      "files": [],
-      "pending": { "reason": "Required artifact and native-load evidence are not yet available.", "missing": ["verified-files", "native-load", "model-license"] }
+      "files": [
+        { "relativePath": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/model.int8.onnx", "sha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51", "bytes": 239233841, "role": "model" },
+        { "relativePath": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/tokens.txt", "sha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc", "bytes": 315894, "role": "tokens" }
+      ]
     }
   ]
 }

@@ -1,5 +1,5 @@
 {
-  "recordedAt": "2026-08-25T06:26:07.970Z",
+  "recordedAt": "2026-08-25T10:53:33.953Z",
   "environment": {
     "node": "22.23.0",
     "modules": "127",
@@ -13,6 +13,57 @@
     "offlineRecognizerExport": "function"
   },
   "candidateInitializations": [
+    {
+      "candidateId": "paraformer-bilingual-zh-en-control",
+      "mode": "streaming",
+      "verifiedAt": "2026-08-25T10:52:52.161Z",
+      "totalBytes": 237202501,
+      "archive": {
+        "bytes": 1047319737,
+        "sha256": "5462a1fce42693deae572af1e8c4687124b12aa85fe61ff4d3168bb5280e205f",
+        "upstreamSha256": null
+      },
+      "files": [
+        {
+          "relativePath": "sherpa-onnx-streaming-paraformer-bilingual-zh-en/encoder.int8.onnx",
+          "bytes": 165462184,
+          "sha256": "81a70226a8934e6ed92aa1d4fc486b428b5398e2f2619ed4897b7294cab90e9a"
+        },
+        {
+          "relativePath": "sherpa-onnx-streaming-paraformer-bilingual-zh-en/decoder.int8.onnx",
+          "bytes": 71664561,
+          "sha256": "f3cca9f77bb9d93c8fcbfb63ae617b6b1ee96818df3aa3b151c40658fe38594f"
+        },
+        {
+          "relativePath": "sherpa-onnx-streaming-paraformer-bilingual-zh-en/tokens.txt",
+          "bytes": 75756,
+          "sha256": "59aba8873a2ed1e122c25fee421e25f283b63290efbde85c1f01a853d83cb6e6"
+        }
+      ],
+      "config": {
+        "recognizerKind": "online",
+        "featConfig": { "sampleRate": 16000, "featureDim": 80 },
+        "modelConfig": {
+          "tokens": "<model-root>\\sherpa-onnx-streaming-paraformer-bilingual-zh-en\\tokens.txt",
+          "numThreads": 2,
+          "provider": "cpu",
+          "debug": false,
+          "paraformer": {
+            "encoder": "<model-root>\\sherpa-onnx-streaming-paraformer-bilingual-zh-en\\encoder.int8.onnx",
+            "decoder": "<model-root>\\sherpa-onnx-streaming-paraformer-bilingual-zh-en\\decoder.int8.onnx"
+          }
+        },
+        "decodingMethod": "greedy_search",
+        "maxActivePaths": 4,
+        "enableEndpoint": true,
+        "rule1MinTrailingSilence": 2.4,
+        "rule2MinTrailingSilence": 1.2,
+        "rule3MinUtteranceLength": 20
+      },
+      "initSuccess": true,
+      "initError": null,
+      "initElapsedMs": 1516.1384
+    },
     {
       "candidateId": "zipformer-small-ctc-zh-int8-2025-04-01",
       "mode": "streaming",
@@ -60,8 +111,49 @@
       "initSuccess": true,
       "initError": null,
       "initElapsedMs": 1922.078
+    },
+    {
+      "candidateId": "sensevoice-small-int8-2024-07-17",
+      "mode": "utterance",
+      "verifiedAt": "2026-08-25T10:52:52.594Z",
+      "totalBytes": 239549735,
+      "archive": {
+        "bytes": 163002883,
+        "sha256": "7d1efa2138a65b0b488df37f8b89e3d91a60676e416f515b952358d83dfd347e",
+        "upstreamSha256": "7d1efa2138a65b0b488df37f8b89e3d91a60676e416f515b952358d83dfd347e"
+      },
+      "files": [
+        {
+          "relativePath": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/model.int8.onnx",
+          "bytes": 239233841,
+          "sha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51"
+        },
+        {
+          "relativePath": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/tokens.txt",
+          "bytes": 315894,
+          "sha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc"
+        }
+      ],
+      "config": {
+        "recognizerKind": "offline",
+        "featConfig": { "sampleRate": 16000, "featureDim": 80 },
+        "modelConfig": {
+          "tokens": "<model-root>\\sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17\\tokens.txt",
+          "numThreads": 2,
+          "provider": "cpu",
+          "debug": false,
+          "senseVoice": {
+            "model": "<model-root>\\sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17\\model.int8.onnx",
+            "language": "auto",
+            "useInverseTextNormalization": true
+          }
+        }
+      },
+      "initSuccess": true,
+      "initError": null,
+      "initElapsedMs": 1647.8367
     }
   ],
-  "status": "partial-evidence-awaiting-paraformer-and-sensevoice-artifacts",
-  "reason": "The Zipformer candidate is hash-verified and initialized. Paraformer and SenseVoice remain unverified; native-addon loading alone is not model initialization evidence for those candidates."
+  "status": "all-required-candidate-artifacts-hash-verified-and-native-initialized",
+  "reason": "This records only archive/runtime-file integrity and minimal native initialization. It contains no recognition benchmark, ranking, default-model decision, or redistribution approval."
 }

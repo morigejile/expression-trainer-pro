@@ -87,20 +87,21 @@ test('committed registry contains the hash-verified small Chinese Zipformer cand
   assert.equal(candidate.files.every(({ relativePath }) => !path.isAbsolute(relativePath)), true);
 });
 
-test('committed registry represents verified and pending required candidates', () => {
+test('committed registry represents all downloaded candidates as hash-verified without approving redistribution', () => {
   const { loadCandidateRegistry, listCandidatesByStatus } = require('../benchmark/lib/candidate-registry');
   const registry = loadCandidateRegistry(path.join(__dirname, '..', 'benchmark', 'models', 'candidates.json'));
 
   assert.deepEqual(
     registry.candidates.map(({ id, status }) => [id, status]),
     [
-      ['paraformer-bilingual-zh-en-control', 'pending'],
+      ['paraformer-bilingual-zh-en-control', 'verified'],
       ['zipformer-small-ctc-zh-int8-2025-04-01', 'verified'],
-      ['sensevoice-small-int8-2024-07-17', 'pending']
+      ['sensevoice-small-int8-2024-07-17', 'verified']
     ]
   );
   assert.deepEqual(
     listCandidatesByStatus(registry, 'pending').map(({ id }) => id),
-    ['paraformer-bilingual-zh-en-control', 'sensevoice-small-int8-2024-07-17']
+    []
   );
+  assert.equal(registry.candidates.every(({ files, license }) => files.length > 0 && license.redistribution === 'not-approved'), true);
 });
