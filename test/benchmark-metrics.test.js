@@ -72,3 +72,20 @@ test('collectEnvironment fingerprints every configured model file with runtime c
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test('collectEnvironment rejects absolute model paths in persisted metadata', () => {
+  const { collectEnvironment } = require('../benchmark/lib/environment');
+  const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'expression-trainer-model-'));
+  const modelPath = path.join(directory, 'model.onnx');
+  fs.writeFileSync(modelPath, 'model-bytes');
+
+  try {
+    assert.throws(() => collectEnvironment({
+      candidateId: 'fake',
+      candidateVersion: '1.0.0',
+      modelFiles: [{ path: modelPath, relativePath: modelPath }]
+    }), /relativePath must be relative/);
+  } finally {
+    fs.rmSync(directory, { recursive: true, force: true });
+  }
+});

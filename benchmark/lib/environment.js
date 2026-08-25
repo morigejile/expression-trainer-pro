@@ -15,9 +15,13 @@ function readGit(command) {
 function collectModelFile(modelFile) {
   const descriptor = typeof modelFile === 'string' ? { path: modelFile } : modelFile;
   if (!descriptor || typeof descriptor.path !== 'string') throw new TypeError('modelFiles entries require a path');
+  const relativePath = descriptor.relativePath || path.basename(descriptor.path);
+  if (path.isAbsolute(relativePath) || path.win32.isAbsolute(relativePath) || path.posix.isAbsolute(relativePath) || relativePath === '..' || relativePath.startsWith('../') || relativePath.startsWith('..\\')) {
+    throw new TypeError('modelFiles relativePath must be relative');
+  }
   const bytes = fs.readFileSync(descriptor.path);
   return {
-    relativePath: descriptor.relativePath || path.basename(descriptor.path),
+    relativePath,
     sizeBytes: bytes.length,
     sha256: crypto.createHash('sha256').update(bytes).digest('hex')
   };
