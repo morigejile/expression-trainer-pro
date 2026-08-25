@@ -5,7 +5,7 @@ const { validateProbeResult, parseProbeOutput } = require('../benchmark/audio/pr
 const { runProbe, stopProcessTree } = require('../benchmark/audio/run-probe');
 const { selectProbeSession } = require('../benchmark/audio/probe-session');
 const {
-  authorizeMediaRequest,
+  createMediaPermissionHandlers,
   blockUnexpectedNavigation,
   denyWindowOpen
 } = require('../benchmark/audio/probe-security');
@@ -42,52 +42,84 @@ test('probe uses the BrowserWindow session that owns the probe renderer', () => 
   assert.equal(selectProbeSession({ session: probeSession }), probeSession);
 });
 
-test('probe grants media only to its expected local page and main frame', () => {
+test('probe permission handlers authorize only the exact local main-frame request', () => {
   const expectedUrl = 'file:///D:/benchmark/audio/probe.html';
   const probeWebContents = {
     getURL: () => expectedUrl,
     mainFrame: { url: expectedUrl }
   };
+  const handlers = createMediaPermissionHandlers({
+    expectedWebContents: probeWebContents,
+    expectedUrl
+  });
+  let requestAllowed;
 
-  assert.equal(authorizeMediaRequest({
-    expectedWebContents: probeWebContents,
-    webContents: probeWebContents,
-    permission: 'media',
-    requestingOrigin: 'file://',
+  handlers.request(probeWebContents, 'media', allowed => {
+    requestAllowed = allowed;
+  }, {
     requestingUrl: expectedUrl,
-    expectedUrl
+    isMainFrame: true
+  });
+  assert.equal(requestAllowed, true);
+
+  assert.equal(handlers.check(probeWebContents, 'media', 'file://', {
+    securityOrigin: 'file://',
+    mediaType: 'audio',
+    requestingUrl: expectedUrl,
+    isMainFrame: true
   }), true);
-  assert.equal(authorizeMediaRequest({
+});
+
+test('probe permission request handler denies missing URL and subframe requests', () => {
+  const expectedUrl = 'file:///D:/benchmark/audio/probe.html';
+  const probeWebContents = {
+    getURL: () => expectedUrl,
+    mainFrame: { url: expectedUrl }
+  };
+  const handlers = createMediaPermissionHandlers({
     expectedWebContents: probeWebContents,
-    webContents: probeWebContents,
-    permission: 'media',
-    requestingOrigin: 'file://',
+    expectedUrl
+  });
+  const request = details => {
+    let allowed;
+    handlers.request(probeWebContents, 'media', value => { allowed = value; }, details);
+    return allowed;
+  };
+
+  assert.equal(request({ isMainFrame: true }), false);
+  assert.equal(request({
     requestingUrl: 'file:///D:/benchmark/audio/other.html',
-    expectedUrl
+    isMainFrame: true
   }), false);
-  assert.equal(authorizeMediaRequest({
-    expectedWebContents: probeWebContents,
-    webContents: { getURL: () => expectedUrl, mainFrame: { url: expectedUrl } },
-    permission: 'media',
-    requestingOrigin: 'file://',
-    requestingUrl: expectedUrl,
-    expectedUrl
+  assert.equal(request({ requestingUrl: expectedUrl, isMainFrame: false }), false);
+  assert.equal(request({
+    requestingUrl: 'https://untrusted.example/probe.html',
+    isMainFrame: false
   }), false);
-  assert.equal(authorizeMediaRequest({
+});
+
+test('probe permission check handler denies cross-origin subframes and unknown renderers', () => {
+  const expectedUrl = 'file:///D:/benchmark/audio/probe.html';
+  const probeWebContents = {
+    getURL: () => expectedUrl,
+    mainFrame: { url: expectedUrl }
+  };
+  const handlers = createMediaPermissionHandlers({
     expectedWebContents: probeWebContents,
-    webContents: probeWebContents,
-    permission: 'media',
-    requestingOrigin: undefined,
-    requestingUrl: expectedUrl,
     expectedUrl
+  });
+
+  assert.equal(handlers.check(null, 'media', 'https://untrusted.example', {
+    embeddingOrigin: 'file://',
+    securityOrigin: 'https://untrusted.example',
+    mediaType: 'audio',
+    isMainFrame: false
   }), false);
-  assert.equal(authorizeMediaRequest({
-    expectedWebContents: probeWebContents,
-    webContents: probeWebContents,
-    permission: 'media',
-    requestingOrigin: 'https://untrusted.example',
+  assert.equal(handlers.check({ getURL: () => expectedUrl, mainFrame: { url: expectedUrl } }, 'media', 'file://', {
+    securityOrigin: 'file://',
+    mediaType: 'audio',
     requestingUrl: expectedUrl,
-    expectedUrl
+    isMainFrame: true
   }), false);
 });
 

@@ -10,18 +10,56 @@ function expectedRequestOrigin(expectedUrl) {
   return url.protocol === 'file:' ? 'file://' : url.origin;
 }
 
-function authorizeMediaRequest({
+function authorizeMediaPermissionRequest({
+  expectedWebContents,
+  webContents,
+  permission,
+  details,
+  expectedUrl
+}) {
+  return permission === 'media' &&
+    details?.requestingUrl === expectedUrl &&
+    details?.isMainFrame === true &&
+    isExpectedProbeFrame({ expectedWebContents, webContents, expectedUrl });
+}
+
+function authorizeMediaPermissionCheck({
   expectedWebContents,
   webContents,
   permission,
   requestingOrigin,
-  requestingUrl,
+  details,
   expectedUrl
 }) {
   return permission === 'media' &&
     requestingOrigin === expectedRequestOrigin(expectedUrl) &&
-    requestingUrl === expectedUrl &&
+    details?.requestingUrl === expectedUrl &&
+    details?.isMainFrame === true &&
     isExpectedProbeFrame({ expectedWebContents, webContents, expectedUrl });
+}
+
+function createMediaPermissionHandlers({ expectedWebContents, expectedUrl }) {
+  return {
+    request(webContents, permission, callback, details) {
+      callback(authorizeMediaPermissionRequest({
+        expectedWebContents,
+        webContents,
+        permission,
+        details,
+        expectedUrl
+      }));
+    },
+    check(webContents, permission, requestingOrigin, details) {
+      return authorizeMediaPermissionCheck({
+        expectedWebContents,
+        webContents,
+        permission,
+        requestingOrigin,
+        details,
+        expectedUrl
+      });
+    }
+  };
 }
 
 function blockUnexpectedNavigation(event, targetUrl, expectedUrl) {
@@ -33,8 +71,10 @@ function denyWindowOpen() {
 }
 
 module.exports = {
-  authorizeMediaRequest,
+  authorizeMediaPermissionRequest,
+  authorizeMediaPermissionCheck,
   blockUnexpectedNavigation,
+  createMediaPermissionHandlers,
   denyWindowOpen,
   expectedRequestOrigin,
   isExpectedProbeFrame

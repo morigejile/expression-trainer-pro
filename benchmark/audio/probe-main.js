@@ -3,7 +3,7 @@ const path = require('node:path');
 const { pathToFileURL } = require('node:url');
 const { RESULT_MARKER, validateProbeResult } = require('./probe-result');
 const { selectProbeSession } = require('./probe-session');
-const { authorizeMediaRequest, blockUnexpectedNavigation, denyWindowOpen, isExpectedProbeFrame } = require('./probe-security');
+const { blockUnexpectedNavigation, createMediaPermissionHandlers, denyWindowOpen, isExpectedProbeFrame } = require('./probe-security');
 const { createProbeShutdownCoordinator } = require('./probe-shutdown');
 
 const RESULT_CHANNEL = 'audio-baseline:submit-result';
@@ -57,24 +57,16 @@ async function startProbe() {
     webContents,
     expectedUrl: expectedProbeUrl
   });
-  const allowsMedia = (webContents, permission, requestingOrigin, requestingUrl) => authorizeMediaRequest({
+  const mediaPermissionHandlers = createMediaPermissionHandlers({
     expectedWebContents: probeWindow.webContents,
-    webContents,
-    permission,
-    requestingOrigin,
-    requestingUrl,
     expectedUrl: expectedProbeUrl
   });
   probeWindow.webContents.on('will-navigate', (event, targetUrl) => {
     blockUnexpectedNavigation(event, targetUrl, expectedProbeUrl);
   });
   probeWindow.webContents.setWindowOpenHandler(denyWindowOpen);
-  probeSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
-    callback(allowsMedia(webContents, permission, details?.requestingOrigin, details?.requestingUrl));
-  });
-  probeSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
-    return allowsMedia(webContents, permission, requestingOrigin, details?.requestingUrl);
-  });
+  probeSession.setPermissionRequestHandler(mediaPermissionHandlers.request);
+  probeSession.setPermissionCheckHandler(mediaPermissionHandlers.check);
 
   shutdownCoordinator = createProbeShutdownCoordinator({
     sendShutdown: () => {
