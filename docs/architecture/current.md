@@ -1,6 +1,6 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 Smoke（尚未完成真实设备/模型运行验收）
+> 状态：Verified from Source + Electron 43 Smoke；BM-02 harness In Progress（尚未完成真实设备/模型运行验收）
 > 基线日期：2026-08-23
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
 > 描述对象：截至 Phase 1 / T-08 状态；基于 T-04～T-07 集成提交 `33a6ee59c321f613d66357bff4ead09835387010` 的受控升级
@@ -33,6 +33,8 @@ data/*.json                     词库数据
 package.json / package-lock.json
 test/electron-smoke.test.js      Node 测试父进程、超时、日志和清理
 smoke/electron-smoke-runner.js  Electron 内 smoke 驱动与 Fake ASR/LLM
+benchmark/run.js                 独立 benchmark CLI；不进入生产 ASR/Audio/IPC/Main 路径
+benchmark/lib/*.js               manifest、CER、metrics、environment、results 与 adapter 契约
 ```
 
 ## 2. 当前目标与范围
@@ -68,6 +70,10 @@ smoke/electron-smoke-runner.js  Electron 内 smoke 驱动与 Fake ASR/LLM
 | 构建/测试 | scripts 为 `start`、`dev`、`test`、`check` | `node:test` 覆盖模块入口、词库、设置迁移、尾部文本、安全渲染、LLM 请求控制和真实 Electron smoke；LLM 单测使用 fake fetch，smoke 使用 Fake ASR/LLM；无 build/package/CI 配置 |
 
 开发工具基线固定为 Node 22.23.x/npm 12.0.x，与 Electron 内置 Node 24.18.1 明确区分。本轮只验证 Windows NT 10.0.26200.0 x64；Electron 38 起的 macOS 12+ 下限、Linux GTK/Wayland 和正式最低 Windows 版本仍没有 CI、打包配置或制品测试证明。
+
+### 3.1 BM-02 harness（In Progress）
+
+BM-02 新增独立 benchmark CLI 和 fake adapter，用 BM-01 manifest 输出每个 sample/repetition 的 JSONL、汇总 JSON/CSV、环境快照及 tag 分层统计；失败的 init、sample、timeout 和 dispose 事件也会被落盘。它不改动生产 `lib/asr.js`、Audio、IPC、Main 或默认模型，且没有新增依赖。2026-08-25 已用 checked-in 合成 WAV 与 fake adapter 连续运行两次及注入四类失败；详情见 `benchmark/results/fixtures/reproducibility-report.md`。该 fixture 不含人类语音，BM-01 所需的 50～100 条授权、脱敏、双人复核真实中文语料尚未完成，因此 BM-02、模型排名和 ADR-0005 仍保持未决。
 
 ## 4. C4 Level 2：当前容器/运行边界
 

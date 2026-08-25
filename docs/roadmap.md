@@ -109,7 +109,8 @@ flowchart LR
 
 | ID | 状态 | Owner | 证据 |
 |---|---|---|---|
-| BM-01 | In Progress | Codex + maintainer | Contract Gate commit `0e5168d55201dee3496c35caec1570fea5548982`：schema、Node 内置 validator、路径/哈希/元数据测试、合成 1 kHz 示例。当前治理 manifest 为 `expression-zh-v1` / `0.1.0`，SHA-256 `1dadf62bace0cdd8961718b9dd9c50cb0bdb0136a8c08fb0ac480a8a8326b948`，0 条 / 0 ms，7 个分层均为 0。原始音频必须保留在 Git 外受控 dataset root；本轮没有获得授权真人录音、双人复核 ground truth 或许可样本，故不能 Completed。 |
+| BM-01 | In Progress | Codex + maintainer | Corrected Contract Gate commit `f06a43bb2819aac07e4ecbd0ebd3fd27576e99e1`：schema、Node 内置 validator、路径/哈希/WAV 元数据测试、质量汇总和合成 1 kHz fixture。当前治理 manifest 为 `expression-zh-v1` / `0.1.0`，SHA-256 `1dadf62bace0cdd8961718b9dd9c50cb0bdb0136a8c08fb0ac480a8a8326b948`，0 条 / 0 ms，7 个分层均为 0。原始音频必须保留在 Git 外受控 dataset root；尚未满足 50～100 条经授权、脱敏、双人复核真实中文录音的完成标准，故不能 Completed。 |
+| BM-02 | In Progress | Codex + maintainer | Harness 已实现并用 fake/synthetic fixture 连续复跑与故障注入；逐条 JSONL、汇总 JSON/CSV、环境快照、不可覆盖 run 和失败记录见 `docs/benchmark/harness.md` 与 `benchmark/results/fixtures/reproducibility-report.md`。BM-01 未完成，故不得标记 Completed、合入 main 或用于候选排名。 |
 
 > FunASR-Nano、Whisper、WASM 可作为研究参考，但不阻塞首轮决策，也不进入默认运行依赖。
 
