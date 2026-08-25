@@ -38,8 +38,17 @@ function createExternalDataset() {
   };
   const intakePath = path.join(intakeDirectory, 'inventory.json');
   fs.writeFileSync(intakePath, `${JSON.stringify(intake)}\n`, 'utf8');
-  return { root, intakePath, audioPath, audioBytes };
+  return { root, intakePath, intakeRelativePath: 'intake/inventory.json', audioPath, audioBytes };
 }
+
+test('canonicalJson rejects values that cannot form canonical JSON evidence', () => {
+  const { canonicalJson } = require('../benchmark/lib/assisted-review-storage');
+  const cyclic = {};
+  cyclic.self = cyclic;
+  for (const value of [undefined, NaN, Infinity, () => {}, Symbol('value'), 1n, new Date(), cyclic]) {
+    assert.throws(() => canonicalJson(value), /canonical JSON|plain object|finite/i);
+  }
+});
 
 test('readBoundPcmCandidate seals sorted, hash-bound candidate evidence', () => {
   const fixture = createExternalDataset();
@@ -49,7 +58,7 @@ test('readBoundPcmCandidate seals sorted, hash-bound candidate evidence', () => 
 
     const result = readBoundPcmCandidate({
       datasetRoot: fixture.root,
-      intakePath: fixture.intakePath,
+      intakePath: fixture.intakeRelativePath,
       candidateId: 'fleurs-cmn-hans-cn-dev-synthetic'
     });
 
@@ -64,22 +73,49 @@ test('readBoundPcmCandidate seals sorted, hash-bound candidate evidence', () => 
   }
 });
 
-test('storage rejects escaping, modified, and duplicate external evidence writes', (t) => {
+test('storage confines relative intake and create-new evidence writes', (t) => {
   const fixture = createExternalDataset();
   try {
     const { readBoundPcmCandidate, resolveContained, writeCreateNewJson } = require('../benchmark/lib/assisted-review-storage');
     assert.throws(() => resolveContained(fixture.root, '../outside.json', { mustExist: false }), /relative|escape/i);
-    assert.throws(() => resolveContained(fixture.root, fixture.intakePath, { mustExist: true }), /relative|absolute/i);
+    assert.throws(
+      () => readBoundPcmCandidate({ datasetRoot: fixture.root, intakePath: fixture.intakePath, candidateId: 'fleurs-cmn-hans-cn-dev-synthetic' }),
+      /relative/i
+    );
 
     const outputDirectory = path.join(fixture.root, 'assisted-review');
     fs.mkdirSync(outputDirectory);
-    const outputPath = path.join(outputDirectory, 'binding.json');
-    writeCreateNewJson(outputPath, { record: 'first' });
-    assert.throws(() => writeCreateNewJson(outputPath, { record: 'second' }), /EEXIST/);
+    const writeRequest = { datasetRoot: fixture.root, relativePath: 'assisted-review/binding.json', value: { record: 'first' } };
+    writeCreateNewJson(writeRequest);
+    assert.throws(() => writeCreateNewJson(writeRequest), /EEXIST/);
+    assert.throws(
+      () => writeCreateNewJson({ datasetRoot: fixture.root, relativePath: path.join(outputDirectory, 'absolute.json'), value: { record: 'absolute' } }),
+      /relative/i
+    );
+    assert.throws(
+      () => writeCreateNewJson({ datasetRoot: fixture.root, relativePath: '../outside.json', value: { record: 'escape' } }),
+      /relative|escape/i
+    );
+
+    const outsideOutputDirectory = path.join(path.dirname(fixture.root), 'assisted-review-output-outside');
+    fs.mkdirSync(outsideOutputDirectory);
+    const outputLink = path.join(fixture.root, 'linked-output');
+    try {
+      fs.symlinkSync(outsideOutputDirectory, outputLink, 'junction');
+      assert.throws(
+        () => writeCreateNewJson({ datasetRoot: fixture.root, relativePath: 'linked-output/binding.json', value: { record: 'linked' } }),
+        /escape|contain/i
+      );
+    } catch (error) {
+      if (error.code === 'EPERM') t.skip('directory junction creation is unavailable on this Windows host');
+      else throw error;
+    } finally {
+      fs.rmSync(outsideOutputDirectory, { recursive: true, force: true });
+    }
 
     fs.appendFileSync(fixture.audioPath, Buffer.from([0]));
     assert.throws(
-      () => readBoundPcmCandidate({ datasetRoot: fixture.root, intakePath: fixture.intakePath, candidateId: 'fleurs-cmn-hans-cn-dev-synthetic' }),
+      () => readBoundPcmCandidate({ datasetRoot: fixture.root, intakePath: fixture.intakeRelativePath, candidateId: 'fleurs-cmn-hans-cn-dev-synthetic' }),
       /sha-?256|hash/i
     );
 
@@ -97,6 +133,23 @@ test('storage rejects escaping, modified, and duplicate external evidence writes
     }
     fs.rmSync(outside, { force: true });
   } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('readStableFile rejects a canonical path whose file identity changes after open', () => {
+  const fixture = createExternalDataset();
+  const replacement = path.join(fixture.root, 'audio', 'replacement.wav');
+  fs.copyFileSync(syntheticWav, replacement);
+  const originalRealpath = fs.realpathSync.native;
+  try {
+    const { readStableFile, sameFileIdentity } = require('../benchmark/lib/assisted-review-storage');
+    assert.equal(sameFileIdentity({ dev: 1, ino: 2, size: 10, birthtimeMs: 1 }, { dev: 1, ino: 3, size: 10, birthtimeMs: 1 }), false);
+    assert.equal(sameFileIdentity({ dev: 0, ino: 0, size: 10, birthtimeMs: 1 }, { dev: 0, ino: 0, size: 10, birthtimeMs: 1 }), true);
+    fs.realpathSync.native = (value) => path.resolve(value) === fixture.audioPath ? replacement : originalRealpath(value);
+    assert.throws(() => readStableFile(fixture.audioPath, fixture.root), /changed/i);
+  } finally {
+    fs.realpathSync.native = originalRealpath;
     fs.rmSync(fixture.root, { recursive: true, force: true });
   }
 });

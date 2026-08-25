@@ -43,7 +43,7 @@
 - Create: `benchmark/lib/assisted-review-storage.js`, `benchmark/assisted-review/input-binding.schema.json`, `test/assisted-review-storage.test.js`
 
 **Interfaces:**
-- Produces `canonicalJson(value): string`, `sha256Text(text): string`, `canonicalizeExternalRoot(root): string`, `resolveContained(root, relativePath, { mustExist }): string`, `readBoundPcmCandidate({ datasetRoot, intakePath, candidateId }): { candidate, bytes, binding }`, and `writeCreateNewJson(filePath, value): { sha256, bytes }`.
+- Produces `canonicalJson(value): string`, `sha256Text(text): string`, `canonicalizeExternalRoot(root): string`, `resolveContained(root, relativePath, { mustExist }): string`, `readBoundPcmCandidate({ datasetRoot, intakePath, candidateId }): { candidate, bytes, binding }` where `intakePath` is portable relative, and `writeCreateNewJson({ datasetRoot, relativePath, value }): { sha256, bytes }`.
 - `binding` is `{ schemaVersion: 1, candidateId, audioFile, audioSha256, sampleRateHz, channels, durationMs, intakeSha256, sourceRevision, upstreamDraftSha256, bindingSha256 }`.
 
 - [ ] **Step 1: Write the failing test**
