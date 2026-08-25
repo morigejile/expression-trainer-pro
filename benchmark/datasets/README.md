@@ -24,3 +24,8 @@ The validator also verifies that every referenced audio file resolves below the 
 Keep participant and public-corpus audio in a controlled dataset root that is not inside this repository. The `private/` directory is intentionally ignored as a local convenience only; do not use it to store consent originals, contact data, or unapproved recordings. Before adding a real sample, confirm authorization, remove personal identifiers, produce a first transcript, obtain a second-person review, compute the SHA-256, and record only the de-identified metadata permitted for Git.
 
 `example/` is a public, checked-in 1 kHz synthetic PCM WAV. It contains no human speech and demonstrates the contract without implying that synthetic audio counts toward the 50–100 governed human-recording requirement.
+
+See [SOURCES.md](SOURCES.md) for the current evidence-backed public-corpus
+acquisition boundary. It records candidate licensing and download constraints;
+it does not claim that any upstream transcript, metadata, or source record has
+completed the human-review gate.
