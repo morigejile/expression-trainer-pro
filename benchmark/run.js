@@ -1,5 +1,4 @@
 const childProcess = require('node:child_process');
-const fs = require('node:fs/promises');
 const path = require('node:path');
 const { performance } = require('node:perf_hooks');
 
@@ -8,13 +7,9 @@ const { calculateCer } = require('./lib/cer');
 const { loadDatasetManifest } = require('./lib/dataset-manifest');
 const { collectEnvironment } = require('./lib/environment');
 const { measureRun } = require('./lib/metrics');
+const { acquireFormalRunLock, prepareOutputRoot } = require('./lib/output-root');
 const { writeResults } = require('./lib/results');
 const { normalizeTranscript } = require('./lib/transcript');
-
-function isPathInside(parent, child) {
-  const relative = path.relative(parent, child);
-  return relative === '' || (!relative.startsWith(`..${path.sep}`) && relative !== '..' && !path.isAbsolute(relative));
-}
 
 function isWorktreeDirty() {
   try {
@@ -29,7 +24,7 @@ function makeRunId(candidateId) {
 }
 
 function validateRunId(runId) {
-  if (typeof runId !== 'string' || runId.trim() === '' || runId !== path.basename(runId)) {
+  if (typeof runId !== 'string' || runId.trim() === '' || runId === '.' || runId === '..' || runId !== path.basename(runId)) {
     throw new TypeError('runId must be a single directory name');
   }
 }
@@ -62,21 +57,60 @@ function failedSample(sample, repetition, error, initMs = null) {
   };
 }
 
-function withTimeout(operation, timeoutMs) {
-  let timer;
-  return Promise.race([
-    operation,
-    new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`sample timeout after ${timeoutMs}ms`)), timeoutMs);
-    })
-  ]).finally(() => clearTimeout(timer));
+function notRunSample(sample, repetition, reason, initMs = null) {
+  return {
+    sampleId: sample.id,
+    repetition,
+    tags: sample.tags,
+    status: 'not-run',
+    error: null,
+    skippedReason: reason,
+    reference: sample.transcript,
+    hypothesis: null,
+    distance: null,
+    referenceLength: null,
+    cer: null,
+    ...emptyMetrics(initMs)
+  };
 }
 
-async function ensureWritable(directory) {
-  await fs.mkdir(directory, { recursive: true });
-  const probe = path.join(directory, `.benchmark-write-check-${process.pid}-${Date.now()}`);
-  await fs.writeFile(probe, '');
-  await fs.rm(probe);
+async function transcribeWithTimeout(adapter, sample, hooks, timeoutMs) {
+  const controller = new AbortController();
+  let active = true;
+  let timedOut = false;
+  let timer;
+  const guardedHooks = {
+    onPartial(payload) {
+      if (active) hooks.onPartial(payload);
+    },
+    onFinal(payload) {
+      if (active) hooks.onFinal(payload);
+    }
+  };
+  const transcription = Promise.resolve().then(() => adapter.transcribe(sample, guardedHooks, { signal: controller.signal }));
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      timedOut = true;
+      active = false;
+      controller.abort();
+      reject(new Error(`sample timeout after ${timeoutMs}ms`));
+    }, timeoutMs);
+  });
+  try {
+    await Promise.race([transcription, timeout]);
+  } catch (error) {
+    if (timedOut) {
+      try {
+        await adapter.cancel({ reason: 'timeout', signal: controller.signal });
+      } finally {
+        await transcription.catch(() => {});
+      }
+    }
+    throw error;
+  } finally {
+    active = false;
+    clearTimeout(timer);
+  }
 }
 
 function validateOptions(options) {
@@ -86,7 +120,6 @@ function validateOptions(options) {
   if (typeof candidateId !== 'string' || candidateId.trim() === '') throw new TypeError('candidateId is required');
   if (!Number.isInteger(repetitions) || repetitions <= 0) throw new TypeError('repetitions must be a positive integer');
   if (!dryRun && (typeof outputRoot !== 'string' || !path.isAbsolute(outputRoot))) throw new TypeError('outputRoot must be an absolute path');
-  if (outputRoot && isPathInside(datasetRoot, outputRoot)) throw new Error('outputRoot must not be inside datasetRoot');
 }
 
 async function runBenchmark(options) {
@@ -107,78 +140,83 @@ async function runBenchmark(options) {
   if (!Number.isFinite(sampleTimeoutMs) || sampleTimeoutMs <= 0) throw new TypeError('sampleTimeoutMs must be positive');
   const manifest = loadDatasetManifest(manifestPath, { datasetRoot });
   const adapter = createBenchmarkAdapter({ candidateId, candidateConfig });
+  const canonicalOutputRoot = outputRoot ? await prepareOutputRoot({ datasetRoot, outputRoot }) : undefined;
   if (dryRun) {
-    if (outputRoot) await ensureWritable(outputRoot);
     return { dryRun: true, datasetId: manifest.datasetId, sampleCount: manifest.samples.length, candidateId };
   }
   if (formal && !allowDirty && isWorktreeDirty()) throw new Error('formal benchmark refuses a dirty worktree');
   validateRunId(runId);
-  await ensureWritable(outputRoot);
-
-  const sampleRuns = manifest.samples.flatMap((sample) => Array.from({ length: repetitions }, (_, index) => ({ sample, repetition: index + 1 })));
-  const records = [];
-  const initStartedAt = performance.now();
-  let initMs;
-  let initialized = false;
+  const releaseFormalLock = formal ? await acquireFormalRunLock(canonicalOutputRoot) : null;
   try {
-    await adapter.init();
-    initMs = performance.now() - initStartedAt;
-    initialized = true;
-  } catch (error) {
-    initMs = performance.now() - initStartedAt;
-    for (const { sample, repetition } of sampleRuns) records.push(failedSample(sample, repetition, error.message, initMs));
-  }
+    const sampleRuns = manifest.samples.flatMap((sample) => Array.from({ length: repetitions }, (_, index) => ({ sample, repetition: index + 1 })));
+    const records = [];
+    const candidateFailures = [];
+    const initStartedAt = performance.now();
+    let initMs;
+    let initialized = false;
+    try {
+      await adapter.init();
+      initMs = performance.now() - initStartedAt;
+      initialized = true;
+    } catch (error) {
+      initMs = performance.now() - initStartedAt;
+      candidateFailures.push({ phase: 'init', error: error.message, initMs });
+      for (const { sample, repetition } of sampleRuns) records.push(notRunSample(sample, repetition, 'candidate init failed', initMs));
+    }
 
-  if (initialized) {
-    for (const { sample, repetition } of sampleRuns) {
-      let finalText = null;
-      try {
-        const metrics = await measureRun(async ({ markInitialized, markPartial, markFinal }) => {
-          markInitialized(initMs);
-          await withTimeout(adapter.transcribe(sample, {
-            onPartial({ atMs }) { markPartial(atMs); },
-            onFinal({ text, atMs }) {
-              if (typeof text !== 'string') throw new TypeError('adapter final text must be a string');
-              finalText = text;
-              markFinal(atMs);
-            }
-          }), sampleTimeoutMs);
-          if (finalText === null) throw new Error('adapter returned no final result');
-        }, { audioDurationMs: sample.durationMs });
-        const referenceTokens = normalizeTranscript(sample.transcript);
-        const hypothesisTokens = normalizeTranscript(finalText);
-        const score = calculateCer(referenceTokens, hypothesisTokens);
-        records.push({
-          sampleId: sample.id,
-          repetition,
-          tags: sample.tags,
-          status: score.invalidReference ? 'failed' : 'passed',
-          error: score.invalidReference ? 'invalid reference transcript' : null,
-          reference: sample.transcript,
-          hypothesis: finalText,
-          ...score,
-          ...metrics
-        });
-      } catch (error) {
-        records.push(failedSample(sample, repetition, error.message, initMs));
+    if (initialized) {
+      for (const { sample, repetition } of sampleRuns) {
+        let finalText = null;
+        try {
+          const metrics = await measureRun(async ({ markInitialized, markPartial, markFinal }) => {
+            markInitialized(initMs);
+            await transcribeWithTimeout(adapter, sample, {
+              onPartial({ atMs }) { markPartial(atMs); },
+              onFinal({ text, atMs }) {
+                if (typeof text !== 'string') throw new TypeError('adapter final text must be a string');
+                finalText = text;
+                markFinal(atMs);
+              }
+            }, sampleTimeoutMs);
+            if (finalText === null) throw new Error('adapter returned no final result');
+          }, { audioDurationMs: sample.durationMs });
+          const referenceTokens = normalizeTranscript(sample.transcript);
+          const hypothesisTokens = normalizeTranscript(finalText);
+          const score = calculateCer(referenceTokens, hypothesisTokens);
+          records.push({
+            sampleId: sample.id,
+            repetition,
+            tags: sample.tags,
+            status: score.invalidReference ? 'failed' : 'passed',
+            error: score.invalidReference ? 'invalid reference transcript' : null,
+            reference: sample.transcript,
+            hypothesis: finalText,
+            ...score,
+            ...metrics
+          });
+        } catch (error) {
+          records.push(failedSample(sample, repetition, error.message, initMs));
+        }
       }
     }
-  }
 
-  try {
-    await adapter.dispose();
-  } catch (error) {
-    records.push(failedSample(null, null, error.message, initMs));
-  }
+    try {
+      await adapter.dispose();
+    } catch (error) {
+      candidateFailures.push({ phase: 'dispose', error: error.message, initMs });
+    }
 
-  const environment = collectEnvironment({
-    candidateId: adapter.id,
-    candidateVersion: adapter.version,
-    candidateConfig: adapter.config,
-    modelFiles: adapter.modelFiles
-  });
-  const output = await writeResults(path.join(outputRoot, runId), records, environment);
-  return { ...output, exitCode: output.summary.failed > 0 ? 1 : 0 };
+    const environment = collectEnvironment({
+      candidateId: adapter.id,
+      candidateVersion: adapter.version,
+      candidateConfig: adapter.config,
+      modelFiles: adapter.modelFiles
+    });
+    const output = await writeResults(path.join(canonicalOutputRoot, runId), records, environment, { candidateFailures });
+    return { ...output, exitCode: output.summary.failed > 0 || candidateFailures.length > 0 ? 1 : 0 };
+  } finally {
+    if (releaseFormalLock) await releaseFormalLock();
+  }
 }
 
 function parseArguments(argv) {
@@ -220,4 +258,4 @@ async function main() {
 
 if (require.main === module) main();
 
-module.exports = { parseArguments, runBenchmark };
+module.exports = { parseArguments, runBenchmark, transcribeWithTimeout };

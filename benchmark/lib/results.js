@@ -1,5 +1,6 @@
 const fs = require('node:fs/promises');
 const path = require('node:path');
+const crypto = require('node:crypto');
 
 const METRIC_FIELDS = [
   'cer',
@@ -31,6 +32,7 @@ function summarizeSamples(samples) {
     total: samples.length,
     passed: samples.filter((sample) => sample.status === 'passed').length,
     failed: samples.filter((sample) => sample.status === 'failed').length,
+    notRun: samples.filter((sample) => sample.status === 'not-run').length,
     metrics: Object.fromEntries(METRIC_FIELDS.map((field) => [field, summarizeMetric(samples, field)])),
     byTag: {}
   };
@@ -41,6 +43,7 @@ function summarizeSamples(samples) {
       total: taggedSamples.length,
       passed: taggedSamples.filter((sample) => sample.status === 'passed').length,
       failed: taggedSamples.filter((sample) => sample.status === 'failed').length,
+      notRun: taggedSamples.filter((sample) => sample.status === 'not-run').length,
       metrics: Object.fromEntries(METRIC_FIELDS.map((field) => [field, summarizeMetric(taggedSamples, field)]))
     };
   }
@@ -66,29 +69,50 @@ function buildSummaryCsv(summary) {
   return `${rows.map((row) => row.map(quoteCsv).join(',')).join('\n')}\n`;
 }
 
-async function writeResults(runDir, samples, environment) {
+async function reserveRunDirectory(runDir) {
   if (!path.isAbsolute(runDir)) throw new TypeError('runDir must be an absolute path');
-  if (!Array.isArray(samples)) throw new TypeError('samples must be an array');
+  await fs.mkdir(path.dirname(runDir), { recursive: true });
   try {
-    await fs.access(runDir);
-    throw new Error(`Benchmark run directory already exists: ${runDir}`);
+    await fs.mkdir(runDir);
   } catch (error) {
-    if (error.code !== 'ENOENT') throw error;
+    if (error.code === 'EEXIST') throw new Error(`Benchmark run directory already exists: ${runDir}`);
+    throw error;
   }
+  return {
+    runDir,
+    async release({ remove = false } = {}) {
+      if (remove) await fs.rm(runDir, { recursive: true, force: true });
+    }
+  };
+}
 
-  const parent = path.dirname(runDir);
-  const temporaryDir = path.join(parent, `.${path.basename(runDir)}.tmp-${process.pid}-${Date.now()}`);
+async function writeResults(runDir, samples, environment, { candidateFailures = [] } = {}) {
+  if (!Array.isArray(samples)) throw new TypeError('samples must be an array');
+  if (!Array.isArray(candidateFailures)) throw new TypeError('candidateFailures must be an array');
+  const reservation = await reserveRunDirectory(runDir);
+  const temporaryDir = path.join(runDir, `.staging-${process.pid}-${crypto.randomUUID()}`);
   const summary = summarizeSamples(samples);
-  await fs.mkdir(parent, { recursive: true });
+  summary.candidateFailures = {
+    total: candidateFailures.length,
+    byPhase: Object.fromEntries([...new Set(candidateFailures.map((failure) => failure.phase))].sort().map((phase) => [phase, candidateFailures.filter((failure) => failure.phase === phase).length]))
+  };
   await fs.mkdir(temporaryDir);
   try {
     await Promise.all([
       fs.writeFile(path.join(temporaryDir, 'samples.jsonl'), samples.map((sample) => JSON.stringify(sample)).join('\n') + (samples.length ? '\n' : ''), 'utf8'),
       fs.writeFile(path.join(temporaryDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, 'utf8'),
       fs.writeFile(path.join(temporaryDir, 'summary.csv'), buildSummaryCsv(summary), 'utf8'),
-      fs.writeFile(path.join(temporaryDir, 'environment.json'), `${JSON.stringify(environment, null, 2)}\n`, 'utf8')
+      fs.writeFile(path.join(temporaryDir, 'environment.json'), `${JSON.stringify(environment, null, 2)}\n`, 'utf8'),
+      fs.writeFile(path.join(temporaryDir, 'failures.jsonl'), candidateFailures.map((failure) => JSON.stringify(failure)).join('\n') + (candidateFailures.length ? '\n' : ''), 'utf8')
     ]);
-    await fs.rename(temporaryDir, runDir);
+    await Promise.all([
+      fs.rename(path.join(temporaryDir, 'samples.jsonl'), path.join(runDir, 'samples.jsonl')),
+      fs.rename(path.join(temporaryDir, 'summary.json'), path.join(runDir, 'summary.json')),
+      fs.rename(path.join(temporaryDir, 'summary.csv'), path.join(runDir, 'summary.csv')),
+      fs.rename(path.join(temporaryDir, 'environment.json'), path.join(runDir, 'environment.json')),
+      fs.rename(path.join(temporaryDir, 'failures.jsonl'), path.join(runDir, 'failures.jsonl'))
+    ]);
+    await fs.rm(temporaryDir, { recursive: true, force: true });
   } catch (error) {
     await fs.rm(temporaryDir, { recursive: true, force: true });
     throw error;
@@ -96,4 +120,4 @@ async function writeResults(runDir, samples, environment) {
   return { runDir, summary };
 }
 
-module.exports = { METRIC_FIELDS, SUMMARY_CSV_COLUMNS, writeResults };
+module.exports = { METRIC_FIELDS, SUMMARY_CSV_COLUMNS, reserveRunDirectory, writeResults };

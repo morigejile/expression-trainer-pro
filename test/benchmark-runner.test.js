@@ -62,6 +62,16 @@ async function withDataset(run) {
   }
 }
 
+async function withAdapter(candidateId, factory, run) {
+  const { ADAPTER_FACTORIES } = require('../benchmark/lib/adapter');
+  ADAPTER_FACTORIES[candidateId] = factory;
+  try {
+    return await run();
+  } finally {
+    delete ADAPTER_FACTORIES[candidateId];
+  }
+}
+
 test('runner writes one result per sample and repetition', async () => {
   const { runBenchmark } = require('../benchmark/run');
 
@@ -108,8 +118,28 @@ test('runner rejects an unknown candidate and output nested inside its dataset',
       outputRoot: path.join(root, 'results'),
       runId: 'invalid-output',
       formal: false
-    }), /outputRoot must not be inside datasetRoot/);
+    }), /outputRoot must not .*inside datasetRoot/);
   });
+});
+
+test('dry run rejects an output-root junction that resolves inside the dataset', async () => {
+  const { runBenchmark } = require('../benchmark/run');
+  const dataset = createDataset();
+  const outsideRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'expression-trainer-output-link-'));
+  const junctionPath = path.join(outsideRoot, 'dataset-link');
+  fs.symlinkSync(dataset.root, junctionPath, 'junction');
+  try {
+    await assert.rejects(runBenchmark({
+      manifestPath: dataset.manifestPath,
+      datasetRoot: dataset.root,
+      candidateId: 'fake',
+      outputRoot: junctionPath,
+      dryRun: true
+    }), /outputRoot must not resolve inside datasetRoot/);
+  } finally {
+    fs.rmSync(dataset.root, { recursive: true, force: true });
+    fs.rmSync(outsideRoot, { recursive: true, force: true });
+  }
 });
 
 test('runner records fake init, sample, timeout, and dispose failures with a nonzero result', async () => {
@@ -129,9 +159,108 @@ test('runner records fake init, sample, timeout, and dispose failures with a non
       });
 
       assert.equal(result.exitCode, 1, failureMode);
-      assert.ok(result.summary.failed >= 1, failureMode);
       const records = fs.readFileSync(path.join(result.runDir, 'samples.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
-      assert.ok(records.some((record) => record.status === 'failed' && record.error.includes(failureMode)), failureMode);
+      if (failureMode === 'init' || failureMode === 'dispose') {
+        const failures = fs.readFileSync(path.join(result.runDir, 'failures.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+        assert.equal(result.summary.candidateFailures.total, 1, failureMode);
+        assert.ok(failures.some((failure) => failure.error.includes(failureMode)), failureMode);
+      } else {
+        assert.ok(result.summary.failed >= 1, failureMode);
+        assert.ok(records.some((record) => record.status === 'failed' && record.error.includes(failureMode)), failureMode);
+      }
     }
+  });
+});
+
+test('timeout aborts and settles transcription before the next repetition can start', async () => {
+  const { runBenchmark } = require('../benchmark/run');
+  const events = [];
+  let firstTimer;
+  let settleFirst;
+  await withDataset(async ({ root, manifestPath, outputRoot }) => {
+    await withAdapter('controlled-timeout', () => {
+      let calls = 0;
+      return {
+        id: 'controlled-timeout',
+        version: '1.0.0',
+        config: {},
+        modelFiles: [],
+        async init() {},
+        transcribe(sample, hooks, { signal }) {
+          calls += 1;
+          assert.equal(signal instanceof AbortSignal, true);
+          if (calls === 1) {
+            return new Promise(resolve => {
+              settleFirst = resolve;
+              firstTimer = setTimeout(() => {
+                events.push('late-final');
+                hooks.onFinal({ text: sample.transcript, atMs: 20 });
+                resolve();
+              }, 20);
+            });
+          }
+          events.push('second-start');
+          hooks.onFinal({ text: sample.transcript, atMs: 4 });
+        },
+        async cancel() {
+          events.push('cancel');
+          clearTimeout(firstTimer);
+          settleFirst();
+        },
+        async dispose() {}
+      };
+    }, async () => {
+      const result = await runBenchmark({
+        manifestPath,
+        datasetRoot: root,
+        candidateId: 'controlled-timeout',
+        outputRoot,
+        runId: 'controlled-timeout',
+        repetitions: 2,
+        formal: false,
+        sampleTimeoutMs: 5
+      });
+      assert.equal(result.summary.total, 2);
+      assert.equal(result.summary.failed, 1);
+    });
+  });
+  assert.deepEqual(events, ['cancel', 'second-start']);
+});
+
+test('candidate init and dispose failures are persisted outside the sample denominator', async () => {
+  const { runBenchmark } = require('../benchmark/run');
+  await withDataset(async ({ root, manifestPath, outputRoot }) => {
+    const initResult = await runBenchmark({
+      manifestPath,
+      datasetRoot: root,
+      candidateId: 'fake',
+      candidateConfig: { failureMode: 'init' },
+      outputRoot,
+      runId: 'candidate-init',
+      repetitions: 2,
+      formal: false
+    });
+    assert.equal(initResult.summary.total, 2);
+    assert.equal(initResult.summary.failed, 0);
+    assert.equal(initResult.summary.notRun, 2);
+    assert.equal(initResult.summary.candidateFailures.total, 1);
+    const initFailures = fs.readFileSync(path.join(initResult.runDir, 'failures.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+    assert.deepEqual(initFailures.map(({ phase, error }) => ({ phase, error })), [{ phase: 'init', error: 'fake init failure' }]);
+
+    const disposeResult = await runBenchmark({
+      manifestPath,
+      datasetRoot: root,
+      candidateId: 'fake',
+      candidateConfig: { failureMode: 'dispose' },
+      outputRoot,
+      runId: 'candidate-dispose',
+      formal: false
+    });
+    assert.equal(disposeResult.summary.total, 1);
+    assert.equal(disposeResult.summary.passed, 1);
+    assert.equal(disposeResult.summary.failed, 0);
+    assert.equal(disposeResult.summary.candidateFailures.total, 1);
+    const disposeFailures = fs.readFileSync(path.join(disposeResult.runDir, 'failures.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
+    assert.deepEqual(disposeFailures.map(({ phase, error }) => ({ phase, error })), [{ phase: 'dispose', error: 'fake dispose failure' }]);
   });
 });

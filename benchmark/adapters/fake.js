@@ -8,12 +8,18 @@ function createFakeAdapter(config = {}) {
     async init() {
       if (failureMode === 'init') throw new Error('fake init failure');
     },
-    async transcribe(sample, hooks) {
+    async transcribe(sample, hooks, { signal } = {}) {
       if (failureMode === 'sample') throw new Error('fake sample failure');
-      if (failureMode === 'timeout') return new Promise(() => {});
+      if (failureMode === 'timeout') {
+        return new Promise(resolve => {
+          signal?.addEventListener('abort', resolve, { once: true });
+        });
+      }
+      if (signal?.aborted) throw new Error('fake transcription cancelled');
       hooks.onPartial({ text: 'fake partial', atMs: 2 });
       hooks.onFinal({ text: sample.transcript, atMs: 4 });
     },
+    async cancel() {},
     async dispose() {
       if (failureMode === 'dispose') throw new Error('fake dispose failure');
     }

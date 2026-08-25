@@ -79,3 +79,15 @@ test('result writer rejects an existing run directory without changing its conte
     assert.equal(fs.readFileSync(path.join(runDir, 'keep.txt'), 'utf8'), 'original');
   });
 });
+
+test('result reservation atomically owns a run directory before artifacts are written', async () => {
+  const { reserveRunDirectory } = require('../benchmark/lib/results');
+
+  await withTempDirectory(async (directory) => {
+    const runDir = path.join(directory, 'run-reserved');
+    const reservation = await reserveRunDirectory(runDir);
+    assert.equal(fs.existsSync(runDir), true);
+    await assert.rejects(reserveRunDirectory(runDir), /already exists/);
+    await reservation.release();
+  });
+});
