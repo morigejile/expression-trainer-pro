@@ -1,6 +1,6 @@
 # 开发与可复现安装基线
 
-> 状态：Phase 2 / BM-01 Contract Gate Verified；真实语料治理仍为 In Progress
+> 状态：Phase 2 / BM-01 Corrected Contract Gate `f06a43bb2819aac07e4ecbd0ebd3fd27576e99e1` Verified；真实语料治理仍为 In Progress
 > 验证日期：2026-08-25（T-08 Electron 证据保留其 2026-08-23 原始日期）
 > 验证分支：`codex/benchmark/bm01-dataset`；BM-01 基于精确基线 `94e192d73c04ec36d5c4ad016e8e5daf1dc4670d`
 
@@ -112,7 +112,7 @@ models/sherpa-onnx-streaming-paraformer-bilingual-zh-en/
 
 ## 4.1 BM-01 benchmark 数据集
 
-BM-01 的可提交 Contract Gate 位于 `benchmark/datasets/`：JSON Schema、Node 内置 validator、质量汇总、无真人的合成 1 kHz WAV 示例和脱敏 manifest。真实音频不进入 Git，必须保留在受控 dataset root；manifest 的 `audioFile` 永远是相对于该 root 的路径，不能写入开发机的绝对路径。
+BM-01 的可提交 Corrected Contract Gate（`f06a43bb2819aac07e4ecbd0ebd3fd27576e99e1`）位于 `benchmark/datasets/`：JSON Schema、Node 内置 validator、质量汇总/确定性报告 CLI、无真人的合成 1 kHz WAV 示例和脱敏 manifest。validator 使用 canonical realpath 和打开后复检以拒绝路径、symlink/junction 逃逸并减小 path-swap 风险；v1 只接受 RIFF/WAVE、16-bit PCM，并核对实际采样率、声道、时长和 SHA-256。真实音频不进入 Git，必须保留在受控 dataset root；manifest 的 `audioFile` 永远是相对于该 root 的路径，不能写入开发机的绝对路径。
 
 当前治理 manifest：
 
@@ -127,14 +127,15 @@ BM-01 的可提交 Contract Gate 位于 `benchmark/datasets/`：JSON Schema、No
 
 合成示例只用于验证 WAV、相对路径和 SHA-256 契约，不计入 50–100 条经授权、脱敏、人工双人复核的真实语料完成标准。当前没有此类样本、许可状态或复核证据，BM-01 必须保持 **In Progress**。
 
-在受控 dataset root 已获批准且样本已完成治理后，可用下面的模式复核 manifest；不要把实际 root 写进文档、Git 或报告：
+在受控 dataset root 已获批准且样本已完成治理后，可用下面的独立路径模式生成/复核报告；不要把实际 root 写进文档、Git 或报告：
 
 ```powershell
+$env:MANIFEST_PATH = (Resolve-Path 'benchmark/datasets/expression-zh-v1/manifest.json')
 $env:DATASET_ROOT = '<controlled dataset root outside this repository>'
-& 'C:\Users\mr\AppData\Local\hermes\node\node.exe' -e "const path=require('node:path'); const {loadDatasetManifest}=require('./benchmark/lib/dataset-manifest'); const {summarizeDataset}=require('./benchmark/lib/dataset-quality'); const manifest=loadDatasetManifest(path.join(process.env.DATASET_ROOT,'manifest.json'),{datasetRoot:process.env.DATASET_ROOT}); console.log(JSON.stringify(summarizeDataset(manifest),null,2));"
+node benchmark/scripts/generate-quality-report.js
 ```
 
-Set `DATASET_ROOT` only in the local controlled environment before running the command. The command validates every relative audio reference and SHA-256 before printing coverage, source boundaries, duration, and sample-rate counts.
+`MANIFEST_PATH` is the checked-in/de-identified manifest and `DATASET_ROOT` is the separately controlled audio root. Set `DATASET_ROOT` only in the local controlled environment before running the command. The command validates every relative audio reference, canonical root containment, PCM WAV metadata and SHA-256 before printing deterministic coverage, source-boundary, duration and sample-rate evidence.
 
 ## 5. 本阶段验证边界
 

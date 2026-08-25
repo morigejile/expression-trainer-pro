@@ -201,7 +201,7 @@ providers.custom     { apiKey, baseUrl, model, customModel }
 
 ### 5.8 Benchmark dataset boundary (BM-01)
 
-BM-01 已建立 Git 可提交的契约层：`benchmark/datasets/manifest.schema.json` 定义 schema version 1，`benchmark/lib/dataset-manifest.js` 以 Node 内置模块执行相对路径、受控 root、SHA-256、元数据、来源和分层检查，`benchmark/lib/dataset-quality.js` 输出可复核的覆盖/时长/许可证/再分发/采样率汇总。该契约不接入应用运行路径，也不修改 Main、Preload、Renderer 或现有 ASR 实现。
+BM-01 已由 Corrected Contract Gate `f06a43bb2819aac07e4ecbd0ebd3fd27576e99e1` 建立 Git 可提交的契约层：`benchmark/datasets/manifest.schema.json` 定义 schema version 1，`benchmark/lib/dataset-manifest.js` 以 Node 内置模块执行 canonical realpath、打开后复检、SHA-256、RIFF/WAVE 16-bit PCM 元数据、来源/许可和分层检查，`benchmark/lib/dataset-quality.js` 与 `benchmark/scripts/generate-quality-report.js` 输出可复核且确定性的覆盖/时长/许可证/再分发/采样率报告。该契约不接入应用运行路径，也不修改 Main、Preload、Renderer 或现有 ASR 实现。
 
 当前治理 manifest 为 `expression-zh-v1` / `0.1.0`，SHA-256 为 `1dadf62bace0cdd8961718b9dd9c50cb0bdb0136a8c08fb0ac480a8a8326b948`。截至 2026-08-25，它包含 0 条、0 ms：普通话、快/慢语速、轻口音、中英混合、数字/专名和轻噪声均为 0；没有许可证或再分发观察。仓库另有 1 秒 16 kHz/单声道/16-bit PCM/1 kHz 合成 WAV 作为无隐私合同 fixture，但它不代表人声、不计入 benchmark 语料，也不能作为人工复核证据。
 
