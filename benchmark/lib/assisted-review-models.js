@@ -350,13 +350,14 @@ function preflightPredictionRun({ datasetRoot, binding, modelLock, modelRoot, sh
   if (resolvedSherpaVersion !== modelLock.sherpaVersion) throw new Error('Sherpa version does not match model lock');
   preflightModelLock({ modelRoot, modelLock });
   assertRolesMatchBinding(modelLock, binding);
-  const pcmBytes = readVerifiedBindingAudio(datasetRoot, binding);
+  readVerifiedBindingAudio(datasetRoot, binding);
   const configs = new Map(modelLock.roles.map((role) => [role.role, buildReviewSherpaConfig(role, modelRoot)]));
-  return { pcmBytes, configs, sherpaVersion: resolvedSherpaVersion };
+  return { configs, sherpaVersion: resolvedSherpaVersion };
 }
 
-function sealPreflightedAttempt({ datasetRoot, binding, role, modelLock, modelRoot, runId, pcmBytes, config, transcribe, sherpa }) {
+function sealPreflightedAttempt({ datasetRoot, binding, role, modelLock, modelRoot, runId, config, transcribe, sherpa }) {
   assertSafeSegment(runId, 'runId');
+  const pcmBytes = readVerifiedBindingAudio(datasetRoot, binding);
   const startedAt = process.hrtime.bigint();
   let status = 'succeeded';
   let rawText = '';
@@ -403,7 +404,7 @@ function sealPredictionAttempt({ datasetRoot, binding, role, modelLock, modelRoo
   const preflight = preflightPredictionRun({ datasetRoot, binding, modelLock, modelRoot, sherpaVersion });
   return sealPreflightedAttempt({
     datasetRoot, binding, role: lockedRole, modelLock, modelRoot, runId,
-    pcmBytes: preflight.pcmBytes, config: preflight.configs.get(lockedRole.role), transcribe, sherpa,
+    config: preflight.configs.get(lockedRole.role), transcribe, sherpa,
   });
 }
 
@@ -440,7 +441,6 @@ function runPredictionBundle({ datasetRoot, binding, upstreamDraft, modelLock, m
     runId,
     transcribe,
     sherpa,
-    pcmBytes: preflight.pcmBytes,
     config: preflight.configs.get(role.role),
   }));
   readVerifiedBindingAudio(datasetRoot, binding);

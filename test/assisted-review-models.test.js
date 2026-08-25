@@ -98,6 +98,17 @@ test('model lock accepts only the three stable roles and safe hash-pinned relati
 
   assert.deepEqual(schema.required, ['schemaVersion', 'sherpaVersion', 'roles']);
   assert.equal(schema.additionalProperties, false);
+  assert.equal(schema.properties.sherpaVersion.maxLength, 128);
+  assert.equal(new RegExp(schema.properties.sherpaVersion.pattern).test('C:\\private\\version'), false);
+  const roleSchema = schema.properties.roles.items;
+  assert.equal(roleSchema.properties.modelId.maxLength, 128);
+  assert.equal(new RegExp(roleSchema.properties.modelId.pattern).test('/private/model'), false);
+  assert.equal(new RegExp(roleSchema.properties.modelVersion.pattern).test('..\\private'), false);
+  const fileSchema = roleSchema.properties.files.items;
+  assert.deepEqual(fileSchema.properties.role.enum, ['tokens', 'encoder', 'decoder', 'model']);
+  assert.equal(new RegExp(fileSchema.properties.relativePath.pattern).test('nested/model.onnx'), true);
+  assert.equal(new RegExp(fileSchema.properties.relativePath.pattern).test('..\\model.onnx'), false);
+  assert.equal(new RegExp(fileSchema.properties.relativePath.pattern).test('nested/../model.onnx'), false);
   assert.equal(validateModelLock(fixture.modelLock), fixture.modelLock);
   assert.throws(
     () => validateModelLock({ ...fixture.modelLock, unknown: true }),
@@ -343,6 +354,25 @@ test('post-transcription audio changes abort the current bundle without a predic
   const outputRoot = path.join(fixture.datasetRoot, 'assisted-review', 'runs', 'run-post-audio', 'candidates', fixture.binding.candidateId, fixture.binding.bindingSha256);
   assert.equal(fs.existsSync(path.join(outputRoot, 'predictions', 'baseline-paraformer.json')), false);
   assert.equal(fs.existsSync(path.join(outputRoot, 'comparison.json')), false);
+});
+
+test('bundle revalidates PCM independently immediately before every model consumption', (t) => {
+  const fixture = createFixture(t);
+  const originalRealpath = fs.realpathSync.native;
+  let audioRealpathCalls = 0;
+  try {
+    fs.realpathSync.native = (value) => {
+      if (path.resolve(value) === fixture.audioPath) audioRealpathCalls += 1;
+      return originalRealpath(value);
+    };
+    const result = runPredictionBundle({
+      datasetRoot: fixture.datasetRoot, binding: fixture.binding, upstreamDraft: '上游草稿', modelLock: fixture.modelLock, modelRoot: fixture.modelRoot, runId: 'run-per-attempt-audio', transcribe: () => '文本',
+    });
+    assert.deepEqual(result.attempts.map((attempt) => attempt.status), ['succeeded', 'succeeded', 'succeeded']);
+    assert.equal(audioRealpathCalls, 16);
+  } finally {
+    fs.realpathSync.native = originalRealpath;
+  }
 });
 
 test('sealed config digests cover native configuration fields after model paths are relativized', (t) => {
