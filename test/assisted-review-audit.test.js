@@ -183,6 +183,33 @@ test('recovery quarantines corrupted candidate evidence and transfers no approva
   }
 });
 
+test('recovery isolates a candidate with no event in an otherwise valid audit chain', (t) => {
+  const root = temporaryReviewRoot(t);
+  appendAuditEvent({
+    auditRoot: path.join(root, 'audit'),
+    event: { actorAlias: 'policy-reviewer-3', actorRole: 'primary', batchId: 'fleurs-dev-100-r1', policySha256: POLICY_SHA256, action: 'approve-policy', expectedRevision: 0 },
+  });
+  const result = recoverBrokenCandidate({ reviewRoot: root, candidateId: CANDIDATE_ID });
+  assert.equal(result.status, 'isolated');
+  assert.equal(result.errorCode, 'AUDIT_OR_STATE_CORRUPT');
+  const fresh = JSON.parse(fs.readFileSync(path.join(root, 'reviews', CANDIDATE_ID, 'state.json'), 'utf8'));
+  assert.equal(fresh.status, 'unreviewed');
+  assert.equal(fresh.primaryTranscript, null);
+  assert.ok(fs.readdirSync(path.join(root, 'incidents')).some((name) => name.includes(CANDIDATE_ID)));
+});
+
+test('recovery isolates a structurally valid self-hashed state that lags its valid audit replay', (t) => {
+  const root = temporaryReviewRoot(t);
+  const primary = committedPrimary(root);
+  commitTransition({ reviewRoot: root, state: primary, event: secondaryEvent(), expectedRevision: 1 });
+  fs.writeFileSync(path.join(root, 'reviews', CANDIDATE_ID, 'state.json'), `${canonicalJson(primary)}\n`);
+  const result = recoverBrokenCandidate({ reviewRoot: root, candidateId: CANDIDATE_ID });
+  assert.equal(result.status, 'isolated');
+  const fresh = JSON.parse(fs.readFileSync(path.join(root, 'reviews', CANDIDATE_ID, 'state.json'), 'utf8'));
+  assert.equal(fresh.status, 'unreviewed');
+  assert.equal(fresh.secondaryApproval, null);
+});
+
 test('a broken global chain remains fail-closed for every candidate after one candidate is isolated', (t) => {
   const root = temporaryReviewRoot(t);
   committedPrimary(root);

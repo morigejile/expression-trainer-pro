@@ -573,7 +573,7 @@ function recoverBrokenCandidate({ reviewRoot, candidateId } = {}) {
       writeAtomicState(root, candidateId, replayed);
       return { status: 'replayed', candidateId, stateSha256: replayed.stateSha256 };
     } catch (error) {
-      if (!['AUDIT_CHAIN_INVALID', 'AUDIT_STATE_MISMATCH', 'STATE_INVALID'].includes(error.code)) throw error;
+      if (!['AUDIT_CHAIN_INVALID', 'AUDIT_STATE_MISMATCH', 'AUDIT_OR_STATE_CORRUPT', 'STATE_INVALID'].includes(error.code)) throw error;
       const reviews = ensureDirectory(root, 'reviews');
       const candidateDirectory = containedFile(root, `reviews/${candidateId}`);
       const hashes = hashDirectoryFiles(candidateDirectory);
