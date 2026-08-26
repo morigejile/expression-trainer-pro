@@ -417,6 +417,7 @@ function createRunRecord(modelLock, modelRoot, configs) {
       role: role.role,
       modelId: role.modelId,
       modelVersion: role.modelVersion,
+      modelLockEntrySha256: recordSha256(role),
       configSha256: nativeConfigSha256(configs.get(role.role), modelRoot),
     })),
   };

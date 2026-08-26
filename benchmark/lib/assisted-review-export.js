@@ -1,6 +1,5 @@
 'use strict';
 
-const crypto = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const {
@@ -11,8 +10,10 @@ const {
   resolveContained,
   sha256Text,
 } = require('./assisted-review-storage');
-const { applyHumanTransition, verifyAuditChain } = require('./assisted-review-audit');
-const { policyCanContribute, validatePolicyApproval } = require('./assisted-review-heuristics');
+const { applyHumanTransition, verifyAuditSnapshot } = require('./assisted-review-audit');
+const { comparePredictions, normalizeUnicodeCerV1 } = require('./assisted-review-text');
+const { createSuggestions, policyCanContribute, validatePolicyApproval } = require('./assisted-review-heuristics');
+const { validateDatasetManifest } = require('./dataset-manifest');
 
 const ROLE_ORDER = ['baseline-paraformer', 'candidate-zipformer', 'candidate-sensevoice-small'];
 const SAFE_ID = /^[a-z0-9][a-z0-9-]{0,127}$/;
@@ -20,7 +21,6 @@ const SHA256 = /^[a-f0-9]{64}$/;
 const DEFAULT_INTAKE_PATH = 'intake/fleurs-cmn-hans-cn-dev-candidates-v1.json';
 const NUMERIC_TAGS = new Set(['fast', 'slow', 'light-noise']);
 const SOURCE_LICENSES = new Set(['Apache-2.0', 'BSD-3-Clause', 'CC0-1.0', 'CC-BY-4.0', 'CC-BY-SA-4.0', 'MIT']);
-const SOURCE_REDISTRIBUTION = new Set(['allowed', 'metadata-only', 'prohibited']);
 
 function fail(code) {
   const error = new Error(code);
@@ -85,30 +85,49 @@ function validateInputBinding(root, evidencePath, binding) {
   if (canonicalJson(stored) !== canonicalJson(binding)) fail('EXPORT_BINDING_MISMATCH');
 }
 
-function validateAttempt(root, relativePath, binding, role) {
+function extractPcm16(wavBytes) {
+  for (let offset = 12; offset < wavBytes.length;) {
+    const size = wavBytes.readUInt32LE(offset + 4);
+    if (wavBytes.toString('ascii', offset, offset + 4) === 'data') return Buffer.from(wavBytes.subarray(offset + 8, offset + 8 + size));
+    offset += 8 + size + (size % 2);
+  }
+  fail('EXPORT_PCM_INVALID');
+}
+
+function validateAttempt(root, relativePath, binding, role, runRole, sherpaVersion) {
   const record = readCanonicalJson(root, relativePath, 'EXPORT_ATTEMPT_INVALID');
   const base = verifySealedRecord(record, 'EXPORT_ATTEMPT_INVALID');
   exactKeys(base, ['schemaVersion', 'bindingSha256', 'role', 'modelLockEntrySha256', 'configSha256', 'sherpaVersion', 'status', 'rawText', 'normalizedText', 'elapsedMs', 'errorCode'], 'EXPORT_ATTEMPT_INVALID');
-  if (base.schemaVersion !== 1 || base.bindingSha256 !== binding.bindingSha256 || base.role !== role || !SHA256.test(base.modelLockEntrySha256) || !SHA256.test(base.configSha256) || typeof base.sherpaVersion !== 'string' || base.sherpaVersion === '' || !Number.isFinite(base.elapsedMs) || base.elapsedMs < 0) fail('EXPORT_ATTEMPT_INVALID');
+  if (base.schemaVersion !== 1 || base.bindingSha256 !== binding.bindingSha256 || base.role !== role || base.modelLockEntrySha256 !== runRole.modelLockEntrySha256 || base.configSha256 !== runRole.configSha256 || base.sherpaVersion !== sherpaVersion || !Number.isFinite(base.elapsedMs) || base.elapsedMs < 0) fail('EXPORT_ATTEMPT_INVALID');
   if (base.status === 'succeeded') {
-    if (typeof base.rawText !== 'string' || base.rawText === '' || typeof base.normalizedText !== 'string' || base.normalizedText === '' || base.errorCode !== null) fail('EXPORT_ATTEMPT_INVALID');
+    if (typeof base.rawText !== 'string' || base.rawText === '' || base.normalizedText !== normalizeUnicodeCerV1(base.rawText) || base.normalizedText === '' || base.errorCode !== null) fail('EXPORT_ATTEMPT_INVALID');
   } else if (base.status === 'failed') {
     if (base.rawText !== '' || base.normalizedText !== '' || base.errorCode !== 'TRANSCRIPTION_FAILED') fail('EXPORT_ATTEMPT_INVALID');
   } else fail('EXPORT_ATTEMPT_INVALID');
   return record;
 }
 
-function validatePredictionEvidence(root, evidencePath, binding) {
-  const attempts = ROLE_ORDER.map((role) => validateAttempt(root, `${evidencePath}/predictions/${role}.json`, binding, role));
+function validatePredictionEvidence(root, evidencePath, binding, runId, upstreamDraft) {
+  const run = readCanonicalJson(root, `assisted-review/runs/${runId}/run.json`, 'EXPORT_RUN_INVALID');
+  const runBase = verifySealedRecord(run, 'EXPORT_RUN_INVALID');
+  exactKeys(runBase, ['schemaVersion', 'modelLockSha256', 'sherpaVersion', 'roles'], 'EXPORT_RUN_INVALID');
+  if (runBase.schemaVersion !== 1 || !SHA256.test(runBase.modelLockSha256) || typeof runBase.sherpaVersion !== 'string' || runBase.sherpaVersion === '' || !Array.isArray(runBase.roles) || runBase.roles.length !== ROLE_ORDER.length) fail('EXPORT_RUN_INVALID');
+  const runRoles = new Map();
+  for (const role of runBase.roles) {
+    exactKeys(role, ['role', 'modelId', 'modelVersion', 'modelLockEntrySha256', 'configSha256'], 'EXPORT_RUN_INVALID');
+    if (!ROLE_ORDER.includes(role.role) || runRoles.has(role.role) || typeof role.modelId !== 'string' || typeof role.modelVersion !== 'string' || !SHA256.test(role.modelLockEntrySha256) || !SHA256.test(role.configSha256)) fail('EXPORT_RUN_INVALID');
+    runRoles.set(role.role, role);
+  }
+  let predictionNames;
+  try { predictionNames = fs.readdirSync(resolveContained(root, `${evidencePath}/predictions`, { mustExist: true })).sort(); } catch { fail('EXPORT_ATTEMPT_INVALID'); }
+  if (canonicalJson(predictionNames) !== canonicalJson(ROLE_ORDER.map((role) => `${role}.json`).sort())) fail('EXPORT_ATTEMPT_INVALID');
+  const attempts = ROLE_ORDER.map((role) => validateAttempt(root, `${evidencePath}/predictions/${role}.json`, binding, role, runRoles.get(role), runBase.sherpaVersion));
   const comparison = readCanonicalJson(root, `${evidencePath}/comparison.json`, 'EXPORT_COMPARISON_INVALID');
-  const base = verifySealedRecord(comparison, 'EXPORT_COMPARISON_INVALID');
-  if (base.bindingSha256 !== binding.bindingSha256 || !['low', 'medium', 'high'].includes(base.risk) || !ROLE_ORDER.includes(base.medoidRole) || !SHA256.test(base.thresholdSha256)) fail('EXPORT_COMPARISON_INVALID');
-  const medoid = attempts.find((attempt) => attempt.role === base.medoidRole);
-  if (!medoid || medoid.status !== 'succeeded' || (attempts.some((attempt) => attempt.status === 'failed') && base.risk !== 'high')) fail('EXPORT_COMPARISON_INVALID');
-  const suggestions = readCanonicalJson(root, `${evidencePath}/suggestions.json`, 'EXPORT_SUGGESTIONS_INVALID');
-  const suggestionBase = verifySealedRecord(suggestions, 'EXPORT_SUGGESTIONS_INVALID');
-  if (suggestionBase.schemaVersion !== 1 || suggestionBase.bindingSha256 !== binding.bindingSha256 || suggestionBase.ruleVersion !== 'assisted-review-heuristics-v1' || !SHA256.test(suggestionBase.policySha256) || !Array.isArray(suggestionBase.suggestions) || !Array.isArray(suggestionBase.piiWarnings)) fail('EXPORT_SUGGESTIONS_INVALID');
-  return { attempts, comparison, suggestions };
+  verifySealedRecord(comparison, 'EXPORT_COMPARISON_INVALID');
+  const expectedComparisonBase = { bindingSha256: binding.bindingSha256, ...comparePredictions({ upstreamDraft, attempts }) };
+  const expectedComparison = { ...expectedComparisonBase, recordSha256: sha256Text(canonicalJson(expectedComparisonBase)) };
+  if (canonicalJson(comparison) !== canonicalJson(expectedComparison)) fail('EXPORT_COMPARISON_INVALID');
+  return { attempts, comparison, run };
 }
 
 function stateDigest(state) {
@@ -155,13 +174,11 @@ function validateRawTranscript(root, binding, state) {
 }
 
 function validateAuditAndState(root, binding) {
-  const auditRoot = resolveContained(root, 'assisted-review/audit', { mustExist: true });
   let verification;
   try {
-    // The audit module verifies the full chain; stable reads below detect a swap around it.
-    verification = verifyAuditChain(auditRoot);
-    readStableFile(resolveContained(root, 'assisted-review/audit/genesis.json', { mustExist: true }), root);
-    readStableFile(resolveContained(root, 'assisted-review/audit/audit.jsonl', { mustExist: true }), root);
+    const genesisBytes = readStableFile(resolveContained(root, 'assisted-review/audit/genesis.json', { mustExist: true }), root);
+    const auditBytes = readStableFile(resolveContained(root, 'assisted-review/audit/audit.jsonl', { mustExist: true }), root);
+    verification = verifyAuditSnapshot({ genesisBytes, auditBytes });
   } catch {
     fail('EXPORT_AUDIT_INVALID');
   }
@@ -174,29 +191,27 @@ function validateAuditAndState(root, binding) {
   return { state, transcript, audit: verification };
 }
 
-function numericSuggestionEvidence(root, suggestions, audit, batchId) {
-  const numeric = suggestions.suggestions.filter((suggestion) => isPlainObject(suggestion) && NUMERIC_TAGS.has(suggestion.tag) && suggestion.result === true);
-  if (numeric.length === 0) return [];
-  const policyPath = `assisted-review/policies/${suggestions.policySha256}.json`;
-  let policyRecord;
-  try {
-    policyRecord = readCanonicalJson(root, policyPath, 'EXPORT_POLICY_INVALID');
-    const base = verifySealedRecord(policyRecord, 'EXPORT_POLICY_INVALID');
-    exactKeys(base, ['schemaVersion', 'policy', 'approval'], 'EXPORT_POLICY_INVALID');
-    if (base.schemaVersion !== 1) fail('EXPORT_POLICY_INVALID');
-    const approval = validatePolicyApproval({ policy: base.policy, approval: base.approval });
-    const event = audit.events.find((candidate) => candidate.scope === 'batch' && candidate.action === 'approve-policy' && candidate.batchId === batchId && candidate.policySha256 === suggestions.policySha256 && candidate.eventSha256 === approval.auditEventSha256 && candidate.actorAlias === approval.approvingAlias);
-    if (!event || !policyCanContribute({ policyApproval: approval, batchId })) return [];
-    return numeric.map((suggestion) => ({ tag: suggestion.tag, suggestionRecordSha256: suggestions.recordSha256, policySha256: approval.policySha256, approvalEventSha256: approval.auditEventSha256 }));
-  } catch (error) {
-    return [];
-  }
+function readPolicyEvidence(root, policySha256) {
+  const policyRecord = readCanonicalJson(root, `assisted-review/policies/${policySha256}.json`, 'EXPORT_POLICY_INVALID');
+  const base = verifySealedRecord(policyRecord, 'EXPORT_POLICY_INVALID');
+  exactKeys(base, ['schemaVersion', 'policy', 'approval'], 'EXPORT_POLICY_INVALID');
+  if (base.schemaVersion !== 1) fail('EXPORT_POLICY_INVALID');
+  const approval = validatePolicyApproval({ policy: base.policy, approval: base.approval });
+  return { policyRecord, policy: base.policy, approval };
 }
 
-function sourceForManifest(candidate, intakeSource, binding) {
-  const source = isPlainObject(candidate?.source) ? candidate.source : intakeSource;
-  if (!isPlainObject(source) || source.kind !== 'public-corpus' || !SOURCE_LICENSES.has(source.license) || source.consent !== 'dataset-license' || !SOURCE_REDISTRIBUTION.has(source.redistribution) || (Object.hasOwn(source, 'sourceRevision') && source.sourceRevision !== binding.sourceRevision)) fail('EXPORT_SOURCE_INVALID');
-  return { kind: 'public-corpus', license: source.license, consent: 'dataset-license', redistribution: source.redistribution, attribution: typeof source.attribution === 'string' ? source.attribution : null };
+function numericSuggestionEvidence(suggestions, audit, batchId, approval) {
+  const numeric = suggestions.suggestions.filter((suggestion) => isPlainObject(suggestion) && NUMERIC_TAGS.has(suggestion.tag) && suggestion.result === true);
+  if (numeric.length === 0) return [];
+  const event = audit.events.find((candidate) => candidate.scope === 'batch' && candidate.action === 'approve-policy' && candidate.batchId === batchId && candidate.policySha256 === suggestions.policySha256 && candidate.eventSha256 === approval.auditEventSha256 && candidate.actorAlias === approval.approvingAlias);
+  if (!event || !policyCanContribute({ policyApproval: approval, batchId })) return [];
+  return numeric.map((suggestion) => ({ tag: suggestion.tag, suggestionRecordSha256: suggestions.recordSha256, policySha256: approval.policySha256, approvalEventSha256: approval.auditEventSha256 }));
+}
+
+function sourceForManifest(intakeSource, binding) {
+  const source = intakeSource;
+  if (!isPlainObject(source) || typeof source.publisher !== 'string' || typeof source.dataset !== 'string' || source.locale !== 'cmn_hans_cn' || !SOURCE_LICENSES.has(source.license) || typeof source.attribution !== 'string' || source.attribution === '' || typeof source.archiveUrl !== 'string' || !SHA256.test(source.archiveSha256) || !Number.isSafeInteger(source.archiveBytes) || source.archiveBytes < 1 || source.sourceRevision !== binding.sourceRevision) fail('EXPORT_SOURCE_INVALID');
+  return { kind: 'public-corpus', license: source.license, consent: 'dataset-license', redistribution: 'allowed', attribution: source.attribution, sourceSha256: sha256Text(canonicalJson(source)) };
 }
 
 function validateRequest(request) {
@@ -222,14 +237,20 @@ function validateRequest(request) {
 }
 
 function candidatePlan(request, candidateId) {
-  const { candidate, binding } = readBoundPcmCandidate({ datasetRoot: request.root, intakePath: request.intakePath, candidateId });
+  const { candidate, binding, bytes } = readBoundPcmCandidate({ datasetRoot: request.root, intakePath: request.intakePath, candidateId });
   const evidencePath = `assisted-review/runs/${request.runId}/candidates/${candidateId}/${binding.bindingSha256}`;
   validateInputBinding(request.root, evidencePath, binding);
-  const prediction = validatePredictionEvidence(request.root, evidencePath, binding);
-  const review = validateAuditAndState(request.root, binding);
   const intake = readCanonicalJson(request.root, request.intakePath, 'EXPORT_INTAKE_INVALID');
-  const source = sourceForManifest(candidate, intake.source, binding);
-  const numeric = numericSuggestionEvidence(request.root, prediction.suggestions, review.audit, request.batchId);
+  const prediction = validatePredictionEvidence(request.root, evidencePath, binding, request.runId, candidate.transcript);
+  const review = validateAuditAndState(request.root, binding);
+  const source = sourceForManifest(intake.source, binding);
+  if (source.attribution.includes(request.root) || /(?:[A-Za-z]:[\\/]|^\/)/.test(source.attribution)) fail('EXPORT_SOURCE_INVALID');
+  const suggestions = readCanonicalJson(request.root, `${evidencePath}/suggestions.json`, 'EXPORT_SUGGESTIONS_INVALID');
+  verifySealedRecord(suggestions, 'EXPORT_SUGGESTIONS_INVALID');
+  const policyEvidence = readPolicyEvidence(request.root, suggestions.policySha256);
+  const expectedSuggestions = createSuggestions({ binding, candidate: { sample: candidate, source: intake.source }, comparison: prediction.comparison, pcmBytes: extractPcm16(bytes), policy: policyEvidence.policy });
+  if (canonicalJson(suggestions) !== canonicalJson(expectedSuggestions)) fail('EXPORT_SUGGESTIONS_INVALID');
+  const numeric = numericSuggestionEvidence(suggestions, review.audit, request.batchId, policyEvidence.approval);
   return {
     candidateId,
     binding,
@@ -237,11 +258,11 @@ function candidatePlan(request, candidateId) {
     auditLastEventSha256: review.audit.lastEventSha256,
     primaryTranscript: review.transcript.transcriptText,
     finalTags: [...review.state.finalTags.tags],
-    locale: typeof candidate.locale === 'string' && candidate.locale !== '' ? candidate.locale : 'cmn_hans_cn',
+    locale: candidate.locale === 'zh-CN' ? candidate.locale : fail('EXPORT_LOCALE_INVALID'),
     source,
     attemptEvidence: prediction.attempts.map((attempt) => ({ role: attempt.role, status: attempt.status, recordSha256: attempt.recordSha256 })),
     comparisonSha256: prediction.comparison.recordSha256,
-    suggestionSha256: prediction.suggestions.recordSha256,
+    suggestionSha256: suggestions.recordSha256,
     numericSuggestionEvidence: numeric,
   };
 }
@@ -308,36 +329,51 @@ function safeRemoveStage(stage, exportsRoot) {
 }
 
 function exportReviewedManifest(request) {
-  const initial = preflightExport(request);
-  const exportsRoot = ensureDirectory(initial.datasetRoot, 'assisted-review/exports');
-  const finalDirectory = path.join(exportsRoot, initial.exportId);
-  if (fs.existsSync(finalDirectory)) fail('EXPORT_EXISTS');
-  const stage = fs.mkdtempSync(path.join(exportsRoot, '.stage-'));
+  let stage = null;
+  let exportsRoot = null;
+  let exportLock = null;
+  let committed = false;
   try {
+    const requested = preflightExport(request);
+    exportsRoot = ensureDirectory(requested.datasetRoot, 'assisted-review/exports');
+    const locksRoot = ensureDirectory(requested.datasetRoot, 'assisted-review/export-locks');
+    exportLock = path.join(locksRoot, requested.exportId);
+    try { fs.mkdirSync(exportLock); } catch (error) { if (error.code === 'EEXIST') fail('EXPORT_BUSY'); throw error; }
+    const initial = preflightExport(request);
+    const finalDirectory = path.join(exportsRoot, initial.exportId);
+    if (fs.existsSync(finalDirectory)) fail('EXPORT_EXISTS');
+    stage = fs.mkdtempSync(path.join(exportsRoot, '.stage-'));
     const manifest = {
       schemaVersion: 1, datasetId: 'expression-zh-v1', datasetVersion: '1.0.0',
       samples: initial.candidates.map((candidate) => ({ id: candidate.candidateId, audioFile: candidate.binding.audioFile, sha256: candidate.binding.audioSha256, transcript: candidate.primaryTranscript, locale: candidate.locale, tags: candidate.finalTags, sampleRateHz: candidate.binding.sampleRateHz, channels: candidate.binding.channels, durationMs: candidate.binding.durationMs, source: { kind: candidate.source.kind, license: candidate.source.license, consent: candidate.source.consent, redistribution: candidate.source.redistribution } })),
     };
     const report = {
       schemaVersion: 1, exportId: initial.exportId, runId: initial.runId, batchId: initial.batchId,
-      candidates: initial.candidates.map((candidate) => ({ candidateId: candidate.candidateId, bindingSha256: candidate.binding.bindingSha256, stateSha256: candidate.stateSha256, auditLastEventSha256: candidate.auditLastEventSha256, attemptEvidence: candidate.attemptEvidence, comparisonSha256: candidate.comparisonSha256, suggestionSha256: candidate.suggestionSha256, numericSuggestionEvidence: candidate.numericSuggestionEvidence, sourceAttributionSha256: candidate.source.attribution === null ? null : sha256Text(candidate.source.attribution), sourceRevision: candidate.binding.sourceRevision, outcome: { status: 'exported', finalTags: candidate.finalTags } })),
+      candidates: initial.candidates.map((candidate) => ({ candidateId: candidate.candidateId, bindingSha256: candidate.binding.bindingSha256, stateSha256: candidate.stateSha256, auditLastEventSha256: candidate.auditLastEventSha256, attemptEvidence: candidate.attemptEvidence, comparisonSha256: candidate.comparisonSha256, suggestionSha256: candidate.suggestionSha256, numericSuggestionEvidence: candidate.numericSuggestionEvidence, sourceAttribution: candidate.source.attribution, sourceSha256: candidate.source.sourceSha256, sourceRevision: candidate.binding.sourceRevision, outcome: { status: 'exported', finalTags: candidate.finalTags } })),
     };
+    try { validateDatasetManifest(manifest, { datasetRoot: initial.datasetRoot }); } catch { fail('EXPORT_MANIFEST_INVALID'); }
     const manifestSha256 = writeStageJson(stage, 'manifest.json', manifest);
     const reportSha256 = writeStageJson(stage, 'export-report.json', report);
     if (typeof request.faultInjector === 'function') request.faultInjector('after-stage-write');
     fsyncDirectory(stage);
-    if (typeof request.faultInjector === 'function') request.faultInjector('before-final-revalidation');
+    if (typeof request.faultInjector === 'function') request.faultInjector('before-commit');
     const current = preflightExport(request);
     if (canonicalJson(current) !== canonicalJson(initial)) fail('EXPORT_REVALIDATION_CHANGED');
     if (fs.existsSync(finalDirectory)) fail('EXPORT_EXISTS');
-    if (typeof request.faultInjector === 'function') request.faultInjector('before-final-rename');
     fs.renameSync(stage, finalDirectory);
-    fsyncDirectory(exportsRoot);
+    stage = null;
+    committed = true;
+    try { fsyncDirectory(exportsRoot); } catch { /* rename is committed; report success rather than lie about rollback. */ }
     return { exportDirectory: finalDirectory, manifestSha256, reportSha256 };
   } catch (error) {
-    safeRemoveStage(stage, exportsRoot);
+    if (stage && exportsRoot) safeRemoveStage(stage, exportsRoot);
+    if (committed) throw error;
     if (error.code && error.code.startsWith('EXPORT_')) throw error;
     fail('EXPORT_WRITE_FAILED');
+  } finally {
+    if (exportLock && fs.existsSync(exportLock)) {
+      try { fs.rmdirSync(exportLock); } catch { /* a non-empty or swapped lock is retained fail-closed. */ }
+    }
   }
 }
 

@@ -327,19 +327,42 @@ function ensureGenesis(auditRoot) {
     writeCreateNewText(genesisPath, `${canonicalJson({ ...base, genesisSha256: sha256Text(canonicalJson(base)) })}\n`);
     fsyncDirectory(auditRoot);
   }
-  return readGenesis(auditRoot);
+  return readGenesisText(fs.readFileSync(genesisPath, 'utf8'));
 }
 
-function readGenesis(auditRoot) {
-  const genesisPath = path.join(auditRoot, 'genesis.json');
-  if (!fs.existsSync(genesisPath)) fail('audit genesis is missing', 'AUDIT_CHAIN_INVALID');
-  const text = fs.readFileSync(genesisPath, 'utf8');
+function readGenesisText(text) {
+  if (typeof text !== 'string') fail('audit genesis is malformed', 'AUDIT_CHAIN_INVALID');
   if (!text.endsWith('\n')) fail('audit genesis is malformed', 'AUDIT_CHAIN_INVALID');
   const genesis = JSON.parse(text);
   assertExactKeys(genesis, ['schemaVersion', 'chainVersion', 'initialPriorEventSha256', 'genesisSha256'], 'audit genesis');
   const base = genesisBase();
   if (canonicalJson(genesis) !== canonicalJson({ ...base, genesisSha256: sha256Text(canonicalJson(base)) })) fail('audit genesis is invalid', 'AUDIT_CHAIN_INVALID');
   return genesis;
+}
+
+function verifyAuditSnapshot({ genesisBytes, auditBytes }) {
+  try {
+    const genesis = readGenesisText(Buffer.from(genesisBytes).toString('utf8'));
+    if (auditBytes === null || auditBytes === undefined) return { valid: true, events: [], lastEventSha256: genesis.genesisSha256, nextSequence: 1 };
+    const text = Buffer.from(auditBytes).toString('utf8');
+    if (text === '' || !text.endsWith('\n')) fail('audit JSONL is truncated', 'AUDIT_CHAIN_INVALID');
+    const lines = text.slice(0, -1).split('\n');
+    if (lines.some((line) => line === '')) fail('audit JSONL contains an empty line', 'AUDIT_CHAIN_INVALID');
+    const events = [];
+    let priorEventSha256 = genesis.genesisSha256;
+    for (let index = 0; index < lines.length; index += 1) {
+      let event;
+      try { event = JSON.parse(lines[index]); } catch { fail('audit JSONL is malformed', 'AUDIT_CHAIN_INVALID'); }
+      if (canonicalJson(event) !== lines[index]) fail('audit event is not canonical', 'AUDIT_CHAIN_INVALID');
+      validateSealedEvent(event, priorEventSha256, index + 1);
+      events.push(event);
+      priorEventSha256 = event.eventSha256;
+    }
+    return { valid: true, events, lastEventSha256: priorEventSha256, nextSequence: events.length + 1 };
+  } catch (error) {
+    if (error.code || ['ENOENT', 'EACCES', 'EPERM', 'EIO'].includes(error.code)) throw error;
+    fail('audit chain is invalid', 'AUDIT_CHAIN_INVALID');
+  }
 }
 
 function validateSealedEvent(event, priorEventSha256, sequence) {
@@ -372,30 +395,11 @@ function verifyAuditChain(auditRoot) {
   if (typeof auditRoot !== 'string' || !path.isAbsolute(auditRoot)) fail('auditRoot must be absolute');
   const canonicalAuditRoot = fs.realpathSync.native(auditRoot);
   if (!fs.statSync(canonicalAuditRoot).isDirectory()) fail('auditRoot must be a directory');
-  let genesis;
   try {
-    genesis = readGenesis(canonicalAuditRoot);
-  const auditPath = path.join(canonicalAuditRoot, 'audit.jsonl');
-  if (!fs.existsSync(auditPath)) return { valid: true, events: [], lastEventSha256: genesis.genesisSha256, nextSequence: 1 };
-  const text = fs.readFileSync(auditPath, 'utf8');
-  if (text === '' || !text.endsWith('\n')) fail('audit JSONL is truncated', 'AUDIT_CHAIN_INVALID');
-  const lines = text.slice(0, -1).split('\n');
-  if (lines.some((line) => line === '')) fail('audit JSONL contains an empty line', 'AUDIT_CHAIN_INVALID');
-  const events = [];
-  let priorEventSha256 = genesis.genesisSha256;
-  for (let index = 0; index < lines.length; index += 1) {
-    let event;
-    try {
-      event = JSON.parse(lines[index]);
-    } catch {
-      fail('audit JSONL is malformed', 'AUDIT_CHAIN_INVALID');
-    }
-    if (canonicalJson(event) !== lines[index]) fail('audit event is not canonical', 'AUDIT_CHAIN_INVALID');
-    validateSealedEvent(event, priorEventSha256, index + 1);
-    events.push(event);
-    priorEventSha256 = event.eventSha256;
-  }
-    return { valid: true, events, lastEventSha256: priorEventSha256, nextSequence: events.length + 1 };
+    const genesisPath = path.join(canonicalAuditRoot, 'genesis.json');
+    if (!fs.existsSync(genesisPath)) fail('audit genesis is missing', 'AUDIT_CHAIN_INVALID');
+    const auditPath = path.join(canonicalAuditRoot, 'audit.jsonl');
+    return verifyAuditSnapshot({ genesisBytes: fs.readFileSync(genesisPath), auditBytes: fs.existsSync(auditPath) ? fs.readFileSync(auditPath) : null });
   } catch (error) {
     if (error.code || ['ENOENT', 'EACCES', 'EPERM', 'EIO'].includes(error.code)) throw error;
     fail('audit chain is invalid', 'AUDIT_CHAIN_INVALID');
@@ -597,4 +601,5 @@ module.exports = {
   recoverBrokenCandidate,
   validateAlias,
   verifyAuditChain,
+  verifyAuditSnapshot,
 };
