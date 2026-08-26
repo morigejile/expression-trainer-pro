@@ -41,10 +41,26 @@
     predictions.replaceChildren();
     for (const prediction of Array.isArray(candidate.predictions) ? candidate.predictions : []) appendTextItem(predictions, prediction.rawText || '', documentRef);
     const suggestions = documentRef.getElementById('suggestions'); suggestions.replaceChildren();
-    for (const suggestion of Array.isArray(candidate.suggestions && candidate.suggestions.suggestions) ? candidate.suggestions.suggestions : []) appendTextItem(suggestions, `${suggestion.label || suggestion.type || ''} (${suggestion.policyApproved ? 'approved' : 'unapproved'})`, documentRef);
+    for (const suggestion of Array.isArray(candidate.suggestions && candidate.suggestions.suggestions) ? candidate.suggestions.suggestions : []) {
+      const status = suggestion.humanOnly ? 'human-only' : suggestion.result ? 'suggested' : 'not suggested';
+      const policy = suggestion.exportEvidenceEligible && candidate.policyApproved ? 'approved' : 'unapproved';
+      appendTextItem(suggestions, `${suggestion.tag || ''}: ${status} (${policy})`, documentRef);
+    }
     const warnings = documentRef.getElementById('pii-warnings'); warnings.replaceChildren();
     for (const warning of Array.isArray(candidate.suggestions && candidate.suggestions.piiWarnings) ? candidate.suggestions.piiWarnings : []) appendTextItem(warnings, warning.ruleId || '', documentRef);
     const revision = documentRef.getElementById('expected-revision'); if (candidate.state && Number.isInteger(candidate.state.revision)) revision.value = String(candidate.state.revision);
+    const action = documentRef.getElementById('action-input');
+    for (const option of action.options) option.hidden = !candidate.allowedActions.includes(option.value);
+    action.value = candidate.allowedActions[0] || '';
+    updateActionFields(documentRef);
+  }
+
+  function updateActionFields(documentRef = document) {
+    const action = documentRef.getElementById('action-input').value;
+    const transcript = documentRef.getElementById('transcript-input'); const tags = documentRef.getElementById('tags-input'); const rationale = documentRef.getElementById('light-accent-rationale');
+    transcript.hidden = action !== 'record-primary-transcript'; transcript.required = action === 'record-primary-transcript';
+    tags.hidden = action !== 'set-final-tags'; tags.required = action === 'set-final-tags';
+    rationale.hidden = action !== 'set-final-tags'; rationale.required = action === 'set-final-tags' && tags.value.split(',').map((tag) => tag.trim()).includes('light-accent');
   }
 
   function initializeReviewUi() {
@@ -62,6 +78,8 @@
       }
     });
     const transitionForm = document.getElementById('transition-form');
+    document.getElementById('action-input').addEventListener('change', () => updateActionFields());
+    document.getElementById('tags-input').addEventListener('input', () => updateActionFields());
     transitionForm.addEventListener('submit', async (event) => {
       event.preventDefault();
       try {
@@ -80,6 +98,6 @@
     });
   }
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = { buildTransition, renderText, initializeReviewUi, showCandidate };
+  if (typeof module !== 'undefined' && module.exports) module.exports = { buildTransition, renderText, initializeReviewUi, showCandidate, updateActionFields };
   if (global.document) global.document.addEventListener('DOMContentLoaded', initializeReviewUi, { once: true });
 }(globalThis));

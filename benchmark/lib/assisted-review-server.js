@@ -99,10 +99,7 @@ function bindingFor(candidate, candidateId) {
 function readBoundAudio(datasetRoot, candidate, candidateId) {
   const binding = bindingFor(candidate, candidateId);
   const audioPath = resolveContained(datasetRoot, binding.audioFile, { mustExist: true });
-  if (fs.statSync(audioPath).size > MAX_AUDIO_BYTES) throw new Error('audio file is too large');
-  const bytes = readStableFile(audioPath, datasetRoot);
-  const recheckedBytes = readStableFile(audioPath, datasetRoot);
-  if (!safeEqual(bytes, recheckedBytes)) throw new Error('audio changed while reading');
+  const bytes = readStableFile(audioPath, datasetRoot, { maxBytes: MAX_AUDIO_BYTES });
   if (!safeEqual(crypto.createHash('sha256').update(bytes).digest('hex'), binding.audioSha256)) throw new Error('audio hash changed');
   const metadata = parsePcmWav(bytes);
   validateGovernedPcmMetadata(metadata);
@@ -139,6 +136,16 @@ function createReviewServer({ datasetRoot, reviewStore, tokenBytes = crypto.rand
     return encoded;
   }
 
+  function reviewView(candidate) {
+    const state = candidate && candidate.state || {};
+    const complete = { 'approve-license': Boolean(state.licenseApproval), 'clear-pii': Boolean(state.piiClearance), 'set-final-tags': Boolean(state.finalTags) };
+    let allowedActions = [];
+    if (state.status === 'unreviewed' && identity.role === 'primary') allowedActions = ['record-primary-transcript'];
+    else if (state.status === 'primary-transcript-recorded' && identity.role === 'secondary') allowedActions = ['approve-secondary-transcript'];
+    else if (state.status === 'secondary-approved') allowedActions = Object.keys(complete).filter((action) => !complete[action]);
+    return { ...candidate, sessionRole: identity.role, allowedActions, policyApproved: Boolean(candidate.policyApproval) };
+  }
+
   const server = http.createServer(async (request, response) => { try {
     if (request.headers.host !== expectedHost) return writeError(response, 400);
     let url;
@@ -172,7 +179,7 @@ function createReviewServer({ datasetRoot, reviewStore, tokenBytes = crypto.rand
       if (!currentSession(request)) return writeError(response, 403);
       const candidate = reviewStore.getCandidate(candidateId);
       if (!candidate) return writeError(response, 404);
-      return writeResponse(response, 200, JSON.stringify(candidate), { 'Content-Type': 'application/json; charset=utf-8' });
+      return writeResponse(response, 200, JSON.stringify(reviewView(candidate)), { 'Content-Type': 'application/json; charset=utf-8' });
     }
     if (request.method === 'GET' && audioId) {
       if (url.search) return writeError(response, 404);

@@ -82,18 +82,22 @@ function resolveContained(root, relativePath, { mustExist } = {}) {
   return path.join(canonicalAncestor, ...missing);
 }
 
-function readStableFile(filePath, root) {
+function readStableFile(filePath, root, { maxBytes = Number.MAX_SAFE_INTEGER } = {}) {
   let descriptor;
   try {
     descriptor = fs.openSync(filePath, 'r');
     const before = fs.fstatSync(descriptor);
     if (!before.isFile()) throw new Error('audioFile is not a file');
+    if (!Number.isSafeInteger(maxBytes) || maxBytes < 0 || before.size > maxBytes) throw new Error('audioFile exceeds maximum size');
     const canonical = fs.realpathSync.native(filePath);
     const canonicalStat = fs.statSync(canonical);
     if (!isInside(root, canonical) || canonical !== filePath || !sameFileIdentity(before, canonicalStat)) throw new Error('audioFile changed while opening');
     const bytes = fs.readFileSync(descriptor);
     const after = fs.fstatSync(descriptor);
     if (!sameFileIdentity(before, after) || before.size !== after.size) throw new Error('audioFile changed while reading');
+    const finalCanonical = fs.realpathSync.native(filePath);
+    const finalStat = fs.statSync(finalCanonical);
+    if (!isInside(root, finalCanonical) || finalCanonical !== filePath || !sameFileIdentity(after, finalStat)) throw new Error('audioFile changed while reading');
     return bytes;
   } finally {
     if (descriptor !== undefined) fs.closeSync(descriptor);

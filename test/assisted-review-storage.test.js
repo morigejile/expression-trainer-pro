@@ -153,3 +153,11 @@ test('readStableFile rejects a canonical path whose file identity changes after 
     fs.rmSync(fixture.root, { recursive: true, force: true });
   }
 });
+
+test('readStableFile enforces maxBytes from the opened descriptor before allocation', () => {
+  const fixture = createExternalDataset();
+  try {
+    const { readStableFile } = require('../benchmark/lib/assisted-review-storage');
+    assert.throws(() => readStableFile(fixture.audioPath, fixture.root, { maxBytes: 1 }), /maximum size/i);
+  } finally { fs.rmSync(fixture.root, { recursive: true, force: true }); }
+});

@@ -9,7 +9,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { createReviewServer } = require('../benchmark/lib/assisted-review-server');
-const { buildTransition, renderText } = require('../benchmark/assisted-review/review-ui');
+const { buildTransition, renderText, showCandidate } = require('../benchmark/assisted-review/review-ui');
 
 const CANDIDATE_ID = 'fleurs-dev-candidate-01';
 const BINDING_SHA256 = 'a'.repeat(64);
@@ -293,4 +293,12 @@ test('store read errors return a generic envelope without poisoning later reques
   assert.equal(failed.status, 500); assert.equal(failed.body.toString('utf8').includes(sentinel), false);
   const healthy = await request({ port: session.port, pathname: `/api/candidates/${CANDIDATE_ID}`, headers: { Host: host(session.port), Cookie: session.cookie } });
   assert.equal(healthy.status, 200);
+});
+
+test('showCandidate renders hostile actual-shaped evidence only through fixed text sinks', () => {
+  const nodes = new Map(); const makeNode = () => ({ textContent: '', value: '', hidden: false, required: false, options: [{ value: 'record-primary-transcript' }, { value: 'approve-secondary-transcript' }], replaceChildren() { this.items = []; }, append(item) { (this.items ||= []).push(item.textContent); }, set innerHTML(_value) { throw new Error('unsafe HTML sink'); } });
+  for (const id of ['candidate-id', 'upstream-transcript', 'primary-transcript', 'comparison-risk', 'approval-state', 'review-audio', 'predictions', 'suggestions', 'pii-warnings', 'expected-revision', 'action-input', 'transcript-input', 'tags-input', 'light-accent-rationale']) nodes.set(id, makeNode());
+  const documentRef = { getElementById(id) { return nodes.get(id); }, createElement() { return makeNode(); } };
+  showCandidate({ candidateId: 'safe-id', transcript: '<img>', primaryTranscriptText: '<script>', predictions: [{ rawText: '<b>' }], comparison: { risk: '<risk>' }, suggestions: { suggestions: [{ tag: 'fast', result: true, exportEvidenceEligible: true }, { tag: 'light-accent', result: null, humanOnly: true }], piiWarnings: [{ ruleId: '<warning>' }] }, policyApproved: true, allowedActions: ['record-primary-transcript'], state: { revision: 9, note: '<state>' } }, documentRef);
+  assert.equal(nodes.get('upstream-transcript').textContent, '<img>'); assert.equal(nodes.get('comparison-risk').textContent, '<risk>'); assert.match(nodes.get('suggestions').items[0], /fast: suggested \(approved\)/); assert.match(nodes.get('suggestions').items[1], /light-accent: human-only/); assert.equal(nodes.get('pii-warnings').items[0], '<warning>'); assert.equal(nodes.get('expected-revision').value, '9'); assert.equal(nodes.get('review-audio').src, '/api/candidates/safe-id/audio');
 });
