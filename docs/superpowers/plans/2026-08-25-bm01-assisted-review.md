@@ -1,251 +1,314 @@
-# BM-01 Assisted Review Implementation Plan
+# BM-01 Internal Dataset Freeze Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build an external-only local assisted-review workflow that gives humans sealed Sherpa prediction evidence while preserving all BM-01 governance gates.
+**Goal:** Turn 50–100 FLEURS Chinese candidates into a validated, human-confirmed, create-new frozen benchmark dataset without making the earlier high-trust review workflow a dependency.
 
-**Architecture:** New focused CommonJS modules under `benchmark/lib/` define external-root containment, immutable evidence, text/heuristic analysis, review state, audit, and export. A loopback-only Node HTTP server composes those modules through opaque candidate IDs; production Electron ASR files remain unchanged. Native models and the 100 real external candidates are used only by an explicit external CLI invocation after the synthetic normal suite passes.
+**Architecture:** Keep the existing assisted-review modules and commits intact, but add a small cooperative-maintainer path for final transcript records and dataset freezing. Reuse stable hashing, PCM parsing, transcript normalization, model-lock, and manifest validation helpers; do not require dual roles, audit-chain authorization, policy approval, or the hardened exporter. External audio, predictions, review records, and frozen datasets remain outside Git.
 
-**Tech Stack:** Node.js 22 CommonJS, Node built-ins (`fs`, `crypto`, `http`, `path`, `node:test`), existing `sherpa-onnx-node`, JSON Schema, HTML/CSS/DOM APIs.
+**Tech Stack:** Node.js 22 CommonJS, Node built-ins (`fs`, `crypto`, `path`, `node:test`), the existing `sherpa-onnx-node`, existing BM-01 manifest validator, JSON and CSV/TSV operational artifacts.
 
 **Spec:** `docs/superpowers/specs/2026-08-25-bm01-assisted-review-design.md`
 
 ## Global Constraints
 
-- Keep audio, reviewer aliases, tokens, raw predictions, transcripts, audit events, model locks, and all evidence outside Git and outside the repository root.
-- Preserve corrected Contract Gate `f06a43bb2819aac07e4ecbd0ebd3fd27576e99e1`; do not modify `main.js`, `preload.js`, `src/app.js`, or `lib/asr.js`.
-- Use Node built-ins for new persistence, HTTP, hashing, and tests; do not add a production runtime dependency.
-- Treat model output, consensus, PII warnings, and tags as evidence only. Only authenticated role-checked human transition endpoints create approvals.
-- Validate canonical realpath containment for every root, target, and output ancestor; reject lexical escape, symlink, junction, and post-open swap conditions.
-- Store only relative paths in external evidence. Bind each candidate to current PCM16 SHA-256, sample rate, channels, and duration.
-- All evidence writes are create-new or fsync-plus-atomic-rename within a canonical external root. Never overwrite prior evidence or the committed manifest.
-- Normal `npm test` uses synthetic PCM fixtures and injected fake Sherpa adapters only; it must not require a multi-GB model or external clip.
-- BM-01 remains In Progress and governed `expression-zh-v1` remains at zero samples until separate human governance is complete.
+- Preserve every existing commit through scope boundary `567d54822953f2dba82d0edca59de9320c41aff8`; do not delete the existing security modules or tests.
+- Do not continue fixing or expanding the old Task 7 high-trust exporter unless a regression affects a reused pure helper.
+- Do not modify `main.js`, `preload.js`, `src/app.js`, or `lib/asr.js`.
+- Keep audio, raw model predictions, human transcripts, review aliases, and frozen real datasets outside Git and outside the repository root.
+- Use exactly one human-confirmed final transcript per frozen sample. Upstream and model text are suggestions only.
+- Keep source/license records and basic path, PCM metadata, transcript, and SHA-256 validation as hard gates.
+- Refuse an existing freeze version or benchmark run directory; never silently overwrite results.
+- Normal `npm test` uses synthetic fixtures and fake adapters only. Native corpus/model actions require `ASSISTED_REVIEW_ALLOW_EXTERNAL=1`.
+- Do not merge, push, create a PR, delete worktrees, or rewrite commit history without explicit maintainer instruction.
 
-## File Structure
+## Historical boundary
 
-- `benchmark/lib/assisted-review-storage.js`: canonical JSON, root containment, safe reads, immutable writes, and input bindings.
-- `benchmark/lib/assisted-review-models.js`: lock validation, model hashes, Sherpa adapter, sealed attempt evidence.
-- `benchmark/lib/assisted-review-text.js`: Unicode CER, medoid, risk.
-- `benchmark/lib/assisted-review-heuristics.js`: PII/tag/SNR evidence and policy approval.
-- `benchmark/lib/assisted-review-audit.js`: aliases, atomic state, hash chain, recovery.
-- `benchmark/lib/assisted-review-server.js`: loopback server and static UI.
-- `benchmark/lib/assisted-review-export.js`: preflight and external export.
-- `benchmark/scripts/assisted-review-cli.js`: strict operator wiring.
-- `benchmark/assisted-review/*.schema.json`, `review-ui.html`, `review-ui.js`: schemas and safe browser presentation.
-- `test/assisted-review-*.test.js`: synthetic unit/integration coverage by module boundary.
+Earlier Tasks 1–7 implemented canonical bindings, Unicode CER/comparison,
+three-model prediction evidence, heuristics, review audit/state, a loopback UI,
+and a hardened exporter. They remain tested capabilities but are no longer the
+critical path. The interrupted Task 7 security re-review has no completion gate
+in this plan.
 
 ---
 
-### Task 1: Canonical external binding and immutable storage
+### Task 1: Add the lightweight transcript-record and freeze core
 
 **Files:**
-- Create: `benchmark/lib/assisted-review-storage.js`, `benchmark/assisted-review/input-binding.schema.json`, `test/assisted-review-storage.test.js`
+- Create: `benchmark/lib/benchmark-dataset-freeze.js`
+- Create: `test/benchmark-dataset-freeze.test.js`
+- Reuse: `benchmark/lib/assisted-review-storage.js`
+- Reuse: `benchmark/lib/dataset-manifest.js`
 
 **Interfaces:**
-- Produces `canonicalJson(value): string`, `sha256Text(text): string`, `canonicalizeExternalRoot(root): string`, `resolveContained(root, relativePath, { mustExist }): string`, `readBoundPcmCandidate({ datasetRoot, intakePath, candidateId }): { candidate, bytes, binding }` where `intakePath` is portable relative, and `writeCreateNewJson({ datasetRoot, relativePath, value }): { sha256, bytes }`.
-- `binding` is `{ schemaVersion: 1, candidateId, audioFile, audioSha256, sampleRateHz, channels, durationMs, intakeSha256, sourceRevision, upstreamDraftSha256, bindingSha256 }`.
+- `validateFinalTranscriptRecord(record, { binding }): FinalTranscriptRecord`
+- `writeFinalTranscriptRecord({ reviewRoot, binding, transcriptText, reviewerAlias, confirmedAt }): { relativePath, recordSha256 }`
+- `buildFrozenManifest({ intake, selected, reviewRecords, datasetId, datasetVersion }): DatasetManifest`
+- `freezeReviewedDataset({ datasetRoot, intakePath, reviewRoot, freezeRoot, candidateIds, datasetId, datasetVersion }): { freezeDirectory, manifestSha256, datasetSha256, selectedCount, omittedCount }`
+- `FinalTranscriptRecord` has exact keys `{ schemaVersion: 1, candidateId, bindingSha256, transcriptText, transcriptSha256, transcriptLength, humanConfirmed: true, reviewerAlias, confirmedAt, recordSha256 }`.
+- `datasetSha256` is SHA-256 of canonical JSON `{ manifestSha256, samples: [{ id, audioSha256, transcriptSha256 }] }` in manifest sample order.
 
-- [ ] **Step 1: Write the failing test**
-  Create a temporary synthetic PCM root. Assert sorted canonical JSON, stable binding hash, absolute/traversal rejection, file symlink/junction escape rejection, modified WAV rejection, and `EEXIST` on a second create-new output.
-- [ ] **Step 2: Run test to verify it fails**
-  Run: `$env:Path = 'C:\Users\mr\AppData\Local\hermes\node;' + $env:Path; node --test test/assisted-review-storage.test.js`
-  Expected: FAIL with `Cannot find module '../benchmark/lib/assisted-review-storage'`.
-- [ ] **Step 3: Write minimal implementation**
-  Use `fs.realpathSync.native`, `path.relative`, descriptor/recheck reads, `parsePcmWav`, `crypto.createHash('sha256')`, exclusive `fs.openSync(..., 'wx')`, fsync, and exact binding keys.
-- [ ] **Step 4: Run test to verify it passes**
-  Run: `$env:Path = 'C:\Users\mr\AppData\Local\hermes\node;' + $env:Path; node --test test/assisted-review-storage.test.js`
-  Expected: PASS with escapes and duplicate writes rejected.
-- [ ] **Step 5: Commit**
-  Run: `git add benchmark/lib/assisted-review-storage.js benchmark/assisted-review/input-binding.schema.json test/assisted-review-storage.test.js; git commit -m "Add assisted review binding storage" -m "新增外部根目录约束、不可变证据写入与音频绑定。"`
+- [ ] **Step 1: Write failing record-validation tests**
 
-### Task 2: Unicode CER, medoid, and risk evidence
+  Use a synthetic PCM candidate and assert that empty text, more than 4,096
+  Unicode code points, false/missing `humanConfirmed`, a different candidate or
+  binding, a wrong transcript hash/length, an invalid reviewer alias, and a
+  wrong record self-hash are rejected. Assert that a valid record round-trips
+  without normalization changing the human text.
+
+- [ ] **Step 2: Run the record tests and confirm RED**
+
+  Run:
+
+  ```powershell
+  node --test test/benchmark-dataset-freeze.test.js
+  ```
+
+  Expected: FAIL because `benchmark/lib/benchmark-dataset-freeze.js` does not exist.
+
+- [ ] **Step 3: Implement the minimal record functions**
+
+  Reuse `canonicalJson`, `sha256Text`, and binding reads. Write one create-new
+  JSON record below `<reviewRoot>/final-transcripts/<candidateId>/<bindingSha256>.json`.
+  Validate current audio binding when writing and when consuming the record.
+  Use basic contained relative paths and SHA-256 checks; do not add role state,
+  approval transitions, audit authorization, or adversarial filesystem hooks.
+
+- [ ] **Step 4: Write failing freeze tests**
+
+  Build three synthetic reviewed candidates. Assert sorted deterministic
+  samples, production manifest-validator compatibility, copied audio hash and
+  PCM metadata equality, source/license propagation, manifest and dataset
+  digest stability, explicit omitted-candidate reasons, rejection below 50 or
+  above 100 in formal mode, rejection of stale/missing transcript records, and
+  refusal to overwrite an existing dataset version. Provide a test-only
+  `minimumSamples: 1` option that is rejected unless `testMode: true`.
+
+- [ ] **Step 5: Implement the minimal freeze path**
+
+  Validate all inputs before publishing. Copy selected audio into a new staging
+  directory using stable `audio/<candidateId>.wav` names, write canonical
+  `manifest.json` and `freeze-report.json`, validate the staged manifest using
+  the copied audio as dataset root, then rename to the absent final version
+  directory. Ordinary staging and create-new publication protect consistency;
+  no audit chain, approval policy, junction attack simulation, or multi-stage
+  malicious-swap defense is required.
+
+- [ ] **Step 6: Run focused and regression tests**
+
+  Run:
+
+  ```powershell
+  node --test test/benchmark-dataset-freeze.test.js test/dataset-manifest.test.js test/assisted-review-storage.test.js test/assisted-review-text.test.js
+  ```
+
+  Expected: PASS; synthetic output validates and duplicate publication fails.
+
+- [ ] **Step 7: Commit**
+
+  ```powershell
+  git add benchmark/lib/benchmark-dataset-freeze.js test/benchmark-dataset-freeze.test.js
+  git commit -m "Add lightweight benchmark dataset freeze" -m "新增单人终稿确认、数据绑定与防误覆盖的轻量冻结流程。"
+  ```
+
+### Task 2: Add a focused operator CLI and documentation
 
 **Files:**
-- Create: `benchmark/lib/assisted-review-text.js`, `test/assisted-review-text.test.js`
+- Create: `benchmark/scripts/internal-benchmark-dataset.js`
+- Create: `test/internal-benchmark-dataset-cli.test.js`
+- Create: `benchmark/datasets/INTERNAL_BENCHMARK.md`
+- Modify: `package.json`
+- Modify: `docs/development.md`
+- Modify: `benchmark/datasets/README.md`
 
 **Interfaces:**
-- Produces `normalizeUnicodeCerV1(text): string`, `characterErrorRate(reference, hypothesis): number`, and `comparePredictions({ upstreamDraft, attempts }): ComparisonRecord`.
-- `ComparisonRecord` is `{ normalizationVersion: 'unicode-cer-v1', riskVersion: 'consensus-risk-v1', pairwiseCer, modelToDraftCer, medoidRole, medoidRawText, risk: 'low'|'medium'|'high', thresholdSha256 }`.
+- `parseInternalDatasetArgs(argv)` accepts commands `validate-intake`,
+  `record-transcript`, `review-status`, and `freeze`.
+- All commands require `--dataset-root` and portable relative evidence paths.
+- `record-transcript` additionally requires `--candidate-id`,
+  `--transcript-file`, and `--reviewer-alias`; it never accepts the transcript
+  directly as a command-line argument.
+- `freeze` requires explicit `--dataset-id`, `--dataset-version`,
+  `--freeze-root`, and either repeated `--candidate-id` or `--candidate-file`.
+- External commands require `ASSISTED_REVIEW_ALLOW_EXTERNAL=1`.
 
-- [ ] **Step 1: Write the failing test**
-  Assert NFKC/lowercase/Unicode whitespace/punctuation handling, emoji code points, directional CER denominator, stable role-order tie break, inclusive low/medium boundaries, and high risk for empty or failed attempts.
-- [ ] **Step 2: Run test to verify it fails**
-  Run: `$env:Path = 'C:\Users\mr\AppData\Local\hermes\node;' + $env:Path; node --test test/assisted-review-text.test.js`
-  Expected: FAIL because the text module does not exist.
-- [ ] **Step 3: Write minimal implementation**
-  Use `text.normalize('NFKC').toLowerCase()`, Unicode-property regexes, `Array.from`, dynamic-programming Levenshtein, medoid pairwise sum, and frozen `0.08`, `0.12`, `0.25`, `0.35` thresholds. Preserve raw text and label draft comparisons disagreement.
-- [ ] **Step 4: Run test to verify it passes**
-  Run: `$env:Path = 'C:\Users\mr\AppData\Local\hermes\node;' + $env:Path; node --test test/assisted-review-text.test.js`
-  Expected: PASS; consensus is not a human transcript.
-- [ ] **Step 5: Commit**
-  Run: `git add benchmark/lib/assisted-review-text.js test/assisted-review-text.test.js; git commit -m "Add deterministic review text evidence" -m "新增 Unicode CER、中位模型选择和风险分级证据。"`
+- [ ] **Step 1: Write failing CLI parser and dispatch tests**
 
-### Task 3: Hash-pinned model attempts and prediction evidence
+  Assert duplicate/unknown flags, missing opt-in, missing files, absolute
+  evidence paths, invalid sample limit, repository-root freeze output, and an
+  existing output version fail. Inject fake record/freeze functions and assert
+  that transcript file content is passed without appearing in logs or errors.
+
+- [ ] **Step 2: Run the CLI tests and confirm RED**
+
+  ```powershell
+  node --test test/internal-benchmark-dataset-cli.test.js
+  ```
+
+  Expected: FAIL because the script does not exist.
+
+- [ ] **Step 3: Implement the focused CLI**
+
+  Dispatch only to intake validation, final-transcript record, status summary,
+  and lightweight freeze functions. Do not expose `approve-policy`, role
+  transitions, audit recovery, or hardened export as required commands. Keep the
+  existing prediction script separate and document how its three outputs assist
+  human review.
+
+- [ ] **Step 4: Document the operator flow and package checks**
+
+  Document the external roots, FLEURS source/license record, model-lock path,
+  transcript-file workflow, the one-human confirmation boundary, freeze output,
+  and the fact that old security/UI modules are optional. Add every new tracked
+  JavaScript file to `npm run check`; do not make `npm test` read external roots.
+
+- [ ] **Step 5: Run complete synthetic verification**
+
+  ```powershell
+  npm test
+  npm run check
+  git diff --check
+  ```
+
+  Expected: PASS with no external corpus/model access during the normal suite.
+
+- [ ] **Step 6: Commit**
+
+  ```powershell
+  git add benchmark/scripts/internal-benchmark-dataset.js test/internal-benchmark-dataset-cli.test.js benchmark/datasets/INTERNAL_BENCHMARK.md benchmark/datasets/README.md docs/development.md package.json
+  git commit -m "Document internal benchmark dataset workflow" -m "新增轻量语料校对 CLI、冻结说明和完整检查入口。"
+  ```
+
+### Task 3: Validate the 100-candidate external intake and create review aids
 
 **Files:**
-- Create: `benchmark/lib/assisted-review-models.js`, `benchmark/assisted-review/model-lock.schema.json`, `benchmark/scripts/run-assisted-predictions.js`, `test/assisted-review-models.test.js`
+- External only: `intake/fleurs-cmn-hans-cn-dev-candidates-v1.json`
+- External only: `runs/<runId>/...`
+- External only: `review-packs/<runId>/review-pack.json`
+- External only: `review-packs/<runId>/review-pack.tsv`
 
 **Interfaces:**
-- Consumes Task 1 `binding`, `resolveContained`, and Task 2 `normalizeUnicodeCerV1`.
-- Produces `validateModelLock(lock): ModelLock`, `verifyModelRole({ modelRoot, role }): VerifiedRole`, `decodePcm16ToFloat32(bytes): Float32Array`, `buildReviewSherpaConfig(role, modelRoot): object`, `sealPredictionAttempt({ binding, role, modelLock, modelRoot, runId, transcribe }): AttemptRecord`, and `runPredictionBundle({ binding, upstreamDraft, modelLock, modelRoot, runId, transcribe }): { attempts, comparison }`.
-- `AttemptRecord` is `{ schemaVersion: 1, bindingSha256, role, modelLockEntrySha256, configSha256, status: 'succeeded'|'failed', rawText, normalizedText, elapsedMs, errorCode, recordSha256 }`.
+- The review pack has one row per candidate with candidate ID, relative audio
+  path, audio SHA-256, upstream transcript, three model statuses/texts,
+  pairwise disagreement, medoid suggestion, and risk. It has empty
+  `finalTranscript` and `humanConfirmed` fields until a person acts.
 
-- [ ] **Step 1: Write the failing test**
-  Use fake files/injected `transcribe`. Assert exactly `baseline-paraformer`, `candidate-zipformer`, `candidate-sensevoice-small`; relative paths; hash mismatch rejection; PCM16 little-endian values map to `Float32Array` samples divided by `32768`; both role types call `stream.acceptWaveform({ samples, sampleRate })`; online decode/input-finished/final-result sequence; offline decode/get-result sequence; one success and one sealed failure with no false text.
-- [ ] **Step 2: Run test to verify it fails**
-  Run: `$env:Path = 'C:\Users\mr\AppData\Local\hermes\node;' + $env:Path; node --test test/assisted-review-models.test.js`
-  Expected: FAIL because the model module does not exist.
-- [ ] **Step 3: Write minimal implementation**
-  Port only canonical model-root/path/hash/config patterns from model-prep. Convert every PCM16 little-endian sample to `sample / 32768`. For online roles call `createStream`, `stream.acceptWaveform({ samples, sampleRate })`, decode while ready, `stream.inputFinished()`, decode while ready, then `recognizer.getResult(stream).text`; for offline roles call `createStream`, `stream.acceptWaveform({ samples, sampleRate })`, `recognizer.decode(stream)`, then `recognizer.getResult(stream).text`. Normalize with Task 2 before sealing; after all three attempts call Task 2 `comparePredictions`, then create-new `comparison.json`; revalidate PCM before/after; write evidence below `runs/<run-id>/candidates/<id>/<binding>/predictions/`; do not alter production ASR.
-- [ ] **Step 4: Run test to verify it passes**
-  Run: `$env:Path = 'C:\Users\mr\AppData\Local\hermes\node;' + $env:Path; node --test test/assisted-review-models.test.js`
-  Expected: PASS with sealed normalized outcomes and no absolute model root in evidence.
-- [ ] **Step 5: Commit**
-  Run: `git add benchmark/lib/assisted-review-models.js benchmark/assisted-review/model-lock.schema.json benchmark/scripts/run-assisted-predictions.js test/assisted-review-models.test.js; git commit -m "Add sealed Sherpa review attempts" -m "新增三模型哈希锁定、隔离推理与失败证据记录。"`
+- [ ] **Step 1: Run intake validation without inference**
 
-### Task 4: PII, tag/noise suggestions, and policy approval
-
-**Files:**
-- Create: `benchmark/lib/assisted-review-heuristics.js`, `benchmark/assisted-review/heuristics-policy.schema.json`, `test/assisted-review-heuristics.test.js`
-
-**Interfaces:**
-- Consumes Task 1 PCM and Task 2 comparison.
-- Produces `createSuggestions({ binding, candidate, comparison, pcmBytes, policy }): SuggestionRecord`, `scanPiiWarnings(text): PiiWarning[]`, `validatePolicyApproval({ policy, approval }): PolicyApproval`, and `policyCanContribute({ policyApproval, batchId }): boolean`.
-- `SuggestionRecord` contains `{ policySha256, suggestions, piiWarnings }`; `PiiWarning` is `{ ruleId, start, end, matchSha256 }` and has no approval field.
-
-- [ ] **Step 1: Write the failing test**
-  Cover Mandarin, Han/Latin code-switch, Arabic/Chinese numeral boundaries, 2.5/6.5 chars-per-second, 20 ms p10/p90 SNR at 12/30 dB, human-only light accent, PII hash-not-raw-span, and missing/mismatched batch policy approval.
-- [ ] **Step 2: Run test to verify it fails**
-  Run: `$env:Path = 'C:\Users\mr\AppData\Local\hermes\node;' + $env:Path; node --test test/assisted-review-heuristics.test.js`
-  Expected: FAIL because the heuristic module does not exist.
-- [ ] **Step 3: Write minimal implementation**
-  Implement the v1 rules, PCM16 non-overlapping 20 ms RMS, and all evidence inputs. Return `{ humanOnly: true }` for light accent. Require policy approval alias, policy hash, audit event hash, batch ID; never set a final tag.
-- [ ] **Step 4: Run test to verify it passes**
-  Run: `$env:Path = 'C:\Users\mr\AppData\Local\hermes\node;' + $env:Path; node --test test/assisted-review-heuristics.test.js`
-  Expected: PASS with unapproved numeric suggestions excluded from export evidence.
-- [ ] **Step 5: Commit**
-  Run: `git add benchmark/lib/assisted-review-heuristics.js benchmark/assisted-review/heuristics-policy.schema.json test/assisted-review-heuristics.test.js; git commit -m "Add review heuristic evidence" -m "新增 PII 警告、分层建议与人工批次策略批准。"`
-
-### Task 5: Human roles, atomic state, audit, and recovery
-
-**Files:**
-- Create: `benchmark/lib/assisted-review-audit.js`, `benchmark/assisted-review/review-state.schema.json`, `test/assisted-review-audit.test.js`
-
-**Interfaces:**
-- Produces `validateAlias(alias): string`, `applyHumanTransition(state, event): ReviewState`, `appendAuditEvent({ auditRoot, event }): AuditEvent`, `commitTransition({ reviewRoot, state, event, expectedRevision }): ReviewState`, `verifyAuditChain(auditRoot): AuditVerification`, and `recoverBrokenCandidate({ reviewRoot, candidateId }): RecoveryRecord`.
-- Candidate actions are `record-primary-transcript`, `approve-secondary-transcript`, `approve-license`, `clear-pii`, and `set-final-tags`; each requires `{ actorAlias, actorRole, bindingSha256, candidateId }`.
-- Batch action `approve-policy` is separate and requires fixed action `approve-policy` plus `{ actorAlias, actorRole, batchId, policySha256, expectedRevision }`; it rejects `candidateId`, `bindingSha256`, and payload fields, serializes on a per-batch lock, and writes only batch/policy audit evidence.
-
-**Fail-closed recovery clarification:** `audit/audit.jsonl` remains the sole
-authorization chain. If it is broken, recovery quarantines affected candidate
-evidence and writes a fresh `unreviewed` state with no binding or approvals; it
-does not repair or continue the broken global chain, so review and export remain
-blocked until an operator establishes a new controlled review root. Candidate
-audit decisions contain only a transcript hash/length or other non-sensitive
-decision metadata; raw human transcript text is never stored in the audit log.
-
-- [ ] **Step 1: Write the failing test**
-  Assert alias regex, equal secondary alias rejection, ordered candidate transition, batch policy event without candidate binding, stale revision, competing writers, prior-hash continuity, crash replay, broken-chain quarantine, and no approval transfer to a new chain.
-- [ ] **Step 2: Run test to verify it fails**
-  Run: `$env:Path = 'C:\Users\mr\AppData\Local\hermes\node;' + $env:Path; node --test test/assisted-review-audit.test.js`
-  Expected: FAIL because the audit module does not exist.
-- [ ] **Step 3: Write minimal implementation**
-  Validate distinct exact candidate/batch event keys; lock per candidate or batch; append/fsync canonical audit before fsync-plus-rename state; replay only contiguous valid chains; preserve broken evidence and restart candidate `unreviewed`.
-- [ ] **Step 4: Run test to verify it passes**
-  Run: `$env:Path = 'C:\Users\mr\AppData\Local\hermes\node;' + $env:Path; node --test test/assisted-review-audit.test.js`
-  Expected: PASS; non-human action names cannot create approvals.
-- [ ] **Step 5: Commit**
-  Run: `git add benchmark/lib/assisted-review-audit.js benchmark/assisted-review/review-state.schema.json test/assisted-review-audit.test.js; git commit -m "Add atomic assisted review audit" -m "新增双人角色、原子状态、哈希审计链与恢复隔离。"`
-
-### Task 6: Loopback token server and safe UI
-
-**Files:**
-- Create: `benchmark/lib/assisted-review-server.js`, `benchmark/assisted-review/review-ui.html`, `benchmark/assisted-review/review-ui.js`, `test/assisted-review-server.test.js`
-
-**Interfaces:**
-- Consumes Tasks 1–5 through injected stores, including sealed prediction, comparison, and suggestion evidence.
-- Produces `createReviewServer({ datasetRoot, reviewStore, tokenBytes, port }): { url, close, server }` and `renderText(node, text): void`; routes: `GET /?token=`, `GET /review`, `GET /api/candidates/:id`, `GET /api/candidates/:id/audio`, `POST /api/candidates/:id/transitions`.
-
-`reviewStore.getSessionIdentity(): { alias, role }` is a required read-only
-constructor dependency. Each server instance binds exactly that pre-provisioned
-identity to its session and never accepts alias or role from a request body.
-
-For `record-primary-transcript`, the client submits raw `transcriptText` only.
-The server rejects empty or over-4,096-code-point text, computes its UTF-8
-SHA-256 and code-point length, and places only those derived fields in the
-Task 5 event. `reviewStore.commitPrimaryTranscript({ candidateId,
-bindingSha256, text, event })` must atomically persist the binding-scoped raw
-text before or with the Task 5 transition and return the resulting state;
-candidate reads expose that persisted primary text. The audit event and server
-errors/logs never contain the raw text. Other actions use `commitTransition`.
-
-- [ ] **Step 1: Write the failing test**
-  Start port zero; assert `127.0.0.1`, single-use 256-bit exchange/redirect, cookie/CSRF/origin checks, opaque IDs, hostile transcript JSON, headers, contained audio, and role-checked forwarding. Import `renderText` with a fake node whose `innerHTML` setter throws; pass `<img src=x onerror=1>` and assert only its `textContent` changes.
-- [ ] **Step 2: Run test to verify it fails**
-  Run: `$env:Path = 'C:\Users\mr\AppData\Local\hermes\node;' + $env:Path; node --test test/assisted-review-server.test.js`
-  Expected: FAIL because the server module does not exist.
-- [ ] **Step 3: Write minimal implementation**
-  Bind only IPv4 loopback, exchange token for short-lived `HttpOnly; SameSite=Strict` cookie, reject malformed/oversized input, set CSP/no-referrer/no-cache/nosniff/frame headers, implement `renderText(node, text) { node.textContent = String(text); }` as the only candidate-text renderer, and use Task 1 opaque-ID audio rechecks.
-- [ ] **Step 4: Run test to verify it passes**
-  Run: `$env:Path = 'C:\Users\mr\AppData\Local\hermes\node;' + $env:Path; node --test test/assisted-review-server.test.js`
-  Expected: PASS without wildcard listener, token log, or `innerHTML` candidate injection.
-- [ ] **Step 5: Commit**
-  Run: `git add benchmark/lib/assisted-review-server.js benchmark/assisted-review/review-ui.html benchmark/assisted-review/review-ui.js test/assisted-review-server.test.js; git commit -m "Add loopback review server" -m "新增令牌会话、CSRF、防路径逃逸与安全人工复核界面。"`
-
-### Task 7: Fail-closed external exporter
-
-**Files:**
-- Create: `benchmark/lib/assisted-review-export.js`, `benchmark/scripts/export-assisted-review.js`, `test/assisted-review-export.test.js`
-
-**Interfaces:**
-- Consumes Tasks 1, 2, 3, 4, 5.
-- Produces `preflightExport({ datasetRoot, candidateIds, exportId }): ExportPreflight` and `exportReviewedManifest(request): { exportDirectory, manifestSha256, reportSha256 }`.
-
-- [ ] **Step 1: Write the failing test**
-  Build complete synthetic evidence; independently remove licence, PII, primary transcript, distinct secondary, final tags, sealed model attempt, numeric-policy approval, audit event, or current PCM hash. Assert no final export and unchanged committed manifest bytes.
-- [ ] **Step 2: Run test to verify it fails**
-  Run: `$env:Path = 'C:\Users\mr\AppData\Local\hermes\node;' + $env:Path; node --test test/assisted-review-export.test.js`
-  Expected: FAIL because the exporter module does not exist.
-- [ ] **Step 3: Write minimal implementation**
-  Recompute binding; require three sealed success-or-failure attempts and human state/audit; omit unapproved numeric suggestions; stage/fsync then single-rename `assisted-review/exports/<export-id>`; reject repository manifest paths.
-- [ ] **Step 4: Run test to verify it passes**
-  Run: `$env:Path = 'C:\Users\mr\AppData\Local\hermes\node;' + $env:Path; node --test test/assisted-review-export.test.js`
-  Expected: PASS with only complete human-reviewed synthetic evidence exported.
-- [ ] **Step 5: Commit**
-  Run: `git add benchmark/lib/assisted-review-export.js benchmark/scripts/export-assisted-review.js test/assisted-review-export.test.js; git commit -m "Add fail closed review export" -m "新增人工门禁、审计校验和不可覆盖的外部导出。"`
-
-### Task 8: CLI, package checks, docs, and opt-in external dry run
-
-**Files:**
-- Create: `benchmark/scripts/assisted-review-cli.js`, `test/assisted-review-cli.test.js`, `benchmark/datasets/ASSISTED_REVIEW.md`
-- Modify: `package.json`, `docs/development.md`, `benchmark/datasets/README.md`
-
-**Interfaces:**
-- `parseAssistedReviewArgs(argv): { command, datasetRoot, modelRoot, modelLockPath, candidateIds, runId, exportId, limit, dryRun }` rejects duplicate/unknown flags, repository-root outputs, non-integer `limit`, `limit < 1`, and `limit > 100`.
-- Commands are `predict`, `serve`, `approve-policy`, `recover`, `export`, `dry-run`; external actions require `ASSISTED_REVIEW_ALLOW_EXTERNAL=1`.
-
-- [ ] **Step 1: Write the failing test**
-  Spawn with fake dependencies; assert `dry-run --limit 100` validates 100 candidate bindings without native inference, `--limit 0` and `--limit 101` fail, missing opt-in fails, duplicate flags fail, repository-root output fails, and normal `npm test` reads no external root/model.
-- [ ] **Step 2: Run test to verify it fails**
-  Run: `$env:Path = 'C:\Users\mr\AppData\Local\hermes\node;' + $env:Path; node --test test/assisted-review-cli.test.js`
-  Expected: FAIL because the CLI module does not exist.
-- [ ] **Step 3: Write minimal implementation**
-  Dispatch only to Tasks 2/5/6/7; add all new JS to `npm run check`; document portable variables and:
   ```powershell
   $env:ASSISTED_REVIEW_ALLOW_EXTERNAL = '1'
-  node benchmark/scripts/assisted-review-cli.js dry-run --dataset-root '<controlled external root>' --model-root '<controlled model root>' --model-lock '<external models.lock.json>' --limit 100
-  node benchmark/scripts/assisted-review-cli.js predict --dataset-root '<controlled external root>' --model-root '<controlled model root>' --model-lock '<external models.lock.json>' --limit 100 --run-id 'fleurs-dev-100-r1'
+  node benchmark/scripts/internal-benchmark-dataset.js validate-intake --dataset-root 'D:\Codex_projects\expression-trainer-pro-benchmark-data' --intake 'intake/fleurs-cmn-hans-cn-dev-candidates-v1.json' --limit 100
   ```
-  `dry-run` validates 100 native inputs without inference; `predict` is the explicit opt-in local-model run after unit/integration green.
-- [ ] **Step 4: Run complete verification**
-  Run: `$env:Path = 'C:\Users\mr\AppData\Local\hermes\node;' + $env:Path; npm test; npm run check; git diff --check`
-  Expected: PASS; no normal test needs external models/corpus and no governed manifest changes.
-- [ ] **Step 5: Commit**
-  Run: `git add benchmark/scripts/assisted-review-cli.js test/assisted-review-cli.test.js benchmark/datasets/ASSISTED_REVIEW.md benchmark/datasets/README.md docs/development.md package.json; git commit -m "Document assisted review workflow" -m "新增受控 CLI、外部干跑说明和完整校验入口。"`
 
-## Plan Self-Review
+  Expected: 100 current PCM bindings validated; failures list candidate IDs and
+  stable error codes.
 
-- Spec coverage: Task 1 implements containment, binding, immutable evidence; Task 2 implements normalisation/CER/medoid/risk; Task 3 implements three hash-pinned Sherpa attempts and normalized evidence; Task 4 implements PII/tag/SNR and policy approval; Task 5 implements candidate roles plus batch policy state/audit/recovery; Task 6 implements loopback/token/cookie/CSRF/safe rendering; Task 7 implements every export gate; Task 8 implements wiring, docs, checks, and opt-in 100-candidate run.
-- Unresolved-marker scan: every task has exact files, signatures, red command, green command, implementation mechanism, and commit command.
-- Type consistency: Task 1 creates `bindingSha256`; Tasks 3, 5, 7 consume it unchanged for candidate actions. Task 2 provides `normalizeUnicodeCerV1` to Task 3 and `ComparisonRecord` to Task 4. Task 3 creates `AttemptRecord`; Tasks 2 and 7 consume it. Task 4 creates `PolicyApproval`; Task 7 consumes it. Task 5 creates candidate approvals and the separate `{ batchId, policySha256 }` policy approval event.
+- [ ] **Step 2: Run three-model suggestions**
+
+  Use the verified external model lock and one explicit run ID. Preserve a
+  success or failure attempt for every candidate/model pair; never drop failed
+  candidates from the review pack.
+
+- [ ] **Step 3: Generate deterministic JSON and TSV review packs**
+
+  Sort by candidate ID and include every intake candidate. The pack is a review
+  aid, not ground truth. Store it outside Git and reject overwrite of an existing
+  pack ID.
+
+- [ ] **Step 4: Verify pack completeness**
+
+  Assert 100 unique rows, 300 model statuses, current binding hashes, no missing
+  upstream transcript, and no absolute model path, token, or account data.
+
+### Task 4: Complete the minimized human review
+
+**Files:**
+- External only: `final-transcripts/<candidateId>/<bindingSha256>.json`
+- External only: human working copies of the review pack
+
+- [ ] **Step 1: Prioritize review**
+
+  Present high disagreement, failed attempts, numbers/names, code-switch, and
+  empty-output samples first. Low-risk exact agreements may be reviewed in a
+  fast batch, but still require an explicit human confirmation.
+
+- [ ] **Step 2: Record 50–100 human-final transcripts**
+
+  For each selected sample, a person listens to the audio, corrects the final
+  transcript, and explicitly confirms it. Codex may prepare suggestions,
+  compare candidates, detect empty/duplicate text, and write records after the
+  confirmed text is supplied; Codex must not invent the confirmation.
+
+- [ ] **Step 3: Run review-status checks after each batch**
+
+  Report confirmed, stale, invalid, and pending counts plus the exact candidates
+  still requiring listening. No second reviewer, license transition, PII
+  transition, tag approval, or policy approval is required.
+
+### Task 5: Freeze BM-01 and hand off to BM-02
+
+**Files:**
+- External only: frozen dataset directory
+- Modify after successful external freeze: `docs/development.md`
+- Modify after successful external freeze: `docs/roadmap.md`
+
+- [ ] **Step 1: Freeze a new dataset version**
+
+  Select 50–100 valid human-confirmed candidates and run the create-new freeze
+  command. Record dataset ID/version, manifest SHA-256, dataset SHA-256, source
+  revision, selected count, omitted count/reasons, duration, and tag coverage.
+
+- [ ] **Step 2: Revalidate from the frozen directory**
+
+  Load the emitted manifest using the frozen directory as dataset root, hash
+  every audio file again, and confirm the dataset digest. The validation must
+  not depend on the mutable intake or review directories.
+
+- [ ] **Step 3: Exercise the BM-02 dry-run contract**
+
+  Run BM-02 without native inference and confirm it sees exactly the frozen
+  manifest sample count, candidate registry, output permissions, Git SHA, and
+  environment fields.
+
+- [ ] **Step 4: Update BM-01 evidence and status**
+
+  Mark BM-01 Completed only after Steps 1–3 pass. Commit only de-identified
+  documentation and portable hashes; do not commit audio, raw transcripts,
+  predictions, reviewer working files, or local absolute paths.
+
+## Downstream dependency map
+
+```text
+existing Contract Gate ──> BM-02 harness development
+          |
+          v
+Tasks 1-4 + human confirmation ──> Task 5 frozen BM-01 dataset
+                                      |
+                                      +──> BM-02 acceptance dry-run
+                                      |
+D-01 weights/thresholds frozen ───────+──> serialized BM-04/05/06 formal runs
+
+BM-03 real-device compatibility evidence ──> later product audio compatibility
+                                             (not a model-selection gate)
+```
+
+After BM-01 freezes, BM-02 remains responsible for one row per expected sample
+and repetition, CER, first partial/final latency, RTF, CPU, peak RAM, failure
+rate, model/version/config hashes, environment, manifest/dataset hashes, Git
+SHA, and create-new result directories. BM-04, BM-05, and BM-06 differ only by
+candidate adapter/config; they do not get candidate-specific scoring rules.
+
+## Plan self-review
+
+- Spec coverage: Tasks 1–2 create the lightweight cooperative-maintainer path;
+  Tasks 3–4 use existing real audio and model assistance without fabricating
+  human confirmation; Task 5 freezes and hands the exact dataset to BM-02.
+- Scope check: the old security workflow is retained but not modified or placed
+  on the dependency path. BM-03 is explicitly outside the selection gate.
+- Failure accounting: intake/model/review omissions are reported; downstream
+  benchmark runs must retain every failed expected row.
+- Placeholder scan: no implementation step relies on undefined approval,
+  secondary-review, audit-chain, or policy workflow.
+- Type consistency: final transcript records bind to the existing
+  `bindingSha256`; frozen samples use the existing production manifest shape;
+  BM-02 consumes only the frozen manifest and dataset hashes.

@@ -1,7 +1,7 @@
 # Expression Trainer TODO / Roadmap
 
 > 状态：Active execution baseline
-> 基线日期：2026-08-22
+> 基线日期：2026-08-26
 > 源码：`morigejile/expression-trainer-pro`；Phase 0 实现基线：`b16a1d0bf799887cf7ece1283d73463961346030`（本地 `chore/reproducible-build`）
 
 ## 1. 目标与排序原则
@@ -26,14 +26,39 @@
 - 每个阶段保持应用可运行；不同时重写 UI、Audio、ASR、模型和打包。
 - 原有 `package-lock.json` 清理属于既存工作，已由仓库负责人确认并纳入 Phase 0；后续不得把不相关改动夹带进同一提交。
 
+### 1.1 内部 benchmark 定位（2026-08-26）
+
+Phase 2 benchmark 仅用于项目内部 Paraformer、Zipformer 和
+SenseVoiceSmall 选型，不作为对外权威 benchmark、论文、第三方认证或
+不可抵赖审计。只有会显著影响模型比较公平性、准确性和可复现性的机制
+是硬门禁。
+
+硬门禁保留：固定真人中文数据集、人工确认参考 transcript、manifest 与
+音频 SHA-256、统一 CER、相同机器/环境/参数、模型版本/config/hash、首
+partial 与 final latency（适用时）、RTF、CPU、RAM、failure rate、失败
+样本完整计数、Git SHA、可复现结果和防误覆盖。
+
+不再阻塞：Primary/Secondary 双角色、双人 transcript 审批、candidate 级
+license/PII 状态机、`approve-policy`、不可篡改审计链、复杂 localhost
+身份/CSRF/session、对抗本地恶意攻击者的 TOCTOU/provenance/事务发布。
+已有实现保留，但不继续为旧威胁模型加固，也不作为 BM-01～BM-06 依赖。
+
 ## 2. 依赖关系
 
 ```mermaid
 flowchart LR
   B[0. 文档/源码/构建基线] --> T[1. 最小测试基线]
   T --> H[安全与已知正确性缺陷]
-  T --> BM[2. ASR Benchmark]
-  BM --> D[3. 模型与执行边界 ADR]
+  T --> C[BM-01 Contract Gate]
+  C --> H2[BM-02 harness 开发]
+  C --> F[BM-01 人工终稿与冻结]
+  H2 --> WGT[D-01 预先冻结权重]
+  F --> RUN[BM-04～06 同机串行正式运行]
+  WGT --> RUN
+  RUN --> D2[D-02 接受模型 ADR]
+  T --> A3[BM-03 音频兼容性证据]
+  A3 -. 不阻塞模型选型 .-> R3[Phase 4 AudioCapture/重采样]
+  D2 --> D[3. 模型与执行边界 ADR]
   D --> P[4. AsrProvider + session 契约]
   P --> A[5. AudioWorklet + Resampler]
   A --> W[6. 有界传输 + ASR 移出 Main]
@@ -97,19 +122,31 @@ flowchart LR
 
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
-| BM-01 | P0 | 建 benchmark 数据集（In Progress） | 已建立版本化 manifest 契约、路径/哈希校验、质量汇总和无隐私合成示例；仍需准备经授权、脱敏、人工双人复核的 50～100 条真实中文表达训练录音，并按普通话/语速/轻口音/中英/数字专名/噪声分层 | T-01 | 每条有 ground truth、类别、来源/许可；数量不足时明确局限，不能标记 Completed |
-| BM-02 | P0 | 建可复跑 harness | 同一入口输出逐条与汇总 JSON/CSV：CER、首 partial、最终延迟、RTF、CPU、峰值 RAM、初始化、模型大小；记录硬件/OS/线程/版本 | BM-01 | 同设备重复运行差异可解释；原始结果可审计 |
-| BM-03 | P0 | 验证音频基线 | 用合成频率/时长 fixture 和真实 44.1/48 kHz 设备记录当前 AudioContext 实际率，证明当前链路是否误声明采样率 | T-01 | 得到可复现证据，不再只凭风险推断 |
-| BM-04 | P0 | 跑当前对照 | 冻结当前 Paraformer 归档、hash、许可证和配置，测 cold/warm 与真实流式路径 | BM-02,BM-03 | 完整原始结果和失败日志 |
-| BM-05 | P0 | 跑 Zipformer 候选 | 至少测试小型中文 streaming Zipformer；资源允许时加较大中文版本，使用同一 Sherpa/硬件规则 | BM-02 | 完整原始结果，不只记录公开榜单 |
-| BM-06 | P0 | 跑 SenseVoiceSmall | 使用 Sherpa-ONNX INT8，明确 VAD/utterance 方式；分别度量句级完成体验，不能伪装为 streaming partial | BM-02 | 与产品 UX 权重一致的结果 |
+| BM-01 | P0 | 冻结内部 benchmark 数据集（In Progress） | 继续使用 100 条 FLEURS `cmn_hans_cn` 候选；以“上游 transcript + 三模型建议 + 一名人工最终校对”形成 50～100 条参考 transcript，并通过轻量 create-new 工具冻结音频、manifest、source/license、manifest hash 和 dataset hash | T-01 | 50～100 条真人中文 PCM 音频；每条有人工确认终稿；manifest 稳定绑定 audio ↔ transcript；来源/许可证与所有音频 SHA-256 可复现 |
+| BM-02 | P0 | 建公平可复跑 harness | 同一入口对同一冻结 manifest 输出逐条与汇总 JSON/CSV：CER、首 partial、最终延迟、RTF、CPU、峰值 RAM、failure rate、模型/环境/dataset/Git 证据；每个预期样本/重复都有成功或失败行 | BM-01 Contract Gate（开发）；BM-01 冻结数据集（验收） | 同设备/语料/参数可复跑；失败样本不静默排除；已有 run 不被覆盖 |
+| BM-03 | P1 | 保留音频采样率兼容性验证 | 保留合成 fixture 与已有真实设备证据；继续收集 44.1/48 kHz 设备记录，但移至产品 AudioCapture/重采样兼容性验证，不阻塞 ASR 模型排名 | T-01 | 已有能力和证据不删除；真实设备缺口明确记录并交给 Phase 4 |
+| BM-04 | P0 | 跑当前 Paraformer 对照 | 冻结当前 Paraformer 版本、hash、许可证和配置，在固定 BM-01 数据集/机器/参数下串行运行 | BM-01,BM-02,D-01 | CER、latency、RTF、CPU、RAM、failure rate 和完整逐条结果 |
+| BM-05 | P0 | 跑 Zipformer 候选 | 冻结小型中文 streaming Zipformer 版本/hash/config，使用与 BM-04 完全相同的数据集、机器、运行和计分规则 | BM-01,BM-02,D-01 | 与 BM-04 同结构的完整结果；不只引用公开榜单 |
+| BM-06 | P0 | 跑 SenseVoiceSmall | 冻结 Sherpa-ONNX INT8 版本/hash/config；按 utterance 模式运行，`firstPartialMs: null`，不得伪装 streaming partial | BM-01,BM-02,D-01 | 与 BM-04/05 同结构的完整结果，并明确 utterance UX 差异 |
 | BM-07 | P1 | ASR 执行边界 spike | 用当前模型最小比较 utility/child process 与 worker thread：加载、feed、stop、退出、重启、打包路径、Main 延迟 | T-07,BM-04 | ADR-0006 所需数据齐全 |
 
-#### Phase 2 执行记录（2026-08-25）
+#### Phase 2 执行记录（更新至 2026-08-26）
 
 | ID | 状态 | Owner | 证据 |
 |---|---|---|---|
-| BM-01 | In Progress | Codex + maintainer | **Corrected Contract Gate** commit `f06a43bb2819aac07e4ecbd0ebd3fd27576e99e1`：schema 与 Node 内置 validator 校验 canonical realpath、descriptor recheck、RIFF/WAVE 16-bit PCM 元数据、固定 keys、来源/许可组合与 SHA-256；质量报告由独立 `MANIFEST_PATH` / `DATASET_ROOT` CLI 确定性生成。当前治理 manifest 为 `expression-zh-v1` / `0.1.0`，SHA-256 `1dadf62bace0cdd8961718b9dd9c50cb0bdb0136a8c08fb0ac480a8a8326b948`，0 条 / 0 ms，7 个分层均为 0。另有 100 条官方 FLEURS 外部候选及 hash/PCM intake inventory，但均为 `pending` / `upstream-draft`，仅观察到普通话，不能计入治理样本或完成条件。原始音频必须保留在 Git 外受控 dataset root；尚未完成授权/归因复核、PII 筛查、独立首转写、第二人复核与标签复核，故不能 Completed。 |
+| BM-01 | In Progress | Codex + maintainer | **Corrected Contract Gate** commit `f06a43bb2819aac07e4ecbd0ebd3fd27576e99e1` 保持有效。外部已有 100 条官方 FLEURS `cmn_hans_cn` PCM 候选、来源/许可证记录、音频 hash/intake inventory，以及本地 Paraformer/Zipformer/SenseVoice 模型证据。辅助审核/安全能力截至 scope boundary `567d54822953f2dba82d0edca59de9320c41aff8` 全部保留。2026-08-26 起取消双角色、双人 transcript、candidate license/PII、policy approval、审计链和恶意本地攻击防御的完成门禁；剩余阻塞只是一名人工对 50～100 条终稿的明确确认、轻量冻结与二次校验。 |
+
+#### Phase 2 门禁调整（2026-08-26）
+
+| 门禁 | 状态 | 说明 |
+|---|---|---|
+| 固定数据集、人工终稿、manifest/audio hash、source/license | 保留 | 直接影响 CER 正确性和后续复现 |
+| 统一 CER、同机同参数、模型 hash/config、完整指标和失败分母 | 保留 | 直接影响候选公平比较 |
+| 防误覆盖、逐条结果、Git SHA 与运行环境 | 保留 | 防止普通操作错误并支持复跑 |
+| Primary/Secondary、双人 transcript | 取消硬门禁 | 一名人工明确确认终稿即可 |
+| candidate license/PII 与 `approve-policy` 状态机 | 取消硬门禁 | 改为 dataset 级来源/许可证；启发式仅辅助 |
+| 审计链、不可抵赖 provenance、恶意 TOCTOU 防御 | 降级为可选既有能力 | 保留代码，不继续加固，不得阻塞 benchmark |
+| BM-03 真实 44.1/48 kHz 设备证据 | 从模型选型门禁移除 | 转为 Phase 4 产品音频兼容性输入 |
 
 > FunASR-Nano、Whisper、WASM 可作为研究参考，但不阻塞首轮决策，也不进入默认运行依赖。
 
@@ -164,7 +201,7 @@ flowchart LR
 |---|---|---|
 | M0 基线可复现 | B-01～B-06 | 新环境可安装/启动，事实、依赖和说明一致 |
 | M1 可安全修改 | T-01～T-07 | 核心契约有测试，尾部丢字/注入/悬挂请求受控 |
-| M2 选型有证据 | BM-01～D-04 | 默认模型与 ASR 隔离机制有 Accepted ADR |
+| M2 选型有证据 | BM-01、BM-02、BM-04～BM-06、D-01、D-02 | 固定真人语料上的三模型公平结果形成 Accepted 模型 ADR；BM-03 设备缺口不阻塞 |
 | M3 架构收敛 | R-01～R-09 | Audio/ASR/模型分离，Main 不推理，升级可回退 |
 | M4 可安装发布 | PKG-01～PKG-06 | Tier 1 安装/升级闭环，逐步扩展平台 |
 | M5 可长期维护 | OPS-01～OPS-06 | CI、版本、依赖、模型和诊断机制稳定 |
@@ -177,6 +214,7 @@ flowchart LR
 - 不在 benchmark 前把 Zipformer 或 SenseVoiceSmall写成赢家。
 - 不一开始建设插件系统、模型市场、数据库或云端账户。
 - 不为了“规范”要求 90% 覆盖率；优先覆盖会破坏产品闭环的契约。
+- 不把内部模型选型升级为多组织审计、不可抵赖证据链或对抗已获本地文件系统权限攻击者的系统。
 
 ## 6. Roadmap 维护规则
 
