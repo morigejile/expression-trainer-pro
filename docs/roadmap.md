@@ -135,7 +135,7 @@ flowchart LR
 
 | ID | 状态 | Owner | 证据 |
 |---|---|---|---|
-| BM-01 | In Progress | Codex + maintainer | **Corrected Contract Gate** commit `f06a43bb2819aac07e4ecbd0ebd3fd27576e99e1` 保持有效。外部已有 100 条官方 FLEURS `cmn_hans_cn` PCM 候选、来源/许可证记录、音频 hash/intake inventory，以及本地 Paraformer/Zipformer/SenseVoice 模型证据。辅助审核/安全能力截至 scope boundary `567d54822953f2dba82d0edca59de9320c41aff8` 全部保留。2026-08-26 起取消双角色、双人 transcript、candidate license/PII、policy approval、审计链和恶意本地攻击防御的完成门禁；剩余阻塞只是一名人工对全部 100 条终稿的明确确认、轻量冻结与二次校验。 |
+| BM-01 | In Progress | Codex + maintainer | **Corrected Contract Gate** `f06a43b` 保持有效；轻量终稿记录、强制全部 100 条的 create-new 冻结 core、四命令 CLI 与操作文档已由 `e287dad` 实现。真实 intake 已只读校验 100/100。旧辅助审核/安全历史保留但不再依赖。剩余业务门禁是三模型 review aid、维护者逐条听音确认全部 100 条、正式冻结与二次校验；自动化测试通过不等于这些人工/外部步骤完成。 |
 
 #### Phase 2 门禁调整（2026-08-26）
 

@@ -45,6 +45,11 @@ in this plan.
    Phase 4-6, Forge, Model Manager, and production ASR/Audio/IPC changes remain
    deferred.
 
+The existing loopback review UI remains in the product history and working tree.
+It may assist the maintainer but is not a freeze gate and is not a cleanup
+candidate. Only confirmed-unused audit/policy/export code may be considered for
+a later independent cleanup commit.
+
 ---
 
 ### Task 1: Add the lightweight transcript-record and freeze core
@@ -63,7 +68,7 @@ in this plan.
 - `FinalTranscriptRecord` has exact keys `{ schemaVersion: 1, candidateId, bindingSha256, transcriptText, transcriptSha256, transcriptLength, humanConfirmed: true, reviewerAlias, confirmedAt, recordSha256 }`.
 - `datasetSha256` is SHA-256 of canonical JSON `{ manifestSha256, samples: [{ id, audioSha256, transcriptSha256 }] }` in manifest sample order.
 
-- [ ] **Step 1: Write failing record-validation tests**
+- [x] **Step 1: Write failing record-validation tests**
 
   Use a synthetic PCM candidate and assert that empty text, more than 4,096
   Unicode code points, false/missing `humanConfirmed`, a different candidate or
@@ -71,7 +76,7 @@ in this plan.
   wrong record self-hash are rejected. Assert that a valid record round-trips
   without normalization changing the human text.
 
-- [ ] **Step 2: Run the record tests and confirm RED**
+- [x] **Step 2: Run the record tests and confirm RED**
 
   Run:
 
@@ -81,7 +86,7 @@ in this plan.
 
   Expected: FAIL because `benchmark/lib/benchmark-dataset-freeze.js` does not exist.
 
-- [ ] **Step 3: Implement the minimal record functions**
+- [x] **Step 3: Implement the minimal record functions**
 
   Reuse `canonicalJson`, `sha256Text`, and binding reads. Write one create-new
   JSON record below `<reviewRoot>/final-transcripts/<candidateId>/<bindingSha256>.json`.
@@ -89,7 +94,7 @@ in this plan.
   Use basic contained relative paths and SHA-256 checks; do not add role state,
   approval transitions, audit authorization, or adversarial filesystem hooks.
 
-- [ ] **Step 4: Write failing freeze tests**
+- [x] **Step 4: Write failing freeze tests**
 
   Build three synthetic reviewed candidates. Assert sorted deterministic
   samples, production manifest-validator compatibility, copied audio hash and
@@ -99,7 +104,7 @@ in this plan.
   refusal to overwrite an existing dataset version. Provide a test-only
   `minimumSamples: 1` option that is rejected unless `testMode: true`.
 
-- [ ] **Step 5: Implement the minimal freeze path**
+- [x] **Step 5: Implement the minimal freeze path**
 
   Validate all inputs before publishing. Copy selected audio into a new staging
   directory using stable `audio/<candidateId>.wav` names, write canonical
@@ -109,7 +114,7 @@ in this plan.
   no audit chain, approval policy, junction attack simulation, or multi-stage
   malicious-swap defense is required.
 
-- [ ] **Step 6: Run focused and regression tests**
+- [x] **Step 6: Run focused and regression tests**
 
   Run:
 
@@ -119,7 +124,7 @@ in this plan.
 
   Expected: PASS; synthetic output validates and duplicate publication fails.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
   ```powershell
   git add benchmark/lib/benchmark-dataset-freeze.js test/benchmark-dataset-freeze.test.js
@@ -147,14 +152,14 @@ in this plan.
   `--freeze-root`, and either repeated `--candidate-id` or `--candidate-file`.
 - External commands require `ASSISTED_REVIEW_ALLOW_EXTERNAL=1`.
 
-- [ ] **Step 1: Write failing CLI parser and dispatch tests**
+- [x] **Step 1: Write failing CLI parser and dispatch tests**
 
   Assert duplicate/unknown flags, missing opt-in, missing files, absolute
   evidence paths, invalid sample limit, repository-root freeze output, and an
   existing output version fail. Inject fake record/freeze functions and assert
   that transcript file content is passed without appearing in logs or errors.
 
-- [ ] **Step 2: Run the CLI tests and confirm RED**
+- [x] **Step 2: Run the CLI tests and confirm RED**
 
   ```powershell
   node --test test/internal-benchmark-dataset-cli.test.js
@@ -162,7 +167,7 @@ in this plan.
 
   Expected: FAIL because the script does not exist.
 
-- [ ] **Step 3: Implement the focused CLI**
+- [x] **Step 3: Implement the focused CLI**
 
   Dispatch only to intake validation, final-transcript record, status summary,
   and lightweight freeze functions. Do not expose `approve-policy`, role
@@ -170,14 +175,14 @@ in this plan.
   existing prediction script separate and document how its three outputs assist
   human review.
 
-- [ ] **Step 4: Document the operator flow and package checks**
+- [x] **Step 4: Document the operator flow and package checks**
 
   Document the external roots, FLEURS source/license record, model-lock path,
   transcript-file workflow, the one-human confirmation boundary, freeze output,
   and the fact that old security/UI modules are optional. Add every new tracked
   JavaScript file to `npm run check`; do not make `npm test` read external roots.
 
-- [ ] **Step 5: Run complete synthetic verification**
+- [x] **Step 5: Run complete synthetic verification**
 
   ```powershell
   npm test
@@ -187,7 +192,7 @@ in this plan.
 
   Expected: PASS with no external corpus/model access during the normal suite.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
   ```powershell
   git add benchmark/scripts/internal-benchmark-dataset.js test/internal-benchmark-dataset-cli.test.js benchmark/datasets/INTERNAL_BENCHMARK.md benchmark/datasets/README.md docs/development.md package.json
@@ -208,7 +213,7 @@ in this plan.
   pairwise disagreement, medoid suggestion, and risk. It has empty
   `finalTranscript` and `humanConfirmed` fields until a person acts.
 
-- [ ] **Step 1: Run intake validation without inference**
+- [x] **Step 1: Run intake validation without inference**
 
   ```powershell
   $env:ASSISTED_REVIEW_ALLOW_EXTERNAL = '1'

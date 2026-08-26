@@ -26,10 +26,10 @@ who already has local filesystem access.
 
 The previously implemented binding, prediction evidence, heuristics, review
 state, audit, loopback UI, and high-trust exporter remain in the repository.
-They may be reused when they reduce work, but they are optional capabilities
-and must not block BM-01 or the model comparison. No further hardening,
-expansion, or maintenance is required solely to satisfy their old threat
-model.
+The loopback UI is explicitly retained and may assist human review, but it does
+not block BM-01 or the model comparison. Other historical capabilities may be
+reused when they reduce work; no further hardening or expansion is required
+solely to satisfy the old threat model.
 
 ## 3. Hard gates
 

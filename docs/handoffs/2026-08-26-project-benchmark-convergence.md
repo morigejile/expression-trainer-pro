@@ -3,7 +3,7 @@
 > 日期：2026-08-26
 > 用途：新会话先对整个项目和当前 Phase 2 benchmark 做彻底盘点、去重和收敛，再决定是否继续实现
 > 当前权威工作分支：`codex/benchmark/bm01-dataset`
-> 当前 HEAD：`8c96cf187e1c811a426bf62dd30739bb9b4526d4`
+> 收敛范围基线：`8c96cf187e1c811a426bf62dd30739bb9b4526d4`；当前操作 HEAD 以 `git rev-parse HEAD` 为准
 > 基础主线：`main` / `94e192d73c04ec36d5c4ad016e8e5daf1dc4670d`
 
 ## 1. 新会话的第一原则
@@ -82,7 +82,7 @@
 | 工作线 | Worktree | HEAD | 工作树 | 状态 |
 |---|---|---|---|---|
 | 主线 | `D:\Codex_projects\expression-trainer-pro` | `94e192d` | 有用户改动 | Phase 0/1 已进入主线；禁止直接实施 |
-| BM-01 | `D:\Codex_projects\expression-trainer-pro-bm01` | `8c96cf1` | clean | 当前范围和数据集主线；BM-01 仍 In Progress |
+| BM-01 | `D:\Codex_projects\expression-trainer-pro-bm01` | `8c96cf1` 及后继提交 | clean（提交后） | 当前范围和数据集主线；轻量工具代码完成，BM-01 业务仍 In Progress |
 | BM-02 | `D:\Codex_projects\expression-trainer-pro-bm02` | `4113b9d` | clean | harness 代码完成，业务验收等待冻结数据集 |
 | BM-03 | `D:\Codex_projects\expression-trainer-pro-bm03` | `665d4c6` | clean | probe/fixture 完成，真实设备证据部分完成；不阻塞选型 |
 | 模型准备 | `D:\Codex_projects\expression-trainer-pro-model-prep` | `3d42a70` | clean | 三候选 registry/hash/native load 准备完成 |
@@ -110,6 +110,10 @@
   exporter。安全加固停止在 `567d548`，代码和测试全部保留。
 - 内部 benchmark 范围重定向：设计、Implementation Plan 和 Roadmap 提交
   `8c96cf1`。
+- 轻量终稿记录、正式强制全部 100 条的 create-new 冻结 core、
+  `validate-intake`/`record-transcript`/`review-status`/`freeze` CLI、操作文档与
+  合成回归测试已由 `e287dad` 完成。真实 intake 已只读校验 100/100、0 失败；
+  这不等于人工 transcript 或正式冻结完成。
 
 ### 5.3 BM-02 分支已完成到代码层
 
@@ -121,7 +125,7 @@
 - fake adapter、CLI、dry-run、防误覆盖和原子发布。
 - synthetic fixture 重复性与故障注入验证。
 
-注意：BM-02 作为 Roadmap 事项仍是 In Progress，因为尚未用冻结的 50～100
+注意：BM-02 作为 Roadmap 事项仍是 In Progress，因为尚未用冻结的全部 100
 条真实数据和三个实际候选完成验收。
 
 ### 5.4 BM-03 已完成到部分证据层
@@ -152,8 +156,11 @@
 - 总时长：`1,201,680 ms`
 - source locale：`cmn_hans_cn`；manifest locale：`zh-CN`
 - source revision：`gcs-generation-1650974174867084`
-- 三个本地模型均已完成 runtime-file hash 与 native load；完整 hash 见模型
-  准备分支的 `docs/benchmark/model-inventory.md`。
+- 三个本地模型当前均存在并完成 runtime-file hash 与 native load。Zipformer
+  于 2026-08-26 从官方归档恢复，archive SHA-256 为
+  `b3b309f7ce4a737195fcc6963ea19b0653a7d3401580af5ae0d3e284cbb71f0b`，
+  三个 runtime 文件总计 `26,610,886` bytes，本次 native init 成功。完整既有
+  hash 见模型准备分支的 `docs/benchmark/model-inventory.md`。
 
 外部资产不是 Git 提交内容。新会话先只读核对存在性和 hash，不重新下载，
 除非验证失败或维护者明确要求。
@@ -195,11 +202,11 @@
 
 ```text
 项目/文档/分支收敛审计
-  -> 轻量 transcript record + dataset freeze core
-  -> 聚焦 CLI 与操作文档
-  -> 校验 100 条 intake
+  -> 轻量 transcript record + dataset freeze core（代码完成）
+  -> 聚焦 CLI 与操作文档（代码完成）
+  -> 校验 100 条 intake（100/100 完成）
   -> 三模型真实辅助预测 + review pack
-  -> 一名人工听音并确认 50～100 条最终 transcript
+  -> 一名人工听音并确认全部 100 条最终 transcript
   -> 冻结数据集并二次校验
   -> BM-02 真实数据 dry-run + 三候选 adapter 接入
   -> D-01 预先冻结模型选择权重/最低门槛
@@ -211,11 +218,11 @@
 
 1. **收敛审计**：确定当前文档的 canonical 版本、过期计划处理方式、四分支
    集成顺序和冲突；在批准前不 merge。
-2. **BM-01 轻量冻结实现**：新增终稿 record、freeze core、focused CLI 和
-   synthetic tests；不得依赖旧 Task 5～7 审核授权。
+2. **BM-01 轻量冻结实现**：Completed at code level (`e287dad`)；不得因代码
+   完成把人工 transcript 或正式冻结标为完成。
 3. **外部 dry-run**：验证 100 条当前音频绑定和 intake 完整性。
 4. **真实辅助预测**：对 100 条运行三个本地模型，保留每个模型/样本失败。
-5. **人工最小工作**：一人逐条听音并最终确认 50～100 条；Codex 可排序、
+5. **人工最小工作**：一人逐条听音并最终确认全部 100 条；Codex 可排序、
    预填、批处理和校验，但不能伪造“已听音确认”。
 6. **冻结 BM-01**：create-new 数据集、manifest/source/license/audio hash、
    dataset digest、freeze report 和独立二次验证。
@@ -246,8 +253,8 @@
 
 | 分支 | `node --test --test-reporter=dot` | `npm run check` |
 |---|---:|---:|
-| BM-01 `8c96cf1` | 135 tests，exit 0 | exit 0 |
-| BM-02 `4113b9d` | 82 tests，exit 0 | exit 0 |
+| BM-01 `e287dad` | 143 tests（140 pass / 3 capability skip），exit 0 | exit 0 |
+| BM-02 `4113b9d` | 102 tests，exit 0 | exit 0 |
 | BM-03 `665d4c6` | 72 tests，exit 0 | exit 0 |
 | 模型准备 `3d42a70` | 67 tests，exit 0 | exit 0 |
 
@@ -265,7 +272,7 @@ BM-01/BM-02/BM-04～06 已业务完成。
   新实现必须旁路依赖，而不是先删除旧代码或继续加固。
 - 四个分支都从不同提交演进，直接互相 merge 可能带入旧 Roadmap、重复
   Contract Gate 或 package/check 冲突。
-- 目前没有 50～100 条 human-confirmed transcript、没有冻结真人 manifest、
+- 目前没有 100 条 human-confirmed transcript、没有冻结真人 manifest、
   没有正式三模型结果、没有 D-01 权重、没有赢家。
 - FLEURS 当前只观察到普通话，分层覆盖不足必须写入局限，但不再为了完美
   分层无限扩充语料来源。
@@ -280,8 +287,9 @@ BM-01/BM-02/BM-04～06 已业务完成。
 - D-01 基本门槛为 failure rate ≤ 5%、RTF ≤ 1；过门槛后 CER 第一，CER
   处于重复运行波动范围内时再比较性能和资源。Streaming UX 单列。License
   不阻塞内部测试，但阻塞 D-02 发布默认模型。
-- BM-01 完整开发历史进入 integration；集成验证后可以独立 cleanup commit
-  删除确认无用的旧 audit/UI/export 工作树内容，历史提交继续保留。
+- BM-01 完整开发历史进入 integration；loopback review UI 继续保留但不作为
+  冻结门禁。集成验证后可以独立 cleanup commit 删除确认无用且无调用方的旧
+  audit/policy/export 工作树内容，历史提交继续保留。
 - BM-03 保留但不阻塞，integration 时最后合入，必要时晚于 D-02。
 - BM-07、Phase 4～6、Forge、Model Manager、生产 ASR/Audio/IPC 重构当前跳过。
 - 长期工程原则：不过度扩散、不过度设计、不过度设计审计审核，减少不必要
@@ -291,7 +299,8 @@ BM-01/BM-02/BM-04～06 已业务完成。
 
 | 现有内容 | 当前处理 | 后续删除条件 |
 |---|---|---|
-| BM-01 dual-role、audit chain、policy、loopback UI、hardened exporter | 保留历史，不修、不扩、不依赖 | integration 验证轻量路径后，确认无调用方即可独立 cleanup |
+| BM-01 loopback review UI | 明确保留；可用于人工听音辅助，但不作为冻结硬门禁 | 不进入当前 cleanup 范围 |
+| BM-01 dual-role、audit chain、policy、hardened exporter | 保留历史，不修、不扩、不依赖 | integration 验证轻量路径后，仅确认无调用方的部分可独立 cleanup |
 | BM-02 多层 publish/lock/sentinel/路径防护 | 保留已经通过的实现，不再增加对抗性门禁 | 若妨碍三候选适配或重复 create-new 保障，再做最小化 |
 | BM-03 设备权限/session/退出治理 | 保留隔离能力，退出当前模型选型门禁 | D-02 后重排产品音频兼容性时再判断复用价值 |
 | Phase 4～6 目标架构 | 只作为 backlog 方向，不提前搭框架 | D-02 后按已选模型和真实瓶颈重新切片 |
@@ -311,8 +320,9 @@ Model Manager、Forge 流程或新的审核系统。
 6. 需要维护者决定的事项；
 7. 明确确认没有 merge/push/PR/实现修改。
 
-维护者批准这份收敛报告后，才进入 BM-01 轻量冻结实现。不要同时启动
-Phase 4、Forge、Model Manager、新模型、新语料源或产品 ASR 重构。
+维护者已批准收敛范围，BM-01 轻量工具已实现。下一停点是三模型 review aid
+与维护者人工听音；不要同时启动 Phase 4、Forge、Model Manager、新模型、
+新语料源或产品 ASR 重构。
 
 ## 12. 可直接粘贴到新会话的指令
 
