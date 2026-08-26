@@ -21,9 +21,9 @@ The validator also verifies that every referenced audio file resolves below the 
 
 ## Storage and governance
 
-Keep participant and public-corpus audio in a controlled dataset root that is not inside this repository. The `private/` directory is intentionally ignored as a local convenience only; do not use it to store consent originals, contact data, or unapproved recordings. Before adding a real sample, confirm authorization, remove personal identifiers, produce a first transcript, obtain a second-person review, compute the SHA-256, and record only the de-identified metadata permitted for Git.
+Keep participant and public-corpus audio in a controlled dataset root that is not inside this repository. The `private/` directory is intentionally ignored as a local convenience only; do not use it to store consent originals, contact data, or unapproved recordings. For the current internal FLEURS benchmark, one maintainer listens to every sample and explicitly confirms the final transcript. Dual roles, second-person approval, audit-chain authorization and `approve-policy` are not completion gates.
 
-`example/` is a public, checked-in 1 kHz synthetic PCM WAV. It contains no human speech and demonstrates the contract without implying that synthetic audio counts toward the 50–100 governed human-recording requirement.
+`example/` is a public, checked-in 1 kHz synthetic PCM WAV. It contains no human speech and demonstrates the contract without implying that synthetic audio counts toward the frozen 100-sample FLEURS requirement.
 
 See [SOURCES.md](SOURCES.md) for the current evidence-backed public-corpus
 acquisition boundary. It records candidate licensing and download constraints;
@@ -37,7 +37,9 @@ candidate inventory from the official FLEURS `cmn_hans_cn` development TSV and
 a separately converted 16-bit PCM audio directory. It emits only relative
 audio paths and SHA-256 metadata, marks every record `upstream-draft` and
 `pending`, and intentionally identifies only the observed `mandarin` stratum.
-It is not a governed manifest and its records do not count toward the BM-01
-50–100 real-human, authorization, and independent-review gates. See
+It is not a frozen manifest and its records do not count until all 100 final
+transcripts have been explicitly confirmed by the maintainer. See
 [SOURCES.md](SOURCES.md) for the exact source revision, licence, checksums, and
 external-only reproduction inputs.
+
+The focused operator flow is documented in [INTERNAL_BENCHMARK.md](INTERNAL_BENCHMARK.md).

@@ -125,7 +125,7 @@ BM-01 的可提交 Corrected Contract Gate（`f06a43bb2819aac07e4ecbd0ebd3fd2757
 | 许可证与再分发观察 | 无许可证样本；`allowed` / `metadata-only` / `prohibited` 均为 `0` |
 | 存储边界 | 原始音频在 Git 外的受控 dataset root；仓库仅保存脱敏 manifest 和报告 |
 
-合成示例只用于验证 WAV、相对路径和 SHA-256 契约，不计入 50–100 条经授权、脱敏、人工双人复核的真实语料完成标准。当前没有此类样本、许可状态或复核证据，BM-01 必须保持 **In Progress**。
+合成示例只用于验证 WAV、相对路径和 SHA-256 契约，不计入正式语料。当前接受现有 100 条 FLEURS `cmn_hans_cn` 候选的普通话覆盖；每条仍需维护者逐条听音并明确确认最终 transcript，随后由轻量 create-new 工具冻结并二次校验。七类覆盖是后期优化，不阻塞首轮；双人审核、audit chain、`approve-policy` 和旧 hardened exporter 不再是 BM-01 完成门禁，因此 BM-01 仍保持 **In Progress** 但不得继续为旧门禁加固。
 
 在受控 dataset root 已获批准且样本已完成治理后，可用下面的独立路径模式生成/复核报告；不要把实际 root 写进文档、Git 或报告：
 
@@ -136,6 +136,8 @@ node benchmark/scripts/generate-quality-report.js
 ```
 
 `MANIFEST_PATH` is the checked-in/de-identified manifest and `DATASET_ROOT` is the separately controlled audio root. Set `DATASET_ROOT` only in the local controlled environment before running the command. The command validates every relative audio reference, canonical root containment, PCM WAV metadata and SHA-256 before printing deterministic coverage, source-boundary, duration and sample-rate evidence.
+
+BM-01 当前只使用 `benchmark/scripts/internal-benchmark-dataset.js` 的四个命令：`validate-intake`、`record-transcript`、`review-status`、`freeze`。完整命令和外部目录布局见 [INTERNAL_BENCHMARK.md](../benchmark/datasets/INTERNAL_BENCHMARK.md)。正式 `freeze` 固定选择 intake 的全部 100 条；在维护者完成逐条听音前只能运行校验和状态查询，不得宣称 BM-01 已冻结。
 
 ## 5. 本阶段验证边界
 
