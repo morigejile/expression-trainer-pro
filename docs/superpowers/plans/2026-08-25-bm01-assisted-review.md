@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Turn 50–100 FLEURS Chinese candidates into a validated, human-confirmed, create-new frozen benchmark dataset without making the earlier high-trust review workflow a dependency.
+**Goal:** Turn all 100 current FLEURS Chinese candidates into a validated, human-confirmed, create-new frozen benchmark dataset without making the earlier high-trust review workflow a dependency.
 
 **Architecture:** Keep the existing assisted-review modules and commits intact, but add a small cooperative-maintainer path for final transcript records and dataset freezing. Reuse stable hashing, PCM parsing, transcript normalization, model-lock, and manifest validation helpers; do not require dual roles, audit-chain authorization, policy approval, or the hardened exporter. External audio, predictions, review records, and frozen datasets remain outside Git.
 
@@ -29,6 +29,21 @@ three-model prediction evidence, heuristics, review audit/state, a loopback UI,
 and a hardened exporter. They remain tested capabilities but are no longer the
 critical path. The interrupted Task 7 security re-review has no completion gate
 in this plan.
+
+## Approved three-stage critical path
+
+1. **BM-01:** implement the lightweight record/freeze core and focused CLI;
+   prepare three-model review aids; pause only for the maintainer to listen to
+   and confirm all 100 transcripts; then freeze and revalidate the dataset.
+2. **BM-02 + D-01:** support only Paraformer, small Zipformer, and
+   SenseVoiceSmall; freeze failure rate <= 5%, RTF <= 1, CER-first selection,
+   performance/resource tie-breaking for close CER, separate Streaming UX, and
+   the D-02 license gate.
+3. **BM-04 through BM-06 + D-02:** run the three candidates serially on one
+   machine and accept the model ADR. BM-03 is retained but nonblocking and is
+   integrated last or after D-02. Larger Zipformer, new models/data, BM-07,
+   Phase 4-6, Forge, Model Manager, and production ASR/Audio/IPC changes remain
+   deferred.
 
 ---
 
@@ -79,8 +94,8 @@ in this plan.
   Build three synthetic reviewed candidates. Assert sorted deterministic
   samples, production manifest-validator compatibility, copied audio hash and
   PCM metadata equality, source/license propagation, manifest and dataset
-  digest stability, explicit omitted-candidate reasons, rejection below 50 or
-  above 100 in formal mode, rejection of stale/missing transcript records, and
+  digest stability, explicit omitted-candidate reasons, rejection unless the
+  formal selection is exactly 100 samples, rejection of stale/missing transcript records, and
   refusal to overwrite an existing dataset version. Provide a test-only
   `minimumSamples: 1` option that is rejected unless `testMode: true`.
 
@@ -232,7 +247,7 @@ in this plan.
   empty-output samples first. Low-risk exact agreements may be reviewed in a
   fast batch, but still require an explicit human confirmation.
 
-- [ ] **Step 2: Record 50–100 human-final transcripts**
+- [ ] **Step 2: Record all 100 human-final transcripts**
 
   For each selected sample, a person listens to the audio, corrects the final
   transcript, and explicitly confirms it. Codex may prepare suggestions,
@@ -254,9 +269,10 @@ in this plan.
 
 - [ ] **Step 1: Freeze a new dataset version**
 
-  Select 50–100 valid human-confirmed candidates and run the create-new freeze
+  Select all 100 valid human-confirmed candidates and run the create-new freeze
   command. Record dataset ID/version, manifest SHA-256, dataset SHA-256, source
-  revision, selected count, omitted count/reasons, duration, and tag coverage.
+  revision, selected count (exactly 100), omitted count/reasons, duration, and
+  the current limited tag coverage.
 
 - [ ] **Step 2: Revalidate from the frozen directory**
 

@@ -35,8 +35,9 @@ model.
 
 ### 3.1 Dataset correctness
 
-- Freeze 50–100 real Chinese speech samples. The current 100 FLEURS
-  `cmn_hans_cn` dev candidates are an acceptable source.
+- Freeze all 100 current FLEURS `cmn_hans_cn` dev candidates. Their current
+  Mandarin-heavy coverage is accepted for the first benchmark; broader strata
+  are a later optimization and do not block this dataset.
 - Each frozen sample has a final transcript explicitly confirmed by a human.
   One human confirmation is sufficient. The reviewer may start from the
   upstream transcript and compare Paraformer, Zipformer, and SenseVoice
@@ -135,8 +136,8 @@ private recordings.
 
 BM-01 is complete when all of the following are true:
 
-1. A frozen set contains 50–100 real Chinese audio samples in the accepted
-   format.
+1. A frozen set contains all 100 current FLEURS Chinese audio samples in the
+   accepted format.
 2. Every frozen sample has one human-confirmed final transcript.
 3. The validator binds every audio file and transcript through the manifest and
    confirms the recorded audio SHA-256 and metadata.
@@ -160,9 +161,10 @@ chain continuity, or use of the loopback UI are not BM-01 completion criteria.
 - BM-04, BM-05, and BM-06 are the formal Paraformer, Zipformer, and
   SenseVoiceSmall runs. They use one BM-02 harness, one frozen BM-01 dataset,
   the same benchmark machine, and serialized execution.
-- D-01 freezes decision weights and minimum thresholds before aggregate
-  candidate results are compared. D-02 records the selected default and the
-  reasons for rejecting the alternatives.
+- D-01 freezes failure rate <= 5% and RTF <= 1 as basic gates. Among candidates
+  that pass, CER is primary; performance and resource use break close CER cases,
+  while streaming UX is reported separately. License does not block internal
+  testing but is a hard D-02 gate for a release default.
 
 ## 8. Requirements removed or downgraded
 
@@ -183,7 +185,7 @@ multi-gigabyte corpus. External verification is explicit and ordered:
 
 1. Validate all 100 intake candidates without native inference.
 2. Run three-model suggestions and retain explicit failures.
-3. Complete human final transcript confirmation for 50–100 candidates.
+3. Complete human final transcript confirmation for all 100 candidates.
 4. Freeze and revalidate the dataset.
 5. Run the BM-02 dry-run, then serialized formal model runs.
 
