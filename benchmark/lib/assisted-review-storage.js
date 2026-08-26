@@ -92,7 +92,20 @@ function readStableFile(filePath, root, { maxBytes = Number.MAX_SAFE_INTEGER } =
     const canonical = fs.realpathSync.native(filePath);
     const canonicalStat = fs.statSync(canonical);
     if (!isInside(root, canonical) || canonical !== filePath || !sameFileIdentity(before, canonicalStat)) throw new Error('audioFile changed while opening');
-    const bytes = fs.readFileSync(descriptor);
+    let bytes;
+    if (maxBytes !== Number.MAX_SAFE_INTEGER) {
+      bytes = Buffer.allocUnsafe(before.size);
+      let offset = 0;
+      while (offset < bytes.length) {
+        const count = fs.readSync(descriptor, bytes, offset, bytes.length - offset, offset);
+        if (count === 0) throw new Error('audioFile changed while reading');
+        offset += count;
+      }
+      const probe = Buffer.allocUnsafe(1);
+      if (fs.readSync(descriptor, probe, 0, 1, before.size) !== 0) throw new Error('audioFile exceeds maximum size');
+    } else {
+      bytes = fs.readFileSync(descriptor);
+    }
     const after = fs.fstatSync(descriptor);
     if (!sameFileIdentity(before, after) || before.size !== after.size) throw new Error('audioFile changed while reading');
     const finalCanonical = fs.realpathSync.native(filePath);

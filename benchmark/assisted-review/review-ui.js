@@ -43,7 +43,8 @@
     const suggestions = documentRef.getElementById('suggestions'); suggestions.replaceChildren();
     for (const suggestion of Array.isArray(candidate.suggestions && candidate.suggestions.suggestions) ? candidate.suggestions.suggestions : []) {
       const status = suggestion.humanOnly ? 'human-only' : suggestion.result ? 'suggested' : 'not suggested';
-      const policy = suggestion.exportEvidenceEligible && candidate.policyApproved ? 'approved' : 'unapproved';
+      const numeric = ['fast', 'slow', 'light-noise'].includes(suggestion.tag);
+      const policy = numeric ? (candidate.numericPolicyApproved ? 'approved' : 'unapproved') : 'policy-not-required';
       appendTextItem(suggestions, `${suggestion.tag || ''}: ${status} (${policy})`, documentRef);
     }
     const warnings = documentRef.getElementById('pii-warnings'); warnings.replaceChildren();

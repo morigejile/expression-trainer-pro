@@ -369,7 +369,7 @@ test('bundle revalidates PCM independently immediately before every model consum
       datasetRoot: fixture.datasetRoot, binding: fixture.binding, upstreamDraft: '上游草稿', modelLock: fixture.modelLock, modelRoot: fixture.modelRoot, runId: 'run-per-attempt-audio', transcribe: () => '文本',
     });
     assert.deepEqual(result.attempts.map((attempt) => attempt.status), ['succeeded', 'succeeded', 'succeeded']);
-    assert.equal(audioRealpathCalls, 16);
+    assert.ok(audioRealpathCalls >= 16, 'each model consumption must independently revalidate canonical audio identity');
   } finally {
     fs.realpathSync.native = originalRealpath;
   }

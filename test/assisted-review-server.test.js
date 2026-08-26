@@ -172,15 +172,15 @@ test('rejects a symlinked audio path that escapes the external dataset root wher
 
 test('fails closed if the audio path is swapped after opening', async (t) => {
   const instance = await makeServer(t); const session = await login(instance); const audioPath = path.join(instance.root, 'audio.wav');
-  const originalRead = fs.readFileSync; let swapped = false;
-  fs.readFileSync = function patchedRead(target, ...args) {
+  const originalRead = fs.readSync; let swapped = false;
+  fs.readSync = function patchedRead(target, ...args) {
     if (!swapped && typeof target === 'number') { swapped = true; fs.renameSync(audioPath, path.join(instance.root, 'prior.wav')); fs.writeFileSync(audioPath, wav({ sampleRateHz: 8000 })); }
     return originalRead.call(this, target, ...args);
   };
   try {
     const response = await request({ port: session.port, pathname: `/api/candidates/${CANDIDATE_ID}/audio`, headers: { Host: host(session.port), Cookie: session.cookie } });
     assert.notEqual(response.status, 200); assert.equal(response.body.equals(instance.audio), false); securityHeaders(response);
-  } finally { fs.readFileSync = originalRead; }
+  } finally { fs.readSync = originalRead; }
 });
 
 test('requires exact mutation authority and derives primary transcript evidence on the server', async (t) => {
@@ -299,6 +299,6 @@ test('showCandidate renders hostile actual-shaped evidence only through fixed te
   const nodes = new Map(); const makeNode = () => ({ textContent: '', value: '', hidden: false, required: false, options: [{ value: 'record-primary-transcript' }, { value: 'approve-secondary-transcript' }], replaceChildren() { this.items = []; }, append(item) { (this.items ||= []).push(item.textContent); }, set innerHTML(_value) { throw new Error('unsafe HTML sink'); } });
   for (const id of ['candidate-id', 'upstream-transcript', 'primary-transcript', 'comparison-risk', 'approval-state', 'review-audio', 'predictions', 'suggestions', 'pii-warnings', 'expected-revision', 'action-input', 'transcript-input', 'tags-input', 'light-accent-rationale']) nodes.set(id, makeNode());
   const documentRef = { getElementById(id) { return nodes.get(id); }, createElement() { return makeNode(); } };
-  showCandidate({ candidateId: 'safe-id', transcript: '<img>', primaryTranscriptText: '<script>', predictions: [{ rawText: '<b>' }], comparison: { risk: '<risk>' }, suggestions: { suggestions: [{ tag: 'fast', result: true, exportEvidenceEligible: true }, { tag: 'light-accent', result: null, humanOnly: true }], piiWarnings: [{ ruleId: '<warning>' }] }, policyApproved: true, allowedActions: ['record-primary-transcript'], state: { revision: 9, note: '<state>' } }, documentRef);
-  assert.equal(nodes.get('upstream-transcript').textContent, '<img>'); assert.equal(nodes.get('comparison-risk').textContent, '<risk>'); assert.match(nodes.get('suggestions').items[0], /fast: suggested \(approved\)/); assert.match(nodes.get('suggestions').items[1], /light-accent: human-only/); assert.equal(nodes.get('pii-warnings').items[0], '<warning>'); assert.equal(nodes.get('expected-revision').value, '9'); assert.equal(nodes.get('review-audio').src, '/api/candidates/safe-id/audio');
+  showCandidate({ candidateId: 'safe-id', transcript: '<img>', primaryTranscriptText: '<script>', predictions: [{ rawText: '<b>' }], comparison: { risk: '<risk>' }, suggestions: { suggestions: [{ tag: 'fast', result: true, exportEvidenceEligible: false }, { tag: 'light-accent', result: null, humanOnly: true }], piiWarnings: [{ ruleId: '<warning>' }] }, numericPolicyApproved: true, allowedActions: ['record-primary-transcript'], state: { revision: 9, note: '<state>' } }, documentRef);
+  assert.equal(nodes.get('upstream-transcript').textContent, '<img>'); assert.equal(nodes.get('comparison-risk').textContent, '<risk>'); assert.match(nodes.get('suggestions').items[0], /fast: suggested \(approved\)/); assert.match(nodes.get('suggestions').items[1], /light-accent: human-only \(policy-not-required\)/); assert.equal(nodes.get('pii-warnings').items[0], '<warning>'); assert.equal(nodes.get('expected-revision').value, '9'); assert.equal(nodes.get('review-audio').src, '/api/candidates/safe-id/audio');
 });

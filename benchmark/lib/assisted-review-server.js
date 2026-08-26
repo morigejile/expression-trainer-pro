@@ -143,7 +143,7 @@ function createReviewServer({ datasetRoot, reviewStore, tokenBytes = crypto.rand
     if (state.status === 'unreviewed' && identity.role === 'primary') allowedActions = ['record-primary-transcript'];
     else if (state.status === 'primary-transcript-recorded' && identity.role === 'secondary') allowedActions = ['approve-secondary-transcript'];
     else if (state.status === 'secondary-approved') allowedActions = Object.keys(complete).filter((action) => !complete[action]);
-    return { ...candidate, sessionRole: identity.role, allowedActions, policyApproved: Boolean(candidate.policyApproval) };
+    return { ...candidate, sessionRole: identity.role, allowedActions, numericPolicyApproved: candidate.numericPolicyApproved === true };
   }
 
   const server = http.createServer(async (request, response) => { try {
