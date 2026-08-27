@@ -18,7 +18,9 @@
 
 三款候选都通过失败率与 RTF 门槛。按冻结规则，SenseVoiceSmall 是本次简单比较的准确率领先者；只看具备 partial 的在线候选时，Paraformer 的 CER 优于 small Zipformer。SenseVoiceSmall 没有流式 partial，且本次 P95 RSS 最高。
 
-这项结果只完成当前候选模型比较。候选注册表仍将三款模型的 redistribution 标为 `not-approved`，本轮也没有测量生产 Audio/IPC/UI 或真实时间流式体验，因此不据此修改生产默认模型，ADR-0005 保持 Proposed。
+这项结果完成当前候选模型比较。SenseVoiceSmall 的准确率领先、small Zipformer 的体积/partial 延迟优势和 Paraformer 的 streaming CER 结果全部保留，供后续优化迭代复用。维护者随后在 ADR-0005 中明确保留 Paraformer 作为产品默认：它维持现有 streaming partial 交互，并避免在渐进重构入口同时更换模型和交互；这项产品选择不改变上述 benchmark 排名。
+
+候选注册表仍将三款模型的 redistribution 标为 `not-approved`。本轮也没有测量生产 Audio/IPC/UI 或真实时间流式体验；在打包或分发任何模型前仍需独立完成许可证门禁。
 
 ## 原始结果
 
@@ -29,3 +31,5 @@
 - `2026-08-27T09-48-17-143Z-sensevoice-small-int8-2024-07-17`
 
 每个目录均包含 `samples.jsonl`、`summary.json`、`summary.csv`、`environment.json` 和空的 `failures.jsonl`。独立核对确认每组均有 100 条、顺序与冻结 manifest 一致、全部 `passed`，重算 corpus CER 与 `summary.json` 一致。
+
+这些目录是后续优化的对照基线，不得被新的 run 覆盖或删除；重跑必须写入新的 run ID。

@@ -1,6 +1,6 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 Smoke；BM-02 三候选简单比较 Completed，ADR-0005 仍为 Proposed
+> 状态：Verified from Source + Electron 43 Smoke；BM-02 三候选简单比较 Completed，ADR-0005 Accepted（保留 Paraformer 默认）
 > 基线日期：2026-08-23
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
 > 描述对象：截至 Phase 1 / T-08 状态；基于 T-04～T-07 集成提交 `33a6ee59c321f613d66357bff4ead09835387010` 的受控升级
@@ -73,7 +73,7 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 
 ### 3.1 BM-02 harness（Completed）
 
-BM-02 提供独立 benchmark CLI，用 BM-01 manifest 输出每个 sample/repetition 的 JSONL、汇总 JSON/CSV、环境快照及 tag 分层统计；失败的 init、sample、timeout 和 dispose 事件也会被落盘。它不改动生产 `lib/asr.js`、Audio、IPC、Main 或默认模型，且没有新增依赖。fake adapter 的重复运行和故障注入证据见 `benchmark/results/fixtures/reproducibility-report.md`。2026-08-27，harness 在 clean commit `703f1630ba2bbcfcb98c914bc67c95e0b120ddc1` 上完成 Paraformer、small Zipformer 与 SenseVoiceSmall 各一轮 100 条比较，全部 0 失败；结果见 `docs/benchmark/bm02-comparison-2026-08-27.md`。该比较不覆盖生产实时流式 UX 或许可证可交付性，因此 ADR-0005 仍为 Proposed。
+BM-02 提供独立 benchmark CLI，用 BM-01 manifest 输出每个 sample/repetition 的 JSONL、汇总 JSON/CSV、环境快照及 tag 分层统计；失败的 init、sample、timeout 和 dispose 事件也会被落盘。它不改动生产 `lib/asr.js`、Audio、IPC、Main 或默认模型，且没有新增依赖。fake adapter 的重复运行和故障注入证据见 `benchmark/results/fixtures/reproducibility-report.md`。2026-08-27，harness 在 clean commit `703f1630ba2bbcfcb98c914bc67c95e0b120ddc1` 上完成 Paraformer、small Zipformer 与 SenseVoiceSmall 各一轮 100 条比较，全部 0 失败；结果见 `docs/benchmark/bm02-comparison-2026-08-27.md`。维护者接受 ADR-0005 并保留现有 Paraformer 默认，因此生产代码无需切换；模型再分发许可仍是后续发布门禁。
 
 ## 4. C4 Level 2：当前容器/运行边界
 

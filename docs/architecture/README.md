@@ -58,7 +58,7 @@ flowchart LR
 
 - **总体复杂度优先**：不为减少 Electron 体积而默认引入 Rust/C++/FFI 或第二套 UI 技术栈。
 - **必要边界，不造框架**：Provider 是小型契约，不是依赖注入容器；Model Manager 是清单 + 文件操作，不是模型平台。
-- **事实先于结论**：Zipformer 与 SenseVoiceSmall 的默认模型地位由项目 benchmark 决定。
+- **事实先于结论**：候选 benchmark 结果与产品默认决策分别记录；当前 ADR-0005 保留 Paraformer 默认。
 - **渐进迁移**：先包住现有行为，再替换内部实现；每一步都应保持可运行和可回退。
 - **用户零开发依赖**：开发者可使用 Node/npm/Forge，最终用户不安装 Node、Python 或编译工具链。
 - **当前即事实**：代码变化应同步更新 `current.md`；未来意图只写入 `target.md` 或 Proposed ADR。
@@ -103,7 +103,7 @@ Preload 最小桥接 → Main（窗口/设置/生命周期/模型协调）
 | [0002](adr/0002-retain-sherpa-onnx.md) | Accepted | 保留 Sherpa-ONNX 作为默认 ASR 引擎 |
 | [0003](adr/0003-separate-audio-and-asr.md) | Proposed | 分离 Audio 与 ASR，使用轻量契约 |
 | [0004](adr/0004-manage-models-separately.md) | Proposed | 模型与应用解耦并校验安装 |
-| [0005](adr/0005-select-default-asr-model-by-benchmark.md) | Proposed | benchmark 后选择 Zipformer 或 SenseVoiceSmall |
+| [0005](adr/0005-select-default-asr-model-by-benchmark.md) | Accepted | 保留 Paraformer 默认，候选结果作为后续优化基线 |
 | [0006](adr/0006-move-asr-out-of-main.md) | Proposed | ASR 移出 Main |
 | [0007](adr/0007-package-with-electron-forge.md) | Proposed | 使用 Electron Forge 打包发布 |
 

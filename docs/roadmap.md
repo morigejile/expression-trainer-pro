@@ -111,7 +111,7 @@ flowchart LR
 |---|---|---|---|
 | BM-01 | Completed | Codex + maintainer | 外部冻结集 `expression-zh-fleurs/v1`：100 条 / 1,201,680 ms，manifest SHA-256 `600bf66fe11273e0c34b5f8859f7a59efce6eddf607cf5fa13ad186cb0469593`，dataset SHA-256 `c7e67435634355d983cabe349f40ad94c116d06c45d00e3166d73dada4c33067`；100 条 transcript 均由 maintainer 人工核查确认。 |
 | BM-02 | Completed | Codex + maintainer | Commit `703f1630ba2bbcfcb98c914bc67c95e0b120ddc1` 接入三个已冻结候选；三次 clean-worktree 独立进程运行各含 100 条结果、0 失败，完整环境与模型指纹在仓库外结果目录。简表及原始目录见 `docs/benchmark/bm02-comparison-2026-08-27.md`。 |
-| BM-04～BM-06 | Completed（当前简单比较范围） | Codex + maintainer | Paraformer、small Zipformer、SenseVoiceSmall 均完成单轮 100 条；本轮不测生产 Audio/IPC/UI 或真实时间流式 UX，不把结果扩张为 D-02 生产默认决定。 |
+| BM-04～BM-06 | Completed（当前简单比较范围） | Codex + maintainer | Paraformer、small Zipformer、SenseVoiceSmall 均完成单轮 100 条；结果作为 D-02 证据保留，但不测生产 Audio/IPC/UI 或真实时间流式 UX。 |
 
 > FunASR-Nano、Whisper、WASM 可作为研究参考，但不阻塞首轮决策，也不进入默认运行依赖。
 
@@ -127,7 +127,7 @@ flowchart LR
 | ID | 状态 | 证据 |
 |---|---|---|
 | D-01 | Completed | 当前简单比较规则在运行前确认：失败率 ≤5%、平均 RTF ≤1；过门槛后以 corpus CER 为主，只有 CER 接近时才比较性能/资源。三候选均过门槛，SenseVoiceSmall corpus CER 最低。 |
-| D-02 | Proposed | SenseVoiceSmall 是当前 benchmark 准确率领先者，但三款候选的 redistribution 仍为 `not-approved`，且本轮不覆盖生产实时流式 UX；不修改生产默认模型。 |
+| D-02 | Completed / Accepted | 维护者选择保留 Paraformer 为默认模型：它维持现有 streaming partial 交互，且在 streaming 候选中 CER 更低；不需要生产代码切换。SenseVoiceSmall 的准确率领先与 Zipformer 的体积/延迟优势继续保留为优化基线。Paraformer redistribution 仍为 `not-approved`，在发布模型前单独处理。 |
 | D-03 | P0 | 接受执行边界 ADR | 基于 BM-07 接受 ADR-0006，明确消息协议、故障恢复和打包方式 | BM-07 | utility/child/worker 选择有数据 |
 | D-04 | P1 | 复审目标架构 | 用已接受的模型/执行机制更新 `target.md`、NFR 性能门槛和支持矩阵 | D-02,D-03 | 目标中不再保留可由实测解决的 TBD |
 
@@ -142,7 +142,7 @@ flowchart LR
 | R-05 | P0 | 改音频传输与背压 | 传 TypedArray/transferable buffer，避免 Array.from；使用 MessagePort/已选通道和有界队列，记录 dropped/backpressure | R-04,D-03 | profile 证明队列不无限增长，序列连续性可观测 |
 | R-06 | P0 | ASR 移出 Main | 按 ADR-0006 实现独立执行单元；Main 只管理生命周期、路由和退出 | R-01,R-02,R-05 | 强制退出可恢复；Main/UI 响应门槛通过 |
 | R-07 | P1 | 实现轻量 Model Manager | 版本化 registry、HTTPS、SHA-256、临时下载/解压、原子激活、上一版本回退；模型存 userData 子目录 | D-02,R-01 | 中断/hash 错/磁盘不足不破坏现有模型 |
-| R-08 | P1 | 切换默认模型 | 用 registry 配置新模型，保留当前 Paraformer 为受控回退/迁移路径；不把多模型复杂度暴露给普通用户 | R-06,R-07,D-02 | 端到端结果与 benchmark 版本一致 |
+| R-08 | P1 | 激活版本化默认模型 | 用 registry 激活已接受的 Paraformer 版本；不增加普通用户多模型选择，也不做无意义的模型切换 | R-06,R-07,D-02 | 端到端模型文件/config 与 ADR-0005 一致 |
 | R-09 | P1 | 收敛设置/规则/日志 | 演进 schemaVersion、增加原子写和脱敏日志；评估系统凭据库的收益与 native 成本后再决定 Key 存储 | T-03,R-07 | 升级保留配置；日志不含 Key/完整敏感文本 |
 
 ### Phase 5 — Electron Forge 打包与发布
