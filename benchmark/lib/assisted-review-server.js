@@ -8,7 +8,7 @@ const { parsePcmWav, validateGovernedPcmMetadata } = require('./dataset-manifest
 const { canonicalizeExternalRoot, readStableFile, resolveContained } = require('./assisted-review-storage');
 const { validateAlias } = require('./assisted-review-audit');
 
-const SESSION_MAX_AGE_SECONDS = 300;
+const SESSION_MAX_AGE_SECONDS = 1200;
 const MAX_BODY_BYTES = 16 * 1024;
 const MAX_TRANSCRIPT_CODE_POINTS = 4096;
 const MAX_AUDIO_BYTES = (192000 * 2 * 2 * 600) + 44;
@@ -133,6 +133,15 @@ function createReviewServer({ datasetRoot, reviewStore, tokenBytes = crypto.rand
     return session;
   }
 
+  function renewSession(request, response) {
+    const sessionId = parseCookie(request.headers.cookie);
+    const session = currentSession(request);
+    if (!session) return null;
+    session.expiresAt = Date.now() + (SESSION_MAX_AGE_SECONDS * 1000);
+    response.setHeader('Set-Cookie', `review_session=${sessionId}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_MAX_AGE_SECONDS}`);
+    return session;
+  }
+
   function candidateFromPath(url, suffix = '') {
     const prefix = '/api/candidates/';
     if (!url.pathname.startsWith(prefix) || !url.pathname.endsWith(suffix)) return null;
@@ -171,12 +180,12 @@ function createReviewServer({ datasetRoot, reviewStore, tokenBytes = crypto.rand
       return writeResponse(response, 302, '', { Location: '/review', 'Set-Cookie': `review_session=${sessionId}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_MAX_AGE_SECONDS}` });
     }
     if (request.method === 'GET' && url.pathname === '/review') {
-      const session = currentSession(request);
+      const session = renewSession(request, response);
       if (!session) return writeError(response, 403);
       return writeResponse(response, 200, renderReviewPage(session.csrf), { 'Content-Type': 'text/html; charset=utf-8' });
     }
     if (request.method === 'GET' && url.pathname === '/review-ui.js') {
-      const session = currentSession(request);
+      const session = renewSession(request, response);
       if (!session) return writeError(response, 403);
       const script = fs.readFileSync(path.join(__dirname, '..', 'assisted-review', 'review-ui.js'), 'utf8');
       return writeResponse(response, 200, script, { 'Content-Type': 'application/javascript; charset=utf-8' });
@@ -184,19 +193,19 @@ function createReviewServer({ datasetRoot, reviewStore, tokenBytes = crypto.rand
     if (request.method === 'GET' && url.pathname === '/api/review-status') {
       if (!singleWorkflow) return writeError(response, 404);
       if (url.search) return writeError(response, 404);
-      if (!currentSession(request)) return writeError(response, 403);
+      if (!renewSession(request, response)) return writeError(response, 403);
       return writeResponse(response, 200, JSON.stringify(reviewStore.getSummary()), { 'Content-Type': 'application/json; charset=utf-8' });
     }
     if (request.method === 'GET' && candidateId) {
       if (url.search) return writeError(response, 404);
-      if (!currentSession(request)) return writeError(response, 403);
+      if (!renewSession(request, response)) return writeError(response, 403);
       const candidate = reviewStore.getCandidate(candidateId);
       if (!candidate) return writeError(response, 404);
       return writeResponse(response, 200, JSON.stringify(reviewView(candidate)), { 'Content-Type': 'application/json; charset=utf-8' });
     }
     if (request.method === 'GET' && audioId) {
       if (url.search) return writeError(response, 404);
-      if (!currentSession(request)) return writeError(response, 403);
+      if (!renewSession(request, response)) return writeError(response, 403);
       try {
         const candidate = reviewStore.getCandidate(audioId);
         if (!candidate) return writeError(response, 404);
@@ -205,7 +214,7 @@ function createReviewServer({ datasetRoot, reviewStore, tokenBytes = crypto.rand
       } catch { return writeError(response, 409); }
     }
     if (request.method === 'POST' && transitionId) {
-      const session = currentSession(request);
+      const session = renewSession(request, response);
       if (!session || request.headers.origin !== `http://${expectedHost}` || request.headers['content-type'] !== 'application/json' || typeof request.headers['x-csrf-token'] !== 'string' || !safeEqual(request.headers['x-csrf-token'], session.csrf)) return writeError(response, 403);
       let body;
       try { body = await readJsonBody(request); } catch { return writeError(response, 400); }
@@ -248,7 +257,7 @@ function createReviewServer({ datasetRoot, reviewStore, tokenBytes = crypto.rand
     }
     if (request.method === 'POST' && confirmId) {
       if (!singleWorkflow) return writeError(response, 404);
-      const session = currentSession(request);
+      const session = renewSession(request, response);
       if (!session || request.headers.origin !== `http://${expectedHost}` || request.headers['content-type'] !== 'application/json' || typeof request.headers['x-csrf-token'] !== 'string' || !safeEqual(request.headers['x-csrf-token'], session.csrf)) return writeError(response, 403);
       let body;
       try { body = await readJsonBody(request); } catch { return writeError(response, 400); }

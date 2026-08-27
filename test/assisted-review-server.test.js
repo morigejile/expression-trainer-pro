@@ -132,17 +132,38 @@ test('requires exactly a 256-bit exchange token', async (t) => {
   await assert.rejects(() => makeServer(t, { tokenBytes: Buffer.alloc(33) }), /32 bytes/);
 });
 
-test('binds IPv4 loopback and exchanges one exact token for a token-free short-lived session', async (t) => {
+test('binds IPv4 loopback and exchanges one exact token for a token-free 20-minute session', async (t) => {
   const instance = await makeServer(t);
   const port = Number(new URL(instance.url).port);
   assert.equal(instance.server.address().address, '127.0.0.1');
   assert.match(instance.url, /^http:\/\/127\.0\.0\.1:\d+\/\?token=[a-f0-9]{64}$/);
   const exchange = await request({ port, pathname: new URL(instance.url).pathname + new URL(instance.url).search, headers: { Host: host(port) } });
   assert.equal(exchange.status, 302); assert.equal(exchange.headers.location, '/review'); securityHeaders(exchange);
-  assert.match(exchange.headers['set-cookie'][0], /HttpOnly; SameSite=Strict; Path=\/; Max-Age=\d+/);
+  assert.match(exchange.headers['set-cookie'][0], /HttpOnly; SameSite=Strict; Path=\/; Max-Age=1200(?:;|$)/);
   assert.equal(exchange.body.toString('utf8').includes('07'.repeat(32)), false);
   const replay = await request({ port, pathname: new URL(instance.url).pathname + new URL(instance.url).search, headers: { Host: host(port) } });
   assert.equal(replay.status, 404); securityHeaders(replay);
+});
+
+test('authenticated activity slides the server-side 20-minute deadline', async (t) => {
+  const originalNow = Date.now; let now = 1000; Date.now = () => now;
+  try {
+    const instance = await makeServer(t); const session = await login(instance);
+    now += 1199000;
+    assert.equal((await request({ port: session.port, pathname: `/api/candidates/${CANDIDATE_ID}`, headers: { Host: host(session.port), Cookie: session.cookie } })).status, 200);
+    now += 1199000;
+    assert.equal((await request({ port: session.port, pathname: `/api/candidates/${CANDIDATE_ID}`, headers: { Host: host(session.port), Cookie: session.cookie } })).status, 200);
+    now += 1201000;
+    assert.equal((await request({ port: session.port, pathname: `/api/candidates/${CANDIDATE_ID}`, headers: { Host: host(session.port), Cookie: session.cookie } })).status, 403);
+  } finally { Date.now = originalNow; }
+});
+
+test('authenticated activity reissues the 20-minute browser cookie', async (t) => {
+  const instance = await makeServer(t); const session = await login(instance);
+  const response = await request({ port: session.port, pathname: `/api/candidates/${CANDIDATE_ID}`, headers: { Host: host(session.port), Cookie: session.cookie } });
+
+  assert.equal(response.status, 200);
+  assert.match(response.headers['set-cookie'][0], new RegExp(`^${session.cookie}; HttpOnly; SameSite=Strict; Path=/; Max-Age=1200$`));
 });
 
 test('rejects sessions and Host values that do not exactly match this loopback server', async (t) => {
@@ -303,7 +324,7 @@ test('expired session after slow body intake cannot commit', async (t) => {
     const instance = await makeServer(t); const session = await login(instance); const body = transitionBody();
     const result = new Promise((resolve, reject) => {
       const req = http.request({ host: '127.0.0.1', port: session.port, method: 'POST', path: `/api/candidates/${CANDIDATE_ID}/transitions`, headers: mutationHeaders(session, body) }, (res) => { const chunks = []; res.on('data', (chunk) => chunks.push(chunk)); res.on('end', () => resolve({ status: res.statusCode, body: Buffer.concat(chunks) })); });
-      req.on('error', reject); req.write(body.slice(0, 8)); setTimeout(() => { now += 301000; req.end(body.slice(8)); }, 30);
+      req.on('error', reject); req.write(body.slice(0, 8)); setTimeout(() => { now += 1201000; req.end(body.slice(8)); }, 30);
     });
     const response = await result;
     assert.notEqual(response.status, 200); assert.equal(instance.calls.length, 0);
