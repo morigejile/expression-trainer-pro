@@ -41,6 +41,7 @@ test('failed samples remain in JSONL and summary counts', async () => {
     assert.equal(output.summary.total, 2);
     assert.equal(output.summary.passed, 1);
     assert.equal(output.summary.failed, 1);
+    assert.equal(output.summary.failureRate, 0.5);
     assert.equal(output.summary.metrics.cer.missing, 1);
     const samples = fs.readFileSync(path.join(runDir, 'samples.jsonl'), 'utf8').trim().split('\n').map(JSON.parse);
     assert.deepEqual(samples.map(({ sampleId, status, error }) => ({ sampleId, status, error })), [
@@ -77,6 +78,19 @@ test('result writer rejects an existing run directory without changing its conte
 
     await assert.rejects(writeResults(runDir, [makeSample()], {}), /already exists/);
     assert.equal(fs.readFileSync(path.join(runDir, 'keep.txt'), 'utf8'), 'original');
+  });
+});
+
+test('summary reports corpus CER from total edit distance and reference length', async () => {
+  const { writeResults } = require('../benchmark/lib/results');
+
+  await withTempDirectory(async (directory) => {
+    const output = await writeResults(path.join(directory, 'corpus-cer'), [
+      makeSample({ distance: 1, referenceLength: 1, cer: 1 }),
+      makeSample({ sampleId: 'sample-2', distance: 1, referenceLength: 9, cer: 1 / 9 })
+    ], { candidate: { id: 'fake' } });
+
+    assert.equal(output.summary.corpusCer, 0.2);
   });
 });
 

@@ -12,6 +12,7 @@ test('RTF is wall-clock inference time divided by audio duration', () => {
 
 test('measureRun captures adapter timing markers and process resource metrics', async () => {
   const { measureRun } = require('../benchmark/lib/metrics');
+  const rssBeforeRun = process.memoryUsage().rss;
 
   const result = await measureRun(async ({ markInitialized, markPartial, markFinal }) => {
     markInitialized(3);
@@ -27,7 +28,7 @@ test('measureRun captures adapter timing markers and process resource metrics', 
   assert.equal(result.rtf, result.inferenceMs / 100);
   assert.ok(result.cpuUserMicros >= 0);
   assert.ok(result.cpuSystemMicros >= 0);
-  assert.ok(result.peakRssBytes >= process.memoryUsage().rss);
+  assert.ok(result.peakRssBytes >= rssBeforeRun);
 });
 
 test('measureRun preserves a missing partial for utterance-style adapters', async () => {

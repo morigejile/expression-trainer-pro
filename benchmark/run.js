@@ -125,6 +125,8 @@ async function runBenchmark(options) {
     datasetRoot,
     candidateId,
     candidateConfig = {},
+    modelRoot,
+    registryPath,
     outputRoot,
     repetitions = 1,
     dryRun = false,
@@ -135,7 +137,7 @@ async function runBenchmark(options) {
   } = options;
   if (!Number.isFinite(sampleTimeoutMs) || sampleTimeoutMs <= 0) throw new TypeError('sampleTimeoutMs must be positive');
   const manifest = loadDatasetManifest(manifestPath, { datasetRoot });
-  const adapter = createBenchmarkAdapter({ candidateId, candidateConfig });
+  const adapter = createBenchmarkAdapter({ candidateId, candidateConfig, modelRoot, registryPath, datasetRoot });
   const canonicalOutputRoot = outputRoot ? await prepareOutputRoot({ datasetRoot, outputRoot }) : undefined;
   if (dryRun) {
     return { dryRun: true, datasetId: manifest.datasetId, sampleCount: manifest.samples.length, candidateId };
@@ -220,7 +222,7 @@ async function runBenchmark(options) {
 
 function parseArguments(argv) {
   const options = {};
-  const valueFlags = new Set(['--manifest', '--dataset-root', '--candidate', '--output-root', '--repetitions']);
+  const valueFlags = new Set(['--manifest', '--dataset-root', '--candidate', '--model-root', '--registry', '--output-root', '--repetitions', '--sample-timeout-ms']);
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === '--dry-run') {
@@ -238,8 +240,11 @@ function parseArguments(argv) {
     manifestPath: options.manifest ? path.resolve(options.manifest) : undefined,
     datasetRoot: options.datasetroot ? path.resolve(options.datasetroot) : undefined,
     candidateId: options.candidate,
+    modelRoot: options.modelroot ? path.resolve(options.modelroot) : undefined,
+    registryPath: options.registry ? path.resolve(options.registry) : undefined,
     outputRoot: options.outputroot ? path.resolve(options.outputroot) : undefined,
     repetitions: options.repetitions === undefined ? 1 : Number(options.repetitions),
+    sampleTimeoutMs: options.sampletimeoutms === undefined ? 30000 : Number(options.sampletimeoutms),
     dryRun: Boolean(options.dryRun)
   };
 }

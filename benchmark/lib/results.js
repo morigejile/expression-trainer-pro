@@ -28,11 +28,19 @@ function summarizeMetric(samples, field) {
 }
 
 function summarizeSamples(samples) {
+  const passed = samples.filter((sample) => sample.status === 'passed').length;
+  const failed = samples.filter((sample) => sample.status === 'failed').length;
+  const notRun = samples.filter((sample) => sample.status === 'not-run').length;
+  const corpusRecords = samples.filter((sample) => Number.isFinite(sample.distance) && Number.isFinite(sample.referenceLength) && sample.referenceLength > 0);
+  const corpusDistance = corpusRecords.reduce((total, sample) => total + sample.distance, 0);
+  const corpusReferenceLength = corpusRecords.reduce((total, sample) => total + sample.referenceLength, 0);
   const summary = {
     total: samples.length,
-    passed: samples.filter((sample) => sample.status === 'passed').length,
-    failed: samples.filter((sample) => sample.status === 'failed').length,
-    notRun: samples.filter((sample) => sample.status === 'not-run').length,
+    passed,
+    failed,
+    notRun,
+    failureRate: samples.length === 0 ? null : (failed + notRun) / samples.length,
+    corpusCer: corpusReferenceLength === 0 ? null : corpusDistance / corpusReferenceLength,
     metrics: Object.fromEntries(METRIC_FIELDS.map((field) => [field, summarizeMetric(samples, field)])),
     byTag: {}
   };

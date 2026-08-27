@@ -36,6 +36,23 @@ test('benchmark CLI exits nonzero when argument validation fails', () => {
   assert.match(result.stderr, /Benchmark failed: unknown argument: --unknown/);
 });
 
+test('benchmark CLI parses explicit model root, registry, and sample timeout', () => {
+  const { parseArguments } = require('../benchmark/run');
+  const parsed = parseArguments([
+    '--manifest', 'dataset/manifest.json',
+    '--dataset-root', 'dataset',
+    '--candidate', 'paraformer-bilingual-zh-en-control',
+    '--model-root', 'models',
+    '--registry', 'models/candidates.json',
+    '--output-root', 'results',
+    '--sample-timeout-ms', '30000'
+  ]);
+
+  assert.equal(parsed.modelRoot, path.resolve('models'));
+  assert.equal(parsed.registryPath, path.resolve('models/candidates.json'));
+  assert.equal(parsed.sampleTimeoutMs, 30000);
+});
+
 function createDataset() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'expression-trainer-runner-'));
   const audioPath = path.join(root, 'audio.wav');
