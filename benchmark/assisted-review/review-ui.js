@@ -23,10 +23,27 @@
     throw new Error('invalid review transition');
   }
 
+  function buildConfirmation(transcriptText) {
+    if (typeof transcriptText !== 'string' || transcriptText.trim() === '') throw new Error('invalid final transcript');
+    return { transcriptText };
+  }
+
   async function fetchCandidate(candidateId) {
     const response = await fetch(`/api/candidates/${encodeURIComponent(candidateId)}`, { credentials: 'same-origin' });
     if (!response.ok) throw new Error('candidate unavailable');
     return response.json();
+  }
+
+  async function fetchSummary() {
+    const response = await fetch('/api/review-status', { credentials: 'same-origin' });
+    if (!response.ok) throw new Error('review status unavailable');
+    return response.json();
+  }
+
+  function showSummary(summary, documentRef = document) {
+    for (const name of ['confirmed', 'pending', 'invalid', 'stale']) {
+      renderText(documentRef.getElementById(`${name}-count`), summary[`${name}Count`] || 0);
+    }
   }
 
   function showCandidate(candidate, documentRef = document) {
@@ -39,7 +56,26 @@
     audio.src = `/api/candidates/${encodeURIComponent(candidate.candidateId || '')}/audio`;
     const predictions = documentRef.getElementById('predictions');
     predictions.replaceChildren();
-    for (const prediction of Array.isArray(candidate.predictions) ? candidate.predictions : []) appendTextItem(predictions, prediction.rawText || '', documentRef);
+    for (const prediction of Array.isArray(candidate.predictions) ? candidate.predictions : []) {
+      const detail = prediction.status === 'failed' ? `failed (${prediction.errorCode || 'INFERENCE_FAILED'})` : `succeeded: ${prediction.rawText || ''}`;
+      appendTextItem(predictions, prediction.role ? `${prediction.role}: ${detail}` : prediction.rawText || '', documentRef);
+    }
+    if (candidate.workflow === 'single') {
+      renderText(documentRef.getElementById('review-status'), candidate.reviewStatus || 'invalid');
+      documentRef.getElementById('final-transcript-input').value = candidate.finalTranscriptText || candidate.transcript || '';
+      documentRef.getElementById('confirm-final-button').disabled = candidate.reviewStatus === 'confirmed' || candidate.reviewStatus === 'invalid';
+      documentRef.getElementById('single-review').hidden = false;
+      documentRef.getElementById('legacy-review').hidden = true;
+      documentRef.getElementById('legacy-primary').hidden = true;
+      documentRef.getElementById('legacy-governance').hidden = true;
+      return;
+    }
+    const singleSection = documentRef.getElementById('single-review');
+    const legacySection = documentRef.getElementById('legacy-review');
+    if (singleSection) singleSection.hidden = true;
+    if (legacySection) legacySection.hidden = false;
+    documentRef.getElementById('legacy-primary').hidden = false;
+    documentRef.getElementById('legacy-governance').hidden = false;
     const suggestions = documentRef.getElementById('suggestions'); suggestions.replaceChildren();
     for (const suggestion of Array.isArray(candidate.suggestions && candidate.suggestions.suggestions) ? candidate.suggestions.suggestions : []) {
       const status = suggestion.humanOnly ? 'human-only' : suggestion.result ? 'suggested' : 'not suggested';
@@ -68,12 +104,22 @@
     const form = document.getElementById('candidate-form');
     if (!form) return;
     const status = document.getElementById('status');
+    let summary = null;
+    async function refreshSummary() {
+      summary = await fetchSummary();
+      showSummary(summary);
+      return summary;
+    }
+    async function loadCandidate(candidateId) {
+      const candidate = await fetchCandidate(candidateId);
+      showCandidate(candidate);
+      document.getElementById('candidate-input').value = candidate.candidateId;
+      renderText(status, 'Loaded');
+    }
     form.addEventListener('submit', async (event) => {
       event.preventDefault();
       try {
-        const candidate = await fetchCandidate(document.getElementById('candidate-input').value);
-        showCandidate(candidate);
-        renderText(status, 'Loaded');
+        await loadCandidate(document.getElementById('candidate-input').value);
       } catch {
         renderText(status, 'Candidate unavailable');
       }
@@ -97,8 +143,31 @@
         renderText(status, 'Transcript was not recorded');
       }
     });
+    document.getElementById('confirm-final-form').addEventListener('submit', async (event) => {
+      event.preventDefault();
+      try {
+        const candidateId = document.getElementById('candidate-id').textContent;
+        const body = buildConfirmation(document.getElementById('final-transcript-input').value);
+        const response = await fetch(`/api/candidates/${encodeURIComponent(candidateId)}/confirm`, {
+          method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': document.body.dataset.csrf }, body: JSON.stringify(body)
+        });
+        if (!response.ok) throw new Error('confirmation unavailable');
+        showCandidate(await response.json());
+        const current = await refreshSummary();
+        renderText(status, 'Final transcript explicitly confirmed');
+        const nextCandidateId = [...current.pending, ...current.stale][0];
+        if (nextCandidateId) await loadCandidate(nextCandidateId);
+      } catch {
+        renderText(status, 'Final transcript was not confirmed');
+      }
+    });
+    refreshSummary().then((current) => {
+      const candidateId = [...current.pending, ...current.stale][0];
+      if (candidateId) return loadCandidate(candidateId);
+      return undefined;
+    }).catch(() => {});
   }
 
-  if (typeof module !== 'undefined' && module.exports) module.exports = { buildTransition, renderText, initializeReviewUi, showCandidate, updateActionFields };
+  if (typeof module !== 'undefined' && module.exports) module.exports = { buildConfirmation, buildTransition, renderText, initializeReviewUi, showCandidate, showSummary, updateActionFields };
   if (global.document) global.document.addEventListener('DOMContentLoaded', initializeReviewUi, { once: true });
 }(globalThis));

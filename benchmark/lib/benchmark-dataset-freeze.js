@@ -14,7 +14,7 @@ const {
 } = require('./assisted-review-storage');
 const { validateDatasetManifest } = require('./dataset-manifest');
 
-const RECORD_KEYS = Object.freeze([
+const LEGACY_RECORD_KEYS = Object.freeze([
   'schemaVersion',
   'candidateId',
   'bindingSha256',
@@ -24,6 +24,11 @@ const RECORD_KEYS = Object.freeze([
   'humanConfirmed',
   'reviewerAlias',
   'confirmedAt',
+  'recordSha256',
+]);
+const CONTEXT_RECORD_KEYS = Object.freeze([
+  ...LEGACY_RECORD_KEYS.slice(0, -1),
+  'reviewContextSha256',
   'recordSha256',
 ]);
 const SHA256 = /^[a-f0-9]{64}$/;
@@ -74,11 +79,13 @@ function ensureContainedDirectory(root, parts) {
 }
 
 function recordBase(record) {
-  return Object.fromEntries(RECORD_KEYS.filter((key) => key !== 'recordSha256').map((key) => [key, record[key]]));
+  const keys = Object.hasOwn(record, 'reviewContextSha256') ? CONTEXT_RECORD_KEYS : LEGACY_RECORD_KEYS;
+  return Object.fromEntries(keys.filter((key) => key !== 'recordSha256').map((key) => [key, record[key]]));
 }
 
-function validateFinalTranscriptRecord(record, { binding } = {}) {
-  assertExactKeys(record, RECORD_KEYS, 'finalTranscriptRecord');
+function validateFinalTranscriptRecord(record, { binding, reviewContextSha256 } = {}) {
+  const contextual = Object.hasOwn(record || {}, 'reviewContextSha256');
+  assertExactKeys(record, contextual ? CONTEXT_RECORD_KEYS : LEGACY_RECORD_KEYS, 'finalTranscriptRecord');
   if (!isPlainObject(binding)) throw new Error('binding must be an object');
   if (record.schemaVersion !== 1) throw new Error('finalTranscriptRecord.schemaVersion must be 1');
   assertSafeId(record.candidateId, 'finalTranscriptRecord.candidateId');
@@ -97,6 +104,11 @@ function validateFinalTranscriptRecord(record, { binding } = {}) {
     throw new Error('finalTranscriptRecord transcript SHA-256 does not match transcriptText');
   }
   if (record.humanConfirmed !== true) throw new Error('finalTranscriptRecord humanConfirmed must be true');
+  if (contextual && (!SHA256.test(record.reviewContextSha256)
+    || (reviewContextSha256 && record.reviewContextSha256 !== reviewContextSha256))) {
+    throw new Error('finalTranscriptRecord review context SHA-256 does not match current review context');
+  }
+  if (reviewContextSha256 && !contextual) throw new Error('finalTranscriptRecord is not bound to the current review context');
   if (typeof record.reviewerAlias !== 'string' || !SAFE_ALIAS.test(record.reviewerAlias)) {
     throw new Error('finalTranscriptRecord reviewerAlias must be a safe non-path label');
   }
@@ -111,15 +123,21 @@ function validateFinalTranscriptRecord(record, { binding } = {}) {
   return record;
 }
 
-function finalTranscriptRelativePath(binding) {
+function finalTranscriptRelativePath(binding, reviewContextSha256) {
   assertSafeId(binding.candidateId, 'binding.candidateId');
   if (!SHA256.test(binding.bindingSha256)) throw new Error('binding.bindingSha256 must be SHA-256');
+  if (reviewContextSha256 !== undefined) {
+    if (!SHA256.test(reviewContextSha256)) throw new Error('reviewContextSha256 must be SHA-256');
+    return `final-transcripts/${binding.candidateId}/${binding.bindingSha256}/${reviewContextSha256}.json`;
+  }
   return `final-transcripts/${binding.candidateId}/${binding.bindingSha256}.json`;
 }
 
-function writeFinalTranscriptRecord({ reviewRoot, binding, transcriptText, reviewerAlias, confirmedAt }) {
+function writeFinalTranscriptRecord({ reviewRoot, binding, transcriptText, reviewerAlias, confirmedAt, reviewContextSha256 }) {
   const canonicalReviewRoot = canonicalizeExternalRoot(reviewRoot);
-  ensureContainedDirectory(canonicalReviewRoot, ['final-transcripts', binding.candidateId]);
+  const directories = ['final-transcripts', binding.candidateId];
+  if (reviewContextSha256 !== undefined) directories.push(binding.bindingSha256);
+  ensureContainedDirectory(canonicalReviewRoot, directories);
   const base = {
     schemaVersion: 1,
     candidateId: binding.candidateId,
@@ -131,9 +149,10 @@ function writeFinalTranscriptRecord({ reviewRoot, binding, transcriptText, revie
     reviewerAlias,
     confirmedAt,
   };
+  if (reviewContextSha256 !== undefined) base.reviewContextSha256 = reviewContextSha256;
   const record = { ...base, recordSha256: sha256Text(canonicalJson(base)) };
-  validateFinalTranscriptRecord(record, { binding });
-  const relativePath = finalTranscriptRelativePath(binding);
+  validateFinalTranscriptRecord(record, { binding, reviewContextSha256 });
+  const relativePath = finalTranscriptRelativePath(binding, reviewContextSha256);
   writeCreateNewJson({ datasetRoot: canonicalReviewRoot, relativePath, value: record });
   return { relativePath, recordSha256: record.recordSha256 };
 }
@@ -177,16 +196,16 @@ function buildFrozenManifest({ intake, selected, reviewRecords, datasetId, datas
   return { schemaVersion: 1, datasetId, datasetVersion, samples };
 }
 
-function loadFinalTranscriptRecord(reviewRoot, binding) {
+function loadFinalTranscriptRecord(reviewRoot, binding, { reviewContextSha256 } = {}) {
   const canonicalReviewRoot = canonicalizeExternalRoot(reviewRoot);
-  const filePath = resolveContained(canonicalReviewRoot, finalTranscriptRelativePath(binding), { mustExist: true });
+  const filePath = resolveContained(canonicalReviewRoot, finalTranscriptRelativePath(binding, reviewContextSha256), { mustExist: true });
   let record;
   try {
     record = JSON.parse(fs.readFileSync(filePath, 'utf8'));
   } catch (error) {
     throw new Error(`Unable to load final transcript record: ${error.message}`);
   }
-  return validateFinalTranscriptRecord(record, { binding });
+  return validateFinalTranscriptRecord(record, { binding, reviewContextSha256 });
 }
 
 function validateFreezeSelection({ intake, candidateIds, testMode, expectedSampleCount }) {
@@ -215,6 +234,7 @@ function freezeReviewedDataset({
   datasetVersion,
   testMode = false,
   expectedSampleCount,
+  reviewContextByCandidate,
 }) {
   const canonicalFreezeRoot = canonicalizeExternalRoot(freezeRoot);
   assertSafeId(datasetId, 'datasetId');
@@ -223,9 +243,18 @@ function freezeReviewedDataset({
   const intake = JSON.parse(fs.readFileSync(intakeFile, 'utf8'));
   if (!Array.isArray(intake.samples)) throw new Error('intake.samples must be an array');
   validateFreezeSelection({ intake, candidateIds, testMode, expectedSampleCount });
+  if (testMode !== true && !(reviewContextByCandidate instanceof Map)) {
+    throw new Error('formal freeze requires current review contexts for every candidate');
+  }
+  if (reviewContextByCandidate && (reviewContextByCandidate.size !== candidateIds.length
+    || candidateIds.some((candidateId) => !SHA256.test(reviewContextByCandidate.get(candidateId) || '')))) {
+    throw new Error('freeze requires one valid current review context for every candidate');
+  }
 
   const selected = candidateIds.map((candidateId) => readBoundPcmCandidate({ datasetRoot, intakePath, candidateId }));
-  const reviews = selected.map(({ binding }) => loadFinalTranscriptRecord(reviewRoot, binding));
+  const reviews = selected.map(({ binding }) => loadFinalTranscriptRecord(reviewRoot, binding, {
+    reviewContextSha256: reviewContextByCandidate && reviewContextByCandidate.get(binding.candidateId),
+  }));
   const manifest = buildFrozenManifest({ intake, selected, reviewRecords: reviews, datasetId, datasetVersion });
 
   const datasetDirectory = ensureContainedDirectory(canonicalFreezeRoot, [datasetId]);

@@ -9,7 +9,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const { createReviewServer } = require('../benchmark/lib/assisted-review-server');
-const { buildTransition, renderText, showCandidate } = require('../benchmark/assisted-review/review-ui');
+const { buildConfirmation, buildTransition, renderText, showCandidate, showSummary } = require('../benchmark/assisted-review/review-ui');
 
 const CANDIDATE_ID = 'fleurs-dev-candidate-01';
 const BINDING_SHA256 = 'a'.repeat(64);
@@ -77,6 +77,30 @@ async function makeServer(t, { tokenBytes = Buffer.alloc(32, 7), mutateStore, au
   if (mutateStore) mutateStore(reviewStore, candidate, root, calls);
   instance = await createReviewServer({ datasetRoot: root, reviewStore, tokenBytes, port: 0 });
   return { ...instance, root, calls, candidate, audio };
+}
+
+async function makeSingleServer(t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'single-review-server-'));
+  let instance;
+  t.after(async () => { if (instance) await instance.close(); fs.rmSync(root, { recursive: true, force: true }); });
+  const audio = wav();
+  fs.writeFileSync(path.join(root, 'audio.wav'), audio);
+  const calls = [];
+  const candidate = {
+    workflow: 'single', candidateId: CANDIDATE_ID,
+    binding: { candidateId: CANDIDATE_ID, bindingSha256: BINDING_SHA256, audioFile: 'audio.wav', audioSha256: sha256(audio), sampleRateHz: 16000, channels: 1, durationMs: 1 },
+    transcript: '上游文本', finalTranscriptText: '上游文本', reviewStatus: 'pending',
+    predictions: [{ role: 'baseline-paraformer', status: 'failed', rawText: '', errorCode: 'TRANSCRIPTION_FAILED' }],
+    comparison: { risk: 'high' },
+  };
+  const reviewStore = {
+    workflow: 'single',
+    getSummary() { return { totalCount: 1, confirmedCount: calls.length, pendingCount: calls.length ? 0 : 1, invalidCount: 0, staleCount: 0, confirmed: calls.length ? [CANDIDATE_ID] : [], pending: calls.length ? [] : [CANDIDATE_ID], invalid: [], stale: [] }; },
+    getCandidate(candidateId) { return candidateId === CANDIDATE_ID ? { ...candidate, reviewStatus: calls.length ? 'confirmed' : 'pending', finalTranscriptText: calls.at(-1)?.transcriptText || candidate.finalTranscriptText } : null; },
+    confirmTranscript(value) { calls.push(value); return this.getCandidate(value.candidateId); },
+  };
+  instance = await createReviewServer({ datasetRoot: root, reviewStore, tokenBytes: Buffer.alloc(32, 9), port: 0 });
+  return { ...instance, calls };
 }
 
 async function login(instance) {
@@ -231,6 +255,41 @@ test('review UI sends a primary transcript as exact client transition keys witho
   });
 });
 
+test('single-review workflow exposes progress and records only an explicit final confirmation', async (t) => {
+  const instance = await makeSingleServer(t); const session = await login(instance);
+  const summaryResponse = await request({ port: session.port, pathname: '/api/review-status', headers: { Host: host(session.port), Cookie: session.cookie } });
+  assert.equal(summaryResponse.status, 200);
+  assert.equal(JSON.parse(summaryResponse.body).pendingCount, 1);
+  const candidateResponse = await request({ port: session.port, pathname: `/api/candidates/${CANDIDATE_ID}`, headers: { Host: host(session.port), Cookie: session.cookie } });
+  assert.equal(candidateResponse.status, 200);
+  assert.equal(JSON.parse(candidateResponse.body).workflow, 'single');
+  assert.equal(instance.calls.length, 0, 'reads never confirm');
+  const body = JSON.stringify(buildConfirmation('人工确认终稿'));
+  const confirmed = await request({ port: session.port, method: 'POST', pathname: `/api/candidates/${CANDIDATE_ID}/confirm`, headers: mutationHeaders(session, body), body });
+  assert.equal(confirmed.status, 200);
+  assert.deepEqual(instance.calls, [{ candidateId: CANDIDATE_ID, transcriptText: '人工确认终稿' }]);
+  const malformed = JSON.stringify({ transcriptText: '伪造', humanConfirmed: true });
+  assert.equal((await request({ port: session.port, method: 'POST', pathname: `/api/candidates/${CANDIDATE_ID}/confirm`, headers: mutationHeaders(session, malformed), body: malformed })).status, 400);
+  assert.equal(instance.calls.length, 1);
+});
+
+test('single-review UI renders progress, role failures, and editable final text without confirming', () => {
+  assert.deepEqual(buildConfirmation('人工确认终稿'), { transcriptText: '人工确认终稿' });
+  const nodes = new Map();
+  const makeNode = () => ({ textContent: '', value: '', hidden: false, disabled: false, options: [], replaceChildren() { this.items = []; }, append(item) { (this.items ||= []).push(item.textContent); } });
+  for (const id of ['candidate-id', 'upstream-transcript', 'primary-transcript', 'comparison-risk', 'approval-state', 'review-audio', 'predictions', 'suggestions', 'pii-warnings', 'expected-revision', 'action-input', 'transcript-input', 'tags-input', 'light-accent-rationale', 'single-review', 'legacy-review', 'legacy-primary', 'legacy-governance', 'final-transcript-input', 'confirm-final-button', 'review-status', 'confirmed-count', 'pending-count', 'invalid-count', 'stale-count']) nodes.set(id, makeNode());
+  const documentRef = { getElementById(id) { return nodes.get(id); }, createElement() { return makeNode(); } };
+  showSummary({ confirmedCount: 3, pendingCount: 94, invalidCount: 1, staleCount: 2 }, documentRef);
+  showCandidate({ workflow: 'single', candidateId: 'safe-id', transcript: '<upstream>', finalTranscriptText: '可编辑终稿', reviewStatus: 'pending', predictions: [{ role: 'candidate-zipformer', status: 'failed', rawText: '', errorCode: 'TRANSCRIPTION_FAILED' }], comparison: { risk: 'high' }, binding: {} }, documentRef);
+  assert.equal(nodes.get('confirmed-count').textContent, '3');
+  assert.equal(nodes.get('final-transcript-input').value, '可编辑终稿');
+  assert.match(nodes.get('predictions').items[0], /candidate-zipformer.*failed.*TRANSCRIPTION_FAILED/i);
+  assert.equal(nodes.get('confirm-final-button').disabled, false);
+  assert.equal(nodes.get('legacy-review').hidden, true);
+  assert.equal(nodes.get('legacy-primary').hidden, true);
+  assert.equal(nodes.get('legacy-governance').hidden, true);
+});
+
 test('mutation revalidates the current bound WAV before reaching either store commit', async (t) => {
   const instance = await makeServer(t); const session = await login(instance); const body = transitionBody();
   fs.writeFileSync(path.join(instance.root, 'audio.wav'), wav({ sampleRateHz: 8000 }));
@@ -297,7 +356,7 @@ test('store read errors return a generic envelope without poisoning later reques
 
 test('showCandidate renders hostile actual-shaped evidence only through fixed text sinks', () => {
   const nodes = new Map(); const makeNode = () => ({ textContent: '', value: '', hidden: false, required: false, options: [{ value: 'record-primary-transcript' }, { value: 'approve-secondary-transcript' }], replaceChildren() { this.items = []; }, append(item) { (this.items ||= []).push(item.textContent); }, set innerHTML(_value) { throw new Error('unsafe HTML sink'); } });
-  for (const id of ['candidate-id', 'upstream-transcript', 'primary-transcript', 'comparison-risk', 'approval-state', 'review-audio', 'predictions', 'suggestions', 'pii-warnings', 'expected-revision', 'action-input', 'transcript-input', 'tags-input', 'light-accent-rationale']) nodes.set(id, makeNode());
+  for (const id of ['candidate-id', 'upstream-transcript', 'primary-transcript', 'comparison-risk', 'approval-state', 'review-audio', 'predictions', 'suggestions', 'pii-warnings', 'expected-revision', 'action-input', 'transcript-input', 'tags-input', 'light-accent-rationale', 'legacy-primary', 'legacy-governance']) nodes.set(id, makeNode());
   const documentRef = { getElementById(id) { return nodes.get(id); }, createElement() { return makeNode(); } };
   showCandidate({ candidateId: 'safe-id', transcript: '<img>', primaryTranscriptText: '<script>', predictions: [{ rawText: '<b>' }], comparison: { risk: '<risk>' }, suggestions: { suggestions: [{ tag: 'fast', result: true, exportEvidenceEligible: false }, { tag: 'light-accent', result: null, humanOnly: true }], piiWarnings: [{ ruleId: '<warning>' }] }, numericPolicyApproved: true, allowedActions: ['record-primary-transcript'], state: { revision: 9, note: '<state>' } }, documentRef);
   assert.equal(nodes.get('upstream-transcript').textContent, '<img>'); assert.equal(nodes.get('comparison-risk').textContent, '<risk>'); assert.match(nodes.get('suggestions').items[0], /fast: suggested \(approved\)/); assert.match(nodes.get('suggestions').items[1], /light-accent: human-only \(policy-not-required\)/); assert.equal(nodes.get('pii-warnings').items[0], '<warning>'); assert.equal(nodes.get('expected-revision').value, '9'); assert.equal(nodes.get('review-audio').src, '/api/candidates/safe-id/audio');

@@ -210,32 +210,50 @@ function decodePcm16ToFloat32(bytes) {
   return samples;
 }
 
-function runSherpaTranscription({ role, config, pcmBytes, sampleRateHz, channels = 1, sherpa = require('sherpa-onnx-node') }) {
-  if (channels !== 1) throw new Error('review transcription requires mono PCM');
+function createSherpaTranscriber({ role, config, sherpa = require('sherpa-onnx-node') }) {
   if ((role.mode === 'streaming') !== (config.recognizerKind === 'online')) throw new Error('role mode and recognizer kind mismatch');
-  const samples = decodePcm16ToFloat32(pcmBytes);
   const { recognizerKind, ...nativeConfig } = config;
   const isOnline = role.mode === 'streaming' && recognizerKind === 'online';
   const Recognizer = isOnline ? sherpa.OnlineRecognizer : sherpa.OfflineRecognizer;
-  let recognizer;
-  let stream;
+  const recognizer = new Recognizer(nativeConfig);
+  let closed = false;
+  return {
+    transcribe({ pcmBytes, sampleRateHz, channels = 1 }) {
+      if (closed) throw new Error('Sherpa transcriber is closed');
+      if (channels !== 1) throw new Error('review transcription requires mono PCM');
+      const samples = decodePcm16ToFloat32(pcmBytes);
+      let stream;
+      try {
+        stream = recognizer.createStream();
+        stream.acceptWaveform({ samples, sampleRate: sampleRateHz });
+        if (isOnline) {
+          while (recognizer.isReady(stream)) recognizer.decode(stream);
+          stream.inputFinished();
+          while (recognizer.isReady(stream)) recognizer.decode(stream);
+        } else {
+          recognizer.decode(stream);
+        }
+        const result = recognizer.getResult(stream);
+        if (!result || typeof result.text !== 'string') throw new Error('Sherpa result text is invalid');
+        return result.text;
+      } finally {
+        if (stream && typeof stream.free === 'function') stream.free();
+      }
+    },
+    close() {
+      if (closed) return;
+      closed = true;
+      if (recognizer && typeof recognizer.free === 'function') recognizer.free();
+    },
+  };
+}
+
+function runSherpaTranscription({ role, config, pcmBytes, sampleRateHz, channels = 1, sherpa = require('sherpa-onnx-node') }) {
+  const transcriber = createSherpaTranscriber({ role, config, sherpa });
   try {
-    recognizer = new Recognizer(nativeConfig);
-    stream = recognizer.createStream();
-    stream.acceptWaveform({ samples, sampleRate: sampleRateHz });
-    if (isOnline) {
-      while (recognizer.isReady(stream)) recognizer.decode(stream);
-      stream.inputFinished();
-      while (recognizer.isReady(stream)) recognizer.decode(stream);
-    } else {
-      recognizer.decode(stream);
-    }
-    const result = recognizer.getResult(stream);
-    if (!result || typeof result.text !== 'string') throw new Error('Sherpa result text is invalid');
-    return result.text;
+    return transcriber.transcribe({ pcmBytes, sampleRateHz, channels });
   } finally {
-    if (stream && typeof stream.free === 'function') stream.free();
-    if (recognizer && typeof recognizer.free === 'function') recognizer.free();
+    transcriber.close();
   }
 }
 
@@ -424,37 +442,78 @@ function createRunRecord(modelLock, modelRoot, configs) {
   return { ...base, recordSha256: recordSha256(base) };
 }
 
-function runPredictionBundle({ datasetRoot, binding, upstreamDraft, modelLock, modelRoot, runId, transcribe, sherpa, sherpaVersion }) {
+function createPredictionRun({ datasetRoot, binding, modelLock, modelRoot, runId, transcribe, sherpa, sherpaVersion, createTranscriber = createSherpaTranscriber }) {
   const preflight = preflightPredictionRun({ datasetRoot, binding, modelLock, modelRoot, sherpaVersion: sherpaVersion || getSherpaVersion });
   assertSafeSegment(runId, 'runId');
-  ensureEvidenceDirectory(datasetRoot, `assisted-review/runs/${runId}`);
-  writeCreateNewJson({
-    datasetRoot,
-    relativePath: `assisted-review/runs/${runId}/run.json`,
-    value: createRunRecord(modelLock, modelRoot, preflight.configs),
-  });
-  const attempts = modelLock.roles.map((role) => sealPreflightedAttempt({
-    datasetRoot,
-    binding,
-    role,
-    modelLock,
-    modelRoot,
-    runId,
-    transcribe,
-    sherpa,
-    config: preflight.configs.get(role.role),
-  }));
-  readVerifiedBindingAudio(datasetRoot, binding);
-  const comparisonBase = { bindingSha256: binding.bindingSha256, ...comparePredictions({ upstreamDraft, attempts }) };
-  const comparison = { ...comparisonBase, recordSha256: recordSha256(comparisonBase) };
-  const relativeDirectory = evidenceDirectory(binding, runId);
-  ensureEvidenceDirectory(datasetRoot, relativeDirectory.join('/'));
-  writeCreateNewJson({ datasetRoot, relativePath: `${relativeDirectory.join('/')}/comparison.json`, value: comparison });
-  return { attempts, comparison };
+  const transcribers = new Map();
+  if (!transcribe) {
+    for (const role of modelLock.roles) {
+      try {
+        transcribers.set(role.role, createTranscriber({ role, config: preflight.configs.get(role.role), sherpa }));
+      } catch (initializationError) {
+        transcribers.set(role.role, {
+          transcribe() { throw initializationError; },
+          close() {},
+        });
+      }
+    }
+  }
+  try {
+    ensureEvidenceDirectory(datasetRoot, `assisted-review/runs/${runId}`);
+    writeCreateNewJson({
+      datasetRoot,
+      relativePath: `assisted-review/runs/${runId}/run.json`,
+      value: createRunRecord(modelLock, modelRoot, preflight.configs),
+    });
+  } catch (error) {
+    for (const value of transcribers.values()) value.close();
+    throw error;
+  }
+  let closed = false;
+  return {
+    runCandidate({ binding, upstreamDraft, candidate, transcribe: candidateTranscribe, sherpa: candidateSherpa }) {
+      if (candidate && candidate.id !== binding.candidateId) throw new Error('candidate does not match binding');
+      assertRolesMatchBinding(modelLock, binding);
+      const attempts = modelLock.roles.map((role) => sealPreflightedAttempt({
+        datasetRoot,
+        binding,
+        role,
+        modelLock,
+        modelRoot,
+        runId,
+        transcribe: candidateTranscribe || transcribe || transcribers.get(role.role).transcribe,
+        sherpa: candidateSherpa || sherpa,
+        config: preflight.configs.get(role.role),
+      }));
+      readVerifiedBindingAudio(datasetRoot, binding);
+      const comparisonBase = { bindingSha256: binding.bindingSha256, ...comparePredictions({ upstreamDraft, attempts }) };
+      const comparison = { ...comparisonBase, recordSha256: recordSha256(comparisonBase) };
+      const relativeDirectory = evidenceDirectory(binding, runId);
+      ensureEvidenceDirectory(datasetRoot, relativeDirectory.join('/'));
+      writeCreateNewJson({ datasetRoot, relativePath: `${relativeDirectory.join('/')}/comparison.json`, value: comparison });
+      return { attempts, comparison };
+    },
+    close() {
+      if (closed) return;
+      closed = true;
+      for (const value of transcribers.values()) value.close();
+    },
+  };
+}
+
+function runPredictionBundle({ datasetRoot, binding, upstreamDraft, modelLock, modelRoot, runId, transcribe, sherpa, sherpaVersion }) {
+  const run = createPredictionRun({ datasetRoot, binding, modelLock, modelRoot, runId, transcribe, sherpa, sherpaVersion });
+  try {
+    return run.runCandidate({ binding, upstreamDraft });
+  } finally {
+    run.close();
+  }
 }
 
 module.exports = {
   buildReviewSherpaConfig,
+  createPredictionRun,
+  createSherpaTranscriber,
   decodePcm16ToFloat32,
   runPredictionBundle,
   runSherpaTranscription,

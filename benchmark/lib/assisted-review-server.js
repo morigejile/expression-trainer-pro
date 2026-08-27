@@ -109,12 +109,17 @@ function readBoundAudio(datasetRoot, candidate, candidateId) {
 
 function createReviewServer({ datasetRoot, reviewStore, tokenBytes = crypto.randomBytes(32), port = 0 } = {}) {
   if (!Buffer.isBuffer(tokenBytes) || tokenBytes.length !== 32) return Promise.reject(new Error('tokenBytes must be exactly 32 bytes'));
-  if (!isPlainObject(reviewStore) || typeof reviewStore.getSessionIdentity !== 'function' || typeof reviewStore.getCandidate !== 'function'
-    || typeof reviewStore.commitPrimaryTranscript !== 'function' || typeof reviewStore.commitTransition !== 'function') {
+  const singleWorkflow = isPlainObject(reviewStore) && reviewStore.workflow === 'single';
+  const validSingleStore = singleWorkflow && typeof reviewStore.getSummary === 'function' && typeof reviewStore.getCandidate === 'function'
+    && typeof reviewStore.confirmTranscript === 'function';
+  const validLegacyStore = !singleWorkflow && isPlainObject(reviewStore) && typeof reviewStore.getSessionIdentity === 'function'
+    && typeof reviewStore.getCandidate === 'function' && typeof reviewStore.commitPrimaryTranscript === 'function'
+    && typeof reviewStore.commitTransition === 'function';
+  if (!validSingleStore && !validLegacyStore) {
     return Promise.reject(new Error('reviewStore is invalid'));
   }
   const root = canonicalizeExternalRoot(datasetRoot);
-  const identity = validateIdentity(reviewStore.getSessionIdentity());
+  const identity = singleWorkflow ? null : validateIdentity(reviewStore.getSessionIdentity());
   const exchangeToken = Buffer.from(tokenBytes);
   const sessions = new Map();
   let tokenUsed = false;
@@ -137,6 +142,7 @@ function createReviewServer({ datasetRoot, reviewStore, tokenBytes = crypto.rand
   }
 
   function reviewView(candidate) {
+    if (singleWorkflow) return candidate;
     const state = candidate && candidate.state || {};
     const complete = { 'approve-license': Boolean(state.licenseApproval), 'clear-pii': Boolean(state.piiClearance), 'set-final-tags': Boolean(state.finalTags) };
     let allowedActions = [];
@@ -153,7 +159,8 @@ function createReviewServer({ datasetRoot, reviewStore, tokenBytes = crypto.rand
     const candidateId = candidateFromPath(url);
     const audioId = candidateFromPath(url, '/audio');
     const transitionId = candidateFromPath(url, '/transitions');
-    const allowedMethod = url.pathname === '/' || url.pathname === '/review' || url.pathname === '/review-ui.js' || candidateId || audioId ? 'GET' : transitionId ? 'POST' : null;
+    const confirmId = candidateFromPath(url, '/confirm');
+    const allowedMethod = url.pathname === '/' || url.pathname === '/review' || url.pathname === '/review-ui.js' || url.pathname === '/api/review-status' || candidateId || audioId ? 'GET' : transitionId || confirmId ? 'POST' : null;
     if (allowedMethod && request.method !== allowedMethod) return writeResponse(response, 405, JSON.stringify({ error: 'request-rejected' }), { Allow: allowedMethod, 'Content-Type': 'application/json; charset=utf-8' });
     if (request.method === 'GET' && url.pathname === '/') {
       const supplied = url.searchParams.get('token');
@@ -173,6 +180,12 @@ function createReviewServer({ datasetRoot, reviewStore, tokenBytes = crypto.rand
       if (!session) return writeError(response, 403);
       const script = fs.readFileSync(path.join(__dirname, '..', 'assisted-review', 'review-ui.js'), 'utf8');
       return writeResponse(response, 200, script, { 'Content-Type': 'application/javascript; charset=utf-8' });
+    }
+    if (request.method === 'GET' && url.pathname === '/api/review-status') {
+      if (!singleWorkflow) return writeError(response, 404);
+      if (url.search) return writeError(response, 404);
+      if (!currentSession(request)) return writeError(response, 403);
+      return writeResponse(response, 200, JSON.stringify(reviewStore.getSummary()), { 'Content-Type': 'application/json; charset=utf-8' });
     }
     if (request.method === 'GET' && candidateId) {
       if (url.search) return writeError(response, 404);
@@ -231,6 +244,25 @@ function createReviewServer({ datasetRoot, reviewStore, tokenBytes = crypto.rand
           state = reviewStore.commitTransition({ state: candidate.state, event, expectedRevision: body.expectedRevision });
         }
         return writeResponse(response, 200, JSON.stringify(state), { 'Content-Type': 'application/json; charset=utf-8' });
+      } catch { return writeError(response, 409); }
+    }
+    if (request.method === 'POST' && confirmId) {
+      if (!singleWorkflow) return writeError(response, 404);
+      const session = currentSession(request);
+      if (!session || request.headers.origin !== `http://${expectedHost}` || request.headers['content-type'] !== 'application/json' || typeof request.headers['x-csrf-token'] !== 'string' || !safeEqual(request.headers['x-csrf-token'], session.csrf)) return writeError(response, 403);
+      let body;
+      try { body = await readJsonBody(request); } catch { return writeError(response, 400); }
+      if (!hasExactKeys(body, ['transcriptText']) || typeof body.transcriptText !== 'string') return writeError(response, 400);
+      const transcriptLength = Array.from(body.transcriptText).length;
+      if (body.transcriptText.trim() === '' || transcriptLength > MAX_TRANSCRIPT_CODE_POINTS) return writeError(response, 400);
+      const candidate = reviewStore.getCandidate(confirmId);
+      if (!candidate) return writeError(response, 404);
+      try {
+        bindingFor(candidate, confirmId);
+        readBoundAudio(root, candidate, confirmId);
+        if (currentSession(request) !== session) return writeError(response, 403);
+        const confirmed = reviewStore.confirmTranscript({ candidateId: confirmId, transcriptText: body.transcriptText });
+        return writeResponse(response, 200, JSON.stringify(confirmed), { 'Content-Type': 'application/json; charset=utf-8' });
       } catch { return writeError(response, 409); }
     }
     if (request.method !== 'GET' && request.method !== 'POST') return writeError(response, 405);

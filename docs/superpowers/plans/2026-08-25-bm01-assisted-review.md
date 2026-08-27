@@ -149,7 +149,8 @@ a later independent cleanup commit.
   `--transcript-file`, and `--reviewer-alias`; it never accepts the transcript
   directly as a command-line argument.
 - `freeze` requires explicit `--dataset-id`, `--dataset-version`,
-  `--freeze-root`, and either repeated `--candidate-id` or `--candidate-file`.
+  `--freeze-root`, and the current `--review-pack`; it always selects the full
+  100-candidate intake and requires a current contextual confirmation for each.
 - External commands require `ASSISTED_REVIEW_ALLOW_EXTERNAL=1`.
 
 - [x] **Step 1: Write failing CLI parser and dispatch tests**
@@ -203,7 +204,7 @@ a later independent cleanup commit.
 
 **Files:**
 - External only: `intake/fleurs-cmn-hans-cn-dev-candidates-v1.json`
-- External only: `runs/<runId>/...`
+- External only: `assisted-review/runs/<runId>/...`
 - External only: `review-packs/<runId>/review-pack.json`
 - External only: `review-packs/<runId>/review-pack.tsv`
 
@@ -217,33 +218,38 @@ a later independent cleanup commit.
 
   ```powershell
   $env:ASSISTED_REVIEW_ALLOW_EXTERNAL = '1'
-  node benchmark/scripts/internal-benchmark-dataset.js validate-intake --dataset-root 'D:\Codex_projects\expression-trainer-pro-benchmark-data' --intake 'intake/fleurs-cmn-hans-cn-dev-candidates-v1.json' --limit 100
+  node benchmark/scripts/internal-benchmark-dataset.js validate-intake --dataset-root 'D:\Codex_projects\expression-trainer-pro-benchmark-data' --intake 'intake/fleurs-cmn-hans-cn-dev-candidates-v1.json'
   ```
 
   Expected: 100 current PCM bindings validated; failures list candidate IDs and
   stable error codes.
 
-- [ ] **Step 2: Run three-model suggestions**
+- [x] **Step 2: Run three-model suggestions**
 
   Use the verified external model lock and one explicit run ID. Preserve a
   success or failure attempt for every candidate/model pair; never drop failed
   candidates from the review pack.
 
-- [ ] **Step 3: Generate deterministic JSON and TSV review packs**
+- [x] **Step 3: Generate deterministic JSON and TSV review packs**
 
   Sort by candidate ID and include every intake candidate. The pack is a review
   aid, not ground truth. Store it outside Git and reject overwrite of an existing
   pack ID.
 
-- [ ] **Step 4: Verify pack completeness**
+- [x] **Step 4: Verify pack completeness**
 
   Assert 100 unique rows, 300 model statuses, current binding hashes, no missing
   upstream transcript, and no absolute model path, token, or account data.
 
+  Completed with external run `bm01-review-20260826-v2`: 100 unique rows,
+  300 explicit model outcomes, 0 failures, and review-pack SHA-256
+  `91aa34aad003ca2715908964757f304a34f98218af762935bcaa3d985b97bea4`.
+  This is prediction evidence only; it contains no human confirmations.
+
 ### Task 4: Complete the minimized human review
 
 **Files:**
-- External only: `final-transcripts/<candidateId>/<bindingSha256>.json`
+- External only: `final-transcripts/<candidateId>/<bindingSha256>/<reviewContextSha256>.json`
 - External only: human working copies of the review pack
 
 - [ ] **Step 1: Prioritize review**

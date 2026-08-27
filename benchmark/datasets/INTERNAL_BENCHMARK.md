@@ -24,8 +24,10 @@ Suggested external layout:
 <dataset-root>/
   intake/fleurs-cmn-hans-cn-dev-candidates-v1.json
   cmn_hans_cn/audio/dev-pcm16/*.wav
-  working/<candidate-id>.txt
-  review/final-transcripts/<candidate-id>/<binding-sha256>.json
+  assisted-review/runs/<run-id>/...
+  review-packs/<run-id>/review-pack.json
+  review-packs/<run-id>/review-pack.tsv
+  review/final-transcripts/<candidate-id>/<binding-sha256>/<review-context-sha256>.json
   frozen/<dataset-id>/<dataset-version>/
 ```
 
@@ -46,46 +48,71 @@ node benchmark/scripts/internal-benchmark-dataset.js validate-intake `
 This reopens and verifies every current audio binding, PCM property, and
 SHA-256. It performs no inference and changes no external file.
 
-## 2. Record one human-confirmed transcript
+## 2. Prepare the three-model review pack
 
-After listening to a sample, save only the confirmed text in a UTF-8 file below
-`working/`. The CLI removes one conventional trailing newline; it otherwise
-preserves the supplied text.
+Use the verified model-preparation registry and extracted model root. One run
+preflights the pinned model files once, then retains a success or explicit
+failure for Paraformer, small Zipformer, and SenseVoiceSmall for every intake
+candidate. The JSON/TSV pack and per-candidate attempts stay outside Git.
 
 ```powershell
-node benchmark/scripts/internal-benchmark-dataset.js record-transcript `
+node benchmark/scripts/internal-benchmark-review.js prepare `
+  --dataset-root 'D:\Codex_projects\expression-trainer-pro-benchmark-data' `
+  --intake 'intake/fleurs-cmn-hans-cn-dev-candidates-v1.json' `
+  --model-root 'D:\Codex_projects\expression-trainer-pro-model-artifacts\extracted' `
+  --registry 'D:\Codex_projects\expression-trainer-pro-model-prep\benchmark\models\candidates.json' `
+  --run-id 'bm01-review-20260826-v2'
+```
+
+The command refuses an existing run/pack ID. A complete pack has 100 unique
+rows and exactly 300 model outcomes; failures remain visible in both the pack
+and UI rather than disappearing.
+
+## 3. Listen, edit, and explicitly confirm in the local UI
+
+```powershell
+node benchmark/scripts/internal-benchmark-review.js serve `
   --dataset-root 'D:\Codex_projects\expression-trainer-pro-benchmark-data' `
   --intake 'intake/fleurs-cmn-hans-cn-dev-candidates-v1.json' `
   --review-root 'review' `
-  --candidate-id '<candidate-id>' `
-  --transcript-file 'working/<candidate-id>.txt' `
+  --review-pack 'review-packs/bm01-review-20260826-v2/review-pack.json' `
   --reviewer-alias 'maintainer'
 ```
 
-The record binds the candidate, current audio/intake binding, exact transcript,
-human confirmation, alias, timestamp, and hashes. It refuses to overwrite an
-existing record. The command output contains hashes and IDs, not transcript
-text.
+Open the printed loopback URL. For each item, listen to the bound WAV, compare
+the upstream text with all three labeled model outcomes, edit the final text,
+then press the explicit confirmation button. Loading or editing an item never
+confirms it. Confirmation records are create-new. If the short local session
+expires, stop and rerun `serve`; existing external records are resumed.
 
-## 3. Check progress
+The UI and status command report `confirmed`, `pending`, `invalid`, and `stale`.
+Upstream/audio binding changes invalidate the record binding; prediction or
+comparison changes invalidate the confirmation context instead of silently
+carrying it forward.
+
+## 4. Check review-context progress
 
 ```powershell
-node benchmark/scripts/internal-benchmark-dataset.js review-status `
+node benchmark/scripts/internal-benchmark-review.js status `
   --dataset-root 'D:\Codex_projects\expression-trainer-pro-benchmark-data' `
   --intake 'intake/fleurs-cmn-hans-cn-dev-candidates-v1.json' `
-  --review-root 'review'
+  --review-root 'review' `
+  --review-pack 'review-packs/bm01-review-20260826-v2/review-pack.json'
 ```
 
-The result separates `confirmed`, `pending`, `invalid`, and `stale` candidates.
-Only `confirmedCount: 100` is ready to freeze.
+Only `confirmedCount: 100`, `pendingCount: 0`, `invalidCount: 0`, and
+`staleCount: 0` is ready to freeze. The older `record-transcript` and
+`review-status` commands remain available as a file-based fallback, but they do
+not replace review-pack-context status for this run.
 
-## 4. Freeze all 100
+## 5. Freeze all 100
 
 ```powershell
 node benchmark/scripts/internal-benchmark-dataset.js freeze `
   --dataset-root 'D:\Codex_projects\expression-trainer-pro-benchmark-data' `
   --intake 'intake/fleurs-cmn-hans-cn-dev-candidates-v1.json' `
   --review-root 'review' `
+  --review-pack 'review-packs/bm01-review-20260826-v2/review-pack.json' `
   --freeze-root 'frozen' `
   --dataset-id 'expression-zh-fleurs' `
   --dataset-version '<new-version>'
@@ -96,4 +123,5 @@ exactly all 100 intake samples. It validates every current binding and final
 record before staging, copies audio under stable names, validates the generated
 production manifest, writes manifest/dataset digests and a freeze report, then
 publishes only to an absent version directory. Re-running the same version is
-an error.
+an error. Run it only after the review-context status above is exactly 100/100,
+then re-run frozen-manifest validation as a separate pass.

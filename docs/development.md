@@ -137,13 +137,13 @@ node benchmark/scripts/generate-quality-report.js
 
 `MANIFEST_PATH` is the checked-in/de-identified manifest and `DATASET_ROOT` is the separately controlled audio root. Set `DATASET_ROOT` only in the local controlled environment before running the command. The command validates every relative audio reference, canonical root containment, PCM WAV metadata and SHA-256 before printing deterministic coverage, source-boundary, duration and sample-rate evidence.
 
-BM-01 当前只使用 `benchmark/scripts/internal-benchmark-dataset.js` 的四个命令：`validate-intake`、`record-transcript`、`review-status`、`freeze`。完整命令和外部目录布局见 [INTERNAL_BENCHMARK.md](../benchmark/datasets/INTERNAL_BENCHMARK.md)。正式 `freeze` 固定选择 intake 的全部 100 条；在维护者完成逐条听音前只能运行校验和状态查询，不得宣称 BM-01 已冻结。
+BM-01 使用 `benchmark/scripts/internal-benchmark-dataset.js` 完成 intake 校验与最终 freeze，并使用 `benchmark/scripts/internal-benchmark-review.js` 的 `prepare`、`serve`、`status` 完成三候选预测、单人逐条听音/编辑/显式确认和 review-context 状态检查。完整命令和外部目录布局见 [INTERNAL_BENCHMARK.md](../benchmark/datasets/INTERNAL_BENCHMARK.md)。正式 `freeze` 固定选择 intake 的全部 100 条；只有 review-context 状态为 100 confirmed、0 pending/invalid/stale 后才能运行，不得把代码或预测准备完成误报为 BM-01 已冻结。
 
 ## 5. 本阶段验证边界
 
 已验证：依赖清单/lockfile 一致、干净安装、JavaScript 语法检查、Electron 二进制可执行和文档相对链接。T-01 建立 1 项模块入口 smoke；T-02 增加 5 项确定性词库测试；T-03 增加 6 项纯设置迁移测试；T-04 与集成修复合计 8 项 Renderer transcript/stop final/迟到结果/异常生命周期回归测试；T-05 增加 4 项安全渲染测试；T-06 增加 25 项 LLM 请求控制测试；T-07 增加 1 项自动化 Electron smoke，实际加载主页面与设置页并通过真实 Preload/IPC 完成 Fake ASR、协调式 Fake LLM 和粘贴分析。T-08 将 Electron 33.4.11 受控升级到 43.4.1：升级前后完整测试集均为 50/50，`npm ci`、`npm test` 与 `npm run check` 均通过；Electron 内置 Node 24.18.1 / ABI 148 直接 `require('sherpa-onnx-node')` 成功，正常非 smoke 入口 5 秒存活。
 
-未验证：真实麦克风、真实 ASR 模型初始化/推理、LLM 网络请求、macOS/Linux、Forge 制品、安装/升级/卸载。不得据此宣称真实识别或三平台同等级支持。
+未验证：生产 ASR/Audio/IPC 链路中的真实麦克风与真实模型初始化/推理、LLM 网络请求、macOS/Linux、Forge 制品、安装/升级/卸载。BM-01 隔离 benchmark 工具已在外部语料上完成 Paraformer、small Zipformer、SenseVoiceSmall 的 100×3 预测准备；该结果不验证或改动生产 ASR 集成。不得据此宣称生产真实识别或三平台同等级支持。
 
 ## 6. 安全渲染基线
 

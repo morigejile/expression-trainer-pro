@@ -7,6 +7,8 @@ const path = require('node:path');
 
 const {
   buildReviewSherpaConfig,
+  createPredictionRun,
+  createSherpaTranscriber,
   decodePcm16ToFloat32,
   runPredictionBundle,
   runSherpaTranscription,
@@ -238,6 +240,72 @@ test('PCM16 decoding and native Sherpa execution use the installed object wavefo
     () => runSherpaTranscription({ role: { mode: 'streaming' }, config: { recognizerKind: 'online' }, pcmBytes: bytes, sampleRateHz: 16000, channels: 2, sherpa }),
     /mono/i,
   );
+});
+
+test('batch transcriber reuses one native recognizer while releasing every stream and closing once', () => {
+  let recognizerCount = 0;
+  let streamCount = 0;
+  let streamFreeCount = 0;
+  let recognizerFreeCount = 0;
+  const sherpa = {
+    OfflineRecognizer: class {
+      constructor() { recognizerCount += 1; }
+      createStream() { streamCount += 1; return { acceptWaveform() {}, free() { streamFreeCount += 1; } }; }
+      decode() {}
+      getResult() { return { text: '批量结果' }; }
+      free() { recognizerFreeCount += 1; }
+    },
+  };
+  const transcriber = createSherpaTranscriber({ role: { mode: 'utterance' }, config: { recognizerKind: 'offline' }, sherpa });
+  const input = { pcmBytes: Buffer.from([0, 0]), sampleRateHz: 16000, channels: 1 };
+  assert.equal(transcriber.transcribe(input), '批量结果');
+  assert.equal(transcriber.transcribe(input), '批量结果');
+  assert.equal(recognizerCount, 1);
+  assert.equal(streamCount, 2);
+  assert.equal(streamFreeCount, 2);
+  assert.equal(recognizerFreeCount, 0);
+  transcriber.close();
+  assert.equal(recognizerFreeCount, 1);
+  assert.throws(() => transcriber.transcribe(input), /closed/i);
+});
+
+test('prediction run records a model initialization failure per candidate and initializes the other roles', (t) => {
+  const fixture = createFixture(t);
+  const closed = [];
+  const run = createPredictionRun({
+    datasetRoot: fixture.datasetRoot,
+    binding: fixture.binding,
+    modelLock: fixture.modelLock,
+    modelRoot: fixture.modelRoot,
+    runId: 'init-failure-run',
+    sherpaVersion: () => '1.13.3',
+    createTranscriber({ role }) {
+      if (role.role === 'candidate-zipformer') throw new Error('native initialization failed');
+      return { transcribe: () => '可用结果', close: () => closed.push(role.role) };
+    },
+  });
+  const result = run.runCandidate({ binding: fixture.binding, upstreamDraft: '上游草稿' });
+  assert.deepEqual(result.attempts.map(({ status }) => status), ['succeeded', 'failed', 'succeeded']);
+  assert.equal(result.attempts[1].errorCode, 'TRANSCRIPTION_FAILED');
+  assert.equal(JSON.stringify(result).includes('native initialization failed'), false);
+  run.close();
+  assert.deepEqual(closed, ['baseline-paraformer', 'candidate-sensevoice-small']);
+});
+
+test('prediction run closes initialized recognizers when run evidence publication collides', (t) => {
+  const fixture = createFixture(t);
+  const first = createPredictionRun({
+    datasetRoot: fixture.datasetRoot, binding: fixture.binding, modelLock: fixture.modelLock, modelRoot: fixture.modelRoot,
+    runId: 'collision-run', sherpaVersion: () => '1.13.3', transcribe: () => '结果',
+  });
+  first.close();
+  let closeCount = 0;
+  assert.throws(() => createPredictionRun({
+    datasetRoot: fixture.datasetRoot, binding: fixture.binding, modelLock: fixture.modelLock, modelRoot: fixture.modelRoot,
+    runId: 'collision-run', sherpaVersion: () => '1.13.3',
+    createTranscriber: () => ({ transcribe: () => '结果', close: () => { closeCount += 1; } }),
+  }), /exist|overwrite/i);
+  assert.equal(closeCount, 3);
 });
 
 test('sealed attempts record success or redacted failure without absolute model paths', (t) => {

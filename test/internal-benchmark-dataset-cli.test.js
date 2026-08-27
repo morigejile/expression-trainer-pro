@@ -136,6 +136,7 @@ test('freeze command selects the complete 100-sample intake without exposing sel
   const { writeFinalTranscriptRecord } = require('../benchmark/lib/benchmark-dataset-freeze');
   const { parseInternalDatasetArgs, runInternalDatasetCommand } = require('../benchmark/scripts/internal-benchmark-dataset');
   const fixture = createFixture(100);
+  const reviewContextSha256 = 'e'.repeat(64);
   try {
     for (const sample of fixture.intake.samples) {
       const { binding } = readBoundPcmCandidate({ datasetRoot: fixture.root, intakePath: 'intake/inventory.json', candidateId: sample.id });
@@ -145,18 +146,39 @@ test('freeze command selects the complete 100-sample intake without exposing sel
         transcriptText: `人工终稿 ${sample.id}`,
         reviewerAlias: 'maintainer-1',
         confirmedAt: '2026-08-26T09:00:00.000Z',
+        reviewContextSha256,
       });
     }
     const parsed = parseInternalDatasetArgs(commandArgs(fixture.root, 'freeze', [
       '--review-root', 'review',
+      '--review-pack', 'review-packs/run-a/review-pack.json',
       '--freeze-root', 'frozen',
       '--dataset-id', 'expression-zh-fleurs',
       '--dataset-version', 'v1',
     ]));
-    const result = runInternalDatasetCommand(parsed, { allowExternal: true });
+    const result = runInternalDatasetCommand(parsed, { allowExternal: true, createStore() { return {
+      getSummary: () => ({ totalCount: 100, confirmedCount: 100, pendingCount: 0, invalidCount: 0, staleCount: 0 }),
+      getReviewContexts: () => new Map(fixture.intake.samples.map(({ id }) => [id, reviewContextSha256])),
+    }; } });
     assert.equal(result.command, 'freeze');
     assert.equal(result.selectedCount, 100);
     assert.equal(fs.existsSync(path.join(fixture.root, 'frozen', 'expression-zh-fleurs', 'v1', 'manifest.json')), true);
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test('freeze command rejects legacy transcripts that are not confirmed against the current prediction pack', () => {
+  const { parseInternalDatasetArgs, runInternalDatasetCommand } = require('../benchmark/scripts/internal-benchmark-dataset');
+  const fixture = createFixture(100);
+  try {
+    const parsed = parseInternalDatasetArgs(commandArgs(fixture.root, 'freeze', [
+      '--review-root', 'review', '--review-pack', 'review-packs/run-a/review-pack.json', '--freeze-root', 'frozen',
+      '--dataset-id', 'expression-zh-fleurs', '--dataset-version', 'v1',
+    ]));
+    assert.throws(() => runInternalDatasetCommand(parsed, { allowExternal: true, createStore() { return {
+      getSummary: () => ({ totalCount: 100, confirmedCount: 0, pendingCount: 0, invalidCount: 0, staleCount: 100 }),
+    }; } }), /100 current explicit human confirmations/i);
   } finally {
     fs.rmSync(fixture.root, { recursive: true, force: true });
   }

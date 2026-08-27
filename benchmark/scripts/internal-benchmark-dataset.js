@@ -13,14 +13,15 @@ const {
   loadFinalTranscriptRecord,
   writeFinalTranscriptRecord,
 } = require('../lib/benchmark-dataset-freeze');
+const { createInternalReviewStore } = require('../lib/internal-review-store');
 
 const COMMAND_FLAGS = Object.freeze({
   'validate-intake': ['--dataset-root', '--intake'],
   'record-transcript': ['--dataset-root', '--intake', '--review-root', '--candidate-id', '--transcript-file', '--reviewer-alias'],
   'review-status': ['--dataset-root', '--intake', '--review-root'],
-  freeze: ['--dataset-root', '--intake', '--review-root', '--freeze-root', '--dataset-id', '--dataset-version'],
+  freeze: ['--dataset-root', '--intake', '--review-root', '--review-pack', '--freeze-root', '--dataset-id', '--dataset-version'],
 });
-const RELATIVE_PATH_FLAGS = new Set(['--intake', '--review-root', '--freeze-root', '--transcript-file']);
+const RELATIVE_PATH_FLAGS = new Set(['--intake', '--review-root', '--review-pack', '--freeze-root', '--transcript-file']);
 
 function assertRelativePath(value, name) {
   if (typeof value !== 'string' || value.trim() === '') throw new Error(`${name} must be a non-empty relative path`);
@@ -58,6 +59,7 @@ function parseInternalDatasetArgs(argv) {
     datasetRoot,
     intake: values.get('--intake'),
     reviewRoot: values.get('--review-root'),
+    reviewPack: values.get('--review-pack'),
     freezeRoot: values.get('--freeze-root'),
     candidateId: values.get('--candidate-id'),
     transcriptFile: values.get('--transcript-file'),
@@ -166,9 +168,20 @@ function reviewStatus(parsed, intake) {
   };
 }
 
-function freezeDataset(parsed, intake) {
+function freezeDataset(parsed, intake, createStore) {
   const reviewRoot = ensureExternalSubdirectory(parsed.datasetRoot, parsed.reviewRoot);
   const freezeRoot = ensureExternalSubdirectory(parsed.datasetRoot, parsed.freezeRoot);
+  const store = createStore({
+    datasetRoot: parsed.datasetRoot,
+    intakePath: parsed.intake,
+    reviewRoot: parsed.reviewRoot,
+    reviewPackPath: parsed.reviewPack,
+    reviewerAlias: 'freeze-gate',
+  });
+  const summary = store.getSummary();
+  if (summary.totalCount !== 100 || summary.confirmedCount !== 100 || summary.pendingCount || summary.invalidCount || summary.staleCount) {
+    throw new Error('freeze requires 100 current explicit human confirmations');
+  }
   return {
     command: 'freeze',
     ...freezeReviewedDataset({
@@ -179,6 +192,7 @@ function freezeDataset(parsed, intake) {
       candidateIds: intake.samples.map(({ id }) => id),
       datasetId: parsed.datasetId,
       datasetVersion: parsed.datasetVersion,
+      reviewContextByCandidate: store.getReviewContexts(),
     }),
   };
 }
@@ -186,6 +200,7 @@ function freezeDataset(parsed, intake) {
 function runInternalDatasetCommand(parsed, {
   allowExternal = process.env.ASSISTED_REVIEW_ALLOW_EXTERNAL === '1',
   now = () => new Date().toISOString(),
+  createStore = createInternalReviewStore,
 } = {}) {
   if (allowExternal !== true) throw new Error('ASSISTED_REVIEW_ALLOW_EXTERNAL=1 is required');
   canonicalizeExternalRoot(parsed.datasetRoot);
@@ -193,7 +208,7 @@ function runInternalDatasetCommand(parsed, {
   if (parsed.command === 'validate-intake') return validateIntake(parsed, intake);
   if (parsed.command === 'record-transcript') return recordTranscript(parsed, now);
   if (parsed.command === 'review-status') return reviewStatus(parsed, intake);
-  return freezeDataset(parsed, intake);
+  return freezeDataset(parsed, intake, createStore);
 }
 
 function main(argv) {
