@@ -125,3 +125,31 @@ production manifest, writes manifest/dataset digests and a freeze report, then
 publishes only to an absent version directory. Re-running the same version is
 an error. Run it only after the review-context status above is exactly 100/100,
 then re-run frozen-manifest validation as a separate pass.
+
+## Frozen BM-01 evidence (2026-08-27)
+
+The first create-new freeze completed under the portable external path
+`frozen/expression-zh-fleurs/v1/` at `2026-08-27T08:29:29.2397482Z`, using
+review/tooling commit `3badd74bd4755542bfe9bec92ab204f2027d4017`.
+
+- Dataset ID/version: `expression-zh-fleurs` / `v1`
+- Selected/omitted: `100` / `0`
+- Duration: `1201680` ms
+- Current tag coverage: `mandarin: 100`; the deferred optional strata remain
+  non-blocking for this accepted first FLEURS freeze
+- Source revision: `gcs-generation-1650974174867084`
+- Review-pack SHA-256:
+  `91aa34aad003ca2715908964757f304a34f98218af762935bcaa3d985b97bea4`
+- Manifest SHA-256:
+  `600bf66fe11273e0c34b5f8859f7a59efce6eddf607cf5fa13ad186cb0469593`
+- Dataset SHA-256:
+  `c7e67435634355d983cabe349f40ad94c116d06c45d00e3166d73dada4c33067`
+
+Independent validation loaded only the frozen directory, revalidated all 100
+PCM files and audio hashes, and recomputed both digests. A BM-02 no-inference
+fake-adapter dry run at commit
+`4113b9d20d77b33211950fd2a88c9d33d853df76` read the frozen dataset as exactly
+100 samples. A companion no-inference handoff check resolved exactly the three
+verified registry families and emitted clean Git, OS, hardware, runtime, and
+thread fields. Real three-candidate adapter integration remains BM-02 + D-01
+work and is not a reason to reopen BM-01 transcripts or dataset scope.

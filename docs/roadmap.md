@@ -123,7 +123,7 @@ flowchart LR
 
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
-| BM-01 | P0 | 冻结内部 benchmark 数据集（In Progress） | 接受现有 100 条 FLEURS `cmn_hans_cn` 候选；以“上游 transcript + 三模型建议 + 一名人工最终校对”形成全部 100 条参考 transcript，并通过轻量 create-new 工具冻结音频、manifest、source/license、manifest hash 和 dataset hash | T-01 | 100 条真人中文 PCM 音频全部有人工确认终稿；manifest 稳定绑定 audio ↔ transcript；来源/许可证与所有音频 SHA-256 可复现 |
+| BM-01 | P0 | 冻结内部 benchmark 数据集（Completed） | 接受现有 100 条 FLEURS `cmn_hans_cn` 候选；以“上游 transcript + 三模型建议 + 一名人工最终校对”形成全部 100 条参考 transcript，并通过轻量 create-new 工具冻结音频、manifest、source/license、manifest hash 和 dataset hash | T-01 | 100 条真人中文 PCM 音频全部有人工确认终稿；manifest 稳定绑定 audio ↔ transcript；来源/许可证与所有音频 SHA-256 可复现 |
 | BM-02 | P0 | 建公平可复跑 harness | 同一入口对同一冻结 manifest 输出逐条与汇总 JSON/CSV：CER、首 partial、最终延迟、RTF、CPU、峰值 RAM、failure rate、模型/环境/dataset/Git 证据；每个预期样本/重复都有成功或失败行 | BM-01 Contract Gate（开发）；BM-01 冻结数据集（验收） | 同设备/语料/参数可复跑；失败样本不静默排除；已有 run 不被覆盖 |
 | BM-03 | P1 | 保留音频采样率兼容性验证 | 保留合成 fixture 与已有真实设备证据；继续收集 44.1/48 kHz 设备记录，但移至产品 AudioCapture/重采样兼容性验证，不阻塞 ASR 模型排名 | T-01 | 已有能力和证据不删除；真实设备缺口明确记录并交给 Phase 4 |
 | BM-04 | P0 | 跑当前 Paraformer 对照 | 冻结当前 Paraformer 版本、hash、许可证和配置，在固定 BM-01 数据集/机器/参数下串行运行 | BM-01,BM-02,D-01 | CER、latency、RTF、CPU、RAM、failure rate 和完整逐条结果 |
@@ -131,11 +131,11 @@ flowchart LR
 | BM-06 | P0 | 跑 SenseVoiceSmall | 冻结 Sherpa-ONNX INT8 版本/hash/config；按 utterance 模式运行，`firstPartialMs: null`，不得伪装 streaming partial | BM-01,BM-02,D-01 | 与 BM-04/05 同结构的完整结果，并明确 utterance UX 差异 |
 | BM-07 | P2 / Deferred | ASR 执行边界 spike | 后续再比较 utility/child process 与 worker thread；不得进入当前 M2 关键路径 | D-02 后重新排期 | 当前跳过；不阻塞 BM-01～BM-06 与 D-02 |
 
-#### Phase 2 执行记录（更新至 2026-08-26）
+#### Phase 2 执行记录（更新至 2026-08-27）
 
 | ID | 状态 | Owner | 证据 |
 |---|---|---|---|
-| BM-01 | In Progress | Codex + maintainer | **Corrected Contract Gate** `f06a43b` 保持有效；轻量终稿记录、强制全部 100 条的 create-new 冻结 core、四命令 CLI 与操作文档已由 `e287dad` 实现。真实 intake 已只读校验 100/100。旧辅助审核/安全历史保留但不再依赖。剩余业务门禁是三模型 review aid、维护者逐条听音确认全部 100 条、正式冻结与二次校验；自动化测试通过不等于这些人工/外部步骤完成。 |
+| BM-01 | Completed | Codex + maintainer | 维护者完成 100/100 人工听音终稿确认；`expression-zh-fleurs/v1` create-new 冻结为 100 selected、0 omitted、1201680 ms。独立从冻结目录重验 100 个 PCM/audio hash；manifest SHA-256 `600bf66f…69593`，dataset SHA-256 `c7e67435…33067`。BM-02 fake dry-run 在 `4113b9d` 无原生推理读取为 100 条；真实三候选 adapter/environment 接入进入 BM-02 + D-01，不回开 BM-01 数据范围。 |
 
 #### Phase 2 门禁调整（2026-08-26）
 
@@ -220,8 +220,8 @@ flowchart LR
 
 ## 5.1 当前三步关键路径
 
-1. **BM-01**：完成轻量终稿/冻结工具；维护者随后逐条听音确认全部 100 条并冻结。
-2. **BM-02 + D-01**：只接入 Paraformer、小型 Zipformer、SenseVoiceSmall，补齐公平运行证据并冻结上述门槛与决策顺序。
+1. **BM-01（已完成）**：100 条人工终稿与 `expression-zh-fleurs/v1` 已冻结并独立复核。
+2. **BM-02 + D-01（当前）**：只接入 Paraformer、小型 Zipformer、SenseVoiceSmall，补齐公平运行证据并冻结上述门槛与决策顺序。
 3. **BM-04～BM-06 + D-02**：同机串行正式运行三候选，随后以结果与许可证边界接受模型 ADR。BM-03 保留但不阻塞，integration 时最后合入，必要时可晚于 D-02。
 
 ## 6. Roadmap 维护规则

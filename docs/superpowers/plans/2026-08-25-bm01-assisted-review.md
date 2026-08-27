@@ -252,20 +252,23 @@ a later independent cleanup commit.
 - External only: `final-transcripts/<candidateId>/<bindingSha256>/<reviewContextSha256>.json`
 - External only: human working copies of the review pack
 
-- [ ] **Step 1: Prioritize review**
+- [x] **Step 1: Prioritize review**
 
   Present high disagreement, failed attempts, numbers/names, code-switch, and
   empty-output samples first. Low-risk exact agreements may be reviewed in a
   fast batch, but still require an explicit human confirmation.
 
-- [ ] **Step 2: Record all 100 human-final transcripts**
+  All 100 candidates were reviewed and explicitly confirmed; completeness
+  superseded any remaining ordering preference.
+
+- [x] **Step 2: Record all 100 human-final transcripts**
 
   For each selected sample, a person listens to the audio, corrects the final
   transcript, and explicitly confirms it. Codex may prepare suggestions,
   compare candidates, detect empty/duplicate text, and write records after the
   confirmed text is supplied; Codex must not invent the confirmation.
 
-- [ ] **Step 3: Run review-status checks after each batch**
+- [x] **Step 3: Run review-status checks after each batch**
 
   Report confirmed, stale, invalid, and pending counts plus the exact candidates
   still requiring listening. No second reviewer, license transition, PII
@@ -278,26 +281,40 @@ a later independent cleanup commit.
 - Modify after successful external freeze: `docs/development.md`
 - Modify after successful external freeze: `docs/roadmap.md`
 
-- [ ] **Step 1: Freeze a new dataset version**
+- [x] **Step 1: Freeze a new dataset version**
 
   Select all 100 valid human-confirmed candidates and run the create-new freeze
   command. Record dataset ID/version, manifest SHA-256, dataset SHA-256, source
   revision, selected count (exactly 100), omitted count/reasons, duration, and
   the current limited tag coverage.
 
-- [ ] **Step 2: Revalidate from the frozen directory**
+  Frozen as `expression-zh-fleurs/v1`: 100 selected, 0 omitted, 1201680 ms,
+  `mandarin: 100`, source revision `gcs-generation-1650974174867084`, manifest
+  SHA-256 `600bf66fe11273e0c34b5f8859f7a59efce6eddf607cf5fa13ad186cb0469593`,
+  and dataset SHA-256
+  `c7e67435634355d983cabe349f40ad94c116d06c45d00e3166d73dada4c33067`.
+
+- [x] **Step 2: Revalidate from the frozen directory**
 
   Load the emitted manifest using the frozen directory as dataset root, hash
   every audio file again, and confirm the dataset digest. The validation must
   not depend on the mutable intake or review directories.
 
-- [ ] **Step 3: Exercise the BM-02 dry-run contract**
+- [x] **Step 3: Exercise the BM-02 dry-run contract**
 
   Run BM-02 without native inference and confirm it sees exactly the frozen
   manifest sample count, candidate registry, output permissions, Git SHA, and
   environment fields.
 
-- [ ] **Step 4: Update BM-01 evidence and status**
+  The current BM-02 fake-adapter dry run at `4113b9d` performed no native
+  inference and read the frozen manifest as `expression-zh-fleurs`, 100
+  samples, and the independent output root was accepted. A companion
+  no-inference check resolved exactly the verified Paraformer, small Zipformer,
+  and SenseVoiceSmall registry entries and emitted clean Git SHA plus OS,
+  hardware, runtime, and thread fields. Real candidate adapters remain BM-02 +
+  D-01 scope, not a reason to reopen the completed BM-01 dataset.
+
+- [x] **Step 4: Update BM-01 evidence and status**
 
   Mark BM-01 Completed only after Steps 1–3 pass. Commit only de-identified
   documentation and portable hashes; do not commit audio, raw transcripts,
