@@ -3,7 +3,7 @@
 BM-02 提供独立的 Node CLI；它不调用生产 `lib/asr.js`、Audio、IPC、Electron Main 或默认模型。候选必须通过 `benchmark/lib/adapter.js` 的最小契约接入：
 
 ```js
-createBenchmarkAdapter({ candidateId, candidateConfig })
+createBenchmarkAdapter({ candidateId, candidateConfig, datasetRoot, modelRoot, registryPath })
 // -> { init(), transcribe(sample, { onPartial, onFinal }, { signal }), cancel({ reason, signal }), dispose() }
 ```
 
@@ -12,7 +12,7 @@ createBenchmarkAdapter({ candidateId, candidateConfig })
 ```text
 <output-root>/<run-id>/
 ├── samples.jsonl       # 保留每个 sample/repetition，包括失败记录
-├── summary.json        # 总计、数值统计和 tag 分层统计
+├── summary.json        # 总计、failureRate、corpusCer、数值统计和 tag 分层统计
 ├── summary.csv         # 固定 UTF-8 CSV 列：scope,tag,metric,count,missing,mean,median,p95
 ├── environment.json    # Git、OS/硬件、runtime、threads、候选/model file fingerprints
 └── failures.jsonl      # init/dispose 等候选级失败；不改变 sample/repetition 分母
@@ -29,8 +29,11 @@ node benchmark/run.js `
   --manifest D:\controlled-dataset\manifest.json `
   --dataset-root D:\controlled-dataset `
   --candidate <candidate-id> `
+  --model-root D:\verified-models `
+  --registry D:\model-prep\benchmark\models\candidates.json `
   --output-root D:\benchmark-output `
-  --repetitions 3
+  --repetitions 1 `
+  --sample-timeout-ms 30000
 ```
 
 正式运行拒绝 dirty worktree、未知 candidate、非正 repetitions、缺失必需路径，以及规范解析后位于 dataset root 内的 output root。dirty gate 与环境快照共用 harness 仓库根目录的 Git 溯源，不受调用进程 cwd 影响。即使 output root 尚不存在，也会先解析既有祖先；创建后及原子预留 run ID 前再次解析，因而 Windows junction/symlink 不能绕过该限制。每个非 dry-run 正式运行以 output root 内的 `.benchmark-formal.lock` 互斥；已有锁（包括 stale lock）一律拒绝，必须由操作人员先确认并显式清除。run ID 由 reservation sentinel 原子预留；staging 写入失败时清理 staging 与 reservation，不会留下可见的最终 run 目录；成功后仅用一次同级目录 rename 发布完整结果。
@@ -41,4 +44,4 @@ node benchmark/run.js `
 
 ## 当前边界
 
-截至 2026-08-25，BM-02 harness 代码与 synthetic fixture 验证已经完成，但 **BM-02 仍为 In Progress**。BM-01 尚未提供 50–100 条经授权、脱敏、双人复核的真实中文语料，因此不得把 fake 结果或此文档视为模型评测、候选排名或 ADR-0005 决策依据。BM-04～BM-06 与 D-01～D-02 继续被 BM-01 阻塞。
+截至 2026-08-27，BM-01 已冻结 `expression-zh-fleurs/v1` 的 100 条人工核查终稿；BM-02 已接入 Paraformer、small Zipformer 和 SenseVoiceSmall，并完成每候选一轮 100 条比较。结果和边界见 `docs/benchmark/bm02-comparison-2026-08-27.md`。这次比较不测生产 Audio/IPC/UI、真实时间流式体验或模型许可证可交付性，因此不能单独接受 ADR-0005 或修改生产默认模型。

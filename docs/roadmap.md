@@ -97,20 +97,21 @@ flowchart LR
 
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
-| BM-01 | P0 | 建 benchmark 数据集（In Progress） | 已建立版本化 manifest 契约、路径/哈希校验、质量汇总和无隐私合成示例；仍需准备经授权、脱敏、人工双人复核的 50～100 条真实中文表达训练录音，并按普通话/语速/轻口音/中英/数字专名/噪声分层 | T-01 | 每条有 ground truth、类别、来源/许可；数量不足时明确局限，不能标记 Completed |
+| BM-01 | P0 | 建 benchmark 数据集 | 冻结 100 条人工核查中文终稿及对应音频、来源和许可元数据 | T-01 | 每条有 ground truth、类别、来源/许可；数量不足时明确局限 |
 | BM-02 | P0 | 建可复跑 harness | 同一入口输出逐条与汇总 JSON/CSV：CER、首 partial、最终延迟、RTF、CPU、峰值 RAM、初始化、模型大小；记录硬件/OS/线程/版本 | BM-01 | 同设备重复运行差异可解释；原始结果可审计 |
 | BM-03 | P0 | 验证音频基线 | 用合成频率/时长 fixture 和真实 44.1/48 kHz 设备记录当前 AudioContext 实际率，证明当前链路是否误声明采样率 | T-01 | 得到可复现证据，不再只凭风险推断 |
 | BM-04 | P0 | 跑当前对照 | 冻结当前 Paraformer 归档、hash、许可证和配置，测 cold/warm 与真实流式路径 | BM-02,BM-03 | 完整原始结果和失败日志 |
-| BM-05 | P0 | 跑 Zipformer 候选 | 至少测试小型中文 streaming Zipformer；资源允许时加较大中文版本，使用同一 Sherpa/硬件规则 | BM-02 | 完整原始结果，不只记录公开榜单 |
+| BM-05 | P0 | 跑 Zipformer 候选 | 测试已冻结的小型中文 streaming Zipformer，使用同一 Sherpa/硬件规则 | BM-02 | 完整原始结果，不只记录公开榜单 |
 | BM-06 | P0 | 跑 SenseVoiceSmall | 使用 Sherpa-ONNX INT8，明确 VAD/utterance 方式；分别度量句级完成体验，不能伪装为 streaming partial | BM-02 | 与产品 UX 权重一致的结果 |
 | BM-07 | P1 | ASR 执行边界 spike | 用当前模型最小比较 utility/child process 与 worker thread：加载、feed、stop、退出、重启、打包路径、Main 延迟 | T-07,BM-04 | ADR-0006 所需数据齐全 |
 
-#### Phase 2 执行记录（2026-08-25）
+#### Phase 2 执行记录（更新于 2026-08-27）
 
 | ID | 状态 | Owner | 证据 |
 |---|---|---|---|
-| BM-01 | In Progress | Codex + maintainer | Corrected Contract Gate commit `f06a43bb2819aac07e4ecbd0ebd3fd27576e99e1`：schema、Node 内置 validator、路径/哈希/WAV 元数据测试、质量汇总和合成 1 kHz fixture。当前治理 manifest 为 `expression-zh-v1` / `0.1.0`，SHA-256 `1dadf62bace0cdd8961718b9dd9c50cb0bdb0136a8c08fb0ac480a8a8326b948`，0 条 / 0 ms，7 个分层均为 0。原始音频必须保留在 Git 外受控 dataset root；尚未满足 50～100 条经授权、脱敏、双人复核真实中文录音的完成标准，故不能 Completed。 |
-| BM-02 | In Progress | Codex + maintainer | Harness 已实现并用 fake/synthetic fixture 连续复跑与故障注入；逐条 JSONL、汇总 JSON/CSV、环境快照、不可覆盖 run 和失败记录见 `docs/benchmark/harness.md` 与 `benchmark/results/fixtures/reproducibility-report.md`。BM-01 未完成，故不得标记 Completed、合入 main 或用于候选排名。 |
+| BM-01 | Completed | Codex + maintainer | 外部冻结集 `expression-zh-fleurs/v1`：100 条 / 1,201,680 ms，manifest SHA-256 `600bf66fe11273e0c34b5f8859f7a59efce6eddf607cf5fa13ad186cb0469593`，dataset SHA-256 `c7e67435634355d983cabe349f40ad94c116d06c45d00e3166d73dada4c33067`；100 条 transcript 均由 maintainer 人工核查确认。 |
+| BM-02 | Completed | Codex + maintainer | Commit `703f1630ba2bbcfcb98c914bc67c95e0b120ddc1` 接入三个已冻结候选；三次 clean-worktree 独立进程运行各含 100 条结果、0 失败，完整环境与模型指纹在仓库外结果目录。简表及原始目录见 `docs/benchmark/bm02-comparison-2026-08-27.md`。 |
+| BM-04～BM-06 | Completed（当前简单比较范围） | Codex + maintainer | Paraformer、small Zipformer、SenseVoiceSmall 均完成单轮 100 条；本轮不测生产 Audio/IPC/UI 或真实时间流式 UX，不把结果扩张为 D-02 生产默认决定。 |
 
 > FunASR-Nano、Whisper、WASM 可作为研究参考，但不阻塞首轮决策，也不进入默认运行依赖。
 
@@ -120,6 +121,13 @@ flowchart LR
 |---|---|---|---|---|---|
 | D-01 | P0 | 冻结产品权重 | 在看汇总排名前确认准确率、首字/最终延迟、RAM、体积、许可证和 streaming UX 权重 | BM-01,BM-02 | 权重版本化且不会为偏好结果事后修改 |
 | D-02 | P0 | 接受模型 ADR | 用 BM-04～06 数据更新 ADR-0005；记录默认模型、版本/hash/config、对照结果和回退模型 | D-01,BM-04～06 | ADR Accepted；不得只有“新模型更好” |
+
+#### Phase 3 执行记录（2026-08-27）
+
+| ID | 状态 | 证据 |
+|---|---|---|
+| D-01 | Completed | 当前简单比较规则在运行前确认：失败率 ≤5%、平均 RTF ≤1；过门槛后以 corpus CER 为主，只有 CER 接近时才比较性能/资源。三候选均过门槛，SenseVoiceSmall corpus CER 最低。 |
+| D-02 | Proposed | SenseVoiceSmall 是当前 benchmark 准确率领先者，但三款候选的 redistribution 仍为 `not-approved`，且本轮不覆盖生产实时流式 UX；不修改生产默认模型。 |
 | D-03 | P0 | 接受执行边界 ADR | 基于 BM-07 接受 ADR-0006，明确消息协议、故障恢复和打包方式 | BM-07 | utility/child/worker 选择有数据 |
 | D-04 | P1 | 复审目标架构 | 用已接受的模型/执行机制更新 `target.md`、NFR 性能门槛和支持矩阵 | D-02,D-03 | 目标中不再保留可由实测解决的 TBD |
 
