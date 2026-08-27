@@ -1,0 +1,88 @@
+{
+  "schemaVersion": 1,
+  "candidates": [
+    {
+      "id": "paraformer-bilingual-zh-en-control",
+      "displayName": "Paraformer bilingual Chinese-English control",
+      "family": "paraformer",
+      "mode": "streaming",
+      "status": "verified",
+      "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-paraformer-bilingual-zh-en.tar.bz2",
+      "upstreamVersion": "2024-03-10",
+      "license": {
+        "model": { "status": "unresolved", "reason": "Official Sherpa documentation identifies the upstream ModelScope conversion source, but no model or data redistribution grant was established in this run.", "source": "https://www.modelscope.cn/models/damo/speech_paraformer_asr_nat-zh-cn-16k-common-vocab8404-online/summary" },
+        "code": { "spdx": "Apache-2.0", "location": "https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE" },
+        "redistribution": "not-approved"
+      },
+      "evidence": {
+        "source": { "status": "verified", "checkedAt": "2026-08-25T10:00:00.000Z" },
+        "license": { "status": "unverified", "checkedAt": "2026-08-25T10:00:00.000Z" },
+        "files": { "status": "verified", "reason": "Complete official archive matched the 1,047,319,737-byte GitHub release size; extracted runtime files were SHA-256 verified locally.", "verifiedAt": "2026-08-25T10:00:00.000Z" },
+        "nativeLoad": { "status": "passed", "reason": "Sherpa-ONNX 1.13.3 native OnlineRecognizer initialization completed on Windows x64.", "recordedAt": "2026-08-25T10:00:00.000Z" }
+      },
+      "sampleRateHz": 16000,
+      "numThreads": 2,
+      "provider": "cpu",
+      "files": [
+        { "relativePath": "sherpa-onnx-streaming-paraformer-bilingual-zh-en/encoder.int8.onnx", "sha256": "81a70226a8934e6ed92aa1d4fc486b428b5398e2f2619ed4897b7294cab90e9a", "bytes": 165462184, "role": "encoder" },
+        { "relativePath": "sherpa-onnx-streaming-paraformer-bilingual-zh-en/decoder.int8.onnx", "sha256": "f3cca9f77bb9d93c8fcbfb63ae617b6b1ee96818df3aa3b151c40658fe38594f", "bytes": 71664561, "role": "decoder" },
+        { "relativePath": "sherpa-onnx-streaming-paraformer-bilingual-zh-en/tokens.txt", "sha256": "59aba8873a2ed1e122c25fee421e25f283b63290efbde85c1f01a853d83cb6e6", "bytes": 75756, "role": "tokens" }
+      ]
+    },
+    {
+      "id": "zipformer-small-ctc-zh-int8-2025-04-01",
+      "displayName": "Zipformer small CTC Chinese INT8",
+      "family": "zipformer-ctc",
+      "mode": "streaming",
+      "status": "verified",
+      "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01.tar.bz2",
+      "upstreamVersion": "2025-04-01",
+      "license": {
+        "model": { "status": "unverified", "reason": "The official Sherpa page identifies the upstream checkpoint, but the release artifact contains no license file.", "source": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-ctc/zipformer-ctc-models.html" },
+        "code": { "spdx": "Apache-2.0", "location": "https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE" },
+        "redistribution": "not-approved"
+      },
+      "evidence": {
+        "source": { "status": "verified", "checkedAt": "2026-08-25T00:00:00.000Z" },
+        "license": { "status": "unverified", "checkedAt": "2026-08-25T00:00:00.000Z" },
+        "files": { "status": "verified", "reason": "SHA-256 and byte counts were recorded from the accepted official archive.", "verifiedAt": "2026-08-25T00:00:00.000Z" },
+        "nativeLoad": { "status": "passed", "reason": "Sherpa-ONNX native online recognizer initialization completed on Windows x64.", "recordedAt": "2026-08-25T00:00:00.000Z" }
+      },
+      "sampleRateHz": 16000,
+      "numThreads": 2,
+      "provider": "cpu",
+      "files": [
+        { "relativePath": "sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01/model.int8.onnx", "sha256": "68c9c943840f7d9cf3e8a4970ba50f404feb5277f611fa82b7e72267786fa84a", "bytes": 26342340, "role": "model" },
+        { "relativePath": "sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01/tokens.txt", "sha256": "6fed8c6c248516f38e7faa19404b57413e8ce259f1cbc1fa4aebc86eac32fdfd", "bytes": 13366, "role": "tokens" },
+        { "relativePath": "sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01/bbpe.model", "sha256": "503204e0690eff065e30d0e01898c9ab06d0e6dc376a741eb6846198f95b2f82", "bytes": 255180, "role": "bpe-vocab" }
+      ]
+    },
+    {
+      "id": "sensevoice-small-int8-2024-07-17",
+      "displayName": "SenseVoiceSmall INT8 utterance candidate",
+      "family": "sensevoice",
+      "mode": "utterance",
+      "status": "verified",
+      "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2",
+      "upstreamVersion": "2024-07-17",
+      "license": {
+        "model": { "status": "unresolved", "reason": "The embedded LICENSE only refers to the FunASR repository; no model or data redistribution grant was established in this run.", "source": "https://github.com/modelscope/FunASR?tab=readme-ov-file#license" },
+        "code": { "spdx": "Apache-2.0", "location": "https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE" },
+        "redistribution": "not-approved"
+      },
+      "evidence": {
+        "source": { "status": "verified", "checkedAt": "2026-08-25T10:00:00.000Z" },
+        "license": { "status": "unverified", "checkedAt": "2026-08-25T10:00:00.000Z" },
+        "files": { "status": "verified", "reason": "Complete official archive matched the 163,002,883-byte GitHub release size and published SHA-256; extracted runtime files were SHA-256 verified locally.", "verifiedAt": "2026-08-25T10:00:00.000Z" },
+        "nativeLoad": { "status": "passed", "reason": "Sherpa-ONNX 1.13.3 native OfflineRecognizer initialization completed on Windows x64.", "recordedAt": "2026-08-25T10:00:00.000Z" }
+      },
+      "sampleRateHz": 16000,
+      "numThreads": 2,
+      "provider": "cpu",
+      "files": [
+        { "relativePath": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/model.int8.onnx", "sha256": "c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51", "bytes": 239233841, "role": "model" },
+        { "relativePath": "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17/tokens.txt", "sha256": "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc", "bytes": 315894, "role": "tokens" }
+      ]
+    }
+  ]
+}
