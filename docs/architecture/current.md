@@ -1,6 +1,6 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 Smoke（尚未完成真实设备/模型运行验收）
+> 状态：Verified from Source + Electron 43 Smoke；BM-02 三候选简单比较 Completed，ADR-0005 Accepted（保留 Paraformer 默认）
 > 基线日期：2026-08-23
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
 > 描述对象：截至 Phase 1 / T-08 状态；基于 T-04～T-07 集成提交 `33a6ee59c321f613d66357bff4ead09835387010` 的受控升级
@@ -33,6 +33,8 @@ data/*.json                     词库数据
 package.json / package-lock.json
 test/electron-smoke.test.js      Node 测试父进程、超时、日志和清理
 smoke/electron-smoke-runner.js  Electron 内 smoke 驱动与 Fake ASR/LLM
+benchmark/run.js                 独立 benchmark CLI；不进入生产 ASR/Audio/IPC/Main 路径
+benchmark/lib/*.js               manifest、CER、metrics、environment、results 与 adapter 契约
 ```
 
 ## 2. 当前目标与范围
@@ -68,6 +70,10 @@ smoke/electron-smoke-runner.js  Electron 内 smoke 驱动与 Fake ASR/LLM
 | 构建/测试 | scripts 为 `start`、`dev`、`test`、`check` | `node:test` 覆盖模块入口、词库、设置迁移、尾部文本、安全渲染、LLM 请求控制和真实 Electron smoke；LLM 单测使用 fake fetch，smoke 使用 Fake ASR/LLM；无 build/package/CI 配置 |
 
 开发工具基线固定为 Node 22.23.x/npm 12.0.x，与 Electron 内置 Node 24.18.1 明确区分。本轮只验证 Windows NT 10.0.26200.0 x64；Electron 38 起的 macOS 12+ 下限、Linux GTK/Wayland 和正式最低 Windows 版本仍没有 CI、打包配置或制品测试证明。
+
+### 3.1 BM-02 harness（Completed）
+
+BM-02 提供独立 benchmark CLI，用 BM-01 manifest 输出每个 sample/repetition 的 JSONL、汇总 JSON/CSV、环境快照及 tag 分层统计；失败的 init、sample、timeout 和 dispose 事件也会被落盘。它不改动生产 `lib/asr.js`、Audio、IPC、Main 或默认模型，且没有新增依赖。fake adapter 的重复运行和故障注入证据见 `benchmark/results/fixtures/reproducibility-report.md`。2026-08-27，harness 在 clean commit `703f1630ba2bbcfcb98c914bc67c95e0b120ddc1` 上完成 Paraformer、small Zipformer 与 SenseVoiceSmall 各一轮 100 条比较，全部 0 失败；结果见 `docs/benchmark/bm02-comparison-2026-08-27.md`。维护者接受 ADR-0005 并保留现有 Paraformer 默认，因此生产代码无需切换；模型再分发许可仍是后续发布门禁。
 
 ## 4. C4 Level 2：当前容器/运行边界
 
@@ -205,7 +211,7 @@ BM-01 已由 Corrected Contract Gate `f06a43bb2819aac07e4ecbd0ebd3fd27576e99e1` 
 
 当前治理 manifest 为 `expression-zh-v1` / `0.1.0`，SHA-256 为 `1dadf62bace0cdd8961718b9dd9c50cb0bdb0136a8c08fb0ac480a8a8326b948`。截至 2026-08-25，它包含 0 条、0 ms：普通话、快/慢语速、轻口音、中英混合、数字/专名和轻噪声均为 0；没有许可证或再分发观察。仓库另有 1 秒 16 kHz/单声道/16-bit PCM/1 kHz 合成 WAV 作为无隐私合同 fixture，但它不代表人声、不计入 benchmark 语料，也不能作为人工复核证据。
 
-原始音频应位于 Git 外的受控 dataset root，manifest 仅存相对音频路径和已脱敏元数据，不能记录个人身份、联系方式、同意书原件或本机绝对路径。当前没有已提供且可核验的授权真人录音、许可、首次转写或第二人复核 ground truth。因此 BM-01 状态是 **In Progress**；ADR-0005 的语料 Acceptance Gate 尚未满足，不能用于选择默认模型或宣称 CER/延迟/排名结果。
+原始音频位于 Git 外的受控 dataset root，manifest 仅存相对音频路径和已脱敏元数据，不记录个人身份、联系方式、同意书原件或本机绝对路径。2026-08-27 已冻结 `expression-zh-fleurs/v1`：100 条人工核查终稿、1,201,680 ms、CC-BY-4.0 public-corpus，manifest SHA-256 `600bf66fe11273e0c34b5f8859f7a59efce6eddf607cf5fa13ad186cb0469593`。它满足当前简单候选比较的 ground-truth 输入要求；只覆盖 `mandarin`，不代表完整产品场景分层。
 
 ## 6. 当前关键数据流
 

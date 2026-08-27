@@ -93,9 +93,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 - 默认不引入 React、Vue、Vite、Webpack、TypeScript、Python、PyTorch、FunASR、FastAPI、Docker、数据库或插件框架。
 - 目标是降低总体维护和交付复杂度，而不是机械减少文件数、模块数或安装包体积。
 - ASR Provider 和 Model Manager 必须保持轻量；不建设通用框架、模型数据库或模型市场。
-- 当前 Paraformer 作为 benchmark 对照组；Zipformer 与 SenseVoiceSmall 均为候选，不得在 benchmark 前写成最终默认模型。
-- 首轮 benchmark 只比较 Paraformer、小型 Zipformer 和 SenseVoiceSmall；较大 Zipformer、新模型和新语料源均进入后续待办，不得扩张当前矩阵。
-- 当前 FLEURS 普通话语料可用于首轮决策。七类语料覆盖是后期优化目标；前期覆盖一至两类并明确局限即可，不得因此阻塞首轮模型选择。
+- ADR-0005 已根据三候选 benchmark 接受保留 Paraformer 为默认；Zipformer 与 SenseVoiceSmall 的结果作为后续复审基线，不向普通用户暴露多模型选择。
 - 架构迁移采用渐进重构，不推倒重写，不以切换 Electron/Tauri/WASM 为默认路径。
 
 ## 7. 发布级验收场景
@@ -126,7 +124,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 
 1. 当前 `package.json` 为应用 `1.0.0`、Electron `43.4.1`（精确版本）、sherpa-onnx-node `^1.10.0`；lock/安装树为 43.4.1/1.13.3，开发基线为 Node 22.23.0/npm 12.0.2。Electron runtime 实测为 Node 24.18.1、Chromium 150.0.7871.224、modules ABI 148；显式清空所有 npm/Electron 缓存后的复跑仍为非阻塞 Runtime-TBD。
 2. README 已把 macOS/Linux 与正式最低 Windows 版本标为 TBD；正式支持等级仍需 CI/制品证据。
-3. Paraformer 模型归档的准确版本、文件 hash、大小和再分发许可证。
+3. Paraformer 的版本、运行文件 hash 与大小已记录；模型再分发许可证仍待发布前确认。
 4. 词库计数/密度是否属于产品认可的评分定义；训练历史目前不持久化，是否需要持久化待产品决定。
 5. 产品最低支持硬件及正式性能预算。
 6. 模型与 LLM 服务的许可证、分发与隐私告知要求。
