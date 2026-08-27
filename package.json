@@ -16,7 +16,7 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "test": "node --test",
-    "check": "node --check main.js && node --check preload.js && node --check lib/ai-feedback.js && node --check lib/asr.js && node --check lib/lexicon.js && node --check lib/prompts.js && node --check lib/settings-config.js && node --check src/app.js && node --check src/safe-rendering.js && node --check src/settings.js && node --check smoke/electron-smoke-runner.js && node --check test/electron-smoke.test.js"
+    "check": "node --check main.js && node --check preload.js && node --check lib/ai-feedback.js && node --check lib/asr.js && node --check lib/lexicon.js && node --check lib/prompts.js && node --check lib/settings-config.js && node --check benchmark/lib/dataset-manifest.js && node --check benchmark/lib/dataset-quality.js && node --check benchmark/lib/dataset-quality-report.js && node --check benchmark/lib/benchmark-dataset-freeze.js && node --check benchmark/lib/assisted-review-batch.js && node --check benchmark/lib/internal-review-store.js && node --check benchmark/lib/assisted-review-server.js && node --check benchmark/assisted-review/review-ui.js && node --check benchmark/scripts/generate-quality-report.js && node --check benchmark/scripts/generate-fleurs-intake-inventory.js && node --check benchmark/scripts/internal-benchmark-dataset.js && node --check benchmark/scripts/internal-benchmark-review.js && node --check src/app.js && node --check src/safe-rendering.js && node --check src/settings.js && node --check smoke/electron-smoke-runner.js && node --check test/electron-smoke.test.js"
   },
   "keywords": ["expression", "training", "speech", "asr", "chinese"],
   "author": "sisi",

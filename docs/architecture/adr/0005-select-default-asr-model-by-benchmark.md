@@ -11,14 +11,15 @@
 
 ## Proposed Decision Process
 
-在接受最终 Decision 前，以当前 Paraformer 为对照，至少比较：
+在接受最终 Decision 前，首轮只比较：
 
 1. `sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01` 或届时冻结的同类小型中文 streaming Zipformer；
-2. 届时冻结版本的较大中文 streaming Zipformer；
-3. Sherpa-ONNX SenseVoiceSmall INT8，明确以 VAD/utterance 方式测量；
-4. 当前 Paraformer。
+2. Sherpa-ONNX SenseVoiceSmall INT8，明确以 VAD/utterance 方式测量；
+3. 当前 Paraformer。
 
-在看结果前冻结：测试语料、硬件、线程、warm/cold 规则、指标权重和最低门槛。核心指标：CER、首个 partial、最终延迟、RTF、CPU、峰值 RAM、初始化时间、模型/制品大小、许可证和跨平台可用性。
+较大 Zipformer、新模型和新语料源作为后续补充，不进入首轮候选矩阵。
+
+在看结果前冻结：测试语料、硬件、线程、warm/cold 规则、指标权重和最低门槛。首轮基本门槛为 failure rate 不高于 5%、RTF 不高于 1；满足门槛后以 CER 为首要选型指标。当 CER 差异处于重复运行波动范围内时，再用性能和资源占用作次级判断。Streaming UX 独立记录，不能把 utterance final 伪装成 streaming partial。许可证不阻塞内部测试，但在 D-02 选择发布默认模型时是硬门槛。
 
 最终通过更新本 ADR 或新建 Accepted ADR 记录：选定模型、版本、配置、数据集版本、原始结果位置和放弃其他候选的原因。
 
@@ -45,7 +46,7 @@
 
 ## Acceptance Gate
 
-- [ ] 语料覆盖普通话、语速、轻口音、中英混合、数字/专名和轻噪声。
+- [ ] 首轮语料至少覆盖一至两类已取得的真实中文语音特征，并明确记录当前 FLEURS 以普通话为主的局限；普通话、语速、轻口音、中英混合、数字/专名、安静与轻噪声的完整覆盖作为后期优化。
 - [ ] 每条音频有经过复核的 ground truth，数据来源/隐私可追溯。
 - [ ] 运行环境、原始逐条结果和汇总可复跑。
 - [ ] 无候选因集成失败而被静默排除；失败也记录。
