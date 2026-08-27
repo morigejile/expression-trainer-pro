@@ -173,7 +173,7 @@ flowchart LR
 
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
-| R-01 | P0 | 包住当前 ASR | 先建立最小 AsrProvider/Fake 契约，让现有 Paraformer 适配；不同时换模型/音频/进程 | T-07,D-02 | UI/业务不 import Sherpa/模型路径；基线行为通过 |
+| R-01 | P0 | 包住当前 ASR（Completed） | 建立当前调用所需的 initialize/feed/stop 契约与 Fake，让现有 Paraformer 适配；不同时换模型/音频/进程 | T-07,D-02 | UI/业务不 import Sherpa/模型路径；基线行为通过 |
 | R-02 | P0 | 建 session/事件协议 | 统一 ready/partial/final/error/stopped，加入 sessionId/sequence/cancel，解决迟到反馈和 stop 竞态 | R-01,T-04 | 旧 session 事件不污染新训练；停止可重复调用 |
 | R-03 | P0 | 分离 AudioCapture | 把权限、track/context 生命周期和 chunk 元数据从 UI 状态中抽出，仍先保留当前处理节点 | R-02,BM-03 | Audio 输出明确 sampleRate/channels/format；生命周期测试通过 |
 | R-04 | P0 | AudioWorklet + Resampler | 以模型 registry 的采样率为目标；使用可测试 resampler；保留 A/B 开关直到真实设备回归通过 | R-03 | 16/44.1/48 kHz fixture 与真实设备通过；移除 ScriptProcessor |
@@ -182,6 +182,12 @@ flowchart LR
 | R-07 | P1 | 实现轻量 Model Manager | 版本化 registry、HTTPS、SHA-256、临时下载/解压、原子激活、上一版本回退；模型存 userData 子目录 | D-02,R-01 | 中断/hash 错/磁盘不足不破坏现有模型 |
 | R-08 | P1 | 激活版本化默认模型 | 用 registry 激活已接受的 Paraformer 版本；不增加普通用户多模型选择，也不做无意义的模型切换 | R-06,R-07,D-02 | 端到端模型文件/config 与 ADR-0005 一致 |
 | R-09 | P1 | 收敛设置/规则/日志 | 演进 schemaVersion、增加原子写和脱敏日志；评估系统凭据库的收益与 native 成本后再决定 Key 存储 | T-03,R-07 | 升级保留配置；日志不含 Key/完整敏感文本 |
+
+#### Phase 4 执行记录（2026-08-27）
+
+| ID | 状态 | 证据 |
+|---|---|---|
+| R-01 | Completed | Main 只组合经过校验的 `initialize/feed/stop` Provider；Paraformer adapter 保留原模型文件、16 kHz、CPU/2 threads、greedy search、endpoint `2.4/1.2/20`、partial/final、stop flush 与 recognizer 复用语义。最小 Fake 进入真实 Electron smoke；Audio、Preload/IPC、Renderer/UI、模型选择与执行边界未改。 |
 
 ### Phase 5 — Electron Forge 打包与发布
 
