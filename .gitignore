@@ -1,4 +1,5 @@
 node_modules/
+.worktrees/
 models/*.onnx
 models/sherpa-onnx-*/
 dist/
