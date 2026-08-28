@@ -1,9 +1,9 @@
 # Expression Trainer 需求基线
 
-> 状态：Draft Baseline  
-> 基线日期：2026-08-22
+> 状态：Current Baseline
+> 基线日期：2026-08-28
 > 适用范围：当前版本（Existing）与下一阶段工程化目标（Planned）
-> 源码基线：`https://github.com/morigejile/expression-trainer-pro.git`，Phase 0 实现 `b16a1d0bf799887cf7ece1283d73463961346030`（本地 `chore/reproducible-build`）；已确认并纳入原有 lockfile 清理
+> 源码基线：`main`，已包含 Phase 4 / R-01 Paraformer Provider 适配
 
 ## 1. 文档目的
 
@@ -52,6 +52,8 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | FR-E08 | 应用应保存各 LLM Provider 配置并兼容旧版扁平配置。 | 配置写入 Electron `userData/settings.json`，按 provider 保存；旧字段在读取时迁移。API Key 当前为明文，属于安全债。 |
 | FR-E09 | 用户应能编辑训练目标、自定义规则、风格参考和额外口癖词。 | 内容保存到 `userData/custom-prompt.json`，后续实时/报告 prompt 读取。 |
 | FR-E10 | 用户应能复制或保存原文与报告。 | 原文可复制/保存为 Markdown；报告可复制/保存为 Markdown；保存路径通过系统对话框选择。 |
+| FR-E11 | 当前 Paraformer 应通过轻量 ASR Provider 边界访问。 | Main 只依赖 initialize/feed/stop 契约；Fake Provider 可在不加载真实模型时验证业务与 smoke 路径。 |
+| FR-E12 | 默认中文模型选择应由项目数据 benchmark 和明确产品取舍支持。 | 三候选比较结果可复跑；ADR-0005 记录继续使用 Paraformer 的 streaming UX 与渐进迁移理由。 |
 
 ### 4.2 Planned
 
@@ -59,16 +61,13 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 |---|---|---|
 | FR-P01 | 音频采集与 ASR 推理应成为独立职责。 | Audio 模块只输出带明确采样率/声道/格式的音频块；业务和 UI 不直接依赖 Sherpa 配置。 |
 | FR-P02 | 音频链路应使用 AudioWorklet，并按模型要求正确重采样。 | 44.1 kHz、48 kHz 等常见输入经测试后以模型声明的采样率送入 ASR；不再使用 `ScriptProcessorNode`。 |
-| FR-P03 | ASR 应通过轻量 Provider 契约访问。 | 至少提供 `start`、`feed`、`stop`/`dispose` 等等价能力；业务测试可使用 Fake Provider，无需加载真实模型。 |
+| FR-P03 | ASR Provider 应补全 session 和规范事件语义。 | 明确 sessionId、sequence、partial/final/error、迟到事件抑制及 dispose 语义；业务测试继续无需加载真实模型。 |
 | FR-P04 | ASR 初始化和推理应移出 Electron Main。 | 长时间初始化/推理不阻塞 Main 事件循环；执行单元失败可检测并向 UI 返回可恢复错误。具体隔离机制由 ADR 决定。 |
 | FR-P05 | 应提供轻量 Model Manager。 | 可依据模型清单检查、下载、SHA-256 校验、原子安装、选择和返回本地模型路径；失败不破坏上一可用模型。 |
 | FR-P06 | 模型与应用版本应解耦。 | 模型清单至少包含 `modelId`、`version`、`engine`、`languages`、文件来源、`sha256` 和兼容版本信息。 |
-| FR-P07 | 默认中文模型应由项目数据 benchmark 决定。 | 在同一设备/语料/参数下比较当前 Paraformer、新 Zipformer 与 SenseVoiceSmall；记录 CER、延迟、RTF、CPU、RAM、模型大小和初始化时间，不预设胜者。 |
 | FR-P08 | 应用应能生成普通用户可安装的桌面制品。 | 通过 Electron Forge 生成目标平台制品；终端用户无需安装 Node.js、Python、CMake 或编译器。 |
 | FR-P09 | 设置、用户数据、模型、缓存和日志应与程序文件分离。 | 应用升级或重装不应默认删除用户数据和已下载模型；实际目录遵循 Electron `userData` 等平台目录。 |
 | FR-P10 | 本地训练在 LLM 不可用时仍应工作。 | 离线、无 API Key 或 LLM 请求失败时，录音、本地 ASR 和基础词库分析仍可完成。 |
-| FR-P11 | 停止训练时不得丢失最后一个未形成 endpoint 的识别结果。 | `stop` 返回的 final text 经去重后合并到当前 session，并进入展示与分析。 |
-| FR-P12 | 展示 ASR、粘贴文本和 LLM 输出前应安全编码/消毒。 | 恶意 HTML/事件属性不得通过 `innerHTML` 执行；高亮和报告格式化测试覆盖脚本/标签输入。 |
 
 ## 5. 非功能需求（NFR）
 
@@ -81,7 +80,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | NFR-05 | 性能 | 默认模型应在项目定义的最低支持设备上满足实时或近实时体验；阈值、设备和场景在 benchmark 方案中冻结。 |
 | NFR-06 | 可靠性 | 模型下载使用校验和与原子替换；ASR/LLM/麦克风错误应可诊断，不得导致未捕获崩溃或损坏上一可用状态。 |
 | NFR-07 | 隐私与安全 | 本地 ASR 音频默认不上传；向 LLM 发送文本前应让用户明确知情。API Key、完整音频和敏感文本不得写入普通日志。 |
-| NFR-08 | 权限隔离 | Renderer 不获得不受限的 Node.js 权限；Preload 仅暴露按能力划分的最小 API。`contextIsolation` 等当前配置需源码复核。 |
+| NFR-08 | 权限隔离 | Renderer 不获得不受限的 Node.js 权限；当前 BrowserWindow 使用 `contextIsolation: true`、`nodeIntegration: false`，Preload 只暴露显式能力。后续新增 IPC 时继续维持该边界。 |
 | NFR-09 | 可测试性 | 词库/配置/模型清单/重采样/Provider 契约有单元测试；IPC/ASR 有集成测试；至少有启动、录音、模型初始化冒烟检查。首阶段不设虚假覆盖率目标。 |
 | NFR-10 | 可移植性 | 支持矩阵按实际 CI 和人工验证定义 Tier 1/2/Experimental；在验证前不宣称 Windows/macOS/Linux 全部同等级支持。 |
 | NFR-11 | 可升级性 | 应用、设置 schema 和模型均有版本；升级失败时保留用户数据和上一可用模型。自动更新服务不属于首个基线。 |
@@ -116,7 +115,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 - 默认引入 Python/FunASR、GPU/CUDA 或云端 ASR 运行栈。
 - 引入 React/Vue、Vite、TypeScript 或复杂状态管理以“现代化”界面。
 - 用户账户、云同步、多人协作、数据库、模型市场和通用插件系统。
-- 在没有真实语料 benchmark 前承诺特定模型准确率、延迟或模型排名。
+- 把当前内部三候选结果外推为公开权威 benchmark、跨设备性能承诺或未测试模型的排名。
 - 首阶段建设自动更新服务、遥测平台或完整崩溃上报后端。
 - 把 SenseVoice 情绪/事件标签直接解释为表达质量评分。
 

@@ -126,11 +126,11 @@ npm start
 ## 开发
 
 ```bash
-# JavaScript语法检查
-npm run check
-
 # 开发模式（带DevTools）
 npm run dev
+
+# 测试
+npm test
 
 # 目录结构
 ├── main.js              # Electron主进程
@@ -143,6 +143,7 @@ npm run dev
 │   └── settings.js      # 设置逻辑
 ├── lib/
 │   ├── asr.js           # 语音识别
+│   ├── asr-provider.js  # ASR provider 契约
 │   ├── lexicon.js       # 词库匹配
 │   ├── ai-feedback.js   # AI反馈
 │   └── prompts.js       # Prompt模板

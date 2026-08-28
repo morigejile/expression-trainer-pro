@@ -21,7 +21,7 @@ ADR 记录“为什么”，架构文档记录“是什么”。ADR 一旦 Accep
 | [0005](0005-select-default-asr-model-by-benchmark.md) | 通过 benchmark 选择默认中文 ASR 模型 | Accepted | 保留 Paraformer 默认；utterance UX、目标平台或许可变化时复审 |
 | [0006](0006-move-asr-out-of-main.md) | 将 ASR 初始化与推理移出 Electron Main | Proposed | 隔离机制 spike、打包、吞吐和故障恢复 |
 | [0007](0007-package-with-electron-forge.md) | 使用 Electron Forge 形成发布制品 | Proposed | Tier 1 平台安装/升级/卸载验证 |
-| [0008](0008-keep-benchmark-as-isolated-non-shipping-tool.md) | 将 Benchmark 保留为同仓库隔离的非发布开发工具 | Accepted | integration/发布配置不得让产品运行时或制品依赖 `benchmark/` |
+| [0008](0008-keep-benchmark-as-isolated-non-shipping-tool.md) | 将 Benchmark 保留为同仓库隔离的非发布开发工具 | Accepted | 核心 harness 保留；已完成的数据制作/review 流程归档；产品运行时不得依赖 `benchmark/` |
 
 ## 编号与模板
 

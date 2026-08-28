@@ -1,45 +1,29 @@
 # Benchmark dataset contract
 
-BM-01 keeps raw audio outside Git. This directory contains only the stable manifest schema, a checked synthetic WAV fixture, and de-identified manifests. `benchmark/lib/dataset-manifest.js` is the executable validator; it uses only Node built-ins.
+`benchmark/lib/dataset-manifest.js` 是当前可执行契约；`manifest.schema.json` 是结构说明。真实音频和正式 manifest 保存在 Git 外，本目录只保留稳定契约与无真人语音的合成 fixture。
 
-## Manifest
+## Manifest v1
 
-Each manifest has `schemaVersion: 1`, a stable `datasetId` and `datasetVersion`, and a `samples` array. A sample has the following required fields:
+每个 manifest 包含 `schemaVersion: 1`、稳定的 `datasetId` / `datasetVersion` 和 `samples`。每条 sample 必须包含：
 
-| Field | Requirement |
+| 字段 | 约束 |
 |---|---|
-| `id` | Unique non-empty identifier without personal information. |
-| `audioFile` | Relative path beneath the caller-provided dataset root. Absolute, lexical escapes, symlinks, and junctions that resolve outside the canonical root are rejected. |
-| `sha256` | Lowercase SHA-256 of the referenced audio file. |
-| `transcript` | Human-reviewed ground truth; never add names, contact details, or consent text. |
-| `locale` | BCP 47 language or language-region tag, e.g. `zh-CN`. |
-| `tags` | Non-empty unique selection from `mandarin`, `fast`, `slow`, `light-accent`, `code-switch`, `numbers-names`, `light-noise`. |
-| `sampleRateHz` / `channels` / `durationMs` | Actual metadata from the WAV bytes, constrained to 8–192 kHz, 1–2 channels, and 1–600000 ms. |
-| `source` | `kind`, a frozen supported SPDX label (`Apache-2.0`, `BSD-3-Clause`, `CC0-1.0`, `CC-BY-4.0`, `CC-BY-SA-4.0`, `MIT`) or `project-local:<label>`, consent state, and redistribution boundary. Participant/public-corpus/synthetic sources require `recorded`/`dataset-license`/`not-required` consent respectively. |
+| `id` | 唯一、非空且不含个人信息 |
+| `audioFile` | 相对于调用方 dataset root 的路径 |
+| `sha256` | 音频文件的小写 SHA-256 |
+| `transcript` | 已人工确认的参考文本 |
+| `locale` | BCP 47 语言或语言-地区标识 |
+| `tags` | 从 schema 允许集合中选择的非空、无重复标签 |
+| `sampleRateHz` / `channels` / `durationMs` | 与 WAV 字节一致的音频元数据 |
+| `source` | 来源类型、许可、同意状态和再分发边界 |
 
-The validator also verifies that every referenced audio file resolves below the canonical dataset root, is opened and rechecked before hashing to reduce path-swap races, and matches the manifest SHA-256. Version 1 accepts only complete RIFF/WAVE, PCM audio-format 1, 16-bit little-endian WAV files; it verifies the manifest sample rate, channel count, and rounded millisecond duration against the bytes. A valid manifest can have zero samples during collection; that never satisfies BM-01 completion criteria.
+Validator 拒绝绝对路径、词法越界及解析后逃离 canonical dataset root 的 symlink/junction；打开文件后复核路径并校验 SHA-256。v1 只接受完整 RIFF/WAVE、PCM format 1、16-bit little-endian 音频，并核对采样率、声道和按字节计算的时长。
 
-## Storage and governance
+## 当前数据
 
-Keep participant and public-corpus audio in a controlled dataset root that is not inside this repository. The `private/` directory is intentionally ignored as a local convenience only; do not use it to store consent originals, contact data, or unapproved recordings. For the current internal FLEURS benchmark, one maintainer listens to every sample and explicitly confirms the final transcript. Dual roles, second-person approval, audit-chain authorization and `approve-policy` are not completion gates.
+- `example/` 是 checked-in 的 1 kHz 合成 PCM WAV，只验证契约，不代表真实语音质量。
+- 正式 `expression-zh-fleurs/v1` 数据集为 Git 外的 100 条人工确认 FLEURS 普通话样本。
+- 正式 manifest SHA-256：`600bf66fe11273e0c34b5f8859f7a59efce6eddf607cf5fa13ad186cb0469593`。
+- 来源、许可和获取证据见 [SOURCES.md](SOURCES.md)。
 
-`example/` is a public, checked-in 1 kHz synthetic PCM WAV. It contains no human speech and demonstrates the contract without implying that synthetic audio counts toward the frozen 100-sample FLEURS requirement.
-
-See [SOURCES.md](SOURCES.md) for the current evidence-backed public-corpus
-acquisition boundary. It records candidate licensing and download constraints;
-it does not claim that any upstream transcript, metadata, or source record has
-completed the human-review gate.
-
-## External FLEURS candidate intake
-
-`benchmark/scripts/generate-fleurs-intake-inventory.js` creates an external
-candidate inventory from the official FLEURS `cmn_hans_cn` development TSV and
-a separately converted 16-bit PCM audio directory. It emits only relative
-audio paths and SHA-256 metadata, marks every record `upstream-draft` and
-`pending`, and intentionally identifies only the observed `mandarin` stratum.
-It is not a frozen manifest and its records do not count until all 100 final
-transcripts have been explicitly confirmed by the maintainer. See
-[SOURCES.md](SOURCES.md) for the exact source revision, licence, checksums, and
-external-only reproduction inputs.
-
-The focused operator flow is documented in [INTERNAL_BENCHMARK.md](INTERNAL_BENCHMARK.md).
+BM-01 的 intake、review、质量报告和 freeze 工具已完成使命并归档到 Git 历史。当前仓库保留的是验证与复跑既有冻结数据的能力；新增语料不是现有维护流程，必须单独重开范围。

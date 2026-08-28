@@ -4,7 +4,3 @@ models/sherpa-onnx-*/
 dist/
 .DS_Store
 .idea/
-
-demo-*.html
-prompt-playground.html
-listenhub-*.png

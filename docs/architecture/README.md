@@ -1,9 +1,9 @@
 # Expression Trainer 架构入口
 
 > 方法：arc42-lite + C4（Context/Container）+ ADR  
-> 状态：Draft Baseline  
-> 基线日期：2026-08-22
-> 源码基线：`morigejile/expression-trainer-pro`，Phase 0 实现 `b16a1d0bf799887cf7ece1283d73463961346030`（本地 `chore/reproducible-build`）
+> 状态：Current Documentation Index
+> 基线日期：2026-08-28
+> 源码基线：`main`，已包含 Phase 4 / R-01
 
 ## 1. 如何阅读
 
@@ -75,7 +75,7 @@ Renderer/Web Audio → Preload/IPC → Main → sherpa-onnx-node/Paraformer
                                              UI
 ```
 
-主要技术债集中在 `ScriptProcessorNode`、缺少显式重采样、高频数组复制/IPC、ASR 位于 Main、模型路径和参数耦合、停止时 final text 丢失、LLM/文本渲染安全、测试缺失以及打包交付未闭环。详情见 [current.md](current.md)。
+停止尾部文本、LLM 请求控制、安全渲染、测试基线和最小 ASR Provider 已完成。剩余技术债主要是 `ScriptProcessorNode`、缺少显式重采样、高频数组复制/IPC、ASR 仍位于 Main、模型手工管理以及打包交付未闭环。详情见 [current.md](current.md)。
 
 ## 7. 目标状态摘要
 
@@ -106,6 +106,7 @@ Preload 最小桥接 → Main（窗口/设置/生命周期/模型协调）
 | [0005](adr/0005-select-default-asr-model-by-benchmark.md) | Accepted | 保留 Paraformer 默认，候选结果作为后续优化基线 |
 | [0006](adr/0006-move-asr-out-of-main.md) | Proposed | ASR 移出 Main |
 | [0007](adr/0007-package-with-electron-forge.md) | Proposed | 使用 Electron Forge 打包发布 |
+| [0008](adr/0008-keep-benchmark-as-isolated-non-shipping-tool.md) | Accepted | 核心 benchmark 同仓库隔离保留，一次性数据流程归档 |
 
 ## 9. 文档维护规则
 

@@ -1,7 +1,7 @@
 # 当前架构（As-Is）
 
 > 状态：Verified from Source + Electron 43 Smoke；BM-02/D-02 Completed，Phase 4 / R-01 Completed（保留 Paraformer 默认）
-> 基线日期：2026-08-27
+> 基线日期：2026-08-28
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
 > 描述对象：截至 Phase 4 / R-01；保留 Electron 43 与 T-04～T-08 行为基线
 
@@ -69,13 +69,13 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 | LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接/实时/报告分别为 10/15/60 秒超时，并支持 AbortSignal、按 Renderer 取消和异常响应验证 |
 | 设置 | `userData/settings.json`、`userData/custom-prompt.json` | settings schema version 1；纯函数迁移旧扁平结构；文件同步写入且 API Key 明文 |
 | 输出 | Clipboard + Electron Save Dialog + Markdown | 原文与报告 |
-| 构建/测试 | scripts 为 `start`、`dev`、`test`、`check` | `node:test` 覆盖 Provider/Fake、Paraformer 固定配置与 partial/final/stop flush、模块入口、词库、设置迁移、尾部文本、安全渲染、LLM 请求控制和真实 Electron smoke；无 build/package/CI 配置 |
+| 构建/测试 | scripts 为 `start`、`dev`、`test`、`benchmark:dry-run` | `node:test` 覆盖 Provider/Fake、Paraformer 固定配置与 partial/final/stop flush、词库、设置迁移、尾部文本、安全渲染、LLM 请求控制、Electron smoke 和核心 benchmark；无 build/package/CI 配置 |
 
 开发工具基线固定为 Node 22.23.x/npm 12.0.x，与 Electron 内置 Node 24.18.1 明确区分。本轮只验证 Windows NT 10.0.26200.0 x64；Electron 38 起的 macOS 12+ 下限、Linux GTK/Wayland 和正式最低 Windows 版本仍没有 CI、打包配置或制品测试证明。
 
 ### 3.1 BM-02 harness（Completed）
 
-BM-02 提供独立 benchmark CLI，用 BM-01 manifest 输出每个 sample/repetition 的 JSONL、汇总 JSON/CSV、环境快照及 tag 分层统计；失败的 init、sample、timeout 和 dispose 事件也会被落盘。它不改动生产 `lib/asr.js`、Audio、IPC、Main 或默认模型，且没有新增依赖。fake adapter 的重复运行和故障注入证据见 `benchmark/results/fixtures/reproducibility-report.md`。2026-08-27，harness 在 clean commit `703f1630ba2bbcfcb98c914bc67c95e0b120ddc1` 上完成 Paraformer、small Zipformer 与 SenseVoiceSmall 各一轮 100 条比较，全部 0 失败；结果见 `docs/benchmark/bm02-comparison-2026-08-27.md`。维护者接受 ADR-0005 并保留现有 Paraformer 默认，因此生产代码无需切换；模型再分发许可仍是后续发布门禁。
+BM-02 提供独立 benchmark CLI，用 manifest 输出每个 sample/repetition 的 JSONL、汇总 JSON/CSV、环境快照及 tag 分层统计；失败的 init、sample、timeout 和 dispose 事件也会被落盘。它不改动生产 `lib/asr.js`、Audio、IPC、Main 或默认模型，且没有新增依赖。2026-08-27，harness 在 clean commit `703f1630ba2bbcfcb98c914bc67c95e0b120ddc1` 上完成 Paraformer、small Zipformer 与 SenseVoiceSmall 各一轮 100 条比较，全部 0 失败；结果见 `docs/benchmark/bm02-comparison-2026-08-27.md`。维护者接受 ADR-0005 并保留现有 Paraformer 默认，因此生产代码无需切换；模型再分发许可仍是后续发布门禁。
 
 ## 4. C4 Level 2：当前容器/运行边界
 
@@ -209,9 +209,7 @@ providers.custom     { apiKey, baseUrl, model, customModel }
 
 ### 5.8 Benchmark dataset boundary (BM-01)
 
-BM-01 已由 Corrected Contract Gate `f06a43bb2819aac07e4ecbd0ebd3fd27576e99e1` 建立 Git 可提交的契约层：`benchmark/datasets/manifest.schema.json` 定义 schema version 1，`benchmark/lib/dataset-manifest.js` 以 Node 内置模块执行 canonical realpath、打开后复检、SHA-256、RIFF/WAVE 16-bit PCM 元数据、来源/许可和分层检查，`benchmark/lib/dataset-quality.js` 与 `benchmark/scripts/generate-quality-report.js` 输出可复核且确定性的覆盖/时长/许可证/再分发/采样率报告。该契约不接入应用运行路径，也不修改 Main、Preload、Renderer 或现有 ASR 实现。
-
-当前治理 manifest 为 `expression-zh-v1` / `0.1.0`，SHA-256 为 `1dadf62bace0cdd8961718b9dd9c50cb0bdb0136a8c08fb0ac480a8a8326b948`。截至 2026-08-25，它包含 0 条、0 ms：普通话、快/慢语速、轻口音、中英混合、数字/专名和轻噪声均为 0；没有许可证或再分发观察。仓库另有 1 秒 16 kHz/单声道/16-bit PCM/1 kHz 合成 WAV 作为无隐私合同 fixture，但它不代表人声、不计入 benchmark 语料，也不能作为人工复核证据。
+长期契约由 `benchmark/datasets/manifest.schema.json` 和 `benchmark/lib/dataset-manifest.js` 维护。Validator 以 Node 内置模块执行 canonical realpath、打开后复检、SHA-256、RIFF/WAVE 16-bit PCM 元数据及来源/许可检查；该路径不接入产品 Main、Preload、Renderer 或 ASR。仓库内的 1 秒 16 kHz/单声道/16-bit PCM/1 kHz 合成 WAV 只用于契约测试，不代表人声或正式语料。
 
 原始音频位于 Git 外的受控 dataset root，manifest 仅存相对音频路径和已脱敏元数据，不记录个人身份、联系方式、同意书原件或本机绝对路径。2026-08-27 已冻结 `expression-zh-fleurs/v1`：100 条人工核查终稿、1,201,680 ms、CC-BY-4.0 public-corpus，manifest SHA-256 `600bf66fe11273e0c34b5f8859f7a59efce6eddf607cf5fa13ad186cb0469593`。它满足当前简单候选比较的 ground-truth 输入要求；只覆盖 `mandarin`，不代表完整产品场景分层。
 
@@ -276,7 +274,7 @@ Settings/Prompt Renderer
 
 ## 7. 部署与安装现状
 
-- `package.json` 有 `start`、`dev`、`test`、`check`；无 build/package/make/publish scripts。
+- `package.json` 有 `start`、`dev`、`test`、`benchmark:dry-run`；无 build/package/make/publish scripts。
 - 没有 Electron Forge/electron-builder 配置，没有 GitHub Actions。
 - `models/` 仅跟踪 `.gitkeep`；README 要求用户手工下载和解压模型。
 - 无安装包、签名、公证、自动更新、升级/卸载数据保留测试或正式支持矩阵。
@@ -297,7 +295,7 @@ Settings/Prompt Renderer
 | TD-08 | 已有 Node 测试和 Electron 自动化 smoke，但无 CI 和打包脚本 | 已可发现启动、页面、Preload/IPC、设置窗口和粘贴分析回归；仍无法证明跨平台或发布制品可用 | T-01～T-07 集成测试基线、仓库配置 | 后续接 CI 与 Forge，并在目标平台运行 smoke |
 | TD-09 | API Key 明文保存、设置同步且非原子写入 | 凭据暴露；写入中断可能损坏设置 | 源码确认；schema version 1 和损坏 JSON 运行回退已由 T-03 建立 | R-09 处理原子写、脱敏日志，并评估凭据策略 |
 | TD-10 | IPC payload 无校验 | 大 payload、类型错误或不可信输入影响 Main | 源码确认 | 每个 channel 限定类型/长度/session |
-| TD-11 | **T-05 已缓解**：ASR/粘贴文本使用受控 DOM token，LLM 报告使用严格允许列表，错误使用纯文本；playground 用户输入先转义 | 主应用不再从不可信文本创建标签或事件属性；playground 剩余 `innerHTML` 仅消费静态模板和文件内硬编码数据 | `src/safe-rendering.js`、4 项安全渲染测试、T-07 页面级 smoke、`src/app.js` 无 `innerHTML` | 后续若词库改为外部数据，继续按不可信输入处理 |
+| TD-11 | **T-05 已缓解**：ASR/粘贴文本使用受控 DOM token，LLM 报告使用严格允许列表，错误使用纯文本 | 主应用不再从不可信文本创建标签或事件属性 | `src/safe-rendering.js`、安全渲染测试、Electron smoke、`src/app.js` 无 `innerHTML` | 后续若词库改为外部数据，继续按不可信输入处理 |
 | TD-12 | LLM fetch 控制风险已由 T-06 缓解；仍无自动重试 | 请求已有超时、取消、Main/Renderer 双层迟到抑制、结构验证和脱敏错误；瞬时失败仍需用户重试 | 25 项 fake-fetch 与 3 项 Renderer 竞态测试、源码确认 | 保留错误契约回归测试；是否重试需单独产品策略，不在请求层盲目加入 |
 | TD-13 | UI 高亮词表与 lexicon 规则重复 | 显示和统计不一致 | 源码确认 | 统一由分析结果驱动高亮或共享规则 |
 | TD-14 | README 与实现漂移风险 | 用户预期错误 | Phase 0 已修正触发字数、联网边界和平台口径 | 后续行为变更同步 README 与架构文档 |

@@ -1,9 +1,9 @@
 # 目标架构（To-Be）
 
 > 状态：Proposed  
-> 基线日期：2026-08-19  
+> 基线日期：2026-08-28
 > 目标：在保持功能闭环的前提下降低总体维护、依赖、跨平台安装和升级复杂度
-> 当前源码基线：`morigejile/expression-trainer-pro`，Phase 0 实现 `b16a1d0bf799887cf7ece1283d73463961346030`（本地 `chore/reproducible-build`）
+> 当前源码基线：`main`，已完成 benchmark 选型和 Phase 4 / R-01 最小 Provider 适配
 
 ## 1. 范围与设计约束
 
@@ -271,7 +271,6 @@ await dispose()
 ADR-0005 已接受保留 Paraformer 为默认模型。2026-08-27 的简单比较仍保留以下候选证据：
 
 - 小型中文 streaming Zipformer CTC；
-- 较大中文 streaming Zipformer（用于精度/资源权衡）；
 - SenseVoiceSmall INT8（需明确其 utterance/VAD 使用方式与 streaming 模型的体验差异）。
 
 不得把公开榜单或模型发布时间当作项目结论。后续重开模型优化时沿用统一 benchmark：
@@ -321,20 +320,18 @@ ADR-0005 已接受保留 Paraformer 为默认模型。2026-08-27 的简单比较
 
 迁移必须保持每个阶段可运行：
 
-1. 先固定现有构建与测试基线。
-2. 用契约包住现有 Paraformer 行为，不先换模型。
-3. benchmark 后接受模型 ADR。
-4. 分别替换 Audio、ASR 执行边界和模型管理，每次有独立回归证据。
-5. 最后建立 Forge 制品、支持矩阵和发布机制。
+1. 构建/测试基线、三候选 benchmark、默认模型 ADR 和最小 Paraformer Provider 已完成。
+2. 下一步先补全 session/event 契约，再分别替换 Audio、ASR 执行边界和模型管理。
+3. 每次迁移保留独立回归证据，最后建立 Forge 制品、支持矩阵和发布机制。
 
 当下列条件全部满足时，本目标可合并为 Current：
 
 - [ ] `npm ci`、测试和至少 Tier 1 平台打包可重复执行；
 - [ ] AudioWorklet/重采样通过自动化与真实设备检查；
-- [ ] 业务只依赖轻量 ASR 契约；
+- [x] 业务只依赖轻量 ASR 契约（完整 session/event 语义仍待补全）；
 - [ ] ASR 不在 Main 内执行，退出可恢复；
 - [ ] 模型可校验安装且失败不破坏上一版本；
-- [ ] 默认模型由可复跑 benchmark 和 Accepted ADR 支持；
+- [x] 默认模型由可复跑 benchmark 和 Accepted ADR 支持；
 - [ ] 安装/升级保留设置与模型；
 - [ ] `current.md` 已按实际实现更新。
 
