@@ -29,6 +29,16 @@ npm run dev
 - `benchmark:dry-run` 只验证合成 fixture、manifest、候选注册与路径边界，不运行真实模型。
 - `start` 启动普通应用；`dev` 同时打开 DevTools。
 
+## 提交说明约定
+
+每个项目提交使用简洁的英文主题，并在提交正文中附上简短的中文说明。推荐命令格式：
+
+```powershell
+git commit -m "<English subject>" -m "中文：<简短说明>"
+```
+
+该约定适用于未来提交，不要求改写已有历史。
+
 若本机未把项目基线 Node 加入 `PATH`，当前开发机可直接使用：
 
 ```powershell
