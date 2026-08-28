@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ASR benchmark candidate registry",
+  "type": "object",
+  "required": ["schemaVersion", "candidates"],
+  "additionalProperties": false,
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "candidates": { "type": "array", "minItems": 1, "items": { "$ref": "#/$defs/candidate" } }
+  },
+  "$defs": {
+    "timestamp": { "type": "string", "format": "date-time", "minLength": 1 },
+    "httpsUrl": { "type": "string", "pattern": "^https://", "format": "uri" },
+    "safePositiveInteger": { "type": "integer", "minimum": 1, "maximum": 9007199254740991 },
+    "file": {
+      "type": "object", "additionalProperties": false,
+      "required": ["relativePath", "sha256", "bytes", "role"],
+      "properties": {
+        "relativePath": { "type": "string", "minLength": 1, "not": { "pattern": "(^[\\\\/]|^[A-Za-z]:|(^|[\\\\/])\\.\\.([\\\\/]|$))" } },
+        "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "bytes": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+        "role": { "type": "string", "minLength": 1 }
+      }
+    },
+    "license": {
+      "type": "object", "additionalProperties": false, "required": ["model", "code", "redistribution"],
+      "properties": {
+        "model": { "type": "object", "additionalProperties": false, "required": ["status", "reason", "source"], "properties": { "status": { "enum": ["verified", "unverified", "unresolved"] }, "reason": { "type": "string", "minLength": 1 }, "source": { "$ref": "#/$defs/httpsUrl" } } },
+        "code": { "type": "object", "additionalProperties": false, "required": ["spdx", "location"], "properties": { "spdx": { "type": "string", "minLength": 1 }, "location": { "$ref": "#/$defs/httpsUrl" } } },
+        "redistribution": { "enum": ["approved", "not-approved"] }
+      }
+    },
+    "evidence": {
+      "type": "object", "additionalProperties": false, "required": ["source", "license", "files", "nativeLoad"],
+      "properties": {
+        "source": { "type": "object", "additionalProperties": false, "required": ["status", "checkedAt"], "properties": { "status": { "const": "verified" }, "checkedAt": { "$ref": "#/$defs/timestamp" } } },
+        "license": { "type": "object", "additionalProperties": false, "required": ["status", "checkedAt"], "properties": { "status": { "enum": ["verified", "unverified", "pending"] }, "checkedAt": { "$ref": "#/$defs/timestamp" } } },
+        "files": { "type": "object", "additionalProperties": false, "required": ["status", "reason", "verifiedAt"], "properties": { "status": { "enum": ["verified", "unverified", "pending"] }, "reason": { "type": "string", "minLength": 1 }, "verifiedAt": { "$ref": "#/$defs/timestamp" } } },
+        "nativeLoad": { "type": "object", "additionalProperties": false, "required": ["status", "reason", "recordedAt"], "properties": { "status": { "enum": ["passed", "pending"] }, "reason": { "type": "string", "minLength": 1 }, "recordedAt": { "$ref": "#/$defs/timestamp" } } }
+      }
+    },
+    "candidate": {
+      "type": "object", "additionalProperties": false,
+      "required": ["id", "displayName", "family", "mode", "status", "sourceUrl", "upstreamVersion", "license", "evidence", "sampleRateHz", "numThreads", "provider", "files"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }, "displayName": { "type": "string", "minLength": 1 },
+        "family": { "enum": ["paraformer", "zipformer-ctc", "sensevoice"] }, "mode": { "enum": ["streaming", "utterance"] }, "status": { "enum": ["verified", "pending"] },
+        "sourceUrl": { "$ref": "#/$defs/httpsUrl" }, "upstreamVersion": { "type": "string", "minLength": 1 }, "license": { "$ref": "#/$defs/license" }, "evidence": { "$ref": "#/$defs/evidence" },
+        "sampleRateHz": { "$ref": "#/$defs/safePositiveInteger" }, "numThreads": { "$ref": "#/$defs/safePositiveInteger" }, "provider": { "const": "cpu" },
+        "files": { "type": "array", "items": { "$ref": "#/$defs/file" } },
+        "pending": { "type": "object", "additionalProperties": false, "required": ["reason", "missing"], "properties": { "reason": { "type": "string", "minLength": 1 }, "missing": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } } } }
+      },
+      "allOf": [
+        { "if": { "properties": { "family": { "enum": ["paraformer", "zipformer-ctc"] } } }, "then": { "properties": { "mode": { "const": "streaming" } } } },
+        { "if": { "properties": { "family": { "const": "sensevoice" } } }, "then": { "properties": { "mode": { "const": "utterance" } } } },
+        { "if": { "properties": { "status": { "const": "verified" } } }, "then": { "properties": { "files": { "minItems": 1 }, "evidence": { "properties": { "files": { "properties": { "status": { "const": "verified" } } }, "nativeLoad": { "properties": { "status": { "const": "passed" } } } } } }, "not": { "required": ["pending"] } } },
+        { "if": { "properties": { "status": { "const": "pending" } } }, "then": { "required": ["pending"], "properties": { "files": { "maxItems": 0 }, "evidence": { "properties": { "files": { "properties": { "status": { "const": "pending" } } }, "nativeLoad": { "properties": { "status": { "const": "pending" } } } } } } } }
+      ]
+    }
+  }
+}

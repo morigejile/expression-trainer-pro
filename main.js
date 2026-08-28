@@ -8,12 +8,13 @@ const {
   parseSettingsJson,
   getCurrentProviderSettings
 } = require('./lib/settings-config');
+const { assertAsrProvider } = require('./lib/asr-provider');
 
 const isSmokeTest = process.argv.includes('--smoke-test');
 const smokeTest = isSmokeTest ? require('./smoke/electron-smoke-runner') : null;
-const { initASR, feedAudio, stopRecognition } = isSmokeTest
-  ? smokeTest.fakeAsr
-  : require('./lib/asr');
+const asrProvider = assertAsrProvider(isSmokeTest
+  ? smokeTest.fakeAsrProvider
+  : require('./lib/asr').createParaformerAsrProvider());
 const {
   createRequestCoordinator,
   runCoordinatedRequest,
@@ -255,7 +256,7 @@ ipcMain.handle('close-current-window', (event) => {
 // 语音识别相关 - Web Audio方案
 ipcMain.handle('init-asr', async () => {
   try {
-    await initASR();
+    await asrProvider.initialize();
     asrReady = true;
     return { success: true };
   } catch (error) {
@@ -267,12 +268,12 @@ ipcMain.handle('init-asr', async () => {
 ipcMain.handle('feed-audio', (event, samplesArray) => {
   if (!asrReady) return null;
   const samples = new Float32Array(samplesArray);
-  const result = feedAudio(samples);
+  const result = asrProvider.feed(samples);
   return result; // { text, isFinal } or null
 });
 
 ipcMain.handle('stop-asr', () => {
-  const finalText = stopRecognition();
+  const finalText = asrProvider.stop();
   asrReady = false;
   return { success: true, finalText };
 });

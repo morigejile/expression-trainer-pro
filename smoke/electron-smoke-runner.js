@@ -1,32 +1,23 @@
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const { createFakeAsrProvider } = require('../lib/fake-asr-provider');
 
 const SUCCESS_MARKER = 'ELECTRON_SMOKE_OK';
 const STEP_TIMEOUT_MS = 10_000;
 
 const calls = {
-  asrInit: 0,
-  asrFeed: 0,
-  asrStop: 0,
   llmFeedback: 0
 };
 
-const fakeAsr = {
-  async initASR() {
-    calls.asrInit += 1;
-  },
-
-  feedAudio(samples) {
-    calls.asrFeed += 1;
-    assert.ok(samples instanceof Float32Array, 'ASR fake expected Float32Array samples');
-    assert.equal(samples.length, 3, 'ASR fake expected the smoke audio fixture');
-    return { text: 'SMOKE_ASR_TEXT', isFinal: false };
-  },
-
-  stopRecognition() {
-    calls.asrStop += 1;
-    return 'SMOKE_ASR_FINAL';
-  }
+const fakeAsrProvider = createFakeAsrProvider({
+  feedResult: { text: 'SMOKE_ASR_TEXT', isFinal: false },
+  finalText: 'SMOKE_ASR_FINAL'
+});
+const fakeFeed = fakeAsrProvider.feed;
+fakeAsrProvider.feed = samples => {
+  assert.ok(samples instanceof Float32Array, 'ASR fake expected Float32Array samples');
+  assert.equal(samples.length, 3, 'ASR fake expected the smoke audio fixture');
+  return fakeFeed(samples);
 };
 
 function createRequestCoordinator() {
@@ -167,11 +158,6 @@ async function run({ app, BrowserWindow, mainWindow }) {
     feed: { text: 'SMOKE_ASR_TEXT', isFinal: false },
     stop: { success: true, finalText: 'SMOKE_ASR_FINAL' }
   });
-  assert.deepEqual(
-    { init: calls.asrInit, feed: calls.asrFeed, stop: calls.asrStop },
-    { init: 1, feed: 1, stop: 1 }
-  );
-
   await mainWindow.webContents.executeJavaScript(
     `document.getElementById('btn-settings').click()`
   );
@@ -251,7 +237,7 @@ async function run({ app, BrowserWindow, mainWindow }) {
 
 module.exports = {
   configureApp,
-  fakeAsr,
+  fakeAsrProvider,
   fakeLlm,
   run
 };

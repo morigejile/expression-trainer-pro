@@ -1,8 +1,8 @@
 # 开发与可复现安装基线
 
-> 状态：Phase 1 / T-08 Electron Security Upgrade Verified
-> 验证日期：2026-08-23
-> 验证分支：`codex/security/electron-upgrade-spike`；基于 T-04～T-07 精确集成提交 `33a6ee59c321f613d66357bff4ead09835387010`
+> 状态：Phase 2 / BM-01 Corrected Contract Gate `f06a43bb2819aac07e4ecbd0ebd3fd27576e99e1` Verified；真实语料治理仍为 In Progress
+> 验证日期：2026-08-25（T-08 Electron 证据保留其 2026-08-23 原始日期）
+> 验证分支：`codex/benchmark/bm01-dataset`；BM-01 基于精确基线 `94e192d73c04ec36d5c4ad016e8e5daf1dc4670d`
 
 ## 1. 已验证开发环境
 
@@ -110,11 +110,40 @@ models/sherpa-onnx-streaming-paraformer-bilingual-zh-en/
 
 没有模型时，应用窗口仍应能够启动；真实 ASR、麦克风采样率和模型兼容性验证为 **Runtime-TBD**。模型下载、版本、hash 与许可证治理由后续 Model Manager/benchmark 项目处理。
 
+## 4.1 BM-01 benchmark 数据集
+
+BM-01 的可提交 Corrected Contract Gate（`f06a43bb2819aac07e4ecbd0ebd3fd27576e99e1`）位于 `benchmark/datasets/`：JSON Schema、Node 内置 validator、质量汇总/确定性报告 CLI、无真人的合成 1 kHz WAV 示例和脱敏 manifest。validator 使用 canonical realpath 和打开后复检以拒绝路径、symlink/junction 逃逸并减小 path-swap 风险；v1 只接受 RIFF/WAVE、16-bit PCM，并核对实际采样率、声道、时长和 SHA-256。真实音频不进入 Git，必须保留在受控 dataset root；manifest 的 `audioFile` 永远是相对于该 root 的路径，不能写入开发机的绝对路径。
+
+当前治理 manifest：
+
+| 项目 | 值 |
+|---|---|
+| dataset ID / version | `expression-zh-v1` / `0.1.0` |
+| manifest SHA-256 | `1dadf62bace0cdd8961718b9dd9c50cb0bdb0136a8c08fb0ac480a8a8326b948` |
+| 样本 / 总时长 | `0` / `0 ms` |
+| 7 个目标分层 | 全部 `0` |
+| 许可证与再分发观察 | 无许可证样本；`allowed` / `metadata-only` / `prohibited` 均为 `0` |
+| 存储边界 | 原始音频在 Git 外的受控 dataset root；仓库仅保存脱敏 manifest 和报告 |
+
+合成示例只用于验证 WAV、相对路径和 SHA-256 契约，不计入正式语料。BM-01 已接受并冻结现有 100 条 FLEURS `cmn_hans_cn`：维护者完成全部逐条听音与明确终稿确认，create-new `expression-zh-fleurs/v1` 随后从冻结目录独立复核 100 个 PCM/audio hash、manifest hash 与 dataset hash。七类覆盖是后期优化，不阻塞首轮；双人审核、audit chain、`approve-policy` 和旧 hardened exporter 不是 BM-01 完成门禁，不得为旧门禁继续扩张范围。
+
+在受控 dataset root 已获批准且样本已完成治理后，可用下面的独立路径模式生成/复核报告；不要把实际 root 写进文档、Git 或报告：
+
+```powershell
+$env:MANIFEST_PATH = (Resolve-Path 'benchmark/datasets/expression-zh-v1/manifest.json')
+$env:DATASET_ROOT = '<controlled dataset root outside this repository>'
+node benchmark/scripts/generate-quality-report.js
+```
+
+`MANIFEST_PATH` is the checked-in/de-identified manifest and `DATASET_ROOT` is the separately controlled audio root. Set `DATASET_ROOT` only in the local controlled environment before running the command. The command validates every relative audio reference, canonical root containment, PCM WAV metadata and SHA-256 before printing deterministic coverage, source-boundary, duration and sample-rate evidence.
+
+BM-01 使用 `benchmark/scripts/internal-benchmark-dataset.js` 完成 intake 校验与最终 freeze，并使用 `benchmark/scripts/internal-benchmark-review.js` 的 `prepare`、`serve`、`status` 完成三候选预测、单人逐条听音/编辑/显式确认和 review-context 状态检查。完整命令、外部目录布局及冻结 digest 见 [INTERNAL_BENCHMARK.md](../benchmark/datasets/INTERNAL_BENCHMARK.md)。正式 freeze 已在 100 confirmed、0 pending/invalid/stale 后完成；任何后续版本仍必须重新通过同一门禁且不得覆盖 `v1`。
+
 ## 5. 本阶段验证边界
 
 已验证：依赖清单/lockfile 一致、干净安装、JavaScript 语法检查、Electron 二进制可执行和文档相对链接。T-01 建立 1 项模块入口 smoke；T-02 增加 5 项确定性词库测试；T-03 增加 6 项纯设置迁移测试；T-04 与集成修复合计 8 项 Renderer transcript/stop final/迟到结果/异常生命周期回归测试；T-05 增加 4 项安全渲染测试；T-06 增加 25 项 LLM 请求控制测试；T-07 增加 1 项自动化 Electron smoke，实际加载主页面与设置页并通过真实 Preload/IPC 完成 Fake ASR、协调式 Fake LLM 和粘贴分析。T-08 将 Electron 33.4.11 受控升级到 43.4.1：升级前后完整测试集均为 50/50，`npm ci`、`npm test` 与 `npm run check` 均通过；Electron 内置 Node 24.18.1 / ABI 148 直接 `require('sherpa-onnx-node')` 成功，正常非 smoke 入口 5 秒存活。
 
-未验证：真实麦克风、真实 ASR 模型初始化/推理、LLM 网络请求、macOS/Linux、Forge 制品、安装/升级/卸载。不得据此宣称真实识别或三平台同等级支持。
+未验证：生产 ASR/Audio/IPC 链路中的真实麦克风与真实模型初始化/推理、LLM 网络请求、macOS/Linux、Forge 制品、安装/升级/卸载。BM-01 隔离 benchmark 工具已在外部语料上完成 Paraformer、small Zipformer、SenseVoiceSmall 的 100×3 预测准备；该结果不验证或改动生产 ASR 集成。不得据此宣称生产真实识别或三平台同等级支持。
 
 ## 6. 安全渲染基线
 

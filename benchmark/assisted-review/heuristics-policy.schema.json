@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "ruleVersion", "thresholds"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "ruleVersion": { "const": "assisted-review-heuristics-v1" },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slowCps", "fastCps", "noise"],
+      "properties": {
+        "slowCps": { "const": 2.5 },
+        "fastCps": { "const": 6.5 },
+        "noise": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["windowMs", "lowerPercentile", "upperPercentile", "minDb", "maxDb"],
+          "properties": {
+            "windowMs": { "const": 20 },
+            "lowerPercentile": { "const": 0.1 },
+            "upperPercentile": { "const": 0.9 },
+            "minDb": { "const": 12 },
+            "maxDb": { "const": 30 }
+          }
+        }
+      }
+    }
+  }
+}

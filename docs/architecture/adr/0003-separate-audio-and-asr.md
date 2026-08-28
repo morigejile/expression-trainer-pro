@@ -38,7 +38,7 @@ Audio 负责麦克风、声道、采样率、格式、分块与生命周期；AS
 
 ## Validation Before Accepting
 
-- [ ] 用源码记录当前 start/feed/stop 和结果语义。
+- [x] 用源码与聚焦测试记录当前 initialize/feed/stop 和结果语义。
 - [ ] 为契约写 Fake Provider 测试，包括重复 start、stop flush、错误和旧 session 结果。
-- [ ] 让现有 Paraformer 通过新契约，识别行为与基线一致。
-- [ ] 验证业务/Renderer 不再 import Sherpa 或模型配置。
+- [x] 让现有 Paraformer 通过新契约，识别行为与基线一致。
+- [x] 验证业务/Renderer 不再 import Sherpa 或模型配置。

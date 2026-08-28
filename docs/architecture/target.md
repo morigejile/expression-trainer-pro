@@ -268,13 +268,13 @@ await dispose()
 
 ## 7. ASR 模型策略
 
-当前 Paraformer 是对照基线。候选至少包含：
+ADR-0005 已接受保留 Paraformer 为默认模型。2026-08-27 的简单比较仍保留以下候选证据：
 
 - 小型中文 streaming Zipformer CTC；
 - 较大中文 streaming Zipformer（用于精度/资源权衡）；
 - SenseVoiceSmall INT8（需明确其 utterance/VAD 使用方式与 streaming 模型的体验差异）。
 
-不得把公开榜单或模型发布时间当作项目结论。统一 benchmark 需要：
+不得把公开榜单或模型发布时间当作项目结论。后续重开模型优化时沿用统一 benchmark：
 
 - 经过授权且脱敏的 50～100 条真实中文表达训练音频（最终数量以数据可得性为准）；
 - 普通话、语速变化、轻口音、中英混合、数字/专名、安静与轻噪声；
@@ -282,7 +282,7 @@ await dispose()
 - CER、首个 partial、最终延迟、RTF、CPU、峰值 RAM、模型大小、初始化时间；
 - 识别质量之外同时评估安装体积、许可证、跨平台包和集成复杂度。
 
-若产品必须逐字实时显示，streaming 延迟权重更高；若按句反馈可接受，SenseVoice + VAD 的 utterance 方案可公平参与。权重必须在查看结果前冻结。
+当前维持逐步显示 partial 的 streaming 交互，因此选择 Paraformer；SenseVoiceSmall 的准确率优势与 Zipformer 的体积/partial 延迟优势作为复审证据保留。若未来接受 utterance-only 交互或目标硬件/性能预算变化，再按 ADR-0005 的复审条件重开选择。
 
 ## 8. 部署与发布
 
@@ -343,7 +343,7 @@ await dispose()
 1. Tier 1 平台和最低支持硬件。
 2. ASR 隔离采用 utility process、child process 还是 worker thread。
 3. 音频传输通道、块大小、队列上限和背压策略。
-4. 默认模型及 streaming/utterance UX 权重。
+4. 未来是否接受 utterance-only UX 并重开默认模型选择。
 5. 模型 registry 的托管位置、许可证与更新信任链。
 6. API Key 是否需要系统凭据库，以及跨平台成本是否可接受。
 7. 首个稳定版本是否需要代码签名/公证和自动更新。

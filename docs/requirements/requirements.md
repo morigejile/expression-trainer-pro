@@ -45,7 +45,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | FR-E01 | 应用应提供 Electron 桌面界面和训练操作入口。 | `npm start` 应打开主窗口；运行验收仍需在有模型/麦克风环境执行。 |
 | FR-E02 | 用户应能开始、暂停、继续和结束一次录音训练。 | 开始后采集麦克风；暂停期间不送入 ASR；继续后恢复；结束时释放 processor、AudioContext 和 MediaStream tracks。 |
 | FR-E03 | 应用应使用本地 `sherpa-onnx-node` 与 streaming Paraformer 中英双语 INT8 模型识别。 | 从 `models/sherpa-onnx-streaming-paraformer-bilingual-zh-en/` 加载 `encoder.int8.onnx`、`decoder.int8.onnx`、`tokens.txt`；缺失时返回可理解错误。 |
-| FR-E04 | 应用应展示 partial 和 endpoint/final 识别文本。 | partial 更新临时字幕；endpoint 结果进入完整文本、统计和高亮。停止时尚未 endpoint 的 `finalText` 当前未被 Renderer 合并，列为已知缺陷。 |
+| FR-E04 | 应用应展示 partial 和 endpoint/final 识别文本。 | partial 更新临时字幕；endpoint 结果进入完整文本、统计和高亮；停止时尚未 endpoint 的 `finalText` 已由 Renderer 去重合并并有自动化测试。 |
 | FR-E05 | 应用应分析填充词、犹豫词、笼统词、情绪词和表达密度。 | 返回计数、位置、精准替代和建议，并在左右面板更新统计/反馈。 |
 | FR-E06 | 用户应能粘贴逐字稿并复用本地分析和 LLM 反馈。 | 粘贴文本按句展示和分析，无需麦克风或 ASR 模型。 |
 | FR-E07 | 用户配置 LLM 后，应用应生成实时反馈和最终报告。 | 当前实现支持 OpenAI、DeepSeek、Ollama 与自定义 OpenAI-compatible endpoint；每新增约 30 个字符触发实时反馈，用户可手动生成最终报告。 |
@@ -74,7 +74,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 
 | ID | 类别 | 需求与验证方式 |
 |---|---|---|
-| NFR-01 | 可维护性 | 默认保持 Electron + 原生 JS/HTML/CSS + Sherpa-ONNX；只有能明确降低总代码、风险或长期成本时才增加依赖。依赖变更需 ADR 或变更说明。 |
+| NFR-01 | 可维护性与范围收敛 | 默认保持 Electron + 原生 JS/HTML/CSS + Sherpa-ONNX；持续遵循不过度扩散、不过度设计、不把内部工作升级为不必要的审计审核，并减少不能改变决策或发现实质回归的验证。只有能明确降低总代码、风险或长期成本时才增加依赖、流程或门禁；依赖变更需 ADR 或变更说明。 |
 | NFR-02 | 可复现性 | 锁文件与 `package.json` 一致；固定开发工具 Node 22.23.x/npm 12.0.x；当前 lock/安装树为精确 Electron 43.4.1、Sherpa 1.13.3。Electron 43 首次 CLI 下载与 clean `npm ci` 后的校验缓存恢复均已实测；Forge 构建仍按 Roadmap Phase 5 建立。 |
 | NFR-03 | 响应性 | 录音和 ASR 期间 UI 与 Main 应保持可响应。定量预算在基线 benchmark 后确定，不虚构当前 p95 指标。 |
 | NFR-04 | 音频正确性 | 每个音频块携带或继承明确的采样率、声道和样本格式；重采样用自动化测试验证时长和频率行为。 |
@@ -93,7 +93,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 - 默认不引入 React、Vue、Vite、Webpack、TypeScript、Python、PyTorch、FunASR、FastAPI、Docker、数据库或插件框架。
 - 目标是降低总体维护和交付复杂度，而不是机械减少文件数、模块数或安装包体积。
 - ASR Provider 和 Model Manager 必须保持轻量；不建设通用框架、模型数据库或模型市场。
-- 当前 Paraformer 作为 benchmark 对照组；Zipformer 与 SenseVoiceSmall 均为候选，不得在 benchmark 前写成最终默认模型。
+- ADR-0005 已根据三候选 benchmark 接受保留 Paraformer 为默认；Zipformer 与 SenseVoiceSmall 的结果作为后续复审基线，不向普通用户暴露多模型选择。
 - 架构迁移采用渐进重构，不推倒重写，不以切换 Electron/Tauri/WASM 为默认路径。
 
 ## 7. 发布级验收场景
@@ -124,7 +124,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 
 1. 当前 `package.json` 为应用 `1.0.0`、Electron `43.4.1`（精确版本）、sherpa-onnx-node `^1.10.0`；lock/安装树为 43.4.1/1.13.3，开发基线为 Node 22.23.0/npm 12.0.2。Electron runtime 实测为 Node 24.18.1、Chromium 150.0.7871.224、modules ABI 148；显式清空所有 npm/Electron 缓存后的复跑仍为非阻塞 Runtime-TBD。
 2. README 已把 macOS/Linux 与正式最低 Windows 版本标为 TBD；正式支持等级仍需 CI/制品证据。
-3. Paraformer 模型归档的准确版本、文件 hash、大小和再分发许可证。
+3. Paraformer 的版本、运行文件 hash 与大小已记录；模型再分发许可证仍待发布前确认。
 4. 词库计数/密度是否属于产品认可的评分定义；训练历史目前不持久化，是否需要持久化待产品决定。
 5. 产品最低支持硬件及正式性能预算。
 6. 模型与 LLM 服务的许可证、分发与隐私告知要求。

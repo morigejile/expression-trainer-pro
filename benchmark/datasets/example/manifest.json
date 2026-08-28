@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "datasetId": "expression-trainer-synthetic-example",
+  "datasetVersion": "1.0.0",
+  "samples": [
+    {
+      "id": "synthetic-1khz-16k",
+      "audioFile": "audio/synthetic-1khz-16k.wav",
+      "sha256": "64b497986767e43b656e326475e8577b92269cd3c0e898e4d33ada1f1b12c748",
+      "transcript": "这是一个合成的一千赫兹测试信号。",
+      "locale": "zh-CN",
+      "tags": ["mandarin"],
+      "sampleRateHz": 16000,
+      "channels": 1,
+      "durationMs": 1000,
+      "source": {
+        "kind": "synthetic",
+        "license": "CC0-1.0",
+        "consent": "not-required",
+        "redistribution": "allowed"
+      }
+    }
+  ]
+}

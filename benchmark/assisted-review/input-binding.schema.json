@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "candidateId", "audioFile", "audioSha256", "sampleRateHz", "channels", "durationMs", "intakeSha256", "sourceRevision", "upstreamDraftSha256", "bindingSha256"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "candidateId": { "type": "string", "minLength": 1 },
+    "audioFile": { "type": "string", "minLength": 1 },
+    "audioSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "sampleRateHz": { "type": "integer", "minimum": 8000, "maximum": 192000 },
+    "channels": { "type": "integer", "minimum": 1, "maximum": 2 },
+    "durationMs": { "type": "integer", "minimum": 1, "maximum": 600000 },
+    "intakeSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "sourceRevision": { "type": "string", "minLength": 1 },
+    "upstreamDraftSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "bindingSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+  }
+}
