@@ -8,13 +8,14 @@ const {
   parseSettingsJson,
   getCurrentProviderSettings
 } = require('./lib/settings-config');
-const { assertAsrProvider } = require('./lib/asr-provider');
+const { createAsrIpcRouter } = require('./lib/asr-ipc');
 
 const isSmokeTest = process.argv.includes('--smoke-test');
 const smokeTest = isSmokeTest ? require('./smoke/electron-smoke-runner') : null;
-const asrProvider = assertAsrProvider(isSmokeTest
+const asrProvider = isSmokeTest
   ? smokeTest.fakeAsrProvider
-  : require('./lib/asr').createParaformerAsrProvider());
+  : require('./lib/asr').createParaformerAsrProvider();
+const asrIpc = createAsrIpcRouter({ provider: asrProvider });
 const {
   createRequestCoordinator,
   runCoordinatedRequest,
@@ -35,7 +36,6 @@ app.setName('宇宙无敌表达训练');
 let mainWindow;
 let settingsWindow;
 let promptEditorWindow;
-let asrReady = false;
 const llmRequests = createRequestCoordinator();
 
 // Custom prompt 文件路径
@@ -254,28 +254,21 @@ ipcMain.handle('close-current-window', (event) => {
 });
 
 // 语音识别相关 - Web Audio方案
-ipcMain.handle('init-asr', async () => {
-  try {
-    await asrProvider.initialize();
-    asrReady = true;
-    return { success: true };
-  } catch (error) {
-    return { success: false, error: error.message };
-  }
+ipcMain.handle('start-asr', (event, command) => {
+  return asrIpc.start(command);
 });
 
 // 接收渲染进程发来的音频数据
-ipcMain.handle('feed-audio', (event, samplesArray) => {
-  if (!asrReady) return null;
-  const samples = new Float32Array(samplesArray);
-  const result = asrProvider.feed(samples);
-  return result; // { text, isFinal } or null
+ipcMain.handle('feed-audio', (event, command) => {
+  return asrIpc.feed(command);
 });
 
-ipcMain.handle('stop-asr', () => {
-  const finalText = asrProvider.stop();
-  asrReady = false;
-  return { success: true, finalText };
+ipcMain.handle('stop-asr', (event, command) => {
+  return asrIpc.stop(command);
+});
+
+ipcMain.handle('cancel-asr', (event, command) => {
+  return asrIpc.cancel(command);
 });
 
 // LLM 连通性测试

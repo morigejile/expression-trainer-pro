@@ -13,9 +13,13 @@ contextBridge.exposeInMainWorld('api', {
   closeWindow: () => ipcRenderer.invoke('close-current-window'),
 
   // 语音识别 - 使用 Web Audio 方案
-  initASR: () => ipcRenderer.invoke('init-asr'),
-  feedAudio: (samples) => ipcRenderer.invoke('feed-audio', Array.from(samples)),
-  stopASR: () => ipcRenderer.invoke('stop-asr'),
+  startASR: (options) => ipcRenderer.invoke('start-asr', options),
+  feedAudio: (chunk) => ipcRenderer.invoke('feed-audio', {
+    ...chunk,
+    samples: new Float32Array(chunk.samples)
+  }),
+  stopASR: (options) => ipcRenderer.invoke('stop-asr', options),
+  cancelASR: (options) => ipcRenderer.invoke('cancel-asr', options),
 
   // 词库分析
   analyzeText: (text) => ipcRenderer.invoke('analyze-text', text),
