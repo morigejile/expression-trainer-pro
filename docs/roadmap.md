@@ -1,8 +1,9 @@
 # Expression Trainer TODO / Roadmap
 
 > 状态：Active execution baseline
-> 更新日期：2026-08-28
-> 当前进度：Phase 0～3、R-01 已完成；下一主线从 R-02 开始
+> 更新日期：2026-08-29
+> 当前进度：Phase 0-2、D-01/D-02 与 R-01 已完成；D-03/D-04 未完成；下一主线从 R-02 开始
+> 当前模式：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞后续工作；只有它们使当前技术实验无法运行或结论失效时，才阻塞当前路径。
 
 ## 1. 目标与排序原则
 
@@ -34,9 +35,11 @@ flowchart LR
   T --> BM[Phase 2 数据集与三候选 benchmark]
   BM --> D2[Phase 3 默认模型决策]
   D2 --> R1[R-01 最小 Provider]
+  R1 --> ZF[Zipformer Large 候选准备]
   R1 --> R2[R-02 session/event]
   R2 --> R3[R-03 AudioCapture]
   R3 --> R4[R-04 AudioWorklet/重采样]
+  R4 --> FR[FireRedASR2 utterance spike]
   R4 --> D3[D-03 执行边界决策]
   D3 --> R5[R-05 有界音频传输]
   R5 --> R6[R-06 ASR 移出 Main]
@@ -64,7 +67,7 @@ flowchart LR
 - BM-01 数据 intake、review、质量报告和 freeze 工具已归档到 Git 历史；核心 harness 继续保留。
 - BM-03 工作树已归档，分支 `codex/benchmark/bm03-audio-baseline` 保留；其证据不作为模型选择门禁，后续音频兼容性由 R-03/R-04 接手。
 - BM-07 尚未执行，只在 D-03 前做最小执行边界 spike，不提前扩张。
-- 新模型、新语料和新的 review 流程均不在当前关键路径。
+- 仅重开 Zipformer Large CTC INT8 候选准备与 FireRedASR2 CTC INT8 utterance spike；不进行通用的新模型扩张。新语料和新的 review 流程仍不在当前关键路径。
 
 ## 4. Phase 3 未完成决策
 
@@ -88,6 +91,15 @@ flowchart LR
 | R-09 | P1 | 收敛设置/规则/日志 | 演进 schemaVersion、原子写和脱敏日志；凭据库仅在收益超过 native 成本时采用 | T-03,R-07 | 升级保留配置；日志不含 Key 或完整敏感文本 |
 
 当前关键路径是 `R-02 → R-03 → R-04 → D-03 → R-05 → R-06`。R-07 可在不扩大当前步骤的前提下独立准备，但不阻塞 R-02～R-04。
+
+### 5.1 内部 benchmark 候选（不改变产品默认）
+
+| ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
+|---|---|---|---|---|---|
+| C-01 | P1 | 准备 Zipformer Large CTC INT8 候选 | 在现有 `zipformer-ctc` benchmark 路径加入 pending registry/allowlist、候选列表与 adapter 契约测试及模型库存文档；模型文件留在 Git 外 | Phase 0～2、R-01 | 仅候选准备可复核；后续再做外部下载、hash、native 初始化 smoke 与 benchmark |
+| C-02 | P1 | FireRedASR2 CTC INT8 utterance spike | 在 `fire-red-asr-ctc` family 累积一段标准化 16 kHz 单声道音频，只在结束时解码并产生 final；不伪造 streaming partial | R-02,R-04 | 在冻结数据集比较 CER、RTF、内存、冷启动、体积和交互取舍；验证 cancel/new-session 隔离 |
+
+Paraformer 继续是产品默认。上述候选仅用于内部技术验证和 benchmark，不构成生产模型选择、打包或再分发授权。
 
 ## 6. Phase 5 — Electron Forge 打包与发布
 
@@ -126,12 +138,24 @@ flowchart LR
 
 - 不把重构变成 React/Vite/TypeScript UI 重写。
 - 不默认引入 Python/FunASR/PyTorch/CUDA、Tauri 或 WASM。
-- 不新增模型、语料或公开 benchmark，除非维护者显式重开模型决策。
+- 除 Zipformer Large CTC INT8 和 FireRedASR2 CTC INT8 这两个已重开候选外，不新增模型；不新增语料或公开 benchmark，也不进行通用模型扩张。
 - 不建设插件系统、模型市场、数据库、云端账户或通用评测平台。
 - 不把内部模型选择升级为复杂审批、不可抵赖审计链或针对本地恶意管理员的防御系统。
 - 不为覆盖率数字增加无法发现实质回归的测试。
 
-## 10. Roadmap 维护规则
+## 10. 人工与外部跟进（当前非阻塞）
+
+以下事项需要外部证据或人工判断；在内部开发/测试中仅当它们使当前技术实验无法运行或结论失效时才升级为阻塞项：
+
+- 在打包或公开发布前确认模型和数据集再分发权利；
+- 用真实可配置麦克风验证 16/44.1/48 kHz；
+- 确定 Tier 1 OS、最低硬件和生产性能预算；
+- 获得代码签名/公证凭据并检查最终安装器体验；
+- 验证 macOS/Linux 的 native addon 与 package 行为；
+- 确认 FireRedASR2 的 utterance/VAD 交互是否适合最终用户；
+- 确认公开隐私告知、LLM 披露和发布支持口径。
+
+## 11. Roadmap 维护规则
 
 - 任务状态改变时更新本文件；逐步命令、worktree 路径和一次性验收日志不写入 Roadmap。
 - 依赖未满足不得把下游标为完成；spike 结论必须回写对应 ADR。

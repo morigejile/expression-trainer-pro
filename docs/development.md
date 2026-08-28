@@ -1,7 +1,8 @@
 # 开发与验证
 
 > 当前验证基线：Windows x64、Node.js 22.23.x、npm 12.0.x、Electron 43.4.1、sherpa-onnx-node 1.13.3
-> 更新日期：2026-08-28
+> 更新日期：2026-08-29
+> 当前用途：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞跟进，除非它们使当前技术实验无法运行或结论失效。
 
 ## 环境与安装
 
@@ -62,6 +63,12 @@ models/sherpa-onnx-streaming-paraformer-bilingual-zh-en/
 
 BM-01 已完成的数据采集、人工 review 和 freeze 工具已归档到 Git 历史，不再作为当前维护入口。若引入新语料，必须先明确重开该工作并重新评估所需工具，不能把现有冻结结果当作通用数据治理平台。
 
+模型候选只重开 Zipformer Large CTC INT8 和 FireRedASR2 CTC INT8：前者在基础工作后按现有 streaming `zipformer-ctc` benchmark 路径准备；后者在 R-02/R-04 后作为只输出 final 的 utterance spike。两者均不改变 Paraformer 默认，也不代表通用模型扩张或发布可分发性。
+
 ## 发布边界
 
-当前仓库没有 Electron Forge package/make 配置。正式制品、native addon 打包、模型再分发许可、升级保留和平台支持矩阵仍属于后续发布工作；在有实测制品前不宣称已支持。
+当前仓库没有 Electron Forge package/make 配置。正式制品、native addon 打包、模型再分发许可、升级保留和平台支持矩阵仍属于后续发布工作；在有实测制品前不宣称已支持。它们在内部开发/测试中不阻塞当前技术实验，除非会使实验无法运行或结论失效。
+
+## 人工与外部跟进
+
+以下事项保留为非阻塞后续工作：模型/数据集再分发权利、16/44.1/48 kHz 真实麦克风验证、Tier 1 平台和最低硬件、代码签名/公证凭据、macOS/Linux native addon 与制品行为、FireRedASR2 utterance/VAD 交互，以及公开隐私/LLM 披露和发布支持口径。

@@ -1,8 +1,8 @@
 # Expression Trainer 需求基线
 
-> 状态：Current Baseline
-> 基线日期：2026-08-28
-> 适用范围：当前版本（Existing）与下一阶段工程化目标（Planned）
+> 状态：Existing / Partial / Planned
+> 基线日期：2026-08-29
+> 适用范围：内部开发/测试中的当前实现（Existing/Partial）与下一阶段工程化目标（Planned）
 > 源码基线：`main`，已包含 Phase 4 / R-01 Paraformer Provider 适配
 
 ## 1. 文档目的
@@ -12,6 +12,7 @@
 ### 1.1 事实与假设标记
 
 - **Existing**：已从上述本地源码基线确认存在的行为；不等同于已完成端到端运行验收。
+- **Partial**：当前源码已实现需求的一部分边界或前置条件，但尚未满足完整验收标准。
 - **Planned**：已明确的目标需求，不表示当前已经实现。
 - **TBD**：缺少源码、产品选择或测试数据，不能可靠确定。
 - **Assumption**：为形成可执行基线而采用的假设，必须在实施前验证。
@@ -55,36 +56,36 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | FR-E11 | 当前 Paraformer 应通过轻量 ASR Provider 边界访问。 | Main 只依赖 initialize/feed/stop 契约；Fake Provider 可在不加载真实模型时验证业务与 smoke 路径。 |
 | FR-E12 | 默认中文模型选择应由项目数据 benchmark 和明确产品取舍支持。 | 三候选比较结果可复跑；ADR-0005 记录继续使用 Paraformer 的 streaming UX 与渐进迁移理由。 |
 
-### 4.2 Planned
+### 4.2 Partial / Planned
 
-| ID | 需求 | 验收标准 |
-|---|---|---|
-| FR-P01 | 音频采集与 ASR 推理应成为独立职责。 | Audio 模块只输出带明确采样率/声道/格式的音频块；业务和 UI 不直接依赖 Sherpa 配置。 |
-| FR-P02 | 音频链路应使用 AudioWorklet，并按模型要求正确重采样。 | 44.1 kHz、48 kHz 等常见输入经测试后以模型声明的采样率送入 ASR；不再使用 `ScriptProcessorNode`。 |
-| FR-P03 | ASR Provider 应补全 session 和规范事件语义。 | 明确 sessionId、sequence、partial/final/error、迟到事件抑制及 dispose 语义；业务测试继续无需加载真实模型。 |
-| FR-P04 | ASR 初始化和推理应移出 Electron Main。 | 长时间初始化/推理不阻塞 Main 事件循环；执行单元失败可检测并向 UI 返回可恢复错误。具体隔离机制由 ADR 决定。 |
-| FR-P05 | 应提供轻量 Model Manager。 | 可依据模型清单检查、下载、SHA-256 校验、原子安装、选择和返回本地模型路径；失败不破坏上一可用模型。 |
-| FR-P06 | 模型与应用版本应解耦。 | 模型清单至少包含 `modelId`、`version`、`engine`、`languages`、文件来源、`sha256` 和兼容版本信息。 |
-| FR-P08 | 应用应能生成普通用户可安装的桌面制品。 | 通过 Electron Forge 生成目标平台制品；终端用户无需安装 Node.js、Python、CMake 或编译器。 |
-| FR-P09 | 设置、用户数据、模型、缓存和日志应与程序文件分离。 | 应用升级或重装不应默认删除用户数据和已下载模型；实际目录遵循 Electron `userData` 等平台目录。 |
-| FR-P10 | 本地训练在 LLM 不可用时仍应工作。 | 离线、无 API Key 或 LLM 请求失败时，录音、本地 ASR 和基础词库分析仍可完成。 |
+| ID | 状态 | 需求 | 验收标准 |
+|---|---|---|---|
+| FR-P01 | Partial | 音频采集与 ASR 推理应成为独立职责。 | 现有 Provider 已隔离 Sherpa 配置，但 Renderer 仍持有采集生命周期。Audio 模块最终只输出带明确采样率/声道/格式的音频块。 |
+| FR-P02 | Planned | 音频链路应使用 AudioWorklet，并按模型要求正确重采样。 | 44.1 kHz、48 kHz 等常见输入经测试后以模型声明的采样率送入 ASR；不再使用 `ScriptProcessorNode`。 |
+| FR-P03 | Partial | ASR Provider 应补全 session 和规范事件语义。 | 当前仅有 initialize/feed/stop 最小 Provider 契约；仍需明确 sessionId、sequence、partial/final/error、迟到事件抑制及 dispose 语义。 |
+| FR-P04 | Planned | ASR 初始化和推理应移出 Electron Main。 | 当前推理仍在 Main；目标为长时间初始化/推理不阻塞 Main，执行单元失败可检测并向 UI 返回可恢复错误。具体隔离机制由 ADR 决定。 |
+| FR-P05 | Planned | 应提供轻量 Model Manager。 | 当前模型仍手工管理；目标为依据模型清单检查、下载、SHA-256 校验、原子安装、选择和返回本地模型路径，且失败不破坏上一可用模型。 |
+| FR-P06 | Planned | 模型与应用版本应解耦。 | 模型清单至少包含 `modelId`、`version`、`engine`、`languages`、文件来源、`sha256` 和兼容版本信息。 |
+| FR-P08 | Planned | 应用应能生成普通用户可安装的桌面制品。 | 当前无 Forge 配置；目标为通过 Electron Forge 生成目标平台制品，终端用户无需安装 Node.js、Python、CMake 或编译器。 |
+| FR-P09 | Partial | 设置、用户数据、模型、缓存和日志应与程序文件分离。 | 设置已在 Electron `userData`；模型、缓存、日志的完整分离及升级/重装保护仍未实现。 |
+| FR-P10 | Existing | 本地训练在 LLM 不可用时仍应工作。 | 离线、无 API Key 或 LLM 请求失败时，录音、本地 ASR 和基础词库分析仍可完成。 |
 
 ## 5. 非功能需求（NFR）
 
-| ID | 类别 | 需求与验证方式 |
-|---|---|---|
-| NFR-01 | 可维护性与范围收敛 | 默认保持 Electron + 原生 JS/HTML/CSS + Sherpa-ONNX；持续遵循不过度扩散、不过度设计、不把内部工作升级为不必要的审计审核，并减少不能改变决策或发现实质回归的验证。只有能明确降低总代码、风险或长期成本时才增加依赖、流程或门禁；依赖变更需 ADR 或变更说明。 |
-| NFR-02 | 可复现性 | 锁文件与 `package.json` 一致；固定开发工具 Node 22.23.x/npm 12.0.x；当前 lock/安装树为精确 Electron 43.4.1、Sherpa 1.13.3。Electron 43 首次 CLI 下载与 clean `npm ci` 后的校验缓存恢复均已实测；Forge 构建仍按 Roadmap Phase 5 建立。 |
-| NFR-03 | 响应性 | 录音和 ASR 期间 UI 与 Main 应保持可响应。定量预算在基线 benchmark 后确定，不虚构当前 p95 指标。 |
-| NFR-04 | 音频正确性 | 每个音频块携带或继承明确的采样率、声道和样本格式；重采样用自动化测试验证时长和频率行为。 |
-| NFR-05 | 性能 | 默认模型应在项目定义的最低支持设备上满足实时或近实时体验；阈值、设备和场景在 benchmark 方案中冻结。 |
-| NFR-06 | 可靠性 | 模型下载使用校验和与原子替换；ASR/LLM/麦克风错误应可诊断，不得导致未捕获崩溃或损坏上一可用状态。 |
-| NFR-07 | 隐私与安全 | 本地 ASR 音频默认不上传；向 LLM 发送文本前应让用户明确知情。API Key、完整音频和敏感文本不得写入普通日志。 |
-| NFR-08 | 权限隔离 | Renderer 不获得不受限的 Node.js 权限；当前 BrowserWindow 使用 `contextIsolation: true`、`nodeIntegration: false`，Preload 只暴露显式能力。后续新增 IPC 时继续维持该边界。 |
-| NFR-09 | 可测试性 | 词库/配置/模型清单/重采样/Provider 契约有单元测试；IPC/ASR 有集成测试；至少有启动、录音、模型初始化冒烟检查。首阶段不设虚假覆盖率目标。 |
-| NFR-10 | 可移植性 | 支持矩阵按实际 CI 和人工验证定义 Tier 1/2/Experimental；在验证前不宣称 Windows/macOS/Linux 全部同等级支持。 |
-| NFR-11 | 可升级性 | 应用、设置 schema 和模型均有版本；升级失败时保留用户数据和上一可用模型。自动更新服务不属于首个基线。 |
-| NFR-12 | 可观测性 | 日志包含应用/OS/架构、ASR Provider、模型 ID/版本、输入采样率、初始化耗时和脱敏错误；不得包含密钥。 |
+| ID | 状态 | 类别 | 需求与验证方式 |
+|---|---|---|---|
+| NFR-01 | Existing | 可维护性与范围收敛 | 默认保持 Electron + 原生 JS/HTML/CSS + Sherpa-ONNX；持续遵循不过度扩散、不过度设计、不把内部工作升级为不必要的审计审核，并减少不能改变决策或发现实质回归的验证。只有能明确降低总代码、风险或长期成本时才增加依赖、流程或门禁；依赖变更需 ADR 或变更说明。 |
+| NFR-02 | Partial | 可复现性 | 锁文件与 `package.json` 一致；固定开发工具 Node 22.23.x/npm 12.0.x；当前 lock/安装树为精确 Electron 43.4.1、Sherpa 1.13.3。Electron 43 首次 CLI 下载与 clean `npm ci` 后的校验缓存恢复均已实测；Forge 构建仍按 Roadmap Phase 5 建立。 |
+| NFR-03 | Partial | 响应性 | Renderer 在录音期间可继续响应，但 ASR 仍在 Main 同步运行；定量预算在基线 benchmark 后确定，不虚构当前 p95 指标。 |
+| NFR-04 | Partial | 音频正确性 | 当前使用 Float32 单声道输入并意图请求 16 kHz，但没有记录实际率或显式重采样；目标为每块带明确采样率/声道/格式，并用自动化测试验证重采样时长和频率。 |
+| NFR-05 | Planned | 性能 | 默认模型应在项目定义的最低支持设备上满足实时或近实时体验；阈值、设备和场景在 benchmark 方案中冻结。 |
+| NFR-06 | Partial | 可靠性 | ASR/LLM/麦克风错误已有部分受控路径；模型下载校验、原子替换和完整可诊断性仍待实现。 |
+| NFR-07 | Partial | 隐私与安全 | 本地 ASR 音频不上传，且错误已避免暴露密钥；用户告知与完整日志边界仍待发布前确认。 |
+| NFR-08 | Existing | 权限隔离 | Renderer 不获得不受限的 Node.js 权限；当前 BrowserWindow 使用 `contextIsolation: true`、`nodeIntegration: false`，Preload 只暴露显式能力。后续新增 IPC 时继续维持该边界。 |
+| NFR-09 | Partial | 可测试性 | 词库、设置、Provider 和 Electron smoke 已有测试；模型清单、重采样、完整 IPC/ASR 协议和真实模型/录音冒烟仍待补齐。 |
+| NFR-10 | Planned | 可移植性 | 支持矩阵按实际 CI 和人工验证定义 Tier 1/2/Experimental；在验证前不宣称 Windows/macOS/Linux 全部同等级支持。 |
+| NFR-11 | Partial | 可升级性 | 设置已有 schemaVersion 和旧配置迁移；模型版本、原子升级和回退仍待实现。自动更新服务不属于首个基线。 |
+| NFR-12 | Planned | 可观测性 | 当前没有满足该契约的诊断日志；目标日志包含应用/OS/架构、ASR Provider、模型 ID/版本、输入采样率、初始化耗时和脱敏错误，且不得包含密钥。 |
 
 ## 6. 约束
 
@@ -93,9 +94,12 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 - 目标是降低总体维护和交付复杂度，而不是机械减少文件数、模块数或安装包体积。
 - ASR Provider 和 Model Manager 必须保持轻量；不建设通用框架、模型数据库或模型市场。
 - ADR-0005 已根据三候选 benchmark 接受保留 Paraformer 为默认；Zipformer 与 SenseVoiceSmall 的结果作为后续复审基线，不向普通用户暴露多模型选择。
+- 仅重开 Zipformer Large CTC INT8 与 FireRedASR2 CTC INT8 两个内部候选：前者保持 streaming，后者仅做 utterance spike；不进行通用模型扩张，Paraformer 仍为默认。
 - 架构迁移采用渐进重构，不推倒重写，不以切换 Electron/Tauri/WASM 为默认路径。
 
 ## 7. 发布级验收场景
+
+这些场景是后续发布判断，而非当前内部技术实验的默认门槛。发布级 review、审计、签名、广泛平台支持和未解决的再分发权利在本阶段均为非阻塞跟进，除非它们使实验无法运行或其结论失效。
 
 | ID | 场景 | 通过条件 |
 |---|---|---|

@@ -1,7 +1,7 @@
 # 目标架构（To-Be）
 
 > 状态：Proposed  
-> 基线日期：2026-08-28
+> 基线日期：2026-08-29
 > 目标：在保持功能闭环的前提下降低总体维护、依赖、跨平台安装和升级复杂度
 > 当前源码基线：`main`，已完成 benchmark 选型和 Phase 4 / R-01 最小 Provider 适配
 
@@ -268,7 +268,9 @@ await dispose()
 
 ## 7. ASR 模型策略
 
-ADR-0005 已接受保留 Paraformer 为默认模型。2026-08-27 的简单比较仍保留以下候选证据：
+ADR-0005 已接受保留 Paraformer 为默认模型。当前仅为内部开发/测试；发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞后续工作，除非它们使当前技术实验无法运行或结论失效。
+
+2026-08-27 的简单比较仍保留以下候选证据：
 
 - 小型中文 streaming Zipformer CTC；
 - SenseVoiceSmall INT8（需明确其 utterance/VAD 使用方式与 streaming 模型的体验差异）。
@@ -283,6 +285,13 @@ ADR-0005 已接受保留 Paraformer 为默认模型。2026-08-27 的简单比较
 
 当前维持逐步显示 partial 的 streaming 交互，因此选择 Paraformer；SenseVoiceSmall 的准确率优势与 Zipformer 的体积/partial 延迟优势作为复审证据保留。若未来接受 utterance-only 交互或目标硬件/性能预算变化，再按 ADR-0005 的复审条件重开选择。
 
+本里程碑只重开两个具名候选，不做通用模型扩张：
+
+- **Zipformer Large CTC INT8**：在基础工作完成后，准备 `sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30` 的 pending benchmark candidate。它是 16 kHz streaming 路径，使用 `model.int8.onnx` 与 `tokens.txt`；只需沿用现有 `zipformer-ctc` adapter，并补足 allowlist、候选列表和契约测试。它不进入生产模型选择。
+- **FireRedASR2 CTC INT8**：只在 R-02/R-04 后，对 `sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25` 做 utterance-only spike。路径累计一段标准化 16 kHz 单声道样本，结束时解码一次且只发 final；不得通过重复解码增长缓冲区伪造 partial。它是否适合产品仍取决于后续基准与 utterance/VAD 交互判断。
+
+两者都保持 `pending`，模型文件留在 Git 外；下载、文件 hash、native-load 结果及再分发结论只能在实际验证后记录。Paraformer 仍是默认模型，直到后续基准证据和明确决定推翻 ADR-0005。
+
 ## 8. 部署与发布
 
 使用 Electron Forge 统一 package/make 配置，并按实际支持矩阵选择 makers。目标包括：
@@ -293,6 +302,8 @@ ADR-0005 已接受保留 Paraformer 为默认模型。2026-08-27 的简单比较
 - 程序文件、用户数据和模型分离；
 - 先完成一个 Tier 1 平台的可重复安装/升级，再扩展矩阵；
 - 代码签名、公证和自动发布作为后续 release gate，不在无凭据时伪装完成。
+
+这些发布工作在内部开发/测试中不阻塞架构实验，除非缺失的发布、平台或再分发证据会使实验无法运行或结论失效。
 
 最终用户路径应接近：下载安装包 → 安装 → 启动 → 首次选择/下载模型 → 训练，不要求 Node/Python/编译器。
 

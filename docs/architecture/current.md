@@ -1,7 +1,7 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 Smoke；BM-02/D-02 Completed，Phase 4 / R-01 Completed（保留 Paraformer 默认）
-> 基线日期：2026-08-28
+> 状态：Verified from Source + Electron 43 Smoke；内部开发/测试，BM-02/D-02 Completed，Phase 4 / R-01 Completed（保留 Paraformer 默认）
+> 基线日期：2026-08-29
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
 > 描述对象：截至 Phase 4 / R-01；保留 Electron 43 与 T-04～T-08 行为基线
 
@@ -76,6 +76,8 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 ### 3.1 BM-02 harness（Completed）
 
 BM-02 提供独立 benchmark CLI，用 manifest 输出每个 sample/repetition 的 JSONL、汇总 JSON/CSV、环境快照及 tag 分层统计；失败的 init、sample、timeout 和 dispose 事件也会被落盘。它不改动生产 `lib/asr.js`、Audio、IPC、Main 或默认模型，且没有新增依赖。2026-08-27，harness 在 clean commit `703f1630ba2bbcfcb98c914bc67c95e0b120ddc1` 上完成 Paraformer、small Zipformer 与 SenseVoiceSmall 各一轮 100 条比较，全部 0 失败；结果见 `docs/benchmark/bm02-comparison-2026-08-27.md`。维护者接受 ADR-0005 并保留现有 Paraformer 默认，因此生产代码无需切换；模型再分发许可仍是后续发布门禁。
+
+当前源码没有 Zipformer Large CTC INT8 或 FireRedASR2 CTC INT8 的生产 adapter、registry entry 或本地运行验证。它们只是在路线图中重新打开的内部候选，尚未改变 Paraformer 默认或当前实现事实。
 
 ## 4. C4 Level 2：当前容器/运行边界
 
@@ -280,6 +282,8 @@ Settings/Prompt Renderer
 - 无安装包、签名、公证、自动更新、升级/卸载数据保留测试或正式支持矩阵。
 - 原有 `package-lock.json` 清理已由负责人确认纳入 Phase 0；陈旧 `node-microphone` 条目已删除，lockfile 与 `package.json` 一致。
 - 开发基线为 Node 22.23.0/npm 12.0.2。T-08 的 Electron 43.4.1 JS 依赖经 clean `npm ci` 安装；Electron 42+ 改为首次 CLI 调用时下载 binary，本轮首次 43.4.1 下载成功，后续 clean install 从官方校验缓存恢复相同 executable（SHA-256 `E885FFC2A09DAB4C14DE706E3662A5929D1E65EA4EA347C56FD0964640EB923B`）。显式清空所有 npm/Electron 缓存后的复跑仍为 Runtime-TBD。
+
+这些发布级缺口及未确认的模型再分发权利在当前内部开发/测试中是非阻塞后续工作；若它们使本地技术实验无法运行或使结论失效，才需要提前处理。
 
 ## 8. 已确认技术债与风险
 
