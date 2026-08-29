@@ -2,7 +2,7 @@
 
 > 状态：Active execution baseline
 > 更新日期：2026-08-29
-> 当前进度：Phase 0-2、D-01～D-04、R-01～R-09、PKG-01～PKG-04 与 C-01/C-02 最小集成已完成；下一主线为候选模型资产缓存与 Phase 6 长期维护
+> 当前进度：Phase 0-2、D-01～D-04、R-01～R-09、PKG-01～PKG-04、OPS-02 与 C-01/C-02 最小集成已完成；下一主线为候选模型资产缓存与其余 Phase 6 维护节点
 > 当前模式：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞后续工作；只有它们使当前技术实验无法运行或结论失效时，才阻塞当前路径。
 
 ## 1. 目标与排序原则
@@ -118,7 +118,7 @@ Paraformer 继续是产品默认。上述候选仅用于内部技术验证和 be
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
 | OPS-01 | P1 | CI 门禁 | `npm ci → npm test → Forge package`；大模型测试分层，普通 PR 使用 Fake/small smoke | T-07,PKG-02 | 主分支每次变更有自动结果 |
-| OPS-02 | P1 | 版本/变更规范 | SemVer、CHANGELOG、release checklist；统一 package/界面/制品版本 | PKG-03 | 每个 release 可追溯到 commit、模型和 ADR |
+| OPS-02 | P1 | 版本/变更规范（Completed） | `package.json#version` 作为应用/制品唯一版本源；CHANGELOG 记录内部版本、默认模型和 ADR；最小 release checklist 合并进开发文档，不新增发布框架 | PKG-03 | 已记录 1.0.0/1.0.1 基线与提交、模型、ADR；源码 V2 注释不再制造第二版本口径 |
 | OPS-03 | P1 | 受控依赖升级 | Electron/Sherpa/Forge 按具体安全或兼容风险批次升级 | OPS-01 | 每次验证 native load、模型 smoke 和 Tier 1 制品 |
 | OPS-04 | P1 | 模型生命周期 | registry 标记 current/deprecated/removed，定义兼容期和回退 | R-07,OPS-01 | 模型替换有数据、决策和弃用记录 |
 | OPS-05 | P1 | 诊断基线 | 脱敏记录 app/OS/arch、模型、sample rate、初始化时间和错误类别 | R-09 | 用户可导出不含密钥的诊断信息 |
@@ -133,7 +133,7 @@ Paraformer 继续是产品默认。上述候选仅用于内部技术验证和 be
 | M2 选型有证据 | Completed | BM-01、BM-02、BM-04～BM-06、D-01、D-02 | 三候选结果和 Accepted 模型 ADR |
 | M3 架构收敛 | Completed | R-01～R-09、D-03/D-04 | Audio/ASR/模型分离，Main 不推理，模型升级可回退 |
 | M4 可安装发布 | In Progress | PKG-01～PKG-06（PKG-01～PKG-04 Completed；PKG-05/PKG-06 为外部发布跟进） | Windows x64 内部安装/升级闭环已完成；公开发布仍需签名与对应平台证据 |
-| M5 可长期维护 | Planned | OPS-01～OPS-06 | CI、版本、依赖、模型和诊断机制稳定 |
+| M5 可长期维护 | In Progress | OPS-01～OPS-06（OPS-02 Completed） | 版本口径已统一；CI、依赖、模型生命周期和诊断节点待按实际风险推进 |
 
 ## 9. 明确不做
 

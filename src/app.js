@@ -1,4 +1,4 @@
-// 宇宙无敌表达训练系统 V2
+// 宇宙无敌表达训练系统
 
 function mergeFinalText(fullText, finalText) {
   const currentText = typeof fullText === 'string' ? fullText : '';

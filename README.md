@@ -11,6 +11,7 @@
 - [架构决策记录（ADR）](docs/architecture/adr/README.md)
 - [开发路线图](docs/roadmap.md)
 - [开发与可复现安装](docs/development.md)
+- [版本变更记录](CHANGELOG.md)
 
 一个帮你训练口语表达精准度的本地桌面应用。实时语音识别与词库分析在本地完成；AI 反馈是可选能力，除 Ollama 外通常需要网络。
 

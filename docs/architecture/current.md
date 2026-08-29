@@ -73,7 +73,7 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 
 | 区域 | 当前选择 | 证据/备注 |
 |---|---|---|
-| 应用 | `expression-trainer` / product `宇宙无敌表达训练` / `1.0.1` | `package.json`；版本与 README/代码注释的 V2 口径仍待 OPS-02 治理 |
+| 应用 | `expression-trainer` / product `宇宙无敌表达训练` / `1.0.1` | `package.json#version` 是应用与制品唯一版本源；CHANGELOG 和最小 release checklist 已建立 |
 | 桌面运行时 | Electron `43.4.1`（精确版本） | 当前 lock 与 `node_modules` 一致；Windows x64 实测内置 Node 24.18.1、Chromium 150.0.7871.224、modules ABI 148、N-API 10 |
 | UI | 原生 HTML/CSS/JavaScript | 无 bundler/前端框架 |
 | 音频 | 独立 AudioCapture：`getUserMedia` + `AudioContext({sampleRate:16000,latencyHint:'interactive'})` | Renderer 只编排 session/UI；请求/context/可用 track rate 可诊断 |
@@ -350,7 +350,7 @@ Settings/Prompt Renderer
 | TD-13 | **R-09 已关闭**：UI 高亮与 lexicon 使用唯一共享规则源 | 内置 filler/hedge/vague 分类一致；customWords 进入有界本地 filler 统计 | shared rule 与 lexicon 聚焦测试 | 新规则只修改 canonical shared 文件；候选 tiered lexicon 仍独立设计 |
 | TD-14 | README 与实现漂移风险 | 用户预期错误 | Phase 0 已修正触发字数、联网边界和平台口径 | 后续行为变更同步 README 与架构文档 |
 | TD-15 | 未启用候选词库容易被误认为运行时数据 | 维护者可能误删或直接接入不兼容 schema | `tiered-lexicon.json` 无 import，Phase 0 决定保留 | 明确标记未启用；在 T-01/T-02 后以独立任务设计 schema、合并规则和测试 |
-| TD-16 | 版本口径不一致 | 发布历史和兼容性不清 | package 1.0.1、代码 V2、历史提交 v1.1 | OPS-02 建立 SemVer + CHANGELOG + release policy |
+| TD-16 | **OPS-02 已关闭版本口径分裂** | 应用/制品由 `package.json#version` 唯一驱动，模型独立版本化；历史产品代际名称不再冒充 SemVer | package/lock 1.0.1、CHANGELOG、开发文档 release checklist | 仅在实际安装里程碑更新版本；公开发布再增加 tag/签名/checksums |
 | TD-17 | 生产依赖审计为 0；Forge 7.5/Squirrel 的仅开发传递依赖有 19 high/1 critical 告警 | 不进入应用运行依赖，但打包工具仍处理源码和制品；为避开 Forge 新版 `@electron/rebuild` 的 Git 依赖，本轮保留已验证的 registry-only 组合 | 2026-08-29 `npm audit --omit=dev --json` 为 0；完整 audit 为 20；未使用 `audit fix --force` 或通配 Git/script 放行 | OPS-03 以 registry-only 新组合受控升级；每次重跑干净 make 与 packaged native smoke |
 
 ## 9. 当前架构评价

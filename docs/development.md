@@ -46,6 +46,19 @@ git commit -m "<English subject>" -m "中文：<简短说明>"
 
 该约定适用于未来提交，不要求改写已有历史。
 
+## 版本与发布清单
+
+`package.json#version` 是应用、Electron `app.getVersion()` 和 Forge/Squirrel 制品版本的唯一 canonical 来源；`package-lock.json` 根包版本必须与之相同。源码注释、README 标题和产品代际名称不定义 SemVer。模型使用 registry 中独立的 `id/version`，应用升级不隐式切换模型。
+
+版本遵循 SemVer：不兼容的用户数据或公开契约变化升 major，向后兼容能力升 minor，修复与内部交付闭环升 patch。当前仍是内部测试，只有实际生成并验收的版本才写入 [CHANGELOG](../CHANGELOG.md)，不为每个开发提交虚增版本。
+
+发布或内部安装里程碑只执行以下最小清单：
+
+1. 同步 `package.json` 与 lockfile 版本，并在 CHANGELOG 记录变更、默认模型和相关 ADR；
+2. 按本文件的验证触发规则运行 focused tests；里程碑收尾才运行完整测试与对应制品 smoke；
+3. 确认安装制品版本与 `package.json` 一致，且 userData/模型策略没有未记录变化；
+4. 使用英文提交主题和简短中文正文。公开发布时再增加 tag、签名、checksums 和 release notes；内部测试不伪装完成这些外部步骤。
+
 若本机未把项目基线 Node 加入 `PATH`，当前开发机可直接使用：
 
 ```powershell
