@@ -3,7 +3,7 @@
 > 状态：Existing / Partial / Planned
 > 基线日期：2026-08-29
 > 适用范围：内部开发/测试中的当前实现（Existing/Partial）与下一阶段工程化目标（Planned）
-> 源码基线：`main`，已包含 Phase 4 / R-01 Paraformer Provider 适配
+> 源码基线：`main`，已包含 Phase 4 / R-01～R-02 Paraformer Provider/session 协议适配
 
 ## 1. 文档目的
 
@@ -53,8 +53,9 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | FR-E08 | 应用应保存各 LLM Provider 配置并兼容旧版扁平配置。 | 配置写入 Electron `userData/settings.json`，按 provider 保存；旧字段在读取时迁移。API Key 当前为明文，属于安全债。 |
 | FR-E09 | 用户应能编辑训练目标、自定义规则、风格参考和额外口癖词。 | 内容保存到 `userData/custom-prompt.json`，后续实时/报告 prompt 读取。 |
 | FR-E10 | 用户应能复制或保存原文与报告。 | 原文可复制/保存为 Markdown；报告可复制/保存为 Markdown；保存路径通过系统对话框选择。 |
-| FR-E11 | 当前 Paraformer 应通过轻量 ASR Provider 边界访问。 | Main 只依赖 initialize/feed/stop 契约；Fake Provider 可在不加载真实模型时验证业务与 smoke 路径。 |
+| FR-E11 | 当前 Paraformer 应通过轻量 ASR Provider 边界访问。 | Main 只依赖 initialize/start/feed/stop/cancel/dispose 契约；Fake Provider 可在不加载真实 Paraformer/Sherpa 模块时验证业务与 Electron smoke 路径。 |
 | FR-E12 | 默认中文模型选择应由项目数据 benchmark 和明确产品取舍支持。 | 三候选比较结果可复跑；ADR-0005 记录继续使用 Paraformer 的 streaming UX 与渐进迁移理由。 |
+| FR-P03 | ASR Provider 应提供 session 和规范事件语义。 | `startASR/feedAudio/stopASR/cancelASR` 使用 `sessionId` 和 sequence，返回 `ready/partial/final/error/stopped` 事件的安全 envelope；旧 session、迟到/倒序事件不污染当前训练，stop/cancel/dispose 可重复处理。 |
 
 ### 4.2 Partial / Planned
 
@@ -62,7 +63,6 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 |---|---|---|---|
 | FR-P01 | Partial | 音频采集与 ASR 推理应成为独立职责。 | 现有 Provider 已隔离 Sherpa 配置，但 Renderer 仍持有采集生命周期。Audio 模块最终只输出带明确采样率/声道/格式的音频块。 |
 | FR-P02 | Planned | 音频链路应使用 AudioWorklet，并按模型要求正确重采样。 | 44.1 kHz、48 kHz 等常见输入经测试后以模型声明的采样率送入 ASR；不再使用 `ScriptProcessorNode`。 |
-| FR-P03 | Partial | ASR Provider 应补全 session 和规范事件语义。 | 当前仅有 initialize/feed/stop 最小 Provider 契约；仍需明确 sessionId、sequence、partial/final/error、迟到事件抑制及 dispose 语义。 |
 | FR-P04 | Planned | ASR 初始化和推理应移出 Electron Main。 | 当前推理仍在 Main；目标为长时间初始化/推理不阻塞 Main，执行单元失败可检测并向 UI 返回可恢复错误。具体隔离机制由 ADR 决定。 |
 | FR-P05 | Planned | 应提供轻量 Model Manager。 | 当前模型仍手工管理；目标为依据模型清单检查、下载、SHA-256 校验、原子安装、选择和返回本地模型路径，且失败不破坏上一可用模型。 |
 | FR-P06 | Planned | 模型与应用版本应解耦。 | 模型清单至少包含 `modelId`、`version`、`engine`、`languages`、文件来源、`sha256` 和兼容版本信息。 |
@@ -79,10 +79,10 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | NFR-03 | Partial | 响应性 | Renderer 在录音期间可继续响应，但 ASR 仍在 Main 同步运行；定量预算在基线 benchmark 后确定，不虚构当前 p95 指标。 |
 | NFR-04 | Partial | 音频正确性 | 当前使用 Float32 单声道输入并意图请求 16 kHz，但没有记录实际率或显式重采样；目标为每块带明确采样率/声道/格式，并用自动化测试验证重采样时长和频率。 |
 | NFR-05 | Planned | 性能 | 默认模型应在项目定义的最低支持设备上满足实时或近实时体验；阈值、设备和场景在 benchmark 方案中冻结。 |
-| NFR-06 | Partial | 可靠性 | ASR/LLM/麦克风错误已有部分受控路径；模型下载校验、原子替换和完整可诊断性仍待实现。 |
+| NFR-06 | Partial | 可靠性 | ASR session 的旧/迟到事件与安全错误、LLM/麦克风错误已有受控路径；模型下载校验、原子替换、执行单元恢复和完整可诊断性仍待实现。 |
 | NFR-07 | Partial | 隐私与安全 | 本地 ASR 音频不上传，且错误已避免暴露密钥；用户告知与完整日志边界仍待发布前确认。 |
 | NFR-08 | Existing | 权限隔离 | Renderer 不获得不受限的 Node.js 权限；当前 BrowserWindow 使用 `contextIsolation: true`、`nodeIntegration: false`，Preload 只暴露显式能力。后续新增 IPC 时继续维持该边界。 |
-| NFR-09 | Partial | 可测试性 | 词库、设置、Provider 和 Electron smoke 已有测试；模型清单、重采样、完整 IPC/ASR 协议和真实模型/录音冒烟仍待补齐。 |
+| NFR-09 | Partial | 可测试性 | 词库、设置、Provider、ASR session/IPC/Renderer 过滤和 Electron Fake ASR smoke 已有测试；模型清单、重采样、其他 IPC schema 和真实模型/录音冒烟仍待补齐。 |
 | NFR-10 | Planned | 可移植性 | 支持矩阵按实际 CI 和人工验证定义 Tier 1/2/Experimental；在验证前不宣称 Windows/macOS/Linux 全部同等级支持。 |
 | NFR-11 | Partial | 可升级性 | 设置已有 schemaVersion 和旧配置迁移；模型版本、原子升级和回退仍待实现。自动更新服务不属于首个基线。 |
 | NFR-12 | Planned | 可观测性 | 当前没有满足该契约的诊断日志；目标日志包含应用/OS/架构、ASR Provider、模型 ID/版本、输入采样率、初始化耗时和脱敏错误，且不得包含密钥。 |

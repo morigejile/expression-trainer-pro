@@ -2,7 +2,7 @@
 
 > 状态：Active execution baseline
 > 更新日期：2026-08-29
-> 当前进度：Phase 0-2、D-01/D-02 与 R-01 已完成；D-03/D-04 未完成；下一主线从 R-02 开始
+> 当前进度：Phase 0-2、D-01/D-02 与 R-01/R-02 已完成；D-03/D-04 未完成；下一主线从 R-03 开始
 > 当前模式：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞后续工作；只有它们使当前技术实验无法运行或结论失效时，才阻塞当前路径。
 
 ## 1. 目标与排序原则
@@ -60,7 +60,7 @@ flowchart LR
 | Phase 1 — T-01～T-08 | 核心测试、设置迁移、stop final、安全渲染、LLM 控制、Electron smoke、Electron 43 升级 | `test/`、[当前架构](architecture/current.md) |
 | Phase 2 — BM-01/BM-02/BM-04～BM-06 | 100 条冻结 FLEURS 数据、可复跑 harness、三候选同机比较 | [数据集来源](../benchmark/datasets/SOURCES.md)、[Harness](benchmark/harness.md)、[比较结果](benchmark/bm02-comparison-2026-08-27.md) |
 | Phase 3 — D-01/D-02 | 冻结比较规则；ADR-0005 接受继续使用 Paraformer 默认 | [ADR-0005](architecture/adr/0005-select-default-asr-model-by-benchmark.md) |
-| Phase 4 — R-01 | Main 通过 initialize/feed/stop 最小契约使用 Paraformer；Fake Provider 进入 smoke | [当前架构](architecture/current.md) |
+| Phase 4 — R-01/R-02 | Main 通过轻量 Provider 使用 Paraformer；sessionId、输入/事件 sequence、规范事件、安全 IPC envelope、cancel/dispose 语义和 Renderer 迟到事件过滤已建立；Fake Provider 进入真实 Electron IPC smoke | [当前架构](architecture/current.md) |
 
 补充边界：
 
@@ -81,7 +81,7 @@ flowchart LR
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
 | R-01 | P0 | 包住当前 ASR（Completed） | 建立 initialize/feed/stop 契约与 Fake，适配现有 Paraformer；不同时换模型、音频或进程 | T-07,D-02 | UI/业务不接触 Sherpa 对象或模型配置；基线行为通过 |
-| R-02 | P0 | 建 session/事件协议 | 统一 ready/partial/final/error/stopped，加入 sessionId、sequence、cancel 和 dispose 语义 | R-01,T-04 | 旧 session 事件不污染新训练；stop 可重复调用；迟到事件受控 |
+| R-02 | P0 | 建 session/事件协议（Completed） | 统一 ready/partial/final/error/stopped，加入 sessionId、sequence、cancel 和 dispose 语义 | R-01,T-04 | 旧 session 事件不污染新训练；stop 可重复调用；迟到事件受控 |
 | R-03 | P0 | 分离 AudioCapture | 从 UI 状态中抽出权限、track/context 生命周期和 chunk 元数据；先保持现有处理节点 | R-02；BM-03 仅作历史输入 | Audio 输出明确 sampleRate/channels/format；生命周期测试通过 |
 | R-04 | P0 | AudioWorklet + Resampler | 以模型声明采样率为目标，使用可测试 resampler；真实设备回归前保留可回退路径 | R-03 | 16/44.1/48 kHz fixture 与目标真实设备通过；移除 ScriptProcessor |
 | R-05 | P0 | 改音频传输与背压 | 传 TypedArray/transferable buffer，使用已选通道和有界队列，记录 dropped/backpressure | R-04,D-03 | profile 证明队列不无限增长；序列连续性可观测 |
@@ -90,7 +90,7 @@ flowchart LR
 | R-08 | P1 | 激活版本化默认模型 | 用 registry 激活 ADR-0005 接受的 Paraformer；不增加普通用户多模型选择 | R-06,R-07,D-02 | 端到端模型文件/config 与 ADR-0005 一致 |
 | R-09 | P1 | 收敛设置/规则/日志 | 演进 schemaVersion、原子写和脱敏日志；凭据库仅在收益超过 native 成本时采用 | T-03,R-07 | 升级保留配置；日志不含 Key 或完整敏感文本 |
 
-当前关键路径是 `R-02 → R-03 → R-04 → D-03 → R-05 → R-06`。R-07 可在不扩大当前步骤的前提下独立准备，但不阻塞 R-02～R-04。
+当前关键路径是 `R-03 → R-04 → D-03 → R-05 → R-06`；已完成的 R-02 继续作为后续 session/事件依赖。R-07 可在不扩大当前步骤的前提下独立准备，但不阻塞 R-03～R-04。
 
 ### 5.1 内部 benchmark 候选（不改变产品默认）
 

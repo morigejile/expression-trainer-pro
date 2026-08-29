@@ -4,20 +4,24 @@ const { createFakeAsrProvider } = require('../lib/fake-asr-provider');
 
 const SUCCESS_MARKER = 'ELECTRON_SMOKE_OK';
 const STEP_TIMEOUT_MS = 10_000;
+const SMOKE_SESSION_ID = '123e4567-e89b-42d3-a456-426614174000';
 
 const calls = {
   llmFeedback: 0
 };
 
 const fakeAsrProvider = createFakeAsrProvider({
-  feedResult: { text: 'SMOKE_ASR_TEXT', isFinal: false },
-  finalText: 'SMOKE_ASR_FINAL'
+  feedResults: [
+    { text: 'SMOKE_ASR_PARTIAL', isFinal: false },
+    { text: 'SMOKE_ASR_FINAL', isFinal: true }
+  ],
+  finalText: 'SMOKE_ASR_STOP_FINAL'
 });
 const fakeFeed = fakeAsrProvider.feed;
-fakeAsrProvider.feed = samples => {
-  assert.ok(samples instanceof Float32Array, 'ASR fake expected Float32Array samples');
-  assert.equal(samples.length, 3, 'ASR fake expected the smoke audio fixture');
-  return fakeFeed(samples);
+fakeAsrProvider.feed = command => {
+  assert.ok(command.samples instanceof Float32Array, 'ASR fake expected Float32Array samples');
+  assert.equal(command.samples.length, 3, 'ASR fake expected the smoke audio fixture');
+  return fakeFeed(command);
 };
 
 function createRequestCoordinator() {
@@ -128,6 +132,7 @@ async function waitForPage(window, filename) {
 
 async function run({ app, BrowserWindow, mainWindow }) {
   assert.equal(require.cache[require.resolve('../lib/asr')], undefined);
+  assert.equal(require.cache[require.resolve('sherpa-onnx-node')], undefined);
   assert.equal(require.cache[require.resolve('../lib/ai-feedback')], undefined);
   await waitForPage(mainWindow, 'index.html');
 
@@ -135,7 +140,7 @@ async function run({ app, BrowserWindow, mainWindow }) {
     const expected = [
       'getSettings', 'saveSettings', 'openSettings',
       'openPromptEditor', 'getCustomPrompt', 'saveCustomPrompt', 'closeWindow',
-      'initASR', 'feedAudio', 'stopASR', 'analyzeText',
+      'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText',
       'getRealtimeFeedback', 'getFinalReport', 'testLLMConnection',
       'cancelLLMRequests', 'saveFile'
     ];
@@ -148,16 +153,65 @@ async function run({ app, BrowserWindow, mainWindow }) {
   assert.deepEqual(apiContract.missing, []);
 
   const asrResult = await mainWindow.webContents.executeJavaScript(`(async () => {
-    const init = await window.api.initASR();
-    const feed = await window.api.feedAudio(new Float32Array([0.1, 0.2, 0.3]));
-    const stop = await window.api.stopASR();
-    return { init, feed, stop };
+    const sessionId = '${SMOKE_SESSION_ID}';
+    const start = await window.api.startASR({ sessionId, sampleRateHz: 16000 });
+    const partial = await window.api.feedAudio({
+      sessionId,
+      sequence: 0,
+      samples: new Float32Array([0.1, 0.2, 0.3])
+    });
+    const final = await window.api.feedAudio({
+      sessionId,
+      sequence: 1,
+      samples: new Float32Array([0.1, 0.2, 0.3])
+    });
+    const stop = await window.api.stopASR({ sessionId });
+    const staleFeed = await window.api.feedAudio({
+      sessionId,
+      sequence: 2,
+      samples: new Float32Array([0.1, 0.2, 0.3])
+    });
+    return { start, partial, final, stop, staleFeed };
   })()`);
   assert.deepEqual(asrResult, {
-    init: { success: true },
-    feed: { text: 'SMOKE_ASR_TEXT', isFinal: false },
-    stop: { success: true, finalText: 'SMOKE_ASR_FINAL' }
+    start: {
+      ok: true,
+      events: [{ type: 'ready', sessionId: SMOKE_SESSION_ID, sequence: 0 }]
+    },
+    partial: {
+      ok: true,
+      events: [{
+        type: 'partial',
+        sessionId: SMOKE_SESSION_ID,
+        sequence: 1,
+        text: 'SMOKE_ASR_PARTIAL'
+      }]
+    },
+    final: {
+      ok: true,
+      events: [{
+        type: 'final',
+        sessionId: SMOKE_SESSION_ID,
+        sequence: 2,
+        text: 'SMOKE_ASR_FINAL'
+      }]
+    },
+    stop: {
+      ok: true,
+      events: [
+        {
+          type: 'final',
+          sessionId: SMOKE_SESSION_ID,
+          sequence: 3,
+          text: 'SMOKE_ASR_STOP_FINAL'
+        },
+        { type: 'stopped', sessionId: SMOKE_SESSION_ID, sequence: 4 }
+      ]
+    },
+    staleFeed: { ok: true, events: [] }
   });
+  assert.equal(require.cache[require.resolve('../lib/asr')], undefined);
+  assert.equal(require.cache[require.resolve('sherpa-onnx-node')], undefined);
   await mainWindow.webContents.executeJavaScript(
     `document.getElementById('btn-settings').click()`
   );
