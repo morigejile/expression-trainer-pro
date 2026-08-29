@@ -64,7 +64,7 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 | 桌面运行时 | Electron `43.4.1`（精确版本） | 当前 lock 与 `node_modules` 一致；Windows x64 实测内置 Node 24.18.1、Chromium 150.0.7871.224、modules ABI 148、N-API 10 |
 | UI | 原生 HTML/CSS/JavaScript | 无 bundler/前端框架 |
 | 音频 | Renderer 中 `getUserMedia` + `AudioContext({sampleRate:16000})` | `src/app.js` |
-| 音频节点 | `createScriptProcessor(4096, 1, 1)` | 已废弃 API；无显式 resampler |
+| 音频节点 | `createScriptProcessor(4096, 1, 1)` | 已废弃 API；未记录请求/实际 context rate 或 track rate |
 | 权限桥接 | Preload `contextBridge` + `ipcRenderer.invoke` | `contextIsolation:true`、`nodeIntegration:false` |
 | ASR 引擎 | `sherpa-onnx-node` `^1.10.0` | 当前 lock 与 `node_modules` 为 1.13.3；由 Paraformer Provider 在 Main 中延迟加载 |
 | ASR 模型 | `sherpa-onnx-streaming-paraformer-bilingual-zh-en` | 固定目录；INT8 encoder/decoder + tokens；模型未纳入 Git |
@@ -125,14 +125,14 @@ Main 既是 Electron 控制面，又直接执行同步 ASR decode、词库分析
 - 持有 `ExpressionTrainer` 的录音、暂停、计时、完整文本、句子和统计状态。
 - 开始时创建 UUID `sessionId`，调用 `startASR({sessionId,sampleRateHz:16000})`，成功后再请求麦克风；初始化或麦克风失败显示字幕错误并使当前 ASR session 失效。
 - 创建 16 kHz 意图的 AudioContext 和 4096 帧 ScriptProcessor。
-- 在每个 `onaudioprocess` 中以连续 input `sequence` 等待一次 `feedAudio({sessionId,sequence,samples})` invoke；暂停仅跳过 feed，MediaStream/AudioContext 仍运行。
+- 在每个 `onaudioprocess` 中以连续 input `sequence` 等待一次 `feedAudio({sessionId,sequence,samples})` invoke；暂停仅跳过 feed，MediaStream/AudioContext 仍运行。feed rejection 或 command-error envelope 会立即使当前 session 失效、复用同一路径释放 processor/context/tracks/timer、取消失败 session，并阻止后续 callback 继续发送。
 - 只接受当前 `sessionId` 且 event `sequence` 严格递增的 `ready/partial/final/error/stopped`；旧 session、重复/倒序、未知或 malformed 事件不产生 UI 副作用，`stopped` 使 session 失效。
 - final 文本追加到 `fullText`，逐句做本地分析；每新增约 30 字触发一次 LLM 实时反馈。
 - 展示 partial 临时字幕；final 与粘贴字幕通过 text node 和受控 `span` token 高亮词语，不解析输入中的 HTML。
 - 支持粘贴逐字稿、生成报告、复制/保存原文和报告、清空当前内存状态。
 - LLM 报告只渲染标题、加粗、行内代码、引用、普通行和换行等严格允许列表；LLM/HTTP 错误作为纯文本显示。
 
-R-02 已建立 ASR session/event 状态，但尚未形成覆盖权限、录音、分析等全部阶段的训练状态机。Renderer 在新开始、麦克风失败、停止和清空时先使旧 session 失效；迟到 feed/stop 返回即使越过 IPC，也会因 session/sequence 过滤而失去副作用。T-06 的 LLM pending 请求协调和 Renderer 代际过滤继续独立生效。
+R-02 已建立 ASR session/event 状态，但尚未形成覆盖权限、录音、分析等全部阶段的训练状态机。替换 session、启动/麦克风/feed 失败和清空会立即使旧 session 失效；正常 stop 先处理已接受的 final/stopped 事件，再在 stopped 后完成失效。迟到 feed/stop 返回即使越过 IPC，也会因 session/sequence 过滤而失去副作用。T-06 的 LLM pending 请求协调和 Renderer 代际过滤继续独立生效。
 
 ### 5.2 Preload / `preload.js`
 
@@ -239,7 +239,7 @@ getUserMedia({audio:true})
 → Renderer session/sequence 过滤后更新 UI
 ```
 
-源码没有显式 resampler，也没有检查 `audioContext.sampleRate` 是否实际为 16000。Chromium/OS 是否满足请求属于 Runtime-TBD；一旦实际值不是 16000，代码仍把样本声明为 16000。
+源码没有记录请求值、`audioContext.sampleRate` 或 track rate，也没有 fixture 证明当前 Chromium graph 的采样率适配。实际 context rate 是否为 16000 属于 Runtime-TBD；一旦实际值不是 16000，代码仍把样本声明为 16000。
 
 每个 4096 样本块仍会在 Preload 规范为新的 TypedArray，并采用 request/response IPC。没有 transferable 专用通道、显式有界队列、背压或丢块指标。
 
@@ -296,7 +296,7 @@ Settings/Prompt Renderer
 |---|---|---|---|---|
 | TD-01 | ASR 在 Main 同步初始化/decode | Main 控制面阻塞；native 故障影响应用 | 源码确认 | event-loop 指标、故障注入后移出 Main |
 | TD-02 | `ScriptProcessorNode` | 废弃 API；音频依赖 Renderer 线程 | 源码确认 | AudioWorklet 对照测试 |
-| TD-03 | 无显式重采样且强制声明 16 kHz | 实际设备率不符时识别速度/准确率错误 | 源码确认风险 | 记录实际率，频率/时长 fixture |
+| TD-03 | 请求 16 kHz context 但未记录请求值、实际 context rate 或 track rate | 无法确认固定 Electron 的 Chromium graph 是否把设备输入正确适配到 16 kHz | 源码确认风险 | R-04 记录三种 rate，并用 16/44.1/48 kHz 确定性 fixture 验证 graph 适配；真实设备非阻塞 follow-up |
 | TD-04 | 每块 TypedArray 规范化 + invoke | 复制、GC、IPC 延迟 | 源码确认 | R-05 在 D-03 后按 profile 选择 transferable/MessagePort/有界流 |
 | TD-05 | **R-01/R-02 已缓解**：Main 依赖 session-aware ASR Provider，Sherpa/Paraformer 路径和参数封装在 adapter；单实例/单 stream 仍保留 | 当前模型和 session/event 行为可独立测试，业务不接触 Sherpa；Main 阻塞和执行单元恢复仍待后续 | Provider/session/IPC/Renderer 测试与 Electron smoke | R-06 在 R-05/D-03 后处理执行边界 |
 | TD-06 | 模型完全手工管理 | 首次安装、升级、校验和支持成本高 | README/models 确认 | Model Manager + hash + 原子安装 |
@@ -339,6 +339,6 @@ Settings/Prompt Renderer
 1. 在显式清空 npm 与 Electron 下载缓存的独立环境复跑 Electron 43 首次 CLI 下载；当前首次 43.4.1 下载和后续校验缓存恢复均成功。
 2. 验证当前模型下载源、大小、hash、许可证和三个文件的兼容性。
 3. 自动 Electron smoke 已覆盖 BrowserWindow、17 项 Preload API、设置页、Fake ASR 的 session/event 与 stale feed、Fake LLM 和粘贴分析，并确认 smoke 不加载真实 Sherpa；正常非 smoke 入口已在 Windows x64 保持 5 秒存活并加载真实 Sherpa 模块。真实设置文件持久化、报告保存对话框、真实模型/麦克风和人工交互仍需运行验证。
-4. 在 44.1/48 kHz 设备记录 `audioContext.sampleRate` 与 ASR 接收时序。
+4. 在 16/44.1/48 kHz fixture 记录请求值、`audioContext.sampleRate` 与可用的 track rate，并以真实可配置设备做非阻塞 follow-up。
 5. profile TD-01～TD-04 的 Main 延迟、GC、CPU、RAM 和队列。
 6. 在目标 macOS/Linux/Windows 版本验证安装与运行；在证据前继续保持 TBD，不作支持承诺。

@@ -38,7 +38,7 @@ flowchart LR
   R1 --> ZF[Zipformer Large 候选准备]
   R1 --> R2[R-02 session/event]
   R2 --> R3[R-03 AudioCapture]
-  R3 --> R4[R-04 AudioWorklet/重采样]
+  R3 --> R4[R-04 AudioWorklet/Chromium 图适配]
   R4 --> FR[FireRedASR2 utterance spike]
   R4 --> D3[D-03 执行边界决策]
   D3 --> R5[R-05 有界音频传输]
@@ -83,7 +83,7 @@ flowchart LR
 | R-01 | P0 | 包住当前 ASR（Completed） | 建立 initialize/feed/stop 契约与 Fake，适配现有 Paraformer；不同时换模型、音频或进程 | T-07,D-02 | UI/业务不接触 Sherpa 对象或模型配置；基线行为通过 |
 | R-02 | P0 | 建 session/事件协议（Completed） | 统一 ready/partial/final/error/stopped，加入 sessionId、sequence、cancel 和 dispose 语义 | R-01,T-04 | 旧 session 事件不污染新训练；stop 可重复调用；迟到事件受控 |
 | R-03 | P0 | 分离 AudioCapture | 从 UI 状态中抽出权限、track/context 生命周期和 chunk 元数据；先保持现有处理节点 | R-02；BM-03 仅作历史输入 | Audio 输出明确 sampleRate/channels/format；生命周期测试通过 |
-| R-04 | P0 | AudioWorklet + Resampler | 以模型声明采样率为目标，使用可测试 resampler；真实设备回归前保留可回退路径 | R-03 | 16/44.1/48 kHz fixture 与目标真实设备通过；移除 ScriptProcessor |
+| R-04 | P0 | AudioWorklet + Chromium 图适配 | 请求 `AudioContext({sampleRate:16000,latencyHint:'interactive'})` 并记录请求值、实际 context rate 与可用的 track rate；由 Electron/Chromium graph 适配 16/44.1/48 kHz，worklet 只下混并把可变 render quantum 汇集为 320 帧单声道 Float32 chunk，停止时 flush 非空 tail；直接移除 ScriptProcessor。仅当固定 Electron/设备证据显示 graph 适配存在实质失败时，才评估有状态 SpeexDSP/libsamplerate WASM 备选，不预先增加依赖 | R-03 | 16/44.1/48 kHz 确定性 fixture、320 帧 chunk 与 final tail 通过；请求/实际/track rate 可诊断；ScriptProcessor 已移除；真实设备验证作为非阻塞 follow-up |
 | R-05 | P0 | 改音频传输与背压 | 传 TypedArray/transferable buffer，使用已选通道和有界队列，记录 dropped/backpressure | R-04,D-03 | profile 证明队列不无限增长；序列连续性可观测 |
 | R-06 | P0 | ASR 移出 Main | 按 ADR-0006 实现独立执行单元；Main 只管理生命周期、路由和退出 | R-02,R-05,D-03 | 强制退出可恢复；Main/UI 响应满足已定义门槛 |
 | R-07 | P1 | 实现轻量 Model Manager | 版本化 registry、HTTPS、SHA-256、临时下载/解压、原子激活和上一版本回退；模型放 userData 子目录 | D-02,R-01 | 中断、hash 错或空间不足不破坏现有模型 |

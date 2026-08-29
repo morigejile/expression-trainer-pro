@@ -15,7 +15,7 @@
 - Sherpa-ONNX Node API；
 - Node 内置 API 与原生 `fetch`。
 
-默认不引入 React/Vue、Vite/Webpack、TypeScript、Python/PyTorch/FunASR、服务端、数据库或容器。若未来评估 WASM/Tauri，必须作为独立技术验证和新 ADR，不进入本次默认迁移。
+默认不引入 React/Vue、Vite/Webpack、TypeScript、Python/PyTorch/FunASR、服务端、数据库、容器或音频 WASM 依赖。只有固定 Electron/设备证据显示 Chromium graph 采样率适配存在实质失败时，才评估有状态 SpeexDSP/libsamplerate WASM 备选；不采用手写线性/FIR resampler。若未来评估 Tauri，必须作为独立技术验证和新 ADR，不进入本次默认迁移。
 
 ## 2. 架构目标
 
@@ -37,7 +37,7 @@ flowchart LR
   subgraph Electron[Expression Trainer / Electron]
     subgraph Renderer[Renderer]
       UI[UI / Training Controller\n原生 JS/HTML/CSS]
-      Audio[AudioCapture\nAudioWorklet + Resampler]
+      Audio[AudioCapture\nChromium graph + AudioWorklet]
       Analysis[本地词库分析]
     end
 
@@ -93,9 +93,8 @@ src/
 │   └── asr-process.js          # ASR 执行单元生命周期与消息协议
 ├── renderer/
 │   ├── app.js                  # UI/训练流程
-│   ├── audio-capture.js        # AudioContext、权限、生命周期
-│   ├── resampler.js            # 可测试的采样率转换
-│   └── audio-worklet.js        # 实时音频线程处理
+│   ├── audio-capture.js        # AudioContext、权限、采样率记录与生命周期
+│   └── audio-worklet.js        # 下混、320 帧汇集与 final tail
 ├── asr/
 │   ├── contract.js             # 小型消息/Provider 契约
 │   ├── sherpa-provider.js      # Sherpa 具体实现
@@ -110,7 +109,7 @@ src/
     └── prompts.js
 ```
 
-如果现有项目很小，可合并 `main/ipc.js` 与 `main/main.js`、`audio-capture.js` 与 `resampler.js`；不得为了匹配目录图而机械拆文件。
+如果现有项目很小，可合并 `main/ipc.js` 与 `main/main.js`；不得为了匹配目录图而机械拆文件。
 
 ## 5. 核心模块与契约
 
@@ -133,11 +132,13 @@ ASR、粘贴文本和 LLM 返回均视为不可信文本。高亮通过 text nod
 职责：
 
 - 请求/释放麦克风；
-- 记录设备实际 `AudioContext.sampleRate`；
-- 使用 AudioWorklet 接收单声道 Float32 音频；
-- 依据当前模型元数据重采样；
-- 按固定时长或样本数分块；
-- 在停止时 flush，并关闭 tracks/context。
+- 请求 `AudioContext({ sampleRate: 16000, latencyHint: 'interactive' })`；
+- 记录请求的 16000 Hz、实际 `audioContext.sampleRate`，以及可取得的 `track.getSettings().sampleRate`；
+- 让 Electron/Chromium audio graph 在 16/44.1/48 kHz 输入与 16 kHz context 之间完成采样率适配；
+- AudioWorklet 只把可变长度 render quantum 下混为单声道 Float32，并汇集为每块 320 帧；
+- 停止时只 flush 一次非空 final tail，并关闭 tracks/context。
+
+R-04 不实现应用级 resampler，也不保留 ScriptProcessor fallback。只有固定 Electron 版本和真实设备证据表明 graph 适配存在实质失败时，才评估有状态 SpeexDSP/libsamplerate WASM 备选；当前不增加依赖。
 
 输出契约示例（形状而非最终 API）：
 
@@ -145,9 +146,10 @@ ASR、粘贴文本和 LLM 返回均视为不可信文本。高亮通过 text nod
 {
   sessionId,
   sequence,
-  sampleRate,
+  sampleRateHz: 16000,
   channels: 1,
   format: 'f32',
+  frames,
   samples: Float32Array
 }
 ```
@@ -244,9 +246,9 @@ Preload 公开 API 固定为 `startASR`、`feedAudio`、`stopASR`、`cancelASR`�
 ```text
 用户开始
 → 创建 sessionId
-→ AudioCapture 获取真实设备采样率
-→ AudioWorklet 产生音频
-→ Resampler 转为模型要求
+→ AudioCapture 请求 16 kHz context，并记录请求值、实际 context rate 与可用的 track rate
+→ Electron/Chromium graph 把 16/44.1/48 kHz 输入适配到 16 kHz context
+→ AudioWorklet 下混可变 render quantum，汇集 320 帧 chunk 并在停止时 flush final tail
 → 有界流发送 ASR 执行单元
 → partial/final 事件
 → UI 展示
@@ -312,7 +314,7 @@ ADR-0005 已接受保留 Paraformer 为默认模型。当前仅为内部开发/�
 
 | 层级 | 优先覆盖 |
 |---|---|
-| 单元 | lexicon、settings migration、model registry/sha256/atomic install、resampler、Provider 契约 |
+| 单元 | lexicon、settings migration、model registry/sha256/atomic install、AudioWorklet 下混/320 帧汇集/final tail、Provider 契约 |
 | 集成 | Preload/ASR IPC schema 与消息协议已覆盖；Sherpa 模型 smoke、其他 IPC schema、LLM 错误归一化继续按对应阶段补齐 |
 | 冒烟 | 应用启动、麦克风开始/停止、模型初始化、安装制品启动 |
 | Benchmark | 音频正确性、CER、延迟、RTF、CPU/RAM、冷启动、模型体积 |
@@ -333,13 +335,13 @@ ADR-0005 已接受保留 Paraformer 为默认模型。当前仅为内部开发/�
 迁移必须保持每个阶段可运行：
 
 1. 构建/测试基线、三候选 benchmark、默认模型 ADR、最小 Paraformer Provider 和 session/event 契约已完成。
-2. 下一步按 R-03/R-04 分离 AudioCapture 并替换 AudioWorklet/重采样，再处理 ASR 执行边界和模型管理。
+2. 下一步按 R-03/R-04 分离 AudioCapture，以 Chromium graph 采样率适配和 AudioWorklet collector 直接替换 ScriptProcessor，再处理 ASR 执行边界和模型管理。
 3. 每次迁移保留独立回归证据，最后建立 Forge 制品、支持矩阵和发布机制。
 
 当下列条件全部满足时，本目标可合并为 Current：
 
 - [ ] `npm ci`、测试和至少 Tier 1 平台打包可重复执行；
-- [ ] AudioWorklet/重采样通过自动化与真实设备检查；
+- [ ] 16/44.1/48 kHz graph 适配 fixture 与 AudioWorklet collector 自动化通过，真实设备 follow-up 已记录；
 - [x] 业务只依赖轻量 ASR 契约，session/event 与迟到事件过滤已完成；
 - [ ] ASR 不在 Main 内执行，退出可恢复；
 - [ ] 模型可校验安装且失败不破坏上一版本；

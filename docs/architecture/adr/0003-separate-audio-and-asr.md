@@ -11,10 +11,10 @@ Audio 负责麦克风、声道、采样率、格式、分块与生命周期；AS
 
 建立两个小边界：
 
-1. `AudioCapture` 输出 `Float32Array`、明确 `sampleRate/channels/format/sessionId/sequence`；
+1. `AudioCapture` 请求 16 kHz AudioContext、记录请求/实际 context/track rate，并依赖 Chromium graph 适配后由 AudioWorklet 输出 320 帧单声道 `Float32Array` chunk 与 final tail，明确 `sampleRate/channels/format/sessionId/sequence`；
 2. `AsrProvider` 暴露 initialize/start/feed/stop/dispose 等最小语义并输出 ready/partial/final/error/stopped 事件。
 
-不要求抽象基类、依赖注入容器或 Provider 注册框架。先用现有 Paraformer 实现契约，行为不变后再替换 Audio 和模型。
+不要求抽象基类、依赖注入容器或 Provider 注册框架。R-04 不实现应用级 resampler 或 ScriptProcessor fallback；只有固定 Electron/设备证据显示 graph 适配存在实质失败时，才评估有状态 SpeexDSP/libsamplerate WASM 备选。先用现有 Paraformer 实现契约，行为不变后再替换 Audio 和模型。
 
 ## Alternatives
 
@@ -26,7 +26,7 @@ Audio 负责麦克风、声道、采样率、格式、分块与生命周期；AS
 
 ### Positive
 
-- 重采样可独立测试，模型选择不改变麦克风代码。
+- Chromium graph 适配与 AudioWorklet collector 可独立验证，模型选择不改变麦克风代码。
 - Fake Provider 可让 UI/业务测试不加载百 MB 模型。
 - Sherpa API 和路径不会泄漏到 UI。
 
