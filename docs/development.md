@@ -77,6 +77,8 @@ $expressionTrainerRuntime = 'C:\Users\mr\AppData\Local\hermes\node'
 
 耗时模型资产统一留在 Git 外的本机缓存中；当前开发机使用 `D:\model-prep\archives`。只有首次安装/下载链路 smoke 从空目录验证完整下载，其余模型开发与测试复用已下载缓存，不重复拉取。下载中的文件使用 `.partial` 后缀，完成后再原子改名；缓存本身不构成 native-load、Benchmark 或发布许可证据。
 
+当前缓存已包含 Zipformer Large CTC INT8（127,965,713 bytes，SHA-256 `f2ab7a5deb02717801f6a5b26c751b42f8a2db891b07f5b095e6da7442081448`）和 FireRedASR2 CTC INT8（520,516,278 bytes，SHA-256 `1da8b737ecc5e29f36759a4460c754863e7c919a4ba325aea187331fbfc83274`），均与 GitHub 官方 release API 的 size/digest 一致。FireRed 复用既有 partial，经 1 MiB Range 同区段 hash 测速选择 `ghfast.top` 代理后，用缓存于 `D:\model-prep\tools` 的已校验 aria2 1.37.0 以 4 路续传完成；4 路已达到约 8 MiB/s，未提高到 8 路。未来换源继续先核对官方 metadata、Range/Content-Range 和小样本 hash，最终必须匹配官方完整 digest。
+
 ## Benchmark 边界
 
 长期保留的 `benchmark/` 是非发布开发工具，只负责读取 manifest、校验外部数据/模型、运行候选并把结果写到外部 output root。正式数据、模型与结果均在 Git 外；当前冻结数据集和比较结果见：
