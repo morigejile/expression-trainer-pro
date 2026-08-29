@@ -86,6 +86,34 @@
       }
     },
     {
+      "id": "fire-red-asr2-ctc-zh-en-int8-2026-02-25",
+      "displayName": "FireRedASR2 CTC Chinese-English INT8",
+      "family": "fire-red-asr-ctc",
+      "mode": "utterance",
+      "status": "pending",
+      "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25.tar.bz2",
+      "upstreamVersion": "2026-02-25",
+      "license": {
+        "model": { "status": "unverified", "reason": "Official Sherpa documentation identifies the FireRedASR2 conversion source, but model and training-data redistribution terms remain unverified for this internal candidate.", "source": "https://k2-fsa.github.io/sherpa/onnx/FireRedAsr/pretrained.html" },
+        "code": { "spdx": "Apache-2.0", "location": "https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE" },
+        "redistribution": "not-approved"
+      },
+      "evidence": {
+        "source": { "status": "verified", "checkedAt": "2026-08-29T00:00:00.000Z" },
+        "license": { "status": "pending", "checkedAt": "2026-08-29T00:00:00.000Z" },
+        "files": { "status": "pending", "reason": "Official archive has not been downloaded or hashed in this worktree.", "verifiedAt": "2026-08-29T00:00:00.000Z" },
+        "nativeLoad": { "status": "pending", "reason": "Sherpa native OfflineRecognizer initialization awaits external model files.", "recordedAt": "2026-08-29T00:00:00.000Z" }
+      },
+      "sampleRateHz": 16000,
+      "numThreads": 2,
+      "provider": "cpu",
+      "files": [],
+      "pending": {
+        "reason": "Utterance-only adapter contract is ready; external artifact evidence, benchmark execution, and interaction assessment remain.",
+        "missing": ["archive-download", "runtime-file-hashes", "native-load", "benchmark", "utterance-ux"]
+      }
+    },
+    {
       "id": "sensevoice-small-int8-2024-07-17",
       "displayName": "SenseVoiceSmall INT8 utterance candidate",
       "family": "sensevoice",

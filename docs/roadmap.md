@@ -2,7 +2,7 @@
 
 > 状态：Active execution baseline
 > 更新日期：2026-08-29
-> 当前进度：Phase 0-2、D-01～D-03、R-01～R-06 与 C-01 已完成；D-04 未完成；下一主线为 C-02 FireRedASR2 最小集成
+> 当前进度：Phase 0-2、D-01～D-03、R-01～R-06 与 C-01/C-02 最小集成已完成；D-04 未完成；下一主线为 R-07 Model Manager
 > 当前模式：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞后续工作；只有它们使当前技术实验无法运行或结论失效时，才阻塞当前路径。
 
 ## 1. 目标与排序原则
@@ -90,14 +90,14 @@ flowchart LR
 | R-08 | P1 | 激活版本化默认模型 | 用 registry 激活 ADR-0005 接受的 Paraformer；不增加普通用户多模型选择 | R-06,R-07,D-02 | 端到端模型文件/config 与 ADR-0005 一致 |
 | R-09 | P1 | 收敛设置/规则/日志 | 演进 schemaVersion、原子写和脱敏日志；凭据库仅在收益超过 native 成本时采用 | T-03,R-07 | 升级保留配置；日志不含 Key 或完整敏感文本 |
 
-R-01～R-06 的 Audio/ASR 主链已可运行，C-01 Zipformer Large pending 候选准备已完成。下一步完成 `C-02 FireRedASR2 CTC INT8` 最小集成，再继续 R-07～R-09；Paraformer 默认不变。
+R-01～R-06 的 Audio/ASR 主链已可运行，C-01/C-02 两个 pending benchmark 候选最小集成已完成。下一步继续 R-07～R-09；Paraformer 默认不变。
 
 ### 5.1 内部 benchmark 候选（不改变产品默认）
 
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
 | C-01 | P1 | 准备 Zipformer Large CTC INT8 候选（Completed） | 已在现有 `zipformer-ctc` benchmark 路径加入 pending registry/allowlist、候选列表、adapter 契约测试及模型库存文档；模型文件留在 Git 外 | Phase 0～2、R-01 | 候选准备可复核；外部下载、hash、native 初始化 smoke 与 benchmark 明确保留为待办 |
-| C-02 | P1 | FireRedASR2 CTC INT8 utterance spike | 在 `fire-red-asr-ctc` family 累积一段标准化 16 kHz 单声道音频，只在结束时解码并产生 final；不伪造 streaming partial | R-02,R-04 | 在冻结数据集比较 CER、RTF、内存、冷启动、体积和交互取舍；验证 cancel/new-session 隔离 |
+| C-02 | P1 | FireRedASR2 CTC INT8 utterance spike（Completed: minimal integration） | 已在 `fire-red-asr-ctc` family 建立 pending registry 与 adapter；标准化 16 kHz 单声道音频只在结束时解码一次并产生 final，不伪造 streaming partial | R-02,R-04 | cancel/new-session 隔离契约已验证；外部下载、native-load、冻结数据集 CER/RTF/内存/冷启动/体积比较及 utterance UX 判断保留为待办 |
 
 Paraformer 继续是产品默认。上述候选仅用于内部技术验证和 benchmark，不构成生产模型选择、打包或再分发授权。
 

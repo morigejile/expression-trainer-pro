@@ -7,6 +7,7 @@ const { parsePcmWav } = require('../lib/dataset-manifest');
 const REQUIRED_FILE_ROLES = {
   paraformer: ['tokens', 'encoder', 'decoder'],
   'zipformer-ctc': ['tokens', 'model'],
+  'fire-red-asr-ctc': ['tokens', 'model'],
   sensevoice: ['tokens', 'model']
 };
 
@@ -102,6 +103,15 @@ function buildConfig(candidate) {
       }
     };
   }
+  if (candidate.family === 'fire-red-asr-ctc' && candidate.mode === 'utterance') {
+    return {
+      kind: 'offline',
+      native: {
+        featConfig: { sampleRate: candidate.sampleRateHz, featureDim: 80 },
+        modelConfig: { ...base, fireRedAsrCtc: { model: fileFor(candidate, 'model') } }
+      }
+    };
+  }
   throw new Error(`candidate registry entry has unsupported family or mode: ${candidate.id}`);
 }
 
@@ -152,6 +162,10 @@ function createSherpaAdapter({ candidateId, datasetRoot, modelRoot, registryPath
     async transcribe(sample, hooks, { signal } = {}) {
       if (!recognizer) throw new Error('Sherpa adapter is not initialized');
       cancelled = false;
+      const throwIfCancelled = () => {
+        if (cancelled || signal?.aborted) throw new Error('Sherpa transcription cancelled');
+      };
+      throwIfCancelled();
       const startedAt = performance.now();
       const audioPath = path.resolve(adapter.datasetRoot, sample.audioFile);
       if (!isInside(adapter.datasetRoot, audioPath)) throw new Error('sample audio escapes dataset root');
@@ -163,7 +177,7 @@ function createSherpaAdapter({ candidateId, datasetRoot, modelRoot, registryPath
           const chunkSamples = Math.round(sample.sampleRateHz / 10);
           let lastPartial = '';
           for (let offset = 0; offset < samples.length; offset += chunkSamples) {
-            if (cancelled || signal?.aborted) throw new Error('Sherpa transcription cancelled');
+            throwIfCancelled();
             stream.acceptWaveform({ samples: samples.subarray(offset, offset + chunkSamples), sampleRate: sample.sampleRateHz });
             while (recognizer.isReady(stream)) recognizer.decode(stream);
             const partial = recognizer.getResult(stream)?.text;
@@ -175,9 +189,11 @@ function createSherpaAdapter({ candidateId, datasetRoot, modelRoot, registryPath
           stream.inputFinished();
           while (recognizer.isReady(stream)) recognizer.decode(stream);
         } else {
+          throwIfCancelled();
           stream.acceptWaveform({ samples, sampleRate: sample.sampleRateHz });
           recognizer.decode(stream);
         }
+        throwIfCancelled();
         const result = recognizer.getResult(stream);
         if (!result || typeof result.text !== 'string') throw new Error('Sherpa result text is invalid');
         hooks.onFinal({ text: result.text, atMs: performance.now() - startedAt });

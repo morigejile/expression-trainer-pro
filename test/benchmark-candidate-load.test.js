@@ -34,6 +34,29 @@ test('SenseVoice is configured as utterance without fabricated partial events', 
   assert.equal(config.modelConfig.senseVoice.model, path.join(modelRoot, 'sensevoice', 'model.int8.onnx'));
 });
 
+test('FireRedASR2 CTC uses the offline single-model config', (t) => {
+  const { buildSherpaConfig } = require('../benchmark/models/load-candidate');
+  const candidate = {
+    id: 'fire-red-asr2-ctc-zh-en-int8-2026-02-25',
+    family: 'fire-red-asr-ctc',
+    mode: 'utterance',
+    sampleRateHz: 16000,
+    numThreads: 2,
+    provider: 'cpu',
+    files: [
+      { relativePath: 'fire-red/model.int8.onnx', role: 'model' },
+      { relativePath: 'fire-red/tokens.txt', role: 'tokens' }
+    ]
+  };
+
+  const modelRoot = fixtureModelRoot(t);
+  const config = buildSherpaConfig(candidate, modelRoot);
+
+  assert.equal(config.recognizerKind, 'offline');
+  assert.equal(config.modelConfig.fireRedAsrCtc.model, path.join(modelRoot, 'fire-red', 'model.int8.onnx'));
+  assert.equal(config.modelConfig.tokens, path.join(modelRoot, 'fire-red', 'tokens.txt'));
+});
+
 test('initialization selects the online or offline factory from the candidate mode', (t) => {
   const { initializeCandidate } = require('../benchmark/models/load-candidate');
   const calls = [];

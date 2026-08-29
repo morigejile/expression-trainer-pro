@@ -87,6 +87,20 @@ test('committed registry contains the hash-verified small Chinese Zipformer cand
   assert.equal(candidate.files.every(({ relativePath }) => !path.isAbsolute(relativePath)), true);
 });
 
+test('candidate registry rejects a streaming FireRedASR CTC claim', () => {
+  const { validateCandidateRegistry } = require('../benchmark/lib/candidate-registry');
+  const candidate = validCandidate({
+    id: 'fire-red-invalid',
+    family: 'fire-red-asr-ctc',
+    mode: 'streaming'
+  });
+
+  assert.throws(
+    () => validateCandidateRegistry({ schemaVersion: 1, candidates: [candidate] }),
+    /mode/
+  );
+});
+
 test('committed registry contains the exact pending Zipformer Large CTC INT8 candidate', () => {
   const { loadCandidateRegistry } = require('../benchmark/lib/candidate-registry');
   const registry = loadCandidateRegistry(path.join(__dirname, '..', 'benchmark', 'models', 'candidates.json'));
@@ -103,6 +117,22 @@ test('committed registry contains the exact pending Zipformer Large CTC INT8 can
   ]);
 });
 
+test('committed registry contains the exact pending FireRedASR2 CTC INT8 candidate', () => {
+  const { loadCandidateRegistry } = require('../benchmark/lib/candidate-registry');
+  const registry = loadCandidateRegistry(path.join(__dirname, '..', 'benchmark', 'models', 'candidates.json'));
+  const candidate = registry.candidates.find(({ id }) => id === 'fire-red-asr2-ctc-zh-en-int8-2026-02-25');
+
+  assert.ok(candidate);
+  assert.equal(candidate.family, 'fire-red-asr-ctc');
+  assert.equal(candidate.mode, 'utterance');
+  assert.equal(candidate.status, 'pending');
+  assert.equal(candidate.sourceUrl, 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25.tar.bz2');
+  assert.deepEqual(candidate.files, []);
+  assert.deepEqual(candidate.pending.missing, [
+    'archive-download', 'runtime-file-hashes', 'native-load', 'benchmark', 'utterance-ux'
+  ]);
+});
+
 test('committed registry represents all downloaded candidates as hash-verified without approving redistribution', () => {
   const { loadCandidateRegistry, listCandidatesByStatus } = require('../benchmark/lib/candidate-registry');
   const registry = loadCandidateRegistry(path.join(__dirname, '..', 'benchmark', 'models', 'candidates.json'));
@@ -113,12 +143,13 @@ test('committed registry represents all downloaded candidates as hash-verified w
       ['paraformer-bilingual-zh-en-control', 'verified'],
       ['zipformer-small-ctc-zh-int8-2025-04-01', 'verified'],
       ['zipformer-large-ctc-zh-int8-2025-06-30', 'pending'],
+      ['fire-red-asr2-ctc-zh-en-int8-2026-02-25', 'pending'],
       ['sensevoice-small-int8-2024-07-17', 'verified']
     ]
   );
   assert.deepEqual(
     listCandidatesByStatus(registry, 'pending').map(({ id }) => id),
-    ['zipformer-large-ctc-zh-int8-2025-06-30']
+    ['zipformer-large-ctc-zh-int8-2025-06-30', 'fire-red-asr2-ctc-zh-en-int8-2026-02-25']
   );
   assert.equal(
     listCandidatesByStatus(registry, 'verified').every(({ files, license }) => files.length > 0 && license.redistribution === 'not-approved'),

@@ -20,10 +20,14 @@ function buildZipformerCtcConfig(candidate, modelRoot) {
 function buildSenseVoiceConfig(candidate, modelRoot) {
   return {recognizerKind: 'offline', featConfig: {sampleRate: candidate.sampleRateHz, featureDim: 80}, modelConfig: {...baseModelConfig(candidate, modelRoot), senseVoice: {model: filePath(modelRoot, candidate, 'model'), language: 'auto', useInverseTextNormalization: true}}};
 }
+function buildFireRedAsrCtcConfig(candidate, modelRoot) {
+  return {recognizerKind: 'offline', featConfig: {sampleRate: candidate.sampleRateHz, featureDim: 80}, modelConfig: {...baseModelConfig(candidate, modelRoot), fireRedAsrCtc: {model: filePath(modelRoot, candidate, 'model')}}};
+}
 function buildSherpaConfig(candidate, modelRoot) {
   if (candidate.family === 'paraformer' && candidate.mode === 'streaming') return buildParaformerConfig(candidate, modelRoot);
   if (candidate.family === 'zipformer-ctc' && candidate.mode === 'streaming') return buildZipformerCtcConfig(candidate, modelRoot);
   if (candidate.family === 'sensevoice' && candidate.mode === 'utterance') return buildSenseVoiceConfig(candidate, modelRoot);
+  if (candidate.family === 'fire-red-asr-ctc' && candidate.mode === 'utterance') return buildFireRedAsrCtcConfig(candidate, modelRoot);
   throw new Error(`Unsupported candidate family/mode: ${candidate.family}/${candidate.mode}`);
 }
 

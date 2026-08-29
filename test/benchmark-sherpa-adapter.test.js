@@ -79,6 +79,7 @@ function withFixture(run) {
       candidate({ id: 'paraformer-bilingual-zh-en-control', family: 'paraformer', mode: 'streaming', version: '2024-03-10', files: makeFiles('paraformer', ['encoder', 'decoder', 'tokens']) }),
       candidate({ id: 'zipformer-small-ctc-zh-int8-2025-04-01', family: 'zipformer-ctc', mode: 'streaming', version: '2025-04-01', files: makeFiles('zipformer', ['model', 'tokens', 'bpe-vocab']) }),
       candidate({ id: 'zipformer-large-ctc-zh-int8-2025-06-30', family: 'zipformer-ctc', mode: 'streaming', version: '2025-06-30', files: makeFiles('zipformer-large', ['model', 'tokens']) }),
+      candidate({ id: 'fire-red-asr2-ctc-zh-en-int8-2026-02-25', family: 'fire-red-asr-ctc', mode: 'utterance', version: '2026-02-25', files: makeFiles('fire-red-asr2', ['model', 'tokens']) }),
       candidate({ id: 'sensevoice-small-int8-2024-07-17', family: 'sensevoice', mode: 'utterance', version: '2024-07-17', files: makeFiles('sensevoice', ['model', 'tokens']) })
     ]
   }));
@@ -175,5 +176,44 @@ test('SenseVoice adapter uses the offline config and emits final text without a 
     assert.deepEqual(partials, []);
     assert.equal(final, '离线终稿');
     assert.match(sherpa.state.offlineConfig.modelConfig.senseVoice.model, /model\.bin$/);
+  });
+});
+
+test('FireRedASR2 CTC decodes one utterance once and emits only final text', async () => {
+  const { createSherpaAdapter } = require('../benchmark/adapters/sherpa');
+  await withFixture(async ({ datasetRoot, modelRoot, registryPath }) => {
+    const sherpa = fakeSherpa();
+    const adapter = createSherpaAdapter({ candidateId: 'fire-red-asr2-ctc-zh-en-int8-2026-02-25', datasetRoot, modelRoot, registryPath, sherpa: sherpa.binding });
+    const partials = [];
+    const finals = [];
+    await adapter.init();
+    await adapter.transcribe(sample, { onPartial: ({ text }) => partials.push(text), onFinal: ({ text }) => finals.push(text) }, {});
+    await adapter.dispose();
+
+    assert.deepEqual(partials, []);
+    assert.deepEqual(finals, ['离线终稿']);
+    assert.match(sherpa.state.offlineConfig.modelConfig.fireRedAsrCtc.model, /model\.bin$/);
+    assert.equal(sherpa.state.streamFreed, 1);
+  });
+});
+
+test('FireRedASR2 cancellation does not leak into the next utterance', async () => {
+  const { createSherpaAdapter } = require('../benchmark/adapters/sherpa');
+  await withFixture(async ({ datasetRoot, modelRoot, registryPath }) => {
+    const sherpa = fakeSherpa();
+    const adapter = createSherpaAdapter({ candidateId: 'fire-red-asr2-ctc-zh-en-int8-2026-02-25', datasetRoot, modelRoot, registryPath, sherpa: sherpa.binding });
+    const controller = new AbortController();
+    controller.abort();
+    await adapter.init();
+
+    await assert.rejects(
+      adapter.transcribe(sample, { onPartial() {}, onFinal() { assert.fail('cancelled utterance emitted final'); } }, { signal: controller.signal }),
+      /cancelled/
+    );
+
+    const finals = [];
+    await adapter.transcribe(sample, { onPartial() {}, onFinal: ({ text }) => finals.push(text) }, {});
+    await adapter.dispose();
+    assert.deepEqual(finals, ['离线终稿']);
   });
 });
