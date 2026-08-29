@@ -5,6 +5,7 @@ const { createFakeAsrProvider } = require('../lib/fake-asr-provider');
 const SUCCESS_MARKER = 'ELECTRON_SMOKE_OK';
 const STEP_TIMEOUT_MS = 10_000;
 const SMOKE_SESSION_ID = '123e4567-e89b-42d3-a456-426614174000';
+const SMOKE_CANCEL_SESSION_ID = '123e4567-e89b-42d3-a456-426614174001';
 
 const calls = {
   llmFeedback: 0
@@ -171,7 +172,13 @@ async function run({ app, BrowserWindow, mainWindow }) {
       sequence: 2,
       samples: new Float32Array([0.1, 0.2, 0.3])
     });
-    return { start, partial, final, stop, staleFeed };
+    const cancelSessionId = '${SMOKE_CANCEL_SESSION_ID}';
+    const cancelStart = await window.api.startASR({
+      sessionId: cancelSessionId,
+      sampleRateHz: 16000
+    });
+    const cancel = await window.api.cancelASR({ sessionId: cancelSessionId });
+    return { start, partial, final, stop, staleFeed, cancelStart, cancel };
   })()`);
   assert.deepEqual(asrResult, {
     start: {
@@ -208,7 +215,15 @@ async function run({ app, BrowserWindow, mainWindow }) {
         { type: 'stopped', sessionId: SMOKE_SESSION_ID, sequence: 4 }
       ]
     },
-    staleFeed: { ok: true, events: [] }
+    staleFeed: { ok: true, events: [] },
+    cancelStart: {
+      ok: true,
+      events: [{ type: 'ready', sessionId: SMOKE_CANCEL_SESSION_ID, sequence: 0 }]
+    },
+    cancel: {
+      ok: true,
+      events: [{ type: 'stopped', sessionId: SMOKE_CANCEL_SESSION_ID, sequence: 1 }]
+    }
   });
   assert.equal(require.cache[require.resolve('../lib/asr')], undefined);
   assert.equal(require.cache[require.resolve('sherpa-onnx-node')], undefined);
