@@ -5,17 +5,22 @@ const path = require('node:path');
 const DEVELOPMENT_ONLY_ROOTS = new Set([
   '.agents',
   '.codex',
+  '.git',
   '.github',
   '.superpowers',
   '.worktrees',
   'benchmark',
+  'dist',
   'docs',
+  'out',
   'test'
 ]);
 
 function ignoreDevelopmentOnly(filePath) {
-  const root = filePath.replaceAll('\\', '/').split('/').filter(Boolean)[0];
-  return DEVELOPMENT_ONLY_ROOTS.has(root);
+  const parts = filePath.replaceAll('\\', '/').split('/').filter(Boolean);
+  const root = parts[0];
+  if (DEVELOPMENT_ONLY_ROOTS.has(root)) return true;
+  return root === 'node_modules' && ['.bin', 'electron', 'electron-nightly'].includes(parts[1]);
 }
 
 module.exports = {

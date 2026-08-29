@@ -37,8 +37,8 @@
 ## Validation and follow-up
 
 - [x] 干净环境 `npm ci` 后执行 Forge package/make 成功；packaged Fake smoke 和 utility-only Sherpa native-load smoke 通过。
-- [ ] 安装制品在 Tier 1 的最低支持系统启动并加载 native addon。
-- [ ] 首次模型下载、错误 hash 回退和离线二次启动通过。
+- [x] 安装制品在当前 Windows 11 25H2+ x64 开发机启动并加载 native addon；接近最低资格线环境保留为非阻塞 follow-up。
+- [x] 首次模型下载、完整性门禁、native 初始化和强制离线二次启动通过；中途网络错误支持严格 Range 续传。
 - [ ] 覆盖安装/升级保留设置与模型；卸载行为有文档。
 - [x] SBOM/许可证清单延后到正式发布阶段；内部测试制品不增加独立审计流程。
 

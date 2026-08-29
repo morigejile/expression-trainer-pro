@@ -58,7 +58,7 @@ $expressionTrainerRuntime = 'C:\Users\mr\AppData\Local\hermes\node'
 
 模型权重不进入 Git。首次启动 ASR 时，utility process 根据 `models/registry.json` 自动下载并校验默认 Paraformer，安装到 Electron `userData/models/paraformer-bilingual-zh-en/2024-03-10/`；native 初始化成功后才更新 active pointer。archive/runtime 的固定大小、hash 与再分发状态见 registry 和 ADR-0004/0005。
 
-内部开发阶段 `.tar.bz2` 解包调用系统 `tar`。PKG-02 已证明 packaged utility 可加载 Sherpa native addon，且模型仍位于安装目录外；真实约 1 GB 下载、系统 `tar`、Paraformer 初始化和离线二次启动在 PKG-03 验证。真实麦克风、macOS/Linux 和正式发布制品仍需对应环境证据。
+内部开发阶段 `.tar.bz2` 解包调用系统 `tar`。PKG-03 已证明 packaged utility 可从零下载并校验真实约 1 GB Paraformer、调用系统 `tar`、完成 native 初始化和强制离线二次启动，且模型仍位于安装目录外。真实麦克风、接近资格线硬件、macOS/Linux 和正式发布制品仍需对应环境证据。
 
 ## Benchmark 边界
 
@@ -75,7 +75,7 @@ BM-01 已完成的数据采集、人工 review 和 freeze 工具已归档到 Git
 
 ## 发布边界
 
-仓库已有 Windows x64 Electron Forge/Squirrel package/make 配置和 packaged smoke；当前产物是未签名内部测试制品，不代表公开支持。首次安装真实模型闭环、升级/卸载、签名、模型再分发许可和其他平台仍属于后续发布工作；除非使当前技术实验无法运行或结论失效，否则不阻塞内部开发。
+仓库已有 Windows x64 Electron Forge/Squirrel package/make 配置和 packaged smoke；PKG-03 已完成静默安装、真实模型首次准备及离线二次启动。当前产物仍是未签名内部测试制品，不代表公开支持；升级/卸载、签名、模型再分发许可和其他平台属于后续发布工作，除非使当前技术实验无法运行或结论失效，否则不阻塞内部开发。
 
 ## 人工与外部跟进
 

@@ -16,6 +16,7 @@
     "package": "electron-forge package --platform=win32 --arch=x64",
     "make": "electron-forge make --platform=win32 --arch=x64",
     "smoke:package": "node scripts/verify-packaged-app.js",
+    "smoke:first-install": "node scripts/verify-first-install.js",
     "benchmark:dry-run": "node benchmark/run.js --dry-run --manifest benchmark/datasets/example/manifest.json --dataset-root benchmark/datasets/example --candidate fake",
     "spike:asr-boundary": "electron benchmark/spikes/asr-execution-boundary.js"
   },

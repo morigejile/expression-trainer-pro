@@ -18,19 +18,24 @@ const {
 } = require('./lib/settings-config');
 const { createAsrIpcRouter } = require('./lib/asr-ipc');
 const { createAsrProcessController } = require('./lib/asr-process-controller');
+const {runManagedModelSmoke} = require('./lib/managed-model-smoke');
 
 const isSquirrelStartup = require('electron-squirrel-startup');
 if (isSquirrelStartup) app.quit();
 
 const isSmokeTest = process.argv.includes('--smoke-test');
 const isNativeAddonSmokeTest = process.argv.includes('--native-addon-smoke-test');
-if (isNativeAddonSmokeTest) app.disableHardwareAcceleration();
+const isManagedModelSmokeTest = process.argv.includes('--managed-model-smoke-test');
+const isOfflineModelSmoke = process.env.EXPRESSION_TRAINER_MODEL_SMOKE_OFFLINE === '1';
+if (isNativeAddonSmokeTest || isManagedModelSmokeTest) app.disableHardwareAcceleration();
 const smokeTest = isSmokeTest ? require('./smoke/electron-smoke-runner') : null;
 const asrProvider = createAsrProcessController({
+  initializeTimeoutMs: isManagedModelSmokeTest ? 45 * 60_000 : undefined,
   spawn: () => {
     const args = isSmokeTest
       ? ['--fake-asr']
       : ['--user-data-path', app.getPath('userData'), '--app-version', app.getVersion()];
+    if (isManagedModelSmokeTest && isOfflineModelSmoke) args.push('--offline-model-smoke');
     return utilityProcess.fork(
       path.join(__dirname, 'lib', 'asr-utility-process.js'),
       args,
@@ -52,10 +57,10 @@ const {
 if (smokeTest) {
   smokeTest.configureApp(app);
 }
-if (isNativeAddonSmokeTest) {
+if (isNativeAddonSmokeTest || isManagedModelSmokeTest) {
   const userDataPath = process.env.EXPRESSION_TRAINER_SMOKE_USER_DATA;
   if (!userDataPath || !path.isAbsolute(userDataPath)) {
-    throw new Error('Native smoke mode requires an absolute EXPRESSION_TRAINER_SMOKE_USER_DATA path');
+    throw new Error('Smoke mode requires an absolute EXPRESSION_TRAINER_SMOKE_USER_DATA path');
   }
   app.setPath('userData', userDataPath);
 }
@@ -239,6 +244,20 @@ app.whenReady().then(async () => {
       app.exit(0);
     } catch (error) {
       console.error('[sherpa-native-smoke] FAILED');
+      console.error(formatSafeError(error));
+      app.exit(1);
+    }
+    return;
+  }
+  if (isManagedModelSmokeTest) {
+    try {
+      await runManagedModelSmoke(asrProvider);
+      console.log(isOfflineModelSmoke
+        ? 'MANAGED_MODEL_SMOKE_OFFLINE_OK'
+        : 'MANAGED_MODEL_SMOKE_ONLINE_OK');
+      app.exit(0);
+    } catch (error) {
+      console.error('[managed-model-smoke] FAILED');
       console.error(formatSafeError(error));
       app.exit(1);
     }

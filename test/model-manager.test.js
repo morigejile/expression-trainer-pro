@@ -191,6 +191,78 @@ test('download byte limit rejects an oversized body without trusting headers', a
   assert.deepEqual(fs.readdirSync(path.join(data.userDataPath, 'models', '.staging')), []);
 });
 
+test('an interrupted archive response resumes from the verified partial byte count', async (t) => {
+  const {createModelManager} = require('../lib/model-manager');
+  const data = fixture(t);
+  const splitAt = 7;
+  let requestCount = 0;
+  const fetchImpl = async (url, options = {}) => {
+    requestCount += 1;
+    if (requestCount === 1) {
+      return new Response(new ReadableStream({
+        start(controller) {
+          controller.enqueue(data.archive.subarray(0, splitAt));
+          setTimeout(() => controller.error(new Error('simulated connection reset')), 20);
+        }
+      }), {
+        status: 200,
+        headers: {'content-length': String(data.archive.length)}
+      });
+    }
+    assert.equal(options.headers?.Range, `bytes=${splitAt}-`);
+    return new Response(data.archive.subarray(splitAt), {
+      status: 206,
+      headers: {
+        'content-length': String(data.archive.length - splitAt),
+        'content-range': `bytes ${splitAt}-${data.archive.length - 1}/${data.archive.length}`
+      }
+    });
+  };
+  const extractArchive = async (options) => {
+    assert.deepEqual(fs.readFileSync(options.archivePath), data.archive);
+    await data.extractArchive(options);
+  };
+  const manager = createModelManager({...data, fetchImpl, extractArchive, appVersion: '1.0.0'});
+
+  const installed = await manager.install(data.model.id);
+
+  assert.equal(installed.reused, false);
+  assert.equal(requestCount, 2);
+});
+
+test('a rejected resume response cancels its unconsumed body', async (t) => {
+  const {createModelManager} = require('../lib/model-manager');
+  const data = fixture(t);
+  let requestCount = 0;
+  let resumeBodyCancelled = false;
+  const fetchImpl = async () => {
+    requestCount += 1;
+    if (requestCount === 1) {
+      return new Response(new ReadableStream({
+        start(controller) {
+          controller.enqueue(data.archive.subarray(0, 7));
+          setTimeout(() => controller.error(new Error('simulated connection reset')), 20);
+        }
+      }), {
+        status: 200,
+        headers: {'content-length': String(data.archive.length)}
+      });
+    }
+    return new Response(new ReadableStream({
+      cancel() { resumeBodyCancelled = true; }
+    }), {
+      status: 200,
+      headers: {'content-length': String(data.archive.length)}
+    });
+  };
+  const manager = createModelManager({...data, fetchImpl, appVersion: '1.0.0'});
+
+  await assert.rejects(manager.install(data.model.id), /resume failed: HTTP 200/);
+
+  assert.equal(requestCount, 2);
+  assert.equal(resumeBodyCancelled, true);
+});
+
 test('a wrong archive hash or extraction failure never replaces the active version', async (t) => {
   const {createModelManager} = require('../lib/model-manager');
   const data = fixture(t);

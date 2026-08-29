@@ -168,3 +168,48 @@ test('dispose aborts pending first-install preparation without starting a provid
   assert.equal(installSignal.aborted, true);
   assert.equal(createCalls, 0);
 });
+
+test('default managed provider can enforce a no-network offline smoke', async () => {
+  const {createDefaultManagedParaformerProvider} = require('../lib/managed-asr-provider');
+  let managerOptions;
+  createDefaultManagedParaformerProvider({
+    userDataPath: path.resolve('offline-user-data'),
+    appVersion: '1.0.0',
+    offline: true,
+    createManager(options) {
+      managerOptions = options;
+      return {
+        async getActive() { return null; },
+        async getPrevious() { return null; },
+        async install() { return null; },
+        async activate() {}
+      };
+    }
+  });
+
+  await assert.rejects(
+    managerOptions.fetchImpl('https://example.invalid/model'),
+    error => error.code === 'offline-model-smoke-network-access'
+  );
+});
+
+test('default managed provider forwards the Electron network fetch', () => {
+  const {createDefaultManagedParaformerProvider} = require('../lib/managed-asr-provider');
+  const fetchImpl = async () => ({ok: true});
+  let managerOptions;
+  createDefaultManagedParaformerProvider({
+    userDataPath: path.resolve('online-user-data'),
+    appVersion: '1.0.0',
+    fetchImpl,
+    createManager(options) {
+      managerOptions = options;
+      return {
+        async getActive() { return null; },
+        async getPrevious() { return null; },
+        async install() { return null; },
+        async activate() {}
+      };
+    }
+  });
+  assert.equal(managerOptions.fetchImpl, fetchImpl);
+});

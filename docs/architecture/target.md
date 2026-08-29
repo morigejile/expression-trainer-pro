@@ -176,7 +176,7 @@ Preload 公开 API 固定为 `startASR`、`feedAudio`、`stopASR`、`cancelASR`�
 
 ADR-0006 已选择单个 Electron `utilityProcess`：它拥有 Provider、native addon、模型对象与推理循环；Main 只保留生命周期、R-02 消息路由、退出检测和一次受控重建。`worker_threads` 虽有 ArrayBuffer transfer 和更高空载吞吐，但 native fatal fault 与 Main 共享进程，未满足主要隔离目标。
 
-D-03 spike 表明 10 个在途上限下 utility process 的 structured-clone copy 仍远高于实时 50 chunks/s；R-05/R-06 因此优先保证有界队列、session 顺序和故障可见性，不为 1,280-byte chunk 引入共享内存或通用 supervisor。PKG-02 已验证 Forge 制品路径和 utility-only native load；真实模型循环留到 PKG-03。
+D-03 spike 表明 10 个在途上限下 utility process 的 structured-clone copy 仍远高于实时 50 chunks/s；R-05/R-06 因此优先保证有界队列、session 顺序和故障可见性，不为 1,280-byte chunk 引入共享内存或通用 supervisor。PKG-03 已验证 Forge 安装制品、utility-only native load 和真实模型循环。
 
 ### 5.5 Model Manager
 
@@ -211,7 +211,7 @@ R-07/R-08 已实现以下轻量职责：
 }
 ```
 
-`models/registry.json` 只登记 ADR-0005 接受的 Paraformer，不承载 benchmark 候选数据库。archive 与 runtime 文件使用已核验的 URL、byte size 和 SHA-256；再分发仍为 `not-approved`。安装器限制下载字节数、只提取白名单文件、校验后发布不可变版本目录，并通过 active pointer 保存上一版本以显式回退。跨进程安装锁避免多个 utility 同时清理/发布；下载、hash、解包和校验均接受取消信号。首次版本和回退版本都先通过 native 初始化才切换 active。内部阶段默认调用系统 `tar`；PKG-02 已证明模型位于安装目录外，真实 1 GB archive 和 Tier 1 环境是否具备该工具在 PKG-03 验证，失败时再替换为随应用提供的最小 extractor。
+`models/registry.json` 只登记 ADR-0005 接受的 Paraformer，不承载 benchmark 候选数据库。archive 与 runtime 文件使用已核验的 URL、byte size 和 SHA-256；再分发仍为 `not-approved`。安装器限制下载字节数、只提取白名单文件、校验后发布不可变版本目录，并通过 active pointer 保存上一版本以显式回退。跨进程安装锁避免多个 utility 同时清理/发布；下载、hash、解包和校验均接受取消信号，流中断按实际落盘字节做严格 Range 有限续传。首次版本和回退版本都先通过 native 初始化才切换 active。内部阶段默认调用系统 `tar`；PKG-03 已证明模型位于安装目录外并完成真实 1 GB archive/system tar 闭环。
 
 ### 5.6 Settings Store
 
