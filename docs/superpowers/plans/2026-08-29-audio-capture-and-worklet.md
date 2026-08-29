@@ -22,7 +22,7 @@
 - Do not add WASM, SpeexDSP, libsamplerate, a handwritten resampler, a package, a bundler, a framework, a generic event bus, or a second audio implementation. SpeexDSP/libsamplerate WASM remains an evidence-triggered contingency only if the pinned Electron graph or later real-device evidence materially fails.
 - Keep `preload.js`, `main.js`, `lib/asr-ipc.js`, and the R-02 provider/session command shapes unchanged in this milestone. `feedAudio` still receives exactly `{ sessionId, sequence, samples }` and still uses request/response invoke with a copied Float32Array.
 - Preserve current UI, transcript, pause/resume, stop-final, cancellation, generation, stale-event, and feed-failure behavior. Clear, replacement, microphone/graph failure, worklet failure, and feed failure invalidate the owning session before asynchronous cleanup can create side effects.
-- Normal stop flushes capture, waits only for already emitted feed Promises for that session, then calls `stopASR`. That Promise set is deliberately not a queue and has no capacity/backpressure policy; document it as R-05 debt rather than extending this milestone.
+- Normal stop is one session-scoped single-flight Promise retained through capture flush, already-emitted feed-Promise drain, `stopASR`, final-event handling, and completed UI cleanup. That Promise set is deliberately not a queue and has no capacity/backpressure policy; document it as R-05 debt rather than extending this milestone.
 - Paraformer remains the product default. Do not change model configuration, candidate code, benchmark data, named Zipformer Large/FireRedASR2 tasks, or the internal-development policy.
 - Real configurable-microphone validation at 16/44.1/48 kHz is recorded as non-blocking follow-up. The automated acceptance evidence is a deterministic Web Audio fixture inside the pinned Electron runtime.
 - Every task commit uses a concise English subject and a short Chinese body. Do not combine tasks or rewrite the reviewed R-02 history.
@@ -45,7 +45,7 @@
 - `test/transcript.test.js` — replaces direct AudioContext fakes with an AudioCapture factory fake and preserves all R-02 race regressions.
 - `smoke/electron-smoke-runner.js` — runs and asserts the pinned graph-rate fixture in addition to the existing Fake ASR/UI smoke.
 - `test/electron-smoke.test.js` — names the expanded real-Electron contract while retaining the parent-process timeout and cleanup.
-- `docs/architecture/current.md`, `docs/architecture/target.md`, `docs/architecture/README.md`, `docs/roadmap.md`, `docs/requirements/requirements.md` — first record verified R-03 state in the four canonical files, then remove the obsolete ScriptProcessor summary and record verified R-04 state plus remaining R-05 debt.
+- `docs/architecture/current.md`, `docs/architecture/target.md`, `docs/architecture/README.md`, `docs/roadmap.md`, `docs/requirements/requirements.md` — record verified R-03 state, then update all five listed files to remove the obsolete ScriptProcessor summary and record verified R-04 state plus remaining R-05 debt.
 
 ### Stable interfaces produced by this plan
 
@@ -97,6 +97,14 @@ const rates = await capture.start({ sessionId, onChunk, onError });
 //   trackSampleRateHz: number | null
 // }
 
+// A context-rate mismatch rejects with only sanitized numeric diagnostics:
+// error.code === 'unsupported-audio-context-rate'
+// error.audioRates === {
+//   requestedSampleRateHz: 16000,
+//   contextSampleRateHz: number,
+//   trackSampleRateHz: number | null
+// }
+
 await capture.stop({ flush: true });  // normal stop: one final non-empty tail
 await capture.stop({ flush: false }); // cancel/failure: first stop call wins
 ```
@@ -105,15 +113,15 @@ The AudioWorklet port protocol is deliberately local to AudioCapture:
 
 ```js
 // Renderer -> worklet
-{ type: 'set-enabled', enabled: true | false }
-{ type: 'flush', requestId: 0 }
+{ type: 'set-enabled', enabled: true | false, captureEpoch: 1 }
+{ type: 'flush', requestId: 0, captureEpoch: 1 }
 
 // worklet -> Renderer
-{ type: 'chunk', frames, samples: ArrayBuffer }
-{ type: 'flushed', requestId: 0 }
+{ type: 'chunk', captureEpoch: 1, frames, samples: ArrayBuffer }
+{ type: 'flushed', requestId: 0, captureEpoch: 1 }
 ```
 
-`samples` is transferred from Worklet to Renderer. AudioCapture reconstructs a Float32Array and adds session/sequence/format metadata. Preload performs its existing copy and invoke; R-05 replaces that transport.
+`captureEpoch` is internal and advances on every actual disabled/enabled state transition. AudioCapture accepts a chunk or flush acknowledgment only when its epoch equals the capture's current enabled epoch, so a pre-pause message delivered after pause/resume cannot consume an input sequence. `samples` is transferred from Worklet to Renderer; AudioCapture reconstructs a Float32Array and adds session/sequence/format metadata. Preload performs its existing copy and invoke; R-05 replaces that transport.
 
 ---
 
@@ -385,6 +393,7 @@ class ExpressionTrainer {
   constructor({ audioCaptureFactory = createAudioCapture } = {}) {
     this.audioCaptureFactory = audioCaptureFactory;
     this.audioCapture = null;
+    this.audioCaptureStopPromise = null;
     // existing state initialization remains unchanged, except
     // asrInputSequence is removed because AudioCapture owns it.
   }
@@ -440,12 +449,19 @@ Add one ownership helper used everywhere resources are released:
 ```js
 releaseAudioCapture(options) {
   const capture = this.audioCapture;
+  if (!capture) return this.audioCaptureStopPromise ?? Promise.resolve();
   this.audioCapture = null;
-  return capture ? capture.stop(options) : Promise.resolve();
+  try {
+    this.audioCaptureStopPromise = Promise.resolve(capture.stop(options));
+  } catch (error) {
+    this.audioCaptureStopPromise = Promise.reject(error);
+  }
+  return this.audioCaptureStopPromise;
 }
 ```
 
-- `teardownRecordingCapture()` calls `releaseAudioCapture()` fire-and-forget, then retains its existing immediate timer/state/UI reset.
+- Keep `audioCaptureStopPromise` after clearing its capture reference; repeated release calls for that capture therefore observe the same outcome. If a later capture becomes owned, its non-null `audioCapture` takes precedence, and releasing that later capture atomically replaces the retained Promise without interrupting the older cleanup.
+- `teardownRecordingCapture()` uses `void releaseAudioCapture().catch(() => {})`, then retains its existing immediate timer/state/UI reset; the owner observes any stop rejection, while secondary cleanup never creates an unhandled rejection.
 - `stopRecording()` awaits `releaseAudioCapture()` before `stopASR`, without resetting `startTime` before duration is calculated.
 - `pauseRecording()` sets `isPaused` and calls `audioCapture?.setEnabled(false)`; `resumeRecording()` clears `isPaused` and calls `audioCapture?.setEnabled(true)`.
 - Start setup failure calls the local capture's idempotent `stop()` and preserves the existing owning-session cancellation and stale-error guards.
@@ -516,7 +532,17 @@ git diff --check
 
 Expected: verified R-03 is current/completed, R-04 remains planned, ScriptProcessor remains truthfully current, and R-05 remains downstream debt; no whitespace errors.
 
-- [ ] **Step 4: Commit the R-03 documentation checkpoint**
+- [ ] **Step 4: Run the pinned full-suite R-03 checkpoint**
+
+Run:
+
+```powershell
+& "C:\Users\mr\AppData\Local\hermes\node\npm.cmd" test
+```
+
+Expected: PASS with exit code 0 (apart from the two already documented Windows file-symlink capability skips when the host denies symlink creation). If this command fails, stop here, diagnose R-03, and do not edit any Task 4/R-04 file.
+
+- [ ] **Step 5: Commit the R-03 documentation checkpoint**
 
 ```powershell
 git add docs/architecture/current.md docs/architecture/target.md docs/roadmap.md docs/requirements/requirements.md
@@ -646,23 +672,40 @@ class ExpressionTrainerAudioCollector extends AudioWorkletProcessor {
   constructor(options) {
     super();
     this.enabled = options?.processorOptions?.enabled === true;
+    this.captureEpoch = Number.isSafeInteger(options?.processorOptions?.captureEpoch)
+      && options.processorOptions.captureEpoch >= 0
+      ? options.processorOptions.captureEpoch
+      : 0;
     this.collector = new MonoChunkCollector({
       onChunk: samples => {
         const frames = samples.length;
         const buffer = samples.buffer;
-        this.port.postMessage({ type: 'chunk', frames, samples: buffer }, [buffer]);
+        this.port.postMessage({
+          type: 'chunk', captureEpoch: this.captureEpoch, frames, samples: buffer
+        }, [buffer]);
       }
     });
     this.port.onmessage = event => this.handleMessage(event.data);
   }
 
   handleMessage(message) {
-    if (message?.type === 'set-enabled' && typeof message.enabled === 'boolean') {
+    if (message?.type === 'set-enabled'
+        && typeof message.enabled === 'boolean'
+        && Number.isSafeInteger(message.captureEpoch)
+        && message.captureEpoch > this.captureEpoch
+        && message.enabled !== this.enabled) {
+      this.captureEpoch = message.captureEpoch;
       this.enabled = message.enabled;
       if (!this.enabled) this.collector.reset();
-    } else if (message?.type === 'flush' && Number.isSafeInteger(message.requestId)) {
+    } else if (message?.type === 'flush'
+        && Number.isSafeInteger(message.requestId)
+        && message.captureEpoch === this.captureEpoch) {
       this.collector.flush();
-      this.port.postMessage({ type: 'flushed', requestId: message.requestId });
+      this.port.postMessage({
+        type: 'flushed',
+        requestId: message.requestId,
+        captureEpoch: this.captureEpoch
+      });
     }
   }
 
@@ -675,7 +718,7 @@ class ExpressionTrainerAudioCollector extends AudioWorkletProcessor {
 registerProcessor('expression-trainer-audio-collector', ExpressionTrainerAudioCollector);
 ```
 
-The fixture-only `processorOptions.enabled` starts true when explicitly requested; AudioCapture omits it and starts disabled. The processor writes no output samples and remains connected only so Chromium schedules it.
+The fixture-only `processorOptions: { enabled: true, captureEpoch: 0 }` starts true when explicitly requested; AudioCapture omits the options and starts disabled at epoch 0. AudioCapture increments the epoch only for an actual enabled-state transition, and the processor accepts only a strictly newer transition. A flush is acknowledged only for the processor's current epoch. The processor writes no output samples and remains connected only so Chromium schedules it.
 
 - [ ] **Step 5: Run collector tests and module syntax checks**
 
@@ -738,12 +781,25 @@ test('R-04 capture requests interactive 16 kHz and records all available rates',
 });
 
 test('actual graph output rate mismatch fails closed and releases resources', async () => {
-  const graph = createWorkletGraphFake({ contextSampleRateHz: 48000 });
+  const graph = createWorkletGraphFake({
+    contextSampleRateHz: 48000,
+    trackSampleRateHz: 44100
+  });
   const capture = createAudioCapture(graph.dependencies);
-  await assert.rejects(
-    capture.start({ sessionId: 'session-a', onChunk() {}, onError() {} }),
-    /AudioContext output rate 48000 Hz; expected 16000 Hz/
-  );
+  const error = await capture
+    .start({ sessionId: 'session-a', onChunk() {}, onError() {} })
+    .then(() => assert.fail('start should reject'), reason => reason);
+  assert.equal(error.message, 'AudioContext output rate 48000 Hz; expected 16000 Hz');
+  assert.equal(error.code, 'unsupported-audio-context-rate');
+  assert.deepEqual(error.audioRates, {
+    requestedSampleRateHz: 16000,
+    contextSampleRateHz: 48000,
+    trackSampleRateHz: 44100
+  });
+  assert.deepEqual(Object.keys(error.audioRates).sort(), [
+    'contextSampleRateHz', 'requestedSampleRateHz', 'trackSampleRateHz'
+  ]);
+  assert.equal(Object.isFrozen(error.audioRates), true);
   assert.equal(graph.counts.contextClose, 1);
   assert.equal(graph.counts.trackStop, 1);
   assert.equal(graph.counts.workletConstruct, 0);
@@ -759,9 +815,12 @@ test('worklet buffers become ordered metadata chunks without a plain-array copy'
     onError: assert.fail
   });
   capture.setEnabled(true);
+  const captureEpoch = graph.port.messagesFromRenderer.at(-1).captureEpoch;
   for (const frames of [320, 17]) {
     const samples = new Float32Array(frames).fill(0.25);
-    graph.port.emitToRenderer({ type: 'chunk', frames, samples: samples.buffer });
+    graph.port.emitToRenderer({
+      type: 'chunk', captureEpoch, frames, samples: samples.buffer
+    });
   }
   assert.deepEqual(emitted.map(chunk => chunk.sequence), [0, 1]);
   assert.deepEqual(emitted.map(chunk => chunk.frames), [320, 17]);
@@ -769,6 +828,47 @@ test('worklet buffers become ordered metadata chunks without a plain-array copy'
   assert.equal(emitted.every(chunk => chunk.sampleRateHz === 16000), true);
   assert.equal(emitted.every(chunk => chunk.channels === 1), true);
   assert.equal(emitted.every(chunk => chunk.format === 'f32'), true);
+});
+
+test('a queued pre-pause chunk cannot cross a disable-enable epoch', async () => {
+  const emitted = [];
+  const graph = createWorkletGraphFake();
+  const capture = createAudioCapture(graph.dependencies);
+  await capture.start({
+    sessionId: 'session-a',
+    onChunk: chunk => emitted.push(chunk),
+    onError: assert.fail
+  });
+  capture.setEnabled(true);
+  capture.setEnabled(true); // same-state calls are no-ops
+  const firstEnable = graph.port.messagesFromRenderer.at(-1);
+  assert.deepEqual(firstEnable, {
+    type: 'set-enabled', enabled: true, captureEpoch: 1
+  });
+  const oldSamples = new Float32Array(320).fill(0.1);
+  const queuedOldChunk = {
+    type: 'chunk',
+    captureEpoch: firstEnable.captureEpoch,
+    frames: 320,
+    samples: oldSamples.buffer
+  };
+
+  capture.setEnabled(false);
+  capture.setEnabled(true);
+  const resumedEpoch = graph.port.messagesFromRenderer.at(-1).captureEpoch;
+  assert.equal(resumedEpoch, 3);
+
+  graph.port.emitToRenderer(queuedOldChunk);
+  assert.deepEqual(emitted, []);
+  const freshSamples = new Float32Array(320).fill(0.9);
+  graph.port.emitToRenderer({
+    type: 'chunk',
+    captureEpoch: resumedEpoch,
+    frames: 320,
+    samples: freshSamples.buffer
+  });
+  assert.deepEqual(emitted.map(chunk => chunk.sequence), [0]);
+  assert.equal(emitted[0].samples[0], freshSamples[0]);
 });
 
 test('normal stop flushes one tail before idempotent teardown resolves', async () => {
@@ -785,18 +885,75 @@ test('normal stop flushes one tail before idempotent teardown resolves', async (
   const secondStop = capture.stop({ flush: true });
   assert.equal(firstStop, secondStop);
   assert.equal(graph.counts.sourceDisconnect, 1);
+  const captureEpoch = graph.port.messagesFromRenderer
+    .findLast(message => message.type === 'set-enabled').captureEpoch;
   assert.deepEqual(graph.port.messagesFromRenderer.at(-1), {
-    type: 'flush', requestId: 0
+    type: 'flush', requestId: 0, captureEpoch
   });
   const tail = new Float32Array(17).fill(0.5);
-  graph.port.emitToRenderer({ type: 'chunk', frames: 17, samples: tail.buffer });
-  graph.port.emitToRenderer({ type: 'flushed', requestId: 0 });
+  graph.port.emitToRenderer({
+    type: 'chunk', captureEpoch, frames: 17, samples: tail.buffer
+  });
+  graph.port.emitToRenderer({ type: 'flushed', requestId: 0, captureEpoch });
   await firstStop;
   assert.deepEqual(emitted.map(chunk => chunk.frames), [17]);
   assert.equal(graph.counts.workletDisconnect, 1);
   assert.equal(graph.counts.contextClose, 1);
   assert.equal(graph.counts.trackStop, 1);
 });
+
+for (const scenario of [
+  { name: 'missing flush acknowledgment', emitWrongAck: false },
+  { name: 'wrong-epoch flush acknowledgment', emitWrongAck: true }
+]) {
+  test(`${scenario.name} rejects one stop flight and ignores a late ack`, async () => {
+    const errors = [];
+    const graph = createWorkletGraphFake();
+    const capture = createAudioCapture({
+      ...graph.dependencies,
+      flushTimeoutMs: 5
+    });
+    await capture.start({
+      sessionId: 'session-a',
+      onChunk: assert.fail,
+      onError: error => errors.push(error)
+    });
+    capture.setEnabled(true);
+    const firstStop = capture.stop({ flush: true });
+    const secondStop = capture.stop({ flush: false });
+    assert.equal(firstStop, secondStop);
+    const flush = graph.port.messagesFromRenderer.at(-1);
+    assert.equal(
+      graph.port.messagesFromRenderer.filter(message => message.type === 'flush').length,
+      1
+    );
+    if (scenario.emitWrongAck) {
+      graph.port.emitToRenderer({
+        type: 'flushed',
+        requestId: flush.requestId,
+        captureEpoch: flush.captureEpoch - 1
+      });
+    }
+    await assert.rejects(firstStop, /AudioWorklet flush timed out/);
+    assert.equal(graph.counts.sourceDisconnect, 1);
+    assert.equal(graph.counts.workletDisconnect, 1);
+    assert.equal(graph.counts.contextClose, 1);
+    assert.equal(graph.counts.trackStop, 1);
+    assert.deepEqual(errors, []);
+
+    graph.port.emitToRenderer({
+      type: 'flushed',
+      requestId: flush.requestId,
+      captureEpoch: flush.captureEpoch
+    });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(graph.counts.sourceDisconnect, 1);
+    assert.equal(graph.counts.workletDisconnect, 1);
+    assert.equal(graph.counts.contextClose, 1);
+    assert.equal(graph.counts.trackStop, 1);
+    assert.deepEqual(errors, []);
+  });
+}
 
 test('cancel stop does not flush and a processor error is reported once', async () => {
   const errors = [];
@@ -820,20 +977,152 @@ test('cancel stop does not flush and a processor error is reported once', async 
 
 - [ ] **Step 2: Add failing Renderer tail-drain and failure tests**
 
-Extend the capture fake so `stop({flush:true})` invokes its retained `onChunk` with a 17-frame tail before resolving. Use a deferred `feedAudio` result and record call order:
+Add `startAudioCaptureHarness(t, options)` beside the existing recording harness. It injects the Task 2 capture fake, starts one recording, and returns `{trainer, audio, sessionId, order, calls}`. `audio` exposes the callbacks retained by `start`; `calls` has numeric `captureStop`, `feedAudio`, `stopASR`, and `cancelASR` fields. The fake increments `captureStop` before invoking `options.captureStop({stopOptions, handlers, order})`; the API fakes likewise increment their field before invoking the corresponding override. The helper owns the same DOM/global/timer cleanup as the existing harness. The fake deliberately does **not** deduplicate `capture.stop()` calls, so these tests prove the Renderer owns the whole-session single flight.
+
+Use these concrete regressions:
 
 ```js
-test('normal stop drains the worklet tail feed before stopASR', async () => {
-  // Start the session with the fake capture, call stopRecording(), and assert
-  // stopASR has not run while the tail feed Promise is pending. Resolve feed;
-  // then assert order ['capture-flush', 'feed:0', 'stop-asr'] and existing final
-  // transcript/report behavior.
+test('concurrent normal stops share one flush, tail drain, and stopASR flight', async (t) => {
+  const feedStarted = createDeferred();
+  const feedGate = createDeferred();
+  const harness = await startAudioCaptureHarness(t, {
+    captureStop({ stopOptions, handlers, order }) {
+      assert.deepEqual(stopOptions, { flush: true });
+      order.push('capture-flush');
+      handlers.onChunk({
+        sessionId: handlers.sessionId,
+        sequence: 0,
+        sampleRateHz: 16000,
+        channels: 1,
+        format: 'f32',
+        frames: 17,
+        samples: new Float32Array(17).fill(0.5)
+      });
+      return Promise.resolve();
+    },
+    feedAudio(command, order) {
+      order.push(`feed:${command.sequence}`);
+      feedStarted.resolve();
+      return feedGate.promise;
+    },
+    stopASR(command, order) {
+      order.push('stop-asr');
+      return stopEnvelope(command.sessionId, '尾块后的定稿');
+    }
+  });
+
+  const firstStop = harness.trainer.stopRecording();
+  const secondStop = harness.trainer.stopRecording();
+  assert.equal(firstStop, secondStop);
+  await feedStarted.promise;
+  assert.deepEqual(harness.calls, {
+    captureStop: 1, feedAudio: 1, stopASR: 0, cancelASR: 0
+  });
+  assert.deepEqual(harness.order, ['capture-flush', 'feed:0']);
+
+  feedGate.resolve({ ok: true, events: [] });
+  const outcomes = await Promise.all([firstStop, secondStop]);
+  assert.deepEqual(outcomes, [undefined, undefined]);
+  assert.deepEqual(harness.order, ['capture-flush', 'feed:0', 'stop-asr']);
+  assert.deepEqual(harness.calls, {
+    captureStop: 1, feedAudio: 1, stopASR: 1, cancelASR: 0
+  });
+  assert.equal(harness.trainer.fullText, '尾块后的定稿');
+  assert.equal(harness.trainer.isRecording, false);
+  assert.equal(harness.trainer.btnStart.classList.contains('hidden'), false);
+  assert.equal(harness.trainer.btnStop.classList.contains('hidden'), true);
 });
 
-test('tail feed failure during stop fails the owning session closed', async () => {
-  // Reject tail feed; assert one cancelASR, zero stopASR, one generic actionable
-  // error, inert controls, and no late final side effect.
+for (const failureName of [
+  'missing flush acknowledgment',
+  'wrong-epoch flush acknowledgment'
+]) {
+  test(`${failureName} cancels once and never calls stopASR`, async (t) => {
+    const flushFailure = createDeferred();
+    const shownErrors = [];
+    const harness = await startAudioCaptureHarness(t, {
+      captureStop: () => flushFailure.promise,
+      cancelASR: async () => ({ ok: true, events: [] }),
+      stopASR: assert.fail
+    });
+    harness.trainer.showError = message => shownErrors.push(message);
+
+    const firstStop = harness.trainer.stopRecording();
+    const secondStop = harness.trainer.stopRecording();
+    assert.equal(firstStop, secondStop);
+    flushFailure.reject(new Error('AudioWorklet flush timed out'));
+    await firstStop;
+    await new Promise(resolve => setImmediate(resolve));
+
+    assert.equal(harness.calls.captureStop, 1);
+    assert.equal(harness.calls.cancelASR, 1);
+    assert.equal(harness.calls.stopASR, 0);
+    assert.equal(shownErrors.filter(message =>
+      message === '语音识别处理失败，录音已停止，请重新开始'
+    ).length, 1);
+    assert.equal(harness.trainer.isRecording, false);
+    assert.equal(harness.trainer.asrEventState.activeSessionId, null);
+  });
+}
+
+test('tail feed failure during stop fails the owning session closed', async (t) => {
+  const feedFailure = createDeferred();
+  const shownErrors = [];
+  const harness = await startAudioCaptureHarness(t, {
+    captureStop({ handlers }) {
+      handlers.onChunk({
+        sessionId: handlers.sessionId,
+        sequence: 0,
+        sampleRateHz: 16000,
+        channels: 1,
+        format: 'f32',
+        frames: 17,
+        samples: new Float32Array(17)
+      });
+      return Promise.resolve();
+    },
+    feedAudio: () => feedFailure.promise,
+    cancelASR: async () => ({ ok: true, events: [] }),
+    stopASR: assert.fail
+  });
+  harness.trainer.showError = message => shownErrors.push(message);
+
+  const stop = harness.trainer.stopRecording();
+  feedFailure.reject(new Error('tail feed failed'));
+  await stop;
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(harness.calls.feedAudio, 1);
+  assert.equal(harness.calls.cancelASR, 1);
+  assert.equal(harness.calls.stopASR, 0);
+  assert.equal(shownErrors.length, 1);
+  assert.equal(harness.trainer.asrEventState.activeSessionId, null);
+  assert.equal(harness.trainer.isRecording, false);
 });
+```
+
+In the existing capture-start failure regression, make the injected `start()` reject with this object and assert the rates survive teardown without adding a logger:
+
+```js
+const rateError = new Error('AudioContext output rate 48000 Hz; expected 16000 Hz');
+rateError.code = 'unsupported-audio-context-rate';
+rateError.audioRates = Object.freeze({
+  requestedSampleRateHz: 16000,
+  contextSampleRateHz: 48000,
+  trackSampleRateHz: 44100
+});
+audio.capture.start = async () => { throw rateError; };
+await trainer.startRecording();
+assert.deepEqual(trainer.lastAudioCaptureRates, {
+  requestedSampleRateHz: 16000,
+  contextSampleRateHz: 48000,
+  trackSampleRateHz: 44100
+});
+assert.deepEqual(Object.keys(trainer.lastAudioCaptureRates).sort(), [
+  'contextSampleRateHz', 'requestedSampleRateHz', 'trackSampleRateHz'
+]);
+assert.equal(audio.calls.stop.length, 1);
+assert.equal(cancelCommands.length, 1);
 ```
 
 The test may inspect a per-session tracker, but must not assert a capacity, queue, drop, or backpressure behavior.
@@ -846,28 +1135,29 @@ Run:
 & "C:\Users\mr\AppData\Local\hermes\node\node.exe" --test test/audio-capture.test.js test/transcript.test.js
 ```
 
-Expected: FAIL because R-03 still requests only `{sampleRate:16000}`, creates ScriptProcessor, has no rate mismatch guard/worklet flush, and calls `stopASR` without draining the emitted tail feed.
+Expected: FAIL because R-03 still requests only `{sampleRate:16000}`, creates ScriptProcessor, has no rate mismatch diagnostics/worklet epoch or flush acknowledgment, accepts an old queued chunk after pause/resume, and lets concurrent `stopRecording()` calls bypass one retained tail-drain flight.
 
 - [ ] **Step 4: Replace the capture internals directly with AudioWorklet**
 
 Extend `createAudioCapture()` dependencies exactly as declared in the file map. In `start()`:
 
 1. Request permission, construct `AudioContextClass({ sampleRate: 16000, latencyHint: 'interactive' })`, and read the first audio track's finite positive `getSettings().sampleRate`; use `null` when settings/rate are unavailable.
-2. Record and return `{requestedSampleRateHz:16000, contextSampleRateHz, trackSampleRateHz}`. If the actual context rate is not 16000, release context/tracks through the same owned-resource teardown and reject before constructing a worklet node.
+2. Build exactly `{requestedSampleRateHz:16000, contextSampleRateHz, trackSampleRateHz}` with finite numeric values or `null` for the optional track rate, and return it on success. If the actual context rate is not 16000, create ``new Error(`AudioContext output rate ${contextSampleRateHz} Hz; expected 16000 Hz`)``, set `code = 'unsupported-audio-context-rate'`, attach an `Object.freeze()` copy as `error.audioRates`, release context/tracks through the same owned-resource teardown, and reject that same error before constructing a worklet node. Do not include device labels, constraints, audio, text, or a new log sink.
 3. Await `audioContext.audioWorklet.addModule(workletModuleUrl)` and create `new AudioWorkletNodeClass(audioContext, 'expression-trainer-audio-collector', { numberOfInputs: 1, numberOfOutputs: 1, outputChannelCount: [1] })`.
 4. Connect `source -> workletNode -> destination`. Do not create or retain any ScriptProcessor path.
-5. Start disabled. `setEnabled(false)` immediately marks late or already-queued port chunks ineligible and posts `{type:'set-enabled',enabled:false}` so the processor resets its pending collector; `true` permits new chunks and posts the matching command.
-6. Validate worklet chunk messages: `frames` is a positive safe integer no larger than 320; `samples` is an ArrayBuffer of exactly `frames * Float32Array.BYTES_PER_ELEMENT`. Invalid messages and `onprocessorerror` call the session's `onError` at most once.
-7. Reconstruct `new Float32Array(message.samples)`, attach the stable metadata, and increment sequence only when the capture is enabled/accepting that chunk.
+5. Start disabled with `captureEpoch = 0`. `setEnabled(value)` is a no-op when `value` equals the current state; on each actual transition, increment the epoch, update Renderer acceptance synchronously, and post `{type:'set-enabled',enabled:value,captureEpoch}`. A transition to false makes already queued chunks ineligible before posting the reset command; a transition back to true has a new epoch.
+6. Validate worklet chunk messages: `captureEpoch` must equal the current epoch and capture must be enabled/accepting, `frames` is a positive safe integer no larger than 320, and `samples` is an ArrayBuffer of exactly `frames * Float32Array.BYTES_PER_ELEMENT`. Invalid messages and `onprocessorerror` call the session's `onError` at most once.
+7. Only after all checks, reconstruct `new Float32Array(message.samples)`, attach stable metadata, emit it, and increment sequence. A disabled, stale-epoch, malformed, or post-stop chunk is ignored without consuming sequence.
 
 Implement `stop({ flush = false } = {})` as the one idempotent resource teardown; the first call's mode wins:
 
 - synchronously disconnect the source to reject new graph input;
-- for `flush:false`, stop accepting chunks and release node/context/tracks without a flush message;
-- for `flush:true`, keep accepting port chunks, post one safe-integer request ID, wait for the matching `flushed` acknowledgment with injected/default 1000 ms timeout, then stop accepting chunks and release the remaining resources;
+- for `flush:false`, make an enabled capture transition to disabled (advancing the epoch), stop accepting chunks, and release node/context/tracks without a flush message;
+- for `flush:true`, retain the current epoch and acceptance state, post one `{type:'flush',requestId,captureEpoch}`, and wait for a `flushed` message whose request ID **and** epoch both match, using the injected/default 1000 ms timeout; then stop accepting chunks and release the remaining resources;
 - a tail `chunk` posted before `flushed` is delivered first by the same MessagePort and therefore receives the next sequence;
-- on timeout, release every resource and reject `stop()` with `AudioWorklet flush timed out`; do not silently call `stopASR` after losing the tail;
-- null port handlers and `onprocessorerror` before disconnect/close, and attempt all tracks independently.
+- a missing acknowledgment or an acknowledgment with the wrong request ID/epoch remains pending until timeout; timeout rejects the one retained stop Promise once with `AudioWorklet flush timed out`, and is not separately sent through `onError`;
+- on success or timeout, stop acceptance and clear the timeout, port handlers, and `onprocessorerror` before disconnect/close; attempt every track independently, and keep the handlers null so a late acknowledgment/chunk is inert;
+- release every resource exactly once even when cleanup calls throw, and never let a timeout silently continue to `stopASR` after losing the tail.
 
 - [ ] **Step 5: Add per-session feed draining without creating R-05 transport**
 
@@ -878,28 +1168,121 @@ const feedTracker = { sessionId, pending: new Set() };
 this.audioFeedTracker = feedTracker;
 ```
 
-`handleCapturedChunk(chunk)` retains its current session/pause guards. Wrap its existing async feed/response work in a Promise, add that Promise to the matching tracker's `pending`, and remove it in `finally`. The operation catches transport/envelope failure and calls `failActiveRecording(sessionId)`, so tracked Promises settle rather than producing unhandled rejections.
+`handleCapturedChunk(chunk)` retains its current session/pause guards. Wrap its existing async feed/response work in a Promise, add that Promise to the matching tracker's `pending`, and remove it in `finally`. The operation catches transport/envelope failure and awaits `failActiveRecording(sessionId)`, so tracked Promises settle rather than producing unhandled rejections.
 
-Normal stop order is exact:
+Retain the **whole** stop operation, not only capture teardown. The public method must be non-`async`, because an `async` wrapper would return a different Promise even when it returns an existing Promise:
 
 ```js
-const sessionId = this.asrEventState.activeSessionId;
-const feedTracker = this.audioFeedTracker;
-try {
-  await this.releaseAudioCapture({ flush: true });
-  if (feedTracker?.sessionId === sessionId) {
-    await Promise.all([...feedTracker.pending]);
+// Constructor state:
+this.recordingStopOperation = null;
+
+stopRecording() {
+  if (this.recordingStopOperation) {
+    return this.recordingStopOperation.promise;
   }
-} catch {
-  this.failActiveRecording(sessionId);
-  return;
+
+  const operation = {
+    sessionId: this.asrEventState.activeSessionId,
+    feedTracker: this.audioFeedTracker,
+    promise: null
+  };
+  this.recordingStopOperation = operation;
+  operation.promise = this.completeRecordingStop(operation);
+  return operation.promise;
 }
-if (this.asrEventState.activeSessionId !== sessionId) return;
-this.audioFeedTracker = null;
-// Only now run the existing stopASR/processASRResponse/finally UI flow.
+
+async completeRecordingStop(operation) {
+  const { sessionId, feedTracker } = operation;
+  this.advanceLLMGeneration();
+  try {
+    await this.releaseAudioCapture({ flush: true });
+    if (feedTracker?.sessionId === sessionId) {
+      await Promise.all([...feedTracker.pending]);
+    }
+    if (this.asrEventState.activeSessionId !== sessionId) return;
+    this.audioFeedTracker = null;
+    await this.finishOwnedAsrStopAndUi(sessionId);
+  } catch {
+    await this.failActiveRecording(sessionId);
+  } finally {
+    if (this.recordingStopOperation === operation) {
+      this.recordingStopOperation = null;
+    }
+  }
+}
+
+async finishOwnedAsrStopAndUi(sessionId) {
+  try {
+    if (sessionId) {
+      const stopResponse = await window.api.stopASR({ sessionId });
+      await this.processASRResponse(
+        stopResponse,
+        '语音识别停止失败',
+        '尾部文本分析失败',
+        () => this.asrEventState.activeSessionId === sessionId
+      );
+    }
+  } catch (error) {
+    if (this.asrEventState.activeSessionId === sessionId) {
+      this.showError(`语音识别停止失败: ${error.message}`);
+    }
+  } finally {
+    if (this.asrEventState.activeSessionId === sessionId) {
+      this.asrEventState = invalidateAsrSession(this.asrEventState);
+    }
+    this.advanceLLMGeneration();
+    try {
+      await window.api.cancelLLMRequests();
+    } catch (error) {
+      this.showError(`取消大模型请求失败: ${error.message}`);
+    } finally {
+      this.isRecording = false;
+      this.isPaused = false;
+      clearInterval(this.timerInterval);
+      let totalPaused = this.pausedTime;
+      if (this.pauseStart) totalPaused += Date.now() - this.pauseStart;
+      this.stats.duration = Math.floor(
+        (Date.now() - this.startTime - totalPaused) / 1000
+      );
+      this.btnStop.classList.add('hidden');
+      this.btnPause.classList.add('hidden');
+      this.btnResume.classList.add('hidden');
+      this.btnStart.classList.remove('hidden');
+      this.timer.classList.remove('active');
+      if (this.fullText.trim()) {
+        this.btnReport.classList.remove('hidden');
+        this.btnCopyText.classList.remove('hidden');
+        this.btnSaveText.classList.remove('hidden');
+        this.btnClear.classList.remove('hidden');
+      }
+    }
+  }
+}
 ```
 
-Clear, replacement, feed/worklet failure, and microphone/rate failure set `audioFeedTracker = null`, invalidate the owning session/generations first, and use `releaseAudioCapture({flush:false})` plus existing `cancelASR`. The old tracker remains captured only by its settling Promises and cannot affect a new tracker/session.
+`finishOwnedAsrStopAndUi(sessionId)` is only the shown mechanical extraction of the current `stopRecording()` body; do not introduce a second state transition or change its R-02 response/error/final-text behavior. Thus the retained operation spans exactly: source disconnect and worklet flush, tail `feedAudio` drain, `stopASR`, final-event/analysis handling, `cancelLLMRequests`, and final UI/timer cleanup. The concurrent-double-stop RED test must observe one Promise object and one traversal of that order.
+
+Keep the Task 2 `audioCaptureStopPromise` implementation: after `releaseAudioCapture()` clears a capture reference, later calls with no newer capture return that same Promise. A newly owned capture takes precedence because the helper checks `audioCapture` first; only release of that newer capture replaces the retained Promise, and no stop/failure path clears it early. Make internal `failActiveRecording(sessionId)` invalidate the session/generations and finish inert UI teardown synchronously, then return the one `cancelActiveAsrSession(sessionId, () => false)` Promise (or `Promise.resolve(false)` for a stale owner); callers outside a tracked feed/stop use `void`. A capture flush rejection is caught by `completeRecordingStop()`, which awaits that guarded failure Promise once. Its secondary teardown observes the already retained rejected capture Promise with `.catch(() => {})`, cancellation completes once, normal `stopASR` is skipped, and the whole-session Promise resolves only after failure UI cleanup and cancellation.
+
+Use this exact return-preserving failure shape:
+
+```js
+failActiveRecording(sessionId) {
+  if (this.asrEventState.activeSessionId !== sessionId) {
+    return Promise.resolve(false);
+  }
+  this.asrStartAttempt = null;
+  this.asrGeneration = (this.asrGeneration ?? 0) + 1;
+  this.asrEventState = invalidateAsrSession(this.asrEventState);
+  this.advanceLLMGeneration();
+  this.audioFeedTracker = null;
+  this.teardownRecordingCapture();
+  this.showError('语音识别处理失败，录音已停止，请重新开始');
+  return this.cancelActiveAsrSession(sessionId, () => false).then(() => true);
+}
+```
+
+Clear, replacement, feed/worklet failure, and microphone/rate failure set `audioFeedTracker = null`, invalidate the owning session/generations first, and use `releaseAudioCapture({flush:false})` plus existing `cancelASR`. The old tracker remains captured only by its settling Promises and cannot affect a new tracker/session. They do not clear `recordingStopOperation` if the owning stop is still completing; its `finally` is the only owner that clears that token.
 
 Store the successful `start()` rate result as `this.lastAudioCaptureRates` for developer diagnosis; it contains no audio/user text. Do not add logging infrastructure.
 
@@ -909,9 +1292,19 @@ Update the Task 2 capture start call so the worklet error and rate result are wi
 const rates = await audioCapture.start({
   sessionId,
   onChunk: chunk => this.handleCapturedChunk(chunk),
-  onError: () => this.failActiveRecording(sessionId)
+  onError: () => { void this.failActiveRecording(sessionId); }
 });
 if (ownsSession()) this.lastAudioCaptureRates = rates;
+```
+
+In the matching `catch`, before local capture cleanup or session cancellation, retain a mismatch's already sanitized diagnostics only for the owning attempt:
+
+```js
+if (ownsSession()
+    && error?.code === 'unsupported-audio-context-rate'
+    && error.audioRates) {
+  this.lastAudioCaptureRates = error.audioRates;
+}
 ```
 
 This Set does not serialize feeds, reject at a limit, apply backpressure, or record overrun. Keep `preload.js`, `main.js`, and `lib/asr-ipc.js` unchanged.
@@ -927,7 +1320,7 @@ Run:
 & "C:\Users\mr\AppData\Local\hermes\node\node.exe" --check src/app.js
 ```
 
-Expected: all focused/protocol tests PASS; tail feed precedes stopASR; failure cancels once; no provider/model assertion changes.
+Expected: all focused/protocol tests PASS; the epoch regression preserves sequence 0 after resume; missing/wrong flush acknowledgments release/cancel once and never reach `stopASR`; concurrent stops share one tail-drain/final-UI outcome; no provider/model assertion changes.
 
 - [ ] **Step 7: Prove the legacy production node is gone**
 
@@ -957,7 +1350,7 @@ git commit -m "feat: replace script processor with audio worklet" -m "固定 16k
 
 **Interfaces:**
 - Consumes: real Electron 43.4.1 `OfflineAudioContext`, `AudioBufferSourceNode`, `AudioWorkletNode`, and Task 4's worklet module.
-- Produces: deterministic results `{inputSampleRateHz,contextSampleRateHz,chunkFrames,totalFrames,mean,allFinite}` for each of 16000, 44100, and 48000 Hz.
+- Produces: deterministic results `{inputSampleRateHz,contextSampleRateHz,chunkFrames,totalFrames,firstPlateauMean,secondPlateauMean,transitionFrame,allFinite}` for each of 16000, 44100, and 48000 Hz.
 
 - [ ] **Step 1: Add the failing smoke invocation and assertions**
 
@@ -985,7 +1378,9 @@ for (const result of graphResults) {
   assert.deepEqual(result.chunkFrames, [320, 320]);
   assert.equal(result.totalFrames, 640);
   assert.equal(result.allFinite, true);
-  assert.ok(Math.abs(result.mean - 0.5) < 0.01);
+  assert.ok(Math.abs(result.firstPlateauMean - 0.2) < 0.02);
+  assert.ok(Math.abs(result.secondPlateauMean - 0.8) < 0.02);
+  assert.ok(Math.abs(result.transitionFrame - 320) <= 16);
 }
 graphWindow.destroy();
 ```
@@ -1019,13 +1414,18 @@ const node = new AudioWorkletNode(
     numberOfInputs: 1,
     numberOfOutputs: 1,
     outputChannelCount: [1],
-    processorOptions: { enabled: true }
+    processorOptions: { enabled: true, captureEpoch: 0 }
   }
 );
 const inputFrames = inputSampleRateHz * 40 / 1000;
 const buffer = context.createBuffer(2, inputFrames, inputSampleRateHz);
-buffer.getChannelData(0).fill(0.25);
-buffer.getChannelData(1).fill(0.75);
+const left = buffer.getChannelData(0);
+const right = buffer.getChannelData(1);
+for (let frame = 0; frame < inputFrames; frame += 1) {
+  const firstHalf = frame < inputFrames / 2;
+  left[frame] = firstHalf ? 0.1 : 0.7;
+  right[frame] = firstHalf ? 0.3 : 0.9;
+}
 const source = context.createBufferSource();
 source.buffer = buffer;
 source.connect(node);
@@ -1033,7 +1433,7 @@ node.connect(context.destination);
 source.start();
 ```
 
-Before `startRendering()`, install one port handler that reconstructs each transferred chunk, collects it, and resolves a Promise for `{type:'flushed',requestId:0}`. Await rendering, post `{type:'flush',requestId:0}`, and await that acknowledgment with a 5000 ms fixture-local timeout. Return:
+Before `startRendering()`, install one port handler that accepts only `{type:'chunk',captureEpoch:0}` messages, reconstructs each transferred chunk, collects it, and resolves a Promise only for `{type:'flushed',requestId:0,captureEpoch:0}`. Await rendering, post `{type:'flush',requestId:0,captureEpoch:0}`, and await that acknowledgment with a 5000 ms fixture-local timeout. Concatenate with `const allSamples = Float32Array.from(chunks.flatMap(chunk => [...chunk]))`, compute means only in the edge-safe ranges `[64,256)` and `[384,576)`, and define `transitionFrame` as the first output sample at least `0.5`. Return:
 
 ```js
 {
@@ -1041,12 +1441,14 @@ Before `startRendering()`, install one port handler that reconstructs each trans
   contextSampleRateHz: context.sampleRate,
   chunkFrames: chunks.map(chunk => chunk.length),
   totalFrames: chunks.reduce((sum, chunk) => sum + chunk.length, 0),
-  mean: allSamples.reduce((sum, sample) => sum + sample, 0) / allSamples.length,
+  firstPlateauMean: mean(allSamples.slice(64, 256)),
+  secondPlateauMean: mean(allSamples.slice(384, 576)),
+  transitionFrame: allSamples.findIndex(sample => sample >= 0.5),
   allFinite: allSamples.every(Number.isFinite)
 }
 ```
 
-Because 640 is divisible by both the 128-frame render quantum and 320-frame chunk size, this fixture expects two normal chunks and no tail. Task 4 unit tests own the non-empty tail boundary. Constant stereo 0.25/0.75 makes expected downmix 0.5 while avoiding resampler-edge sensitivity.
+Define the local `mean(samples)` as `samples.reduce((sum, sample) => sum + sample, 0) / samples.length`. Because 640 is divisible by both the 128-frame render quantum and 320-frame chunk size, this fixture expects two normal chunks and no tail; Task 4 unit tests own the non-empty tail boundary. The stereo plateaus downmix from 0.1/0.3 to 0.2 for the first half and from 0.7/0.9 to 0.8 for the second half. Their input transitions occur at frames 320, 882, and 960 respectively, so observing each transition near output frame 320 proves that the real 16 kHz graph preserves time while adapting 16/44.1/48 kHz inputs; a constant-signal mean and frame count alone would not prove conversion.
 
 The fixture proves the pinned Chromium graph and real worklet for deterministic buffers. It does not claim getUserMedia/device/driver coverage.
 
@@ -1059,7 +1461,7 @@ Run:
 & "C:\Users\mr\AppData\Local\hermes\node\node.exe" --test test/electron-smoke.test.js
 ```
 
-Expected: both runs PASS, print `ELECTRON_SMOKE_OK`, validate all three input rates, and still prove smoke does not load real `lib/asr` or `sherpa-onnx-node`.
+Expected: both runs PASS, print `ELECTRON_SMOKE_OK`, validate both plateaus and a transition within 16 frames of output frame 320 for all three input rates, and still prove smoke does not load real `lib/asr` or `sherpa-onnx-node`.
 
 - [ ] **Step 5: Commit pinned graph evidence**
 
@@ -1099,11 +1501,11 @@ Update `docs/architecture/current.md`:
 
 - Baseline/status becomes Phase 4 / R-01 through R-04 verified.
 - Core files include `audio-capture.js`, `audio-chunk-collector.mjs`, `audio-worklet.mjs`, the collector/capture tests, and the pinned graph fixture.
-- Audio stack says the context requests `{sampleRate:16000,latencyHint:'interactive'}`, records requested/context/track rates, fails closed on non-16 kHz actual output, and relies on pinned Chromium graph adaptation.
-- Current flow says AudioWorklet downmixes available channels, collects variable quanta into 320-frame chunks, transfers Worklet-to-Renderer buffers, and emits one non-empty tail on normal stop.
-- Current stop flow says capture flush and already emitted feed Promises settle before `stopASR`; cancel/failure paths do not flush.
+- Audio stack says the context requests `{sampleRate:16000,latencyHint:'interactive'}`, records requested/context/track rates, preserves those three sanitized values on a mismatch error, fails closed on non-16 kHz actual output, and relies on pinned Chromium graph adaptation.
+- Current flow says AudioWorklet downmixes available channels, collects variable quanta into 320-frame chunks, tags port messages with a capture epoch so pause/resume rejects queued old chunks without consuming sequence, transfers Worklet-to-Renderer buffers, and emits one non-empty tail on normal stop.
+- Current stop flow says one session-scoped Promise is retained through capture flush, already emitted feed Promises, `stopASR`, final event handling, and UI cleanup; cancel/failure paths do not flush, and missing/wrong flush acknowledgments cancel rather than calling `stopASR`.
 - TD-02 and TD-03 become mitigated by the verified worklet/graph fixture. TD-04 remains open: Preload copies, invoke remains per chunk, the in-flight Promise Set is unbounded, and there is no queue/backpressure/overrun policy until R-05.
-- The 16/44.1/48 automated fixture moves out of missing-runtime evidence; real configurable-device validation stays visibly non-blocking.
+- The time-varying plateau fixture for 16/44.1/48 inputs moves out of missing-runtime evidence; its transition near 320 output frames demonstrates graph time/rate adaptation, while real configurable-device validation stays visibly non-blocking.
 
 Update `docs/architecture/target.md`:
 
@@ -1129,7 +1531,7 @@ Update `docs/requirements/requirements.md`:
 - Keep NFR-09 Partial, but remove graph fixture and collector from its missing list.
 - Keep R-05 bounded transport, execution isolation, model management, packaging, diagnostics, and platform claims unimplemented.
 
-Across all four files, preserve the internal-development policy, Paraformer default, no-dependency decision, and WASM contingency wording.
+Across all five files, preserve the internal-development policy, Paraformer default, no-dependency decision, and WASM contingency wording.
 
 - [ ] **Step 3: Run focused and full automated verification**
 
@@ -1171,9 +1573,11 @@ Review every item explicitly:
 - Final production/test/smoke code has no `createScriptProcessor` or `onaudioprocess`.
 - One AudioCapture teardown owns source/node/context/tracks and is idempotent across normal stop, cancel, Clear, setup/rate/worklet/feed failure, and replacement.
 - Session ID and input sequence remain monotonic; paused/discarded audio consumes no sequence; old session callbacks cannot affect a new tracker/session.
-- Actual context rate mismatch, worklet processor error, flush timeout, feed rejection, and command-error feed all fail the owning recording closed once.
-- Normal stop emits at most one non-empty worklet tail, drains already emitted feed Promises, then preserves R-02 final/stopped handling and transcript de-duplication.
-- Worklet has no resampler; 16/44.1/48 fixture runs inside pinned Electron; real microphone validation remains non-blocking.
+- Capture epoch advances only on actual enabled-state transitions; a queued pre-pause chunk delivered after false-to-true resume neither emits nor consumes sequence.
+- Actual context rate mismatch preserves exactly requested/context/track numeric diagnostics; mismatch, worklet processor error, missing/wrong flush acknowledgment, feed rejection, and command-error feed all fail the owning recording closed once.
+- Concurrent normal stops return one retained Promise, emit at most one non-empty worklet tail, drain that feed once, call `stopASR` once, and preserve R-02 final/stopped handling, UI cleanup, and transcript de-duplication.
+- Missing/wrong flush acknowledgment releases owned resources once, ignores a late acknowledgment, cancels once, and never calls `stopASR`.
+- Worklet has no resampler; the 16/44.1/48 time-varying fixture transitions near output frame 320 inside pinned Electron; real microphone validation remains non-blocking.
 - Preload/Main still copy/invoke, in-flight feeds are not bounded/serialized, and queue/backpressure/overrun remain R-05 debt.
 - No dependency, WASM, generic transport, execution-unit, model, corpus, release, audit, approval, or provenance machinery entered the milestone.
 - Paraformer default, named candidate tasks, and internal-development policy remain unchanged.
@@ -1188,7 +1592,7 @@ Run:
 $legacyAudio = rg -n "createScriptProcessor|onaudioprocess" src test smoke
 if ($LASTEXITCODE -eq 0) { $legacyAudio; throw "legacy ScriptProcessor path remains" }
 if ($LASTEXITCODE -ne 1) { throw "legacy audio search failed" }
-rg -n "R-03.*Completed|R-04.*Completed|D-03|R-05|Preload|invoke|有界|背压|16/44.1/48|真实.*麦克风|Paraformer|Zipformer Large|FireRedASR2|内部开发" docs/architecture/current.md docs/architecture/target.md docs/architecture/README.md docs/roadmap.md docs/requirements/requirements.md
+rg -n "R-03.*Completed|R-04.*Completed|D-03|R-05|Preload|invoke|有界|背压|capture.*epoch|requested.*context.*track|16/44.1/48|320|真实.*麦克风|Paraformer|Zipformer Large|FireRedASR2|内部开发" docs/architecture/current.md docs/architecture/target.md docs/architecture/README.md docs/roadmap.md docs/requirements/requirements.md
 git diff --check
 ```
 
