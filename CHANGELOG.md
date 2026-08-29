@@ -10,6 +10,7 @@
 
 - 建立 Windows 11 x64 Electron Forge/Squirrel 安装制品的 1.0.0→1.0.1 升级、旧完整安装器降级边界、当前版本恢复和卸载数据保留证据（基线提交 `7a26b5c`）。
 - 修复首次安装 smoke 在应用版本升级后仍查找 `app-1.0.0` 的问题（`cec6099`）。
+- 增加用户主动触发的固定白名单诊断 JSON，记录环境、active 模型、采样率、ASR 初始化耗时和错误类别，不导出用户内容（`8e559d4`）。
 - 默认产品模型保持 `paraformer-bilingual-zh-en/2024-03-10`，未改变模型选择。
 - 相关决策：[ADR-0004](docs/architecture/adr/0004-manage-models-separately.md)、[ADR-0005](docs/architecture/adr/0005-select-default-asr-model-by-benchmark.md)、[ADR-0007](docs/architecture/adr/0007-package-with-electron-forge.md)。
 
