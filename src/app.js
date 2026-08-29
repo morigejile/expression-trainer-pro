@@ -164,6 +164,7 @@ class ExpressionTrainer {
     }
 
     const audioCapture = this.audioCaptureFactory();
+    this.audioCapture = audioCapture;
     try {
       const rates = await audioCapture.start({
         sessionId,
@@ -176,7 +177,6 @@ class ExpressionTrainer {
         return;
       }
       this.lastAudioCaptureRates = rates;
-      this.audioCapture = audioCapture;
       this.audioFeedTracker = { sessionId, pending: new Set() };
     } catch (err) {
       if (ownsSession()
@@ -185,7 +185,13 @@ class ExpressionTrainer {
         this.lastAudioCaptureRates = err.audioRates;
       }
       this.audioFeedTracker = null;
-      try { await audioCapture.stop({ flush: false }); } catch {}
+      try {
+        if (this.audioCapture === audioCapture) {
+          await this.releaseAudioCapture({ flush: false });
+        } else {
+          await audioCapture.stop({ flush: false });
+        }
+      } catch {}
       const failureOwned = ownsSession();
       await this.cancelActiveAsrSession(
         sessionId,
@@ -226,6 +232,7 @@ class ExpressionTrainer {
   }
 
   pauseRecording() {
+    if (this.recordingStopOperation?.sessionId === this.asrEventState.activeSessionId) return;
     this.isPaused = true;
     this.audioCapture?.setEnabled(false);
     this.pauseStart = Date.now();
@@ -235,6 +242,7 @@ class ExpressionTrainer {
   }
 
   resumeRecording() {
+    if (this.recordingStopOperation?.sessionId === this.asrEventState.activeSessionId) return;
     this.isPaused = false;
     this.audioCapture?.setEnabled(true);
     this.pausedTime += Date.now() - this.pauseStart;
@@ -280,10 +288,12 @@ class ExpressionTrainer {
 
   handleCapturedChunk(chunk) {
     const { sessionId, sequence, samples } = chunk;
-    if (!this.isRecording
-        || this.isPaused
-        || this.asrEventState.activeSessionId !== sessionId) return Promise.resolve();
     const tracker = this.audioFeedTracker;
+    const stoppingOwned = this.recordingStopOperation?.sessionId === sessionId
+      && this.recordingStopOperation.feedTracker === tracker;
+    if (!this.isRecording
+        || (this.isPaused && !stoppingOwned)
+        || this.asrEventState.activeSessionId !== sessionId) return Promise.resolve();
     if (!tracker || tracker.sessionId !== sessionId) return Promise.resolve();
 
     let operation;
@@ -324,9 +334,12 @@ class ExpressionTrainer {
   }
 
   stopRecording() {
-    if (this.recordingStopOperation) return this.recordingStopOperation.promise;
+    const activeSessionId = this.asrEventState.activeSessionId;
+    if (this.recordingStopOperation?.sessionId === activeSessionId) {
+      return this.recordingStopOperation.promise;
+    }
     const operation = {
-      sessionId: this.asrEventState.activeSessionId,
+      sessionId: activeSessionId,
       feedTracker: this.audioFeedTracker,
       promise: null
     };

@@ -2,7 +2,22 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createAudioCapture } = require('../src/audio-capture');
 
-function createWorkletGraphFake({ contextSampleRateHz = 16000, trackSampleRateHz = 48000, throwingTrack = false } = {}) {
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
+}
+
+function createWorkletGraphFake({
+  contextSampleRateHz = 16000,
+  trackSampleRateHz = 48000,
+  throwingTrack = false,
+  addModule
+} = {}) {
   const contextOptions = [];
   const addedModules = [];
   const counts = { sourceDisconnect: 0, workletDisconnect: 0, contextClose: 0, trackStop: 0, workletConstruct: 0 };
@@ -40,7 +55,12 @@ function createWorkletGraphFake({ contextSampleRateHz = 16000, trackSampleRateHz
       contextOptions.push(options);
       this.sampleRate = contextSampleRateHz;
       this.destination = {};
-      this.audioWorklet = { async addModule(url) { addedModules.push(url); } };
+      this.audioWorklet = {
+        async addModule(url) {
+          addedModules.push(url);
+          if (addModule) return addModule(url);
+        }
+      };
     }
     createMediaStreamSource(actualStream) {
       assert.equal(actualStream, stream);
@@ -191,4 +211,28 @@ test('cancel stop does not flush and a processor error is reported once', async 
   await capture.stop({ flush: false });
   assert.deepEqual(errors, ['AudioWorklet processor failed']);
   assert.equal(graph.port.messagesFromRenderer.some(message => message.type === 'flush'), false);
+});
+
+test('stop releases an in-progress worklet setup and late module completion stays cancelled', async () => {
+  const moduleRequested = createDeferred();
+  const moduleGate = createDeferred();
+  const graph = createWorkletGraphFake({
+    addModule() {
+      moduleRequested.resolve();
+      return moduleGate.promise;
+    }
+  });
+  const capture = createAudioCapture(graph.dependencies);
+  const start = capture.start({ sessionId: 'session-a', onChunk: assert.fail, onError: assert.fail });
+  await moduleRequested.promise;
+
+  await capture.stop({ flush: false });
+  assert.equal(graph.counts.contextClose, 1);
+  assert.equal(graph.counts.trackStop, 1);
+  assert.equal(graph.counts.workletConstruct, 0);
+
+  moduleGate.resolve();
+  await assert.rejects(start, /AudioCapture stopped during setup/);
+  assert.equal(graph.counts.contextClose, 1);
+  assert.equal(graph.counts.trackStop, 1);
 });

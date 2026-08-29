@@ -1086,3 +1086,50 @@ test('tail feed failure during stop fails the owning session closed', async (t) 
   assert.equal(shownErrors.length, 1);
   assert.equal(harness.trainer.asrEventState.activeSessionId, null);
 });
+
+test('pause during normal stop cannot suppress the flushed tail chunk', async (t) => {
+  const flushStarted = createDeferred();
+  const flushGate = createDeferred();
+  const harness = await startAudioCaptureHarness(t, {
+    captureStop() {
+      flushStarted.resolve();
+      return flushGate.promise;
+    }
+  });
+
+  const stop = harness.trainer.stopRecording();
+  await flushStarted.promise;
+  harness.trainer.pauseRecording();
+  assert.equal(harness.trainer.isPaused, false);
+  await harness.handlers.onChunk({
+    sessionId: harness.sessionId,
+    sequence: 0,
+    sampleRateHz: 16000,
+    channels: 1,
+    format: 'f32',
+    frames: 17,
+    samples: new Float32Array(17)
+  });
+  flushGate.resolve();
+  await stop;
+
+  assert.equal(harness.calls.feedAudio, 1);
+  assert.equal(harness.calls.stopASR, 1);
+});
+
+test('an older session stop operation cannot mask stopping the active session', async (t) => {
+  const harness = await startAudioCaptureHarness(t);
+  const oldStop = createDeferred();
+  harness.trainer.recordingStopOperation = {
+    sessionId: 'old-session',
+    feedTracker: null,
+    promise: oldStop.promise
+  };
+
+  const activeStop = harness.trainer.stopRecording();
+  assert.notEqual(activeStop, oldStop.promise);
+  await activeStop;
+  assert.equal(harness.calls.captureStop, 1);
+  assert.equal(harness.calls.stopASR, 1);
+  oldStop.resolve();
+});

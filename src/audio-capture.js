@@ -35,6 +35,7 @@
     let pendingFlush = null;
     let stopPromise = null;
     let started = false;
+    let stopped = false;
     let errorReported = false;
 
     function reportError(error) {
@@ -147,6 +148,7 @@
 
       try {
         stream = await mediaDevices.getUserMedia({ audio: true });
+        if (stopped) throw new Error('AudioCapture stopped during setup');
         context = new AudioContextClass({ sampleRate: SAMPLE_RATE_HZ, latencyHint: 'interactive' });
         const firstTrack = stream.getAudioTracks?.()[0] ?? stream.getTracks?.()[0];
         let trackSampleRateHz = null;
@@ -167,6 +169,7 @@
         }
 
         await context.audioWorklet.addModule(workletModuleUrl);
+        if (stopped) throw new Error('AudioCapture stopped during setup');
         source = context.createMediaStreamSource(stream);
         workletNode = new AudioWorkletNodeClass(context, PROCESSOR_NAME, {
           numberOfInputs: 1,
@@ -238,7 +241,10 @@
     }
 
     function stop({ flush = false } = {}) {
-      if (!stopPromise) stopPromise = runStop(flush === true);
+      if (!stopPromise) {
+        stopped = true;
+        stopPromise = runStop(flush === true);
+      }
       return stopPromise;
     }
 
