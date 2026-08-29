@@ -1,13 +1,13 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 Smoke；内部开发/测试，BM-02/D-02 Completed，Phase 4 / R-01～R-04 Completed（保留 Paraformer 默认）
+> 状态：Verified from Source + Electron 43 Smoke；内部开发/测试，BM-02/D-03 Completed，Phase 4 / R-01～R-06 Completed（保留 Paraformer 默认）
 > 基线日期：2026-08-29
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
-> 描述对象：截至 Phase 4 / R-04；保留 Electron 43 与 T-04～T-08 行为基线
+> 描述对象：截至 Phase 4 / R-06；保留 Electron 43 与 T-04～T-08 行为基线
 
 ## 1. 证据边界
 
-本文件检查了当前源码、README、依赖清单和 Git 状态，并完成 Node 测试、自动化 Electron smoke、Electron runtime 中的 Sherpa native require 与正常非 smoke 启动。smoke 实际加载 Main、Preload、主页面和设置页，通过真实 IPC 验证 Fake ASR session/event、协调式 Fake LLM 与粘贴分析；隐藏 fixture 窗口还在真实 Electron 43 AudioWorklet/OfflineAudioContext 中验证 16/44.1/48 kHz 双声道时变输入适配到 16 kHz、320 帧分块和时序过渡。尚未连接真实麦克风、初始化/运行真实 ASR 模型或请求真实 LLM，因此固定图证据与真实设备/完整识别运行严格区分。
+本文件检查了当前源码、README、依赖清单和 Git 状态，并完成 Node 测试、自动化 Electron smoke 与 D-03 native-load spike。smoke 实际加载 Main、Preload、主页面和设置页，通过真实 utility-process IPC 验证 Fake ASR session/event、活动执行单元退出后的安全失败和下一 session 重建，并覆盖协调式 Fake LLM 与粘贴分析；隐藏 fixture 窗口还在真实 Electron 43 AudioWorklet/OfflineAudioContext 中验证 16/44.1/48 kHz 双声道时变输入适配到 16 kHz、320 帧分块和时序过渡。尚未连接真实麦克风、初始化/运行真实 Paraformer 模型或请求真实 LLM，因此隔离/固定图证据与真实设备/完整识别运行严格区分。
 
 | 标记 | 含义 |
 |---|---|
@@ -27,12 +27,15 @@ src/prompt-editor.html          自定义训练规则
 lib/asr-provider.js             initialize/start/feed/stop/cancel/dispose 契约校验
 lib/asr-session.js              单 active session、输入/事件 sequence 与规范事件
 lib/asr-ipc.js                  ASR command 校验、安全 envelope 与错误归一化
+lib/asr-process-controller.js   utility process 请求、退出、重建与有界关闭
+lib/asr-utility-process.js      独立 Provider/Sherpa 执行入口
 lib/fake-asr-provider.js        业务与 smoke 使用的 session-aware Fake Provider
 lib/asr.js                      Paraformer adapter；封装 Sherpa、模型路径和固定配置
 src/asr-event-state.js          Renderer 侧 session/sequence 过滤与失效
 src/audio-capture.js            麦克风、16 kHz context、AudioWorklet、epoch/flush 与资源生命周期
 src/audio-chunk-collector.mjs   可变量子下混、320 帧汇集和非空 tail
 src/audio-worklet.mjs           AudioWorklet port/epoch 适配层
+src/audio-feed-queue.js         10-block 串行队列、drain、overrun 与指标
 lib/lexicon.js                  本地确定性文本分析
 lib/ai-feedback.js              多 LLM 后端 fetch
 lib/prompts.js                  实时反馈/报告 prompt
@@ -69,13 +72,13 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 | 音频 | 独立 AudioCapture：`getUserMedia` + `AudioContext({sampleRate:16000,latencyHint:'interactive'})` | Renderer 只编排 session/UI；请求/context/可用 track rate 可诊断 |
 | 音频节点 | AudioWorklet + 320 帧 mono Float32 collector | capture epoch 隔离暂停前旧块；正常 stop flush tail；固定 Electron fixture 覆盖 16/44.1/48 kHz |
 | 权限桥接 | Preload `contextBridge` + `ipcRenderer.invoke` | `contextIsolation:true`、`nodeIntegration:false` |
-| ASR 引擎 | `sherpa-onnx-node` `^1.10.0` | 当前 lock 与 `node_modules` 为 1.13.3；由 Paraformer Provider 在 Main 中延迟加载 |
+| ASR 引擎 | `sherpa-onnx-node` `^1.10.0` | 当前 lock 与 `node_modules` 为 1.13.3；仅由 utility process 内的 Paraformer Provider 延迟加载，Main 不 require |
 | ASR 模型 | `sherpa-onnx-streaming-paraformer-bilingual-zh-en` | 固定目录；INT8 encoder/decoder + tokens；模型未纳入 Git |
 | 本地分析 | `lib/lexicon.js` + `data/emotion-lexicon.json` | 最大正向词表匹配；`tiered-lexicon.json` 保留为未启用候选数据，不参与运行时分析 |
 | LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接/实时/报告分别为 10/15/60 秒超时，并支持 AbortSignal、按 Renderer 取消和异常响应验证 |
 | 设置 | `userData/settings.json`、`userData/custom-prompt.json` | settings schema version 1；纯函数迁移旧扁平结构；文件同步写入且 API Key 明文 |
 | 输出 | Clipboard + Electron Save Dialog + Markdown | 原文与报告 |
-| 构建/测试 | scripts 为 `start`、`dev`、`test`、`benchmark:dry-run` | `node:test` 覆盖 Provider/Fake、ASR session/IPC/Renderer 过滤、Paraformer 固定配置与 partial/final/stop flush、词库、设置迁移、尾部文本、安全渲染、LLM 请求控制、Electron smoke 和核心 benchmark；无 build/package/CI 配置 |
+| 构建/测试 | scripts 为 `start`、`dev`、`test`、`benchmark:dry-run`、`spike:asr-boundary` | `node:test` 覆盖 Provider/Fake、ASR session/IPC/Renderer 过滤、有界队列与 process controller、Paraformer 固定配置、词库、设置、尾部文本、安全渲染、LLM、Electron smoke 和核心 benchmark；无 build/package/CI 配置 |
 
 开发工具基线固定为 Node 22.23.x/npm 12.0.x，与 Electron 内置 Node 24.18.1 明确区分。本轮只验证 Windows NT 10.0.26200.0 x64；Electron 38 起的 macOS 12+ 下限、Linux GTK/Wayland 和正式最低 Windows 版本仍没有 CI、打包配置或制品测试证明。
 
@@ -97,8 +100,9 @@ flowchart LR
   subgraph Electron[Expression Trainer / Electron]
     R[Renderer\nUI + Web Audio + 训练状态\nsrc/app.js]
     P[Preload\nwindow.api\npreload.js]
-    M[Main Process\n窗口 + 文件 + IPC + 高成本调度\nmain.js]
-    A[ASR Provider\ncontract + Paraformer adapter\nsherpa-onnx-node]
+    M[Main Process\n窗口 + 文件 + IPC Router\nmain.js]
+    C[ASR Controller\n请求关联 + 退出/重建]
+    A[Utility Process\nProvider + Paraformer\nsherpa-onnx-node]
     X[Lexicon\nlib/lexicon.js]
     F[LLM\nlib/ai-feedback.js + prompts.js]
   end
@@ -106,9 +110,11 @@ flowchart LR
   Mic --> R
   R -->|sessionId + sequence + Float32Array\n逐块 invoke| P
   P --> M
-  M --> A
+  M --> C
+  C -->|structured clone| A
   Model --> A
-  A --> M
+  A --> C
+  C --> M
   M -->|安全 envelope + 规范事件| P
   P --> R
   R -->|逐句 invoke| P
@@ -119,7 +125,7 @@ flowchart LR
   M <--> UserData
 ```
 
-Main 既是 Electron 控制面，又直接执行同步 ASR decode、词库分析、同步文件 I/O 和 LLM 请求编排。
+Main 负责 Electron 控制面、词库分析、同步文件 I/O 和 LLM 请求编排；ASR 初始化与同步 decode 已移入单个 utility process。
 
 ## 5. 模块职责
 
@@ -128,7 +134,7 @@ Main 既是 Electron 控制面，又直接执行同步 ASR decode、词库分析
 - 持有 `ExpressionTrainer` 的录音、暂停、计时、完整文本、句子和统计状态。
 - 开始时创建 UUID `sessionId`，调用 `startASR({sessionId,sampleRateHz:16000})`，成功后再请求麦克风；初始化或麦克风失败显示字幕错误并使当前 ASR session 失效。
 - 通过 `AudioCapture` 接收带 session/sequence/rate/channels/format/frames 的 320 帧或 final-tail chunk；暂停/恢复使用递增 capture epoch，旧 epoch 消息不消耗序列。
-- 每块仍以 `feedAudio({sessionId,sequence,samples})` invoke；当前只跟踪同一 session 的未完成 Promise，正常 stop 先 flush capture tail、等待 feed drain，再调用 `stopASR`。尚未加入 R-05 的有界队列、背压或专用传输。
+- 每块以 `feedAudio({sessionId,sequence,samples})` invoke 进入单发送者队列；总深度最多 10 块（200 ms），记录 peak/rejected/discarded/overrun，溢出以 `audio-overrun` 失败关闭而不静默丢音频。正常 stop 先 flush capture tail，再关闭入口并只调用一次 drain。
 - 只接受当前 `sessionId` 且 event `sequence` 严格递增的 `ready/partial/final/error/stopped`；旧 session、重复/倒序、未知或 malformed 事件不产生 UI 副作用，`stopped` 使 session 失效。
 - final 文本追加到 `fullText`，逐句做本地分析；每新增约 30 字触发一次 LLM 实时反馈。
 - 展示 partial 临时字幕；final 与粘贴字幕通过 text node 和受控 `span` token 高亮词语，不解析输入中的 HTML。
@@ -154,8 +160,8 @@ R-02 已建立 ASR session/event 状态，R-03/R-04 已把采集生命周期和 
 - 通过 `lib/settings-config.js` 规范化设置、迁移 schema；损坏的 settings JSON 回退默认配置且不自动覆盖原文件。
 - 在启动时同步加载词库。
 - 注册所有 IPC handlers。
-- 仅在显式 `--smoke-test` 参数下组合最小 Fake ASR Provider/Fake LLM、使用测试提供的临时 `userData` 并自动驱动/退出；正常启动组合 Paraformer Provider 与真实 LLM 模块。
-- `start-asr`、`feed-audio`、`stop-asr`、`cancel-asr` 通过 ASR Router 返回 `{ok:true,events:[...]}` 或不暴露底层异常的 `{ok:false,error:{code,message}}`；ASR 初始化与同步推理仍位于 Main。
+- 仅在显式 `--smoke-test` 参数下让 utility process 组合最小 Fake ASR，并在 Main 组合 Fake LLM、临时 `userData` 和自动驱动；正常启动的 utility process 组合 Paraformer Provider。
+- `start-asr`、`feed-audio`、`stop-asr`、`cancel-asr` 通过 ASR Router 与 Controller 返回安全 envelope；Main 不加载 `lib/asr.js` 或 Sherpa。执行单元退出会拒绝 pending 命令，下一次 start 重新创建；应用退出最多等待 5 秒 dispose 后强杀。
 - `analyze-text` 在 Main 中执行本地分析。
 - `get-realtime-feedback`、`get-final-report` 和连接测试在 Main 中发起受超时约束的 fetch；同一 Renderer 的同类新请求会取消旧请求，显式取消可终止该 Renderer 的全部 LLM 请求。
 - `save-file` 通过系统对话框把 Markdown 写到用户选择的位置。
@@ -164,7 +170,7 @@ R-02 已建立 ASR session/event 状态，R-03/R-04 已把采集生命周期和 
 
 ### 5.4 ASR Provider / `lib/asr-provider.js`、`lib/asr-session.js`、`lib/asr.js`
 
-R-01/R-02 后，Main 只持有通过 `initialize/start/feed/stop/cancel/dispose` 契约校验的 Provider。`lib/asr-session.js` 在 Paraformer adapter 外维护单一 active session：start 创建 session 并发出 `ready`，feed 验证连续 input sequence 并发出 `partial/final/error`，stop flush 后发出可选 `final` 和必有 `stopped`，cancel 不 flush 且发出 `stopped`；旧 session 的 feed/stop/cancel 返回空事件，dispose 可重复调用并使 Provider 不可再启动。生产 `createParaformerAsrProvider()` 仍只支持一个并发识别流。Sherpa 对象、模型路径和以下固定配置均留在 Paraformer adapter 内：
+R-06 后，Main 只持有同一 Provider 契约形状的 `AsrProcessController`；实际 session wrapper、Paraformer adapter、Sherpa 对象和模型均位于 utility process。`lib/asr-session.js` 维护单一 active session：start 创建 session 并发出 `ready`，feed 验证连续 input sequence 并发出 `partial/final/error`，stop flush 后发出可选 `final` 和必有 `stopped`，cancel 不 flush 且发出 `stopped`。生产 `createParaformerAsrProvider()` 仍只支持一个并发识别流，其固定配置包括：
 
 - 模型目录 `models/sherpa-onnx-streaming-paraformer-bilingual-zh-en`；
 - `encoder.int8.onnx`、`decoder.int8.onnx`、`tokens.txt`；
@@ -237,6 +243,7 @@ getUserMedia({audio:true})
 → Preload 规范为 Float32Array
 → ipcRenderer.invoke('feed-audio')
 → Main ASR command 校验
+→ AsrProcessController / utility process structured clone
 → stream.acceptWaveform({samples,sampleRate:16000})
 → synchronous decode/getResult/isEndpoint
 → {ok:true,events:[partial/final]}
@@ -245,15 +252,15 @@ getUserMedia({audio:true})
 
 AudioCapture 返回并保留请求值、`audioContext.sampleRate` 与可用的 track rate；实际 context 不是 16000 时在创建 worklet 前失败关闭。固定 Electron fixture 已证明 16/44.1/48 kHz 确定性缓冲进入 16 kHz graph 后的总帧数、平台均值与时间过渡；真实麦克风/驱动仍为 Runtime-TBD。
 
-每个 320 样本块仍会在 Preload 规范为新的 TypedArray，并采用 request/response IPC。Renderer 只追踪未完成 feed 以保证 stop drain，没有容量限制、transferable 专用通道、背压或丢块指标。
+每个 320 样本块仍会在 Preload 规范为新的 TypedArray，并经 request/response IPC 与 utility-process structured clone 复制。D-03 证明该小块复制有充足空载吞吐，因此当前不增加共享内存；Renderer 队列严格限制 10 块并暴露 overrun/discarded/peak 指标。
 
 ### 6.2 结束与尾部文本
 
 ```text
-Renderer 请求 AudioCapture flush，等待非空 tail chunk 与所有 feed Promise
+Renderer 请求 AudioCapture flush，关闭队列入口并 drain 已接受 chunk
 → stopASR({sessionId}) / stop-asr
 → stream.inputFinished + decode
-→ Main 返回可选 final + stopped 事件
+→ utility process 返回可选 final + stopped 事件
 → Renderer 过滤当前 session/sequence，并经 mergeFinalText 去重 final
 → 非空新文本进入字幕、统计、分析和报告
 ```
@@ -298,11 +305,11 @@ Settings/Prompt Renderer
 
 | ID | 风险 | 影响 | 证据 | 推荐验证/处理 |
 |---|---|---|---|---|
-| TD-01 | ASR 在 Main 同步初始化/decode | Main 控制面阻塞；native 故障影响应用 | 源码确认 | event-loop 指标、故障注入后移出 Main |
+| TD-01 | **R-06 已关闭结构风险**：ASR 初始化/decode 位于 utility process | Main 不加载 native addon；Fake smoke 覆盖退出报告和重建 | Controller tests、Electron smoke、D-03 spike | 真实 Paraformer 高负载下补量化响应数据 |
 | TD-02 | **R-04 已关闭**：`ScriptProcessorNode` 已由 AudioWorklet/320 帧 collector 替换 | 废弃节点不再存在于生产/测试/smoke 路径 | 源码、collector tests、Electron smoke | 保留回归；不增加 fallback |
 | TD-03 | **R-04 已缓解**：请求/context/track rate 可诊断，固定 Electron graph 已覆盖 16/44.1/48 kHz | 确定性图适配已有证据；真实麦克风/驱动差异仍未知 | AudioCapture tests 与 Electron graph fixture | 真实可配置设备作为非阻塞 follow-up；实测失败才评估 WASM 备选 |
-| TD-04 | 每块 TypedArray 规范化 + invoke | 复制、GC、IPC 延迟 | 源码确认 | R-05 在 D-03 后按 profile 选择 transferable/MessagePort/有界流 |
-| TD-05 | **R-01/R-02 已缓解**：Main 依赖 session-aware ASR Provider，Sherpa/Paraformer 路径和参数封装在 adapter；单实例/单 stream 仍保留 | 当前模型和 session/event 行为可独立测试，业务不接触 Sherpa；Main 阻塞和执行单元恢复仍待后续 | Provider/session/IPC/Renderer 测试与 Electron smoke | R-06 在 R-05/D-03 后处理执行边界 |
+| TD-04 | **R-05 已缓解**：逐块 TypedArray/invoke/structured-clone 仍复制，但队列为 10 块且可观测 | 不再无限增长或静默丢音频；复制成本仍需真实推理 profile | Queue/Renderer tests 与 D-03 spike | 只有真实 profile 证明必要时再换通道 |
+| TD-05 | **R-06 已关闭当前边界**：Main 只持有 Controller，Provider/Sherpa/模型在 utility process | 退出可见、下一 start 重建；单实例/单 stream 符合当前产品 | Controller tests 与 Electron smoke | Forge 和真实模型路径分别在 PKG-02/R-06 follow-up 验证 |
 | TD-06 | 模型完全手工管理 | 首次安装、升级、校验和支持成本高 | README/models 确认 | Model Manager + hash + 原子安装 |
 | TD-07 | **T-04/R-02/R-04 已缓解**：stop 单飞执行 worklet tail flush、feed drain、ASR final 与分析；旧 session、迟到/倒序事件和清空/重启竞态受过滤 | 尾部语音进入字幕、统计、分析和报告；完整训练阶段状态机仍未建立 | AudioCapture、ASR event state 与 transcript 竞态回归测试 | 后续只在实际状态复杂度需要时收敛状态机 |
 | TD-08 | 已有 Node 测试和 Electron 自动化 smoke，但无 CI 和打包脚本 | 已可发现启动、页面、Preload/IPC、ASR session/event、设置窗口和粘贴分析回归；仍无法证明真实模型/麦克风、跨平台或发布制品可用 | 集成测试基线、仓库配置 | 后续接真实设备/模型验收、CI 与 Forge，并在目标平台运行 smoke |
@@ -329,10 +336,10 @@ Settings/Prompt Renderer
 
 ### 应降低的偶然复杂度
 
-- Audio 逐块 invoke、重复 TypedArray 规范化与无界未完成 feed；
-- ASR 具体模型、全局状态和 Main 生命周期耦合；
+- Audio 逐块 invoke、TypedArray 规范化与跨进程 structured-clone 复制；
+- 真实模型路径/性能与 utility-process 制品打包尚未闭环；
 - 用户手工模型管理；
-- Audio 传输仍逐块 invoke，非 ASR IPC/完整训练状态仍缺少统一边界；
+- 非 ASR IPC 与完整训练状态仍缺少同等级边界；
 - 安全编码、密钥、超时和输入验证不足；
 - 构建、测试、打包、升级和支持矩阵不可复现。
 
@@ -342,7 +349,7 @@ Settings/Prompt Renderer
 
 1. 在显式清空 npm 与 Electron 下载缓存的独立环境复跑 Electron 43 首次 CLI 下载；当前首次 43.4.1 下载和后续校验缓存恢复均成功。
 2. 验证当前模型下载源、大小、hash、许可证和三个文件的兼容性。
-3. 自动 Electron smoke 已覆盖 BrowserWindow、17 项 Preload API、设置页、Fake ASR 的 session/event 与 stale feed、Fake LLM、粘贴分析以及 16/44.1/48 kHz graph fixture，并确认 smoke 不加载真实 Sherpa；正常非 smoke 入口已在 Windows x64 保持 5 秒存活并加载真实 Sherpa 模块。真实设置文件持久化、报告保存对话框、真实模型/麦克风和人工交互仍需运行验证。
+3. 自动 Electron smoke 已覆盖 BrowserWindow、17 项 Preload API、设置页、utility-process Fake ASR 的 session/event、stale feed、强制退出报告与重建、Fake LLM、粘贴分析以及 16/44.1/48 kHz graph fixture，并确认 Main 不加载真实 Sherpa。D-03 只验证 native addon 可在 utility process 加载；真实 Paraformer 模型循环、设置持久化、报告保存对话框、麦克风和人工交互仍需运行验证。
 4. 以真实可配置的 16/44.1/48 kHz 麦克风/驱动复核已记录的请求、context 与 track rate；该项为非阻塞 follow-up。
 5. profile TD-01～TD-04 的 Main 延迟、GC、CPU、RAM 和队列。
 6. 在目标 macOS/Linux/Windows 版本验证安装与运行；在证据前继续保持 TBD，不作支持承诺。

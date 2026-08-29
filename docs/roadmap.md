@@ -2,7 +2,7 @@
 
 > 状态：Active execution baseline
 > 更新日期：2026-08-29
-> 当前进度：Phase 0-2、D-01～D-03 与 R-01～R-04 已完成；D-04 未完成；下一主线为 R-05 有界音频传输
+> 当前进度：Phase 0-2、D-01～D-03 与 R-01～R-06 已完成；D-04 未完成；下一主线为 Zipformer Large / FireRedASR2 最小集成
 > 当前模式：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞后续工作；只有它们使当前技术实验无法运行或结论失效时，才阻塞当前路径。
 
 ## 1. 目标与排序原则
@@ -60,7 +60,7 @@ flowchart LR
 | Phase 1 — T-01～T-08 | 核心测试、设置迁移、stop final、安全渲染、LLM 控制、Electron smoke、Electron 43 升级 | `test/`、[当前架构](architecture/current.md) |
 | Phase 2 — BM-01/BM-02/BM-04～BM-06 | 100 条冻结 FLEURS 数据、可复跑 harness、三候选同机比较 | [数据集来源](../benchmark/datasets/SOURCES.md)、[Harness](benchmark/harness.md)、[比较结果](benchmark/bm02-comparison-2026-08-27.md) |
 | Phase 3 — D-01/D-02 | 冻结比较规则；ADR-0005 接受继续使用 Paraformer 默认 | [ADR-0005](architecture/adr/0005-select-default-asr-model-by-benchmark.md) |
-| Phase 4 — R-01～R-04 | Main 通过轻量 Provider 使用 Paraformer；session/event 与安全 IPC envelope 已建立；AudioCapture 已独立，AudioWorklet 输出 320 帧单声道 Float32 chunk，并由固定 Electron OfflineAudioContext/AudioBufferSource fixture 验证确定性 16/44.1/48 kHz 缓冲适配到 16 kHz | [当前架构](architecture/current.md) |
+| Phase 4 — R-01～R-06 | session/event 与安全 IPC envelope 已建立；AudioCapture/AudioWorklet 输出 320 帧单声道 Float32 chunk；Renderer 使用 10-block 串行队列且 overrun 失败关闭；Main 通过 Controller 路由到单个 ASR utility process，真实 Electron smoke 覆盖退出报告与重建 | [当前架构](architecture/current.md) |
 
 补充边界：
 
@@ -84,13 +84,13 @@ flowchart LR
 | R-02 | P0 | 建 session/事件协议（Completed） | 统一 ready/partial/final/error/stopped，加入 sessionId、sequence、cancel 和 dispose 语义 | R-01,T-04 | 旧 session 事件不污染新训练；stop 可重复调用；迟到事件受控 |
 | R-03 | P0 | 分离 AudioCapture（Completed） | 权限、track/context/node 生命周期、chunk 元数据与幂等释放已从 UI 状态抽出 | R-02；BM-03 仅作历史输入 | Audio 输出明确 sampleRate/channels/format；生命周期测试通过 |
 | R-04 | P0 | AudioWorklet + Chromium 图适配（Completed） | 请求 `AudioContext({sampleRate:16000,latencyHint:'interactive'})` 并记录请求值、实际 context rate 与可用的 track rate；worklet 下混并汇集 320 帧单声道 Float32 chunk，停止时 flush 非空 tail；ScriptProcessor 已移除 | R-03 | 固定 Electron OfflineAudioContext/AudioBufferSource fixture、epoch、tail flush、停止单飞与失败关闭测试通过；真实 MediaStream 麦克风/驱动验证保留为非阻塞 follow-up |
-| R-05 | P0 | 改音频传输与背压 | 传 TypedArray/transferable buffer，使用已选通道和有界队列，记录 dropped/backpressure | R-04,D-03 | profile 证明队列不无限增长；序列连续性可观测 |
-| R-06 | P0 | ASR 移出 Main | 按 ADR-0006 实现独立执行单元；Main 只管理生命周期、路由和退出 | R-02,R-05,D-03 | 强制退出可恢复；Main/UI 响应满足已定义门槛 |
+| R-05 | P0 | 改音频传输与背压（Completed） | 320-frame TypedArray 由单发送者按序发送；总深度最多 10 块，记录 accepted/completed/rejected/discarded/overrun/peak，溢出以 `audio-overrun` 终止 session | R-04,D-03 | 队列与 Renderer 测试证明不会无限增长或静默丢音频；D-03 已接受当前小块 structured-clone copy |
+| R-06 | P0 | ASR 移出 Main（Completed） | 单个 utility process 持有 Provider/Sherpa；Main Controller 关联请求、检测退出、下一 start 重建并以 5 秒上限完成 quit dispose | R-02,R-05,D-03 | Controller 测试与真实 Electron Fake smoke 覆盖强制退出、安全失败、重建和有界关闭；真实模型负载留作非阻塞环境验证 |
 | R-07 | P1 | 实现轻量 Model Manager | 版本化 registry、HTTPS、SHA-256、临时下载/解压、原子激活和上一版本回退；模型放 userData 子目录 | D-02,R-01 | 中断、hash 错或空间不足不破坏现有模型 |
 | R-08 | P1 | 激活版本化默认模型 | 用 registry 激活 ADR-0005 接受的 Paraformer；不增加普通用户多模型选择 | R-06,R-07,D-02 | 端到端模型文件/config 与 ADR-0005 一致 |
 | R-09 | P1 | 收敛设置/规则/日志 | 演进 schemaVersion、原子写和脱敏日志；凭据库仅在收益超过 native 成本时采用 | T-03,R-07 | 升级保留配置；日志不含 Key 或完整敏感文本 |
 
-当前关键路径是 `R-05 → R-06`；D-03 已通过 spike 选择单个 Electron utility process。下一步先把 Renderer 音频发送收敛为 10-block 有界队列，再把 Provider/native 推理移出 Main；R-07 可独立准备但不阻塞关键路径。
+R-01～R-06 的 Audio/ASR 主链已可运行。下一步按已重开范围完成 `C-01 Zipformer Large CTC INT8 → C-02 FireRedASR2 CTC INT8` 最小集成，再继续 R-07～R-09；Paraformer 默认不变。
 
 ### 5.1 内部 benchmark 候选（不改变产品默认）
 
