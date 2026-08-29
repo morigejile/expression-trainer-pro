@@ -66,8 +66,8 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 |---|---|---|---|
 | FR-P05 | Existing | 应提供轻量 Model Manager。 | R-07/R-08 已实现独立清单、HTTPS 下载、archive/runtime SHA-256、白名单解压、安装锁、原子发布/激活，并把 active/default 路径接入生产 Provider；回退版本先通过 native 初始化才切换指针。 |
 | FR-P06 | Existing | 模型与应用版本应解耦。 | 产品清单包含 model ID、version、engine、languages、mode、采样率、兼容应用版本、archive/runtime 来源与 hash；安装目录按 model/version 不可变。 |
-| FR-P08 | Planned | 应用应能生成普通用户可安装的桌面制品。 | 当前无 Forge 配置；目标为通过 Electron Forge 生成目标平台制品，终端用户无需安装 Node.js、Python、CMake 或编译器。 |
-| FR-P09 | Partial | 设置、用户数据、模型、缓存和日志应与程序文件分离。 | 设置与版本化模型已在 Electron `userData`；缓存、日志及安装制品升级/重装保护仍未完整验证。 |
+| FR-P08 | Existing | 应用应能生成普通用户可安装的桌面制品。 | Electron Forge/Squirrel 已生成 Windows x64 Setup/nupkg/RELEASES；PKG-03/PKG-04 证明安装、启动、真实模型、升级与卸载路径不要求终端用户安装 Node.js、Python、CMake 或编译器。公开发布仍需签名与目标环境证据。 |
+| FR-P09 | Existing | 设置、用户数据、模型、缓存和日志应与程序文件分离。 | 设置与版本化模型位于 Electron `userData`；PKG-04 已验证应用升级、手工旧安装器降级、恢复当前版本及卸载均不静默删除这些数据。日志与模型资产缓存仍按各自开发/运行目录管理。 |
 | FR-P10 | Existing | 本地训练在 LLM 不可用时仍应工作。 | 离线、无 API Key 或 LLM 请求失败时，录音、本地 ASR 和基础词库分析仍可完成。 |
 
 ## 5. 非功能需求（NFR）
@@ -84,7 +84,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | NFR-08 | Existing | 权限隔离 | Renderer 不获得不受限的 Node.js 权限；当前 BrowserWindow 使用 `contextIsolation: true`、`nodeIntegration: false`，Preload 只暴露显式能力。后续新增 IPC 时继续维持该边界。 |
 | NFR-09 | Partial | 可测试性 | 词库/共享规则、设置与自定义规则迁移/原子写、Provider、ASR session/IPC/Renderer 过滤、AudioCapture/collector、有界队列、process controller、Model Manager 和 Electron 16/44.1/48 kHz graph fixture 已有测试；packaged 真实模型 smoke 已补齐，真实麦克风仍待环境验证。 |
 | NFR-10 | Partial | 可移植性 | 首个 Tier 1 目标选定 Windows 11 25H2+ x64；Windows ARM64、macOS、Linux 保持 Experimental，只有对应 package/smoke/native-model 证据才能升级支持等级。 |
-| NFR-11 | Partial | 可升级性 | 设置/自定义规则已有 schemaVersion、旧配置迁移、未来 schema 防降级覆盖与原子写；模型具备不可变版本目录、原子 active pointer 和上一版本回退，PKG 阶段仍需验证安装制品升级。自动更新服务不属于首个基线。 |
+| NFR-11 | Existing | 可升级性 | 设置/自定义规则已有 schemaVersion、旧配置迁移、未来 schema 防降级覆盖与原子写；模型具备不可变版本目录、原子 active pointer 和上一版本回退。PKG-04 已验证 1.0.0→1.0.1 安装制品升级与卸载保留 userData；旧完整 Setup 仍可降级二进制，重装当前 Setup 可恢复。自动更新服务不属于首个基线。 |
 | NFR-12 | Partial | 可观测性 | 当前生产日志仅含固定状态或受控错误，不记录密钥/完整文本；OPS-05 仍需补齐可导出的 app/OS/arch、模型、sample rate、初始化时间和错误类别诊断。 |
 
 ## 6. 约束
@@ -110,7 +110,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | AC-05 | LLM 降级 | 无 Key、超时、限流或服务错误时显示可操作错误，本地训练结果仍保留。 |
 | AC-06 | ASR 隔离 | Fake ASR 的真实 utility-process 退出已能安全报告并在下一 start 重建；真实模型初始化/识别高负载下的 Main/UI 响应仍在有模型环境验收。 |
 | AC-07 | 模型完整性 | 下载被中断或校验失败时不激活损坏模型，也不覆盖上一可用模型。 |
-| AC-08 | 升级保护 | 升级应用后设置和已下载模型仍可用，或通过明确迁移恢复；不得静默丢失。 |
+| AC-08 | 升级保护 | PKG-04 已证明 1.0.0→1.0.1 升级及卸载后设置、自定义规则和外部模型目录仍在；旧完整 Setup 的二进制降级行为及当前版本恢复路径已有文档。 |
 | AC-09 | 模型选型 | benchmark 原始结果、环境和汇总可复跑；ADR 只依据实测数据形成 Accepted 结论。 |
 
 ## 8. Out of Scope
@@ -125,13 +125,13 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 
 ## 9. 待确认事项
 
-1. 当前 `package.json` 为应用 `1.0.0`、Electron `43.4.1` 与 sherpa-onnx-node `1.13.3`（均为精确版本），开发基线为 Node 22.23.0/npm 12.0.2。Electron runtime 实测为 Node 24.18.1、Chromium 150.0.7871.224、modules ABI 148；显式清空所有 npm/Electron 缓存后的复跑仍为非阻塞 Runtime-TBD。
-2. PKG-01 已选择 Windows 11 25H2+ x64 作为首个 Tier 1 目标；PKG-03 已形成未签名内部制品的安装、真实模型和离线二次启动证据，正式支持仍需 PKG-04 升级/卸载及对应环境证据，其他平台保持 Experimental。
+1. 当前 `package.json` 为应用 `1.0.1`、Electron `43.4.1` 与 sherpa-onnx-node `1.13.3`（均为精确版本），开发基线为 Node 22.23.0/npm 12.0.2。Electron runtime 实测为 Node 24.18.1、Chromium 150.0.7871.224、modules ABI 148；显式清空所有 npm/Electron 缓存后的复跑仍为非阻塞 Runtime-TBD。
+2. PKG-01 已选择 Windows 11 25H2+ x64 作为首个 Tier 1 目标；PKG-03/PKG-04 已形成未签名内部制品的安装、真实模型、离线二次启动、升级和卸载数据保留证据，正式支持仍需签名、真实设备及对应环境证据，其他平台保持 Experimental。
 3. Paraformer 的版本、运行文件 hash 与大小已记录；模型再分发许可证仍待发布前确认。
 4. 词库计数/密度是否属于产品认可的评分定义；训练历史目前不持久化，是否需要持久化待产品决定。
 5. 4-core/8-GB/3-GB 资格线上的真实录音、RTF、峰值 RAM 与 UI 响应预算。
 6. 模型与 LLM 服务的许可证、分发与隐私告知要求。
-7. 生产依赖 audit 为 0；Forge 7.5/Squirrel 的仅开发传递依赖仍有 19 high/1 critical，留给 OPS-03 在保持 registry-only 安装与 package smoke 的前提下受控升级。真实模型/麦克风、macOS/Linux 和安装升级仍需后续验收。
+7. 生产依赖 audit 为 0；Forge 7.5/Squirrel 的仅开发传递依赖仍有 19 high/1 critical，留给 OPS-03 在保持 registry-only 安装与 package smoke 的前提下受控升级。真实麦克风、接近资格线设备、macOS/Linux 和签名仍需后续验收。
 
 ## 10. 追踪关系
 

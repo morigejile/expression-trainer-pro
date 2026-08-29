@@ -2,7 +2,7 @@
 
 > 状态：Active execution baseline
 > 更新日期：2026-08-29
-> 当前进度：Phase 0-2、D-01～D-04、R-01～R-09、PKG-01～PKG-03 与 C-01/C-02 最小集成已完成；下一主线为 PKG-04 升级/卸载闭环
+> 当前进度：Phase 0-2、D-01～D-04、R-01～R-09、PKG-01～PKG-04 与 C-01/C-02 最小集成已完成；下一主线为候选模型资产缓存与 Phase 6 长期维护
 > 当前模式：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞后续工作；只有它们使当前技术实验无法运行或结论失效时，才阻塞当前路径。
 
 ## 1. 目标与排序原则
@@ -61,7 +61,7 @@ flowchart LR
 | Phase 2 — BM-01/BM-02/BM-04～BM-06 | 100 条冻结 FLEURS 数据、可复跑 harness、三候选同机比较 | [数据集来源](../benchmark/datasets/SOURCES.md)、[Harness](benchmark/harness.md)、[比较结果](benchmark/bm02-comparison-2026-08-27.md) |
 | Phase 3 — D-01/D-02 | 冻结比较规则；ADR-0005 接受继续使用 Paraformer 默认 | [ADR-0005](architecture/adr/0005-select-default-asr-model-by-benchmark.md) |
 | Phase 4 — R-01～R-09 | session/event、安全 IPC、AudioCapture/AudioWorklet、有界传输与 utility process 已建立；版本化 Paraformer 安全激活/回退；settings/custom rules 原子持久化、future-schema 防降级、共享规则与当前日志脱敏边界完成 | [当前架构](architecture/current.md) |
-| Phase 5 — PKG-01～PKG-03 | Windows 11 25H2+ x64 Tier 1 目标；Forge/Squirrel package/make、完整 Sherpa Windows native bundle ASAR unpack、packaged Fake/native-load smoke；静默安装、真实 Paraformer 首次准备和强制离线二次启动 | [支持矩阵](support-matrix.md)、[ADR-0007](architecture/adr/0007-package-with-electron-forge.md) |
+| Phase 5 — PKG-01～PKG-04 | Windows 11 25H2+ x64 Tier 1 目标；Forge/Squirrel package/make、完整 Sherpa Windows native bundle ASAR unpack、packaged Fake/native-load smoke；静默安装、真实 Paraformer 首次准备、强制离线二次启动、1.0.0→1.0.1 升级及卸载数据保留 | [支持矩阵](support-matrix.md)、[ADR-0007](architecture/adr/0007-package-with-electron-forge.md) |
 
 补充边界：
 
@@ -91,7 +91,7 @@ flowchart LR
 | R-08 | P1 | 激活版本化默认模型（Completed） | utility process 从 `userData/models` 解析或安装 registry 默认 Paraformer；使用 role→绝对路径配置，native 初始化成功后才原子激活；当前版本损坏或加载失败时只探测并切换一次上一版本 | R-06,R-07,D-02 | 聚焦测试覆盖首次安装、single-flight、取消、role config、激活时序、损坏 active 与失败回退；PKG-03 已完成 packaged 真实模型初始化与离线二次启动 |
 | R-09 | P1 | 收敛设置/规则/日志（Completed） | settings 与 custom-prompt 使用同盘临时文件 + fsync + rename 原子写；旧 schema 自动迁移，未来 schema 只兼容读取而不降级覆盖；字幕与本地分析共用唯一规则源，customWords 作为有界 filler 生效；现有错误日志维持脱敏边界，不引入 keychain/native 依赖 | T-03,R-07 | 聚焦测试覆盖旧/当前/未来 schema、发布失败保留旧文件、规则同源、自定义 filler 与错误脱敏；API Key 明文和可导出诊断留给发布前权衡/OPS-05 |
 
-R-01～R-09、D-03/D-04、PKG-01～PKG-03 与 C-01/C-02 已完成当前最小边界。下一步验证 Windows x64 升级/卸载与数据保留策略；Paraformer 默认不变。
+R-01～R-09、D-03/D-04、PKG-01～PKG-04 与 C-01/C-02 已完成当前最小边界。下一步提前缓存两个具名候选资产并进入 Phase 6；Paraformer 默认不变。
 
 ### 5.1 内部 benchmark 候选（不改变产品默认）
 
@@ -109,7 +109,7 @@ Paraformer 继续是产品默认。上述候选仅用于内部技术验证和 be
 | PKG-01 | P0 | 选 Tier 1 平台（Completed） | 首个目标固定 Windows 11 25H2+ x64；Windows ARM64/macOS/Linux 为 Experimental；4-core/8-GB/3-GB 硬件线留给 PKG-03 实测，不冒充已证明性能 | D-02 | `docs/support-matrix.md` 明确平台、OS/arch、硬件资格线与提升条件 |
 | PKG-02 | P0 | 接入 Electron Forge（Completed） | Forge 7.5 + Squirrel 集中配置；Windows x64 整个 `sherpa-onnx-win-x64` 包在 ASAR 外，模型仍在 `userData`；packaged smoke 分别验证 Fake 产品流和 utility-only Sherpa native load | R-06,R-07,PKG-01 | 干净 `npm ci → make` 成功；生成 Setup/nupkg/RELEASES，package smoke 成功且不下载模型 |
 | PKG-03 | P0 | 首次安装闭环（Completed） | Squirrel 静默安装后由 packaged utility 下载固定 1,047,319,737-byte Paraformer archive，执行大小/SHA、系统 `tar` 白名单解包、runtime 校验和 native 初始化；流中断在同次安装内用严格 206/Content-Range 有限续传；同一模型目录强制断网二次启动 | PKG-02,R-08 | 当前高配 Windows 11 x64 开发机实测安装 12.798 s、在线首次闭环 563.664 s、离线二次启动 3.672 s；普通用户无需 Node、Python 或编译器；接近资格线设备仍为非阻塞 follow-up |
-| PKG-04 | P0 | 升级/卸载验证 | 覆盖安装、升级、降级限制和卸载后数据策略 | PKG-03,R-09 | 升级不静默丢设置/模型；行为有文档 |
+| PKG-04 | P0 | 升级/卸载验证（Completed） | 以 1.0.0 安装器建立数据后升级到 1.0.1，验证 settings/custom prompt/外部模型目录逐字节保留；Squirrel 卸载保留 userData。手工运行旧完整 Setup 会将应用二进制降级，重新运行当前 Setup 可恢复 1.0.1，此边界不追溯改造旧安装器 | PKG-03,R-09 | 升级与卸载不静默丢用户数据；旧完整安装器的降级行为和恢复路径有文档 |
 | PKG-05 | P1 | 签名与发布 | 按平台启用代码签名/公证、checksums 和 release notes；无凭据时明确阻塞 | PKG-03 | 用户可验证来源和制品完整性 |
 | PKG-06 | P1 | 扩展支持矩阵 | 在对应 OS 构建并执行 install/smoke，逐个平台提升支持等级 | PKG-03 | 每个声称支持的平台都有 CI 或人工证据 |
 
@@ -132,7 +132,7 @@ Paraformer 继续是产品默认。上述候选仅用于内部技术验证和 be
 | M1 可安全修改 | Completed | T-01～T-08 | 核心契约有测试，高风险缺陷受控 |
 | M2 选型有证据 | Completed | BM-01、BM-02、BM-04～BM-06、D-01、D-02 | 三候选结果和 Accepted 模型 ADR |
 | M3 架构收敛 | Completed | R-01～R-09、D-03/D-04 | Audio/ASR/模型分离，Main 不推理，模型升级可回退 |
-| M4 可安装发布 | In Progress | PKG-01～PKG-06（PKG-01～PKG-03 Completed） | Tier 1 安装/升级闭环 |
+| M4 可安装发布 | In Progress | PKG-01～PKG-06（PKG-01～PKG-04 Completed；PKG-05/PKG-06 为外部发布跟进） | Windows x64 内部安装/升级闭环已完成；公开发布仍需签名与对应平台证据 |
 | M5 可长期维护 | Planned | OPS-01～OPS-06 | CI、版本、依赖、模型和诊断机制稳定 |
 
 ## 9. 明确不做

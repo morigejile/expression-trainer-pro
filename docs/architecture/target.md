@@ -340,7 +340,7 @@ ADR-0005 已接受保留 Paraformer 为默认模型。当前仅为内部开发/�
 - [x] ASR 不在 Main 内执行，Fake 执行单元退出可报告且下一 start 可重建；真实模型负载 follow-up 已记录；
 - [x] 模型可校验安装且失败不破坏上一版本；真实 1 GB 下载/native-load 与 Forge 路径 follow-up 已记录；
 - [x] 默认模型由可复跑 benchmark 和 Accepted ADR 支持；
-- [ ] 安装/升级保留设置与模型；
+- [x] 安装/升级保留设置与模型；PKG-04 已记录旧完整 Setup 可降级二进制及当前 Setup 恢复路径；
 - [x] `current.md` 已按实际实现更新。
 
 ## 12. 未决问题
