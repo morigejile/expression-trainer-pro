@@ -19,8 +19,8 @@ ADR 记录“为什么”，架构文档记录“是什么”。ADR 一旦 Accep
 | [0003](0003-separate-audio-and-asr.md) | 分离 Audio 与 ASR，使用轻量 Provider 契约 | Accepted | R-01～R-06 已完成契约、Fake、Audio 与 utility-process 边界 |
 | [0004](0004-manage-models-separately.md) | 模型与应用解耦，由 Model Manager 管理 | Accepted | R-07/R-08 已完成下载、校验、原子激活与安全回退；发布许可仍待办 |
 | [0005](0005-select-default-asr-model-by-benchmark.md) | 通过 benchmark 选择默认中文 ASR 模型 | Accepted | 保留 Paraformer 默认；utterance UX、目标平台或许可变化时复审 |
-| [0006](0006-move-asr-out-of-main.md) | 将 ASR 初始化与推理移出 Electron Main | Accepted | 采用单个 utility process；R-06 验证真实模型循环，PKG-02 验证制品路径 |
-| [0007](0007-package-with-electron-forge.md) | 使用 Electron Forge 形成发布制品 | Proposed | Tier 1 平台安装/升级/卸载验证 |
+| [0006](0006-move-asr-out-of-main.md) | 将 ASR 初始化与推理移出 Electron Main | Accepted | utility process 与 packaged native 路径已验证；PKG-03 补真实模型循环 |
+| [0007](0007-package-with-electron-forge.md) | 使用 Electron Forge 形成发布制品 | Accepted | PKG-02 已闭环 package/make；安装/升级继续由 PKG-03/PKG-04 验证 |
 | [0008](0008-keep-benchmark-as-isolated-non-shipping-tool.md) | 将 Benchmark 保留为同仓库隔离的非发布开发工具 | Accepted | 核心 harness 保留；已完成的数据制作/review 流程归档；产品运行时不得依赖 `benchmark/` |
 
 ## 编号与模板

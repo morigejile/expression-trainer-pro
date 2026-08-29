@@ -19,7 +19,12 @@ const {
 const { createAsrIpcRouter } = require('./lib/asr-ipc');
 const { createAsrProcessController } = require('./lib/asr-process-controller');
 
+const isSquirrelStartup = require('electron-squirrel-startup');
+if (isSquirrelStartup) app.quit();
+
 const isSmokeTest = process.argv.includes('--smoke-test');
+const isNativeAddonSmokeTest = process.argv.includes('--native-addon-smoke-test');
+if (isNativeAddonSmokeTest) app.disableHardwareAcceleration();
 const smokeTest = isSmokeTest ? require('./smoke/electron-smoke-runner') : null;
 const asrProvider = createAsrProcessController({
   spawn: () => {
@@ -47,6 +52,13 @@ const {
 if (smokeTest) {
   smokeTest.configureApp(app);
 }
+if (isNativeAddonSmokeTest) {
+  const userDataPath = process.env.EXPRESSION_TRAINER_SMOKE_USER_DATA;
+  if (!userDataPath || !path.isAbsolute(userDataPath)) {
+    throw new Error('Native smoke mode requires an absolute EXPRESSION_TRAINER_SMOKE_USER_DATA path');
+  }
+  app.setPath('userData', userDataPath);
+}
 
 // 覆盖应用显示名称（菜单栏、Dock、任务栏、窗口标题）
 app.setName('宇宙无敌表达训练');
@@ -57,6 +69,38 @@ let promptEditorWindow;
 const llmRequests = createRequestCoordinator();
 let asrShutdownStarted = false;
 let asrShutdownComplete = false;
+
+function runNativeAddonSmoke() {
+  return new Promise((resolve, reject) => {
+    const child = utilityProcess.fork(
+      path.join(__dirname, 'lib', 'sherpa-native-smoke-utility.js'),
+      [],
+      {serviceName: 'expression-trainer-native-smoke', stdio: 'pipe'}
+    );
+    const timer = setTimeout(() => {
+      child.kill();
+      reject(new Error('Sherpa native smoke timed out'));
+    }, 30_000);
+    child.once('message', message => {
+      clearTimeout(timer);
+      child.kill();
+      const payload = message?.data ?? message;
+      if (payload?.ok && payload.result?.onlineRecognizerAvailable === true) {
+        console.log('SHERPA_NATIVE_SMOKE_OK');
+        resolve();
+        return;
+      }
+      const error = new Error(payload?.error?.message || 'Sherpa native smoke failed');
+      error.code = payload?.error?.code || 'sherpa-native-smoke-failed';
+      reject(error);
+    });
+    child.once('exit', code => {
+      if (code === 0) return;
+      clearTimeout(timer);
+      reject(new Error(`Sherpa native smoke utility exited with code ${code}`));
+    });
+  });
+}
 
 // Custom prompt 文件路径
 function getCustomPromptPath() {
@@ -187,7 +231,19 @@ function createSettingsWindow() {
 }
 
 // App lifecycle
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
+  if (isSquirrelStartup) return;
+  if (isNativeAddonSmokeTest) {
+    try {
+      await runNativeAddonSmoke();
+      app.exit(0);
+    } catch (error) {
+      console.error('[sherpa-native-smoke] FAILED');
+      console.error(formatSafeError(error));
+      app.exit(1);
+    }
+    return;
+  }
   // macOS 需要显式创建应用菜单，否则菜单栏显示默认的 "Electron"
   // Windows/Linux 上此菜单同样适用，macOS 专属角色（hide/hideOthers）会自动生效
   const appMenuTemplate = [

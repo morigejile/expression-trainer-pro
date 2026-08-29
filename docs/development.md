@@ -14,7 +14,7 @@ npm --version
 npm ci
 ```
 
-项目使用 `.npmrc` 的 `strict-allow-scripts=true`。依赖或 install-script 策略发生变化时，必须重新验证干净安装；不要为历史依赖保留重复白名单。
+项目使用 `.npmrc` 的 `strict-allow-scripts=true`，并在 `package.json#allowScripts` 只精确允许 Electron 43.4.1 下载和 Squirrel 5.4.4 的 7-Zip 架构选择脚本。后者随 Squirrel maker 移除时一并删除；依赖或 install-script 策略变化时重新验证干净安装，不增加通配白名单。
 
 ## 常用命令
 
@@ -23,11 +23,16 @@ npm test
 npm run benchmark:dry-run
 npm start
 npm run dev
+npm run package
+npm run make
+npm run smoke:package
 ```
 
 - `npm test` 使用 Node 内置 test runner，覆盖产品核心、Electron smoke 和仍在维护的 benchmark harness。
 - `benchmark:dry-run` 只验证合成 fixture、manifest、候选注册与路径边界，不运行真实模型。
 - `start` 启动普通应用；`dev` 同时打开 DevTools。
+- `package`/`make` 只生成当前 Tier 1 的 Windows x64 目录制品与 Squirrel 安装制品；输出位于 Git 忽略的 `out/`。
+- `smoke:package` 在 `out/` 中验证打包后的 Fake ASR 产品流、UtilityProcess 中的 Sherpa native load、完整相邻 DLL 和外部模型目录边界；它不下载模型。
 
 ## 提交说明约定
 
@@ -53,7 +58,7 @@ $expressionTrainerRuntime = 'C:\Users\mr\AppData\Local\hermes\node'
 
 模型权重不进入 Git。首次启动 ASR 时，utility process 根据 `models/registry.json` 自动下载并校验默认 Paraformer，安装到 Electron `userData/models/paraformer-bilingual-zh-en/2024-03-10/`；native 初始化成功后才更新 active pointer。archive/runtime 的固定大小、hash 与再分发状态见 registry 和 ADR-0004/0005。
 
-内部开发阶段 `.tar.bz2` 解包调用系统 `tar`。真实约 1 GB 下载、native-load、Forge 制品中的工具可用性及安装升级行为仍在 PKG-02/PKG-03 验证；这些事项不阻塞不依赖真实 ASR 的测试和 Electron Fake smoke。真实麦克风、macOS/Linux 和正式制品验证仍需对应环境证据。
+内部开发阶段 `.tar.bz2` 解包调用系统 `tar`。PKG-02 已证明 packaged utility 可加载 Sherpa native addon，且模型仍位于安装目录外；真实约 1 GB 下载、系统 `tar`、Paraformer 初始化和离线二次启动在 PKG-03 验证。真实麦克风、macOS/Linux 和正式发布制品仍需对应环境证据。
 
 ## Benchmark 边界
 
@@ -70,7 +75,7 @@ BM-01 已完成的数据采集、人工 review 和 freeze 工具已归档到 Git
 
 ## 发布边界
 
-当前仓库没有 Electron Forge package/make 配置。正式制品、native addon 打包、模型再分发许可、升级保留和平台支持矩阵仍属于后续发布工作；在有实测制品前不宣称已支持。它们在内部开发/测试中不阻塞当前技术实验，除非会使实验无法运行或结论失效。
+仓库已有 Windows x64 Electron Forge/Squirrel package/make 配置和 packaged smoke；当前产物是未签名内部测试制品，不代表公开支持。首次安装真实模型闭环、升级/卸载、签名、模型再分发许可和其他平台仍属于后续发布工作；除非使当前技术实验无法运行或结论失效，否则不阻塞内部开发。
 
 ## 人工与外部跟进
 

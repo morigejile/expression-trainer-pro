@@ -13,16 +13,33 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "test": "node --test",
+    "package": "electron-forge package --platform=win32 --arch=x64",
+    "make": "electron-forge make --platform=win32 --arch=x64",
+    "smoke:package": "node scripts/verify-packaged-app.js",
     "benchmark:dry-run": "node benchmark/run.js --dry-run --manifest benchmark/datasets/example/manifest.json --dataset-root benchmark/datasets/example --candidate fake",
     "spike:asr-boundary": "electron benchmark/spikes/asr-execution-boundary.js"
   },
-  "keywords": ["expression", "training", "speech", "asr", "chinese"],
+  "keywords": [
+    "expression",
+    "training",
+    "speech",
+    "asr",
+    "chinese"
+  ],
   "author": "sisi",
   "license": "MIT",
+  "allowScripts": {
+    "electron@43.4.1": true,
+    "electron-winstaller@5.4.4": true
+  },
   "devDependencies": {
+    "@electron-forge/cli": "7.5.0",
+    "@electron-forge/maker-squirrel": "7.5.0",
+    "@electron/rebuild": "3.6.0",
     "electron": "43.4.1"
   },
   "dependencies": {
-    "sherpa-onnx-node": "^1.10.0"
+    "electron-squirrel-startup": "1.0.1",
+    "sherpa-onnx-node": "1.13.3"
   }
 }

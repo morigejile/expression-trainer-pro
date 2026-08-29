@@ -125,13 +125,13 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 
 ## 9. 待确认事项
 
-1. 当前 `package.json` 为应用 `1.0.0`、Electron `43.4.1`（精确版本）、sherpa-onnx-node `^1.10.0`；lock/安装树为 43.4.1/1.13.3，开发基线为 Node 22.23.0/npm 12.0.2。Electron runtime 实测为 Node 24.18.1、Chromium 150.0.7871.224、modules ABI 148；显式清空所有 npm/Electron 缓存后的复跑仍为非阻塞 Runtime-TBD。
-2. PKG-01 已选择 Windows 11 25H2+ x64 作为首个 Tier 1 目标；正式支持仍需 PKG-02～PKG-04 的制品证据，其他平台保持 Experimental。
+1. 当前 `package.json` 为应用 `1.0.0`、Electron `43.4.1` 与 sherpa-onnx-node `1.13.3`（均为精确版本），开发基线为 Node 22.23.0/npm 12.0.2。Electron runtime 实测为 Node 24.18.1、Chromium 150.0.7871.224、modules ABI 148；显式清空所有 npm/Electron 缓存后的复跑仍为非阻塞 Runtime-TBD。
+2. PKG-01 已选择 Windows 11 25H2+ x64 作为首个 Tier 1 目标；PKG-02 已形成未签名内部制品并通过 packaged smoke，正式支持仍需 PKG-03/PKG-04 的安装、真实模型和升级证据，其他平台保持 Experimental。
 3. Paraformer 的版本、运行文件 hash 与大小已记录；模型再分发许可证仍待发布前确认。
 4. 词库计数/密度是否属于产品认可的评分定义；训练历史目前不持久化，是否需要持久化待产品决定。
 5. 4-core/8-GB/3-GB 资格线上的真实录音、RTF、峰值 RAM 与 UI 响应预算。
 6. 模型与 LLM 服务的许可证、分发与隐私告知要求。
-7. T-08 已通过 Electron 43.4.1 受控升级关闭 Electron 33 基线的两个 high audit 节点；当前 audit 为 0。真实模型/麦克风、macOS/Linux 和 Forge 制品兼容性仍需后续验收。
+7. 生产依赖 audit 为 0；Forge 7.5/Squirrel 的仅开发传递依赖仍有 19 high/1 critical，留给 OPS-03 在保持 registry-only 安装与 package smoke 的前提下受控升级。真实模型/麦克风、macOS/Linux 和安装升级仍需后续验收。
 
 ## 10. 追踪关系
 

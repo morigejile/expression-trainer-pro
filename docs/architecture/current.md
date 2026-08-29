@@ -79,13 +79,13 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 | 音频 | 独立 AudioCapture：`getUserMedia` + `AudioContext({sampleRate:16000,latencyHint:'interactive'})` | Renderer 只编排 session/UI；请求/context/可用 track rate 可诊断 |
 | 音频节点 | AudioWorklet + 320 帧 mono Float32 collector | capture epoch 隔离暂停前旧块；正常 stop flush tail；固定 Electron fixture 覆盖 16/44.1/48 kHz |
 | 权限桥接 | Preload `contextBridge` + `ipcRenderer.invoke` | `contextIsolation:true`、`nodeIntegration:false` |
-| ASR 引擎 | `sherpa-onnx-node` `^1.10.0` | 当前 lock 与 `node_modules` 为 1.13.3；仅由 utility process 内的 Paraformer Provider 延迟加载，Main 不 require |
+| ASR 引擎 | `sherpa-onnx-node` `1.13.3`（精确版本） | 仅由 utility process 内的 Paraformer Provider 延迟加载，Main 不 require；packaged native-load smoke 已通过 |
 | ASR 模型 | `paraformer-bilingual-zh-en/2024-03-10` | registry 固定 archive/runtime；INT8 encoder/decoder + tokens 安装到 `userData/models`，权重不纳入 Git |
 | 本地分析 | `lib/lexicon.js` + `data/emotion-lexicon.json` | 最大正向词表匹配；`tiered-lexicon.json` 保留为未启用候选数据，不参与运行时分析 |
 | LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接/实时/报告分别为 10/15/60 秒超时，并支持 AbortSignal、按 Renderer 取消和异常响应验证 |
 | 设置 | `userData/settings.json`、`userData/custom-prompt.json` | 两者 schema version 1；旧结构迁移、未来 schema 防降级覆盖；小文件同步但以同盘临时文件/fsync/rename 原子发布；API Key 明文 |
 | 输出 | Clipboard + Electron Save Dialog + Markdown | 原文与报告 |
-| 构建/测试 | scripts 为 `start`、`dev`、`test`、`benchmark:dry-run`、`spike:asr-boundary` | `node:test` 覆盖 Provider/Fake、ASR session/IPC/Renderer 过滤、有界队列与 process controller、Paraformer 固定配置、词库、设置、尾部文本、安全渲染、LLM、Electron smoke 和核心 benchmark；无 build/package/CI 配置 |
+| 构建/测试 | Node test + Electron smoke + Electron Forge 7.5/Squirrel | `package`/`make` 固定 Windows x64；packaged smoke 覆盖 Fake 产品流、utility-only Sherpa native load、完整 DLL unpack 和外部模型目录；尚无 CI |
 
 开发工具基线固定为 Node 22.23.x/npm 12.0.x，与 Electron 内置 Node 24.18.1 明确区分。当前只验证 Windows 11 Home 25H2 build 26200 x64；PKG-01 已把 Windows 11 25H2+ x64 选为首个 Tier 1 目标。Windows ARM64、macOS 与 Linux 为 Experimental，仍没有 CI、打包配置或制品测试证明。
 
@@ -99,7 +99,13 @@ BM-02 提供独立 benchmark CLI，用 manifest 输出每个 sample/repetition �
 
 产品层已有独立 `models/registry.json` 与 `lib/model-manager.js`，不依赖 `benchmark/`。registry 只固定 ADR-0005 接受的 Paraformer archive/runtime 文件 URL、大小和 SHA-256；模型安装位于 `userData/models`，使用跨 utility 安装锁、按年龄清理的同盘 `.staging`、流式下载大小上限、archive/runtime 双重校验、白名单解压、不可变 `model/version` 目录、active pointer 和显式上一版本 rollback。中断、错误 hash、解压失败或空间不足不会替换旧 active。
 
-R-08 已由 Main 向正常 utility process 传入 `userData` 与 app version；Fake smoke 分支仍先行且不加载 Sherpa/Model Manager。生产 provider 解析 active 版本，无 active 时安装但不立即激活；只有 role 路径通过 Paraformer native 初始化后才更新 active。当前版本损坏或 native 加载失败时，上一版本也先 native 探测，成功后才切换指针，且不循环回退。初始化可取消并使用独立 30 分钟预算。内部阶段 `.tar.bz2` 默认调用系统 `tar`；真实 1 GB archive、系统工具可用性和 Forge 制品内 extractor 策略是 PKG-02 非阻塞待办。
+R-08 已由 Main 向正常 utility process 传入 `userData` 与 app version；Fake smoke 分支仍先行且不加载 Sherpa/Model Manager。生产 provider 解析 active 版本，无 active 时安装但不立即激活；只有 role 路径通过 Paraformer native 初始化后才更新 active。当前版本损坏或 native 加载失败时，上一版本也先 native 探测，成功后才切换指针，且不循环回退。初始化可取消并使用独立 30 分钟预算。内部阶段 `.tar.bz2` 默认调用系统 `tar`；真实 1 GB archive、系统工具可用性和首次安装行为是 PKG-03 待办。
+
+### 3.3 PKG-02 Windows x64 packaging（Completed）
+
+`forge.config.js` 是唯一打包配置：只构建 Windows x64 Squirrel，排除 docs/test/benchmark 等开发树，并使用 ASAR；整个 `sherpa-onnx-win-x64` 目录保持 unpack，确保 `.node` 与四个相邻 DLL 的加载关系不被破坏。模型不进入应用资源，继续位于 `userData/models`。
+
+干净 `npm ci → npm run make` 已生成 `ExpressionTrainerSetup.exe`、`ExpressionTrainer-1.0.0-full.nupkg` 与 `RELEASES`。`smoke:package` 在未安装目录制品上验证 Fake 产品流程、utility process 中的 Sherpa native load、native 文件集合和不创建模型目录。安装器执行、真实约 1 GB Paraformer 下载/系统 `tar`/初始化及离线二次启动属于 PKG-03。
 
 ## 4. C4 Level 2：当前容器/运行边界
 
@@ -304,10 +310,10 @@ Settings/Prompt Renderer
 
 ## 7. 部署与安装现状
 
-- `package.json` 有 `start`、`dev`、`test`、`benchmark:dry-run`；无 build/package/make/publish scripts。
-- 没有 Electron Forge/electron-builder 配置，没有 GitHub Actions。
+- `package.json` 有开发、测试、benchmark、Forge package/make 与 packaged smoke scripts；没有 publish script。
+- Electron Forge 7.5/Squirrel 已固定为 Windows x64 最小打包配置；没有 GitHub Actions。
 - `models/` 跟踪版本化产品 registry；模型权重由首次 ASR 初始化自动下载、校验并安装到 `userData/models`。
-- 已有 canonical 支持矩阵和 Windows x64 首发选择；仍无安装包、签名、公证、自动更新或升级/卸载数据保留测试。
+- 已有 canonical 支持矩阵、Windows x64 首发选择和未签名内部安装制品；仍无真实安装/模型闭环、签名、公证、自动更新或升级/卸载数据保留测试。
 - 原有 `package-lock.json` 清理已由负责人确认纳入 Phase 0；陈旧 `node-microphone` 条目已删除，lockfile 与 `package.json` 一致。
 - 开发基线为 Node 22.23.0/npm 12.0.2。T-08 的 Electron 43.4.1 JS 依赖经 clean `npm ci` 安装；Electron 42+ 改为首次 CLI 调用时下载 binary，本轮首次 43.4.1 下载成功，后续 clean install 从官方校验缓存恢复相同 executable（SHA-256 `E885FFC2A09DAB4C14DE706E3662A5929D1E65EA4EA347C56FD0964640EB923B`）。显式清空所有 npm/Electron 缓存后的复跑仍为 Runtime-TBD。
 
@@ -321,10 +327,10 @@ Settings/Prompt Renderer
 | TD-02 | **R-04 已关闭**：`ScriptProcessorNode` 已由 AudioWorklet/320 帧 collector 替换 | 废弃节点不再存在于生产/测试/smoke 路径 | 源码、collector tests、Electron smoke | 保留回归；不增加 fallback |
 | TD-03 | **R-04 已缓解**：请求/context/track rate 可诊断，固定 Electron graph 已覆盖 16/44.1/48 kHz | 确定性图适配已有证据；真实麦克风/驱动差异仍未知 | AudioCapture tests 与 Electron graph fixture | 真实可配置设备作为非阻塞 follow-up；实测失败才评估 WASM 备选 |
 | TD-04 | **R-05 已缓解**：逐块 TypedArray/invoke/structured-clone 仍复制，但队列为 10 块且可观测 | 不再无限增长或静默丢音频；复制成本仍需真实推理 profile | Queue/Renderer tests 与 D-03 spike | 只有真实 profile 证明必要时再换通道 |
-| TD-05 | **R-06 已关闭当前边界**：Main 只持有 Controller，Provider/Sherpa/模型在 utility process | 退出可见、下一 start 重建；单实例/单 stream 符合当前产品 | Controller tests 与 Electron smoke | Forge 和真实模型路径分别在 PKG-02/R-06 follow-up 验证 |
-| TD-06 | **R-07/R-08 已关闭内部开发边界** | registry、校验、安装锁、原子安装/激活、native 成功后切换和一次安全回退已接入 utility process | Model Manager/managed provider 聚焦测试与产品 registry | PKG-02 验证真实 archive/system tar、native model 与 Forge 制品 |
+| TD-05 | **R-06/PKG-02 已关闭当前边界**：Main 只持有 Controller，Provider/Sherpa/模型在 utility process | 退出可见、下一 start 重建；packaged Main 不加载 native addon | Controller tests、Electron smoke 与 packaged native-load smoke | PKG-03 验证真实 Paraformer 初始化循环 |
+| TD-06 | **R-07/R-08 已关闭内部开发边界** | registry、校验、安装锁、原子安装/激活、native 成功后切换和一次安全回退已接入 utility process | Model Manager/managed provider 聚焦测试与产品 registry | PKG-03 验证真实 archive/system tar、native model 与首次/离线二次启动 |
 | TD-07 | **T-04/R-02/R-04 已缓解**：stop 单飞执行 worklet tail flush、feed drain、ASR final 与分析；旧 session、迟到/倒序事件和清空/重启竞态受过滤 | 尾部语音进入字幕、统计、分析和报告；完整训练阶段状态机仍未建立 | AudioCapture、ASR event state 与 transcript 竞态回归测试 | 后续只在实际状态复杂度需要时收敛状态机 |
-| TD-08 | 已有 Node 测试和 Electron 自动化 smoke，但无 CI 和打包脚本 | 已可发现启动、页面、Preload/IPC、ASR session/event、设置窗口和粘贴分析回归；仍无法证明真实模型/麦克风、跨平台或发布制品可用 | 集成测试基线、仓库配置 | 后续接真实设备/模型验收、CI 与 Forge，并在目标平台运行 smoke |
+| TD-08 | 已有 Node/Electron/packaged smoke 与 Windows x64 Forge 打包，但无 CI | 已可发现启动、页面、Preload/IPC、ASR session/event、设置窗口、粘贴分析和 packaged native 回归；仍无法证明真实模型/麦克风、跨平台或安装升级 | 集成测试、Forge 配置与 PKG-02 制品 | PKG-03/PKG-04 接安装/模型闭环；OPS-01 再加 CI |
 | TD-09 | **R-09 已关闭配置损坏/降级覆盖风险**；API Key 仍明文 | settings/custom-prompt 原子发布，损坏文件保留，future schema 不降级；明文凭据仍是发布前权衡 | atomic store、older/current/future schema 与脱敏测试 | PKG-04 验证安装升级；只有收益超过 native/跨平台成本时才采用 keychain |
 | TD-10 | **R-02 已部分缓解**：ASR command 已校验精确字段、session、sequence、16 kHz 与有限样本；其他 IPC payload 仍缺少同等级校验 | settings、文本、filename 等大 payload 或类型错误仍可能影响 Main | ASR IPC 测试与其余 handler 源码确认 | 后续按当前具体风险逐 channel 限定类型/长度，不建设通用 schema 框架 |
 | TD-11 | **T-05 已缓解**：ASR/粘贴文本使用受控 DOM token，LLM 报告使用严格允许列表，错误使用纯文本 | 主应用不再从不可信文本创建标签或事件属性 | `src/safe-rendering.js`、安全渲染测试、Electron smoke、`src/app.js` 无 `innerHTML` | 后续若词库改为外部数据，继续按不可信输入处理 |
@@ -333,7 +339,7 @@ Settings/Prompt Renderer
 | TD-14 | README 与实现漂移风险 | 用户预期错误 | Phase 0 已修正触发字数、联网边界和平台口径 | 后续行为变更同步 README 与架构文档 |
 | TD-15 | 未启用候选词库容易被误认为运行时数据 | 维护者可能误删或直接接入不兼容 schema | `tiered-lexicon.json` 无 import，Phase 0 决定保留 | 明确标记未启用；在 T-01/T-02 后以独立任务设计 schema、合并规则和测试 |
 | TD-16 | 版本口径不一致 | 发布历史和兼容性不清 | package 1.0.0、代码 V2、历史提交 v1.1 | SemVer + CHANGELOG + release policy |
-| TD-17 | **T-08 已关闭当前告警**：Electron 33.4.11 依赖树的两个 high 节点已通过升级到受支持的 43.4.1 移除 | 当前 `npm audit --json` 为 0；旧 `extract-zip@2.0.1`、`boolean` 与旧下载栈已从 lockfile 删除 | 2026-08-23，Node 22.23.0/npm 12.0.2；升级前 `2 high / 0 critical`，升级后 0；未使用 `npm audit fix --force` | OPS-03 持续受控升级；每次验证 native load、smoke 与发布制品 |
+| TD-17 | 生产依赖审计为 0；Forge 7.5/Squirrel 的仅开发传递依赖有 19 high/1 critical 告警 | 不进入应用运行依赖，但打包工具仍处理源码和制品；为避开 Forge 新版 `@electron/rebuild` 的 Git 依赖，本轮保留已验证的 registry-only 组合 | 2026-08-29 `npm audit --omit=dev --json` 为 0；完整 audit 为 20；未使用 `audit fix --force` 或通配 Git/script 放行 | OPS-03 以 registry-only 新组合受控升级；每次重跑干净 make 与 packaged native smoke |
 
 ## 9. 当前架构评价
 
@@ -349,11 +355,11 @@ Settings/Prompt Renderer
 ### 应降低的偶然复杂度
 
 - Audio 逐块 invoke、TypedArray 规范化与跨进程 structured-clone 复制；
-- 真实模型路径/性能与 utility-process 制品打包尚未闭环；
-- 真实约 1 GB 模型下载/native-load 与制品内解包工具尚未闭环；
+- 真实模型路径/性能仍未闭环；utility-process 与 native addon 制品打包已闭环；
+- 真实约 1 GB 模型下载、系统 `tar` 与 Paraformer 初始化尚未闭环；
 - 非 ASR IPC 与完整训练状态仍缺少同等级边界；
 - 安全编码、密钥、超时和输入验证不足；
-- 打包、升级和 Experimental 平台支持仍不可复现；Windows Tier 1 目标尚待制品闭环。
+- 安装、升级和 Experimental 平台支持仍不可复现；Windows Tier 1 已有内部制品但尚待首次安装/真实模型闭环。
 
 结论：当前项目不是“架构过重”，而是“核心闭环已存在，产品工程边界尚未收敛”。推荐渐进重构，不推倒重写。
 
@@ -361,7 +367,7 @@ Settings/Prompt Renderer
 
 1. 在显式清空 npm 与 Electron 下载缓存的独立环境复跑 Electron 43 首次 CLI 下载；当前首次 43.4.1 下载和后续校验缓存恢复均成功。
 2. 验证当前模型下载源、大小、hash、许可证和三个文件的兼容性。
-3. 自动 Electron smoke 已覆盖 BrowserWindow、17 项 Preload API、设置页、utility-process Fake ASR 的 session/event、stale feed、强制退出报告与重建、Fake LLM、粘贴分析以及 16/44.1/48 kHz graph fixture，并确认 Main 不加载真实 Sherpa。D-03 只验证 native addon 可在 utility process 加载；真实 Paraformer 模型循环、设置持久化、报告保存对话框、麦克风和人工交互仍需运行验证。
+3. 自动 Electron smoke 已覆盖 BrowserWindow、17 项 Preload API、设置页、utility-process Fake ASR 的 session/event、stale feed、强制退出报告与重建、Fake LLM、粘贴分析以及 16/44.1/48 kHz graph fixture，并确认 Main 不加载真实 Sherpa。PKG-02 进一步证明打包后的 utility process 可加载 native addon；真实 Paraformer 模型循环、设置持久化、报告保存对话框、麦克风和人工交互仍需运行验证。
 4. 以真实可配置的 16/44.1/48 kHz 麦克风/驱动复核已记录的请求、context 与 track rate；该项为非阻塞 follow-up。
 5. profile TD-01～TD-04 的 Main 延迟、GC、CPU、RAM 和队列。
 6. 在 Windows 11 25H2+ x64 完成 Forge 安装/升级闭环；其他 OS/arch 在各自产生 package/smoke/native-model 证据前保持 Experimental。

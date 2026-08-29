@@ -7,6 +7,7 @@ const path = require('node:path');
 
 const SUCCESS_MARKER = 'ELECTRON_SMOKE_OK';
 const PROCESS_TIMEOUT_MS = 30_000;
+const HEADLESS_SWITCHES = ['--headless', '--disable-gpu', '--no-sandbox'];
 
 function stopProcessTree(child) {
   if (!child.pid || child.exitCode !== null) return;
@@ -47,7 +48,7 @@ test('real Electron covers core flows and offline 16/44.1/48 kHz buffer graph ad
   };
   delete env.ELECTRON_RUN_AS_NODE;
 
-  const child = spawn(electronExecutable, [projectRoot, '--smoke-test'], {
+  const child = spawn(electronExecutable, [...HEADLESS_SWITCHES, projectRoot, '--smoke-test'], {
     cwd: projectRoot,
     env,
     stdio: ['ignore', 'pipe', 'pipe'],

@@ -13,7 +13,7 @@ Main 负责窗口、应用生命周期和高权限控制。模型初始化、持
 
 R-05/R-06 使用单执行单元、单有界队列，不引入 worker pool 或通用消息总线。320-frame Float32 buffer 通过 Electron structured clone 进入 utility process；当前 Electron API 不把 ArrayBuffer 列为 utility-process transferable，因此接受这次小块复制。队列最多保留 10 块（200 ms）；溢出使 session 以 `audio-overrun` 失败，不静默丢音频。
 
-执行单元入口作为 Forge 应用资源显式包含，native addon/共享库随应用依赖打包，模型仍位于外部模型根目录。真实 packaged path 由 PKG-02 验证，D-03 不提前引入 Forge。
+执行单元入口作为 Forge 应用资源显式包含，native addon/共享库随应用依赖打包，模型仍位于外部模型根目录。PKG-02 已验证 packaged path、完整共享库集合与 utility-only native load。
 
 ## Alternatives
 
@@ -46,6 +46,6 @@ R-05/R-06 使用单执行单元、单有界队列，不引入 worker pool 或通
 - [x] 两者强制以 73 退出后均被检测并成功重建；只有 utility process 提供 native 故障所需的进程边界。
 - [x] 测量期间 Main 定时器最大延迟分别约 2.2 ms 与 4.8 ms；队列峰值为 10。
 - [ ] 本 worktree 没有 Paraformer 模型文件，因此真实 start/feed/stop 模型循环、推理 CPU/RAM 和 native fatal crash 注入移到 R-06 集中验证。
-- [ ] Forge packaged app 中的 entry、native addon、共享库和外部模型路径移到 PKG-02；签名和跨平台仍为非阻塞 TODO。
+- [x] Forge packaged app 中的 entry、native addon、共享库和外部模型路径已由 PKG-02 packaged smoke 验证；签名和跨平台仍为非阻塞 TODO。
 
 原始结果保存在 `benchmark/results/asr-boundary/windows-x64-electron-43.4.1.json`。这些数字是一次本地机制 spike，不是产品性能承诺。

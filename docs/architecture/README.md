@@ -106,7 +106,7 @@ Preload 最小桥接 → Main（窗口/设置/生命周期/模型协调）
 | [0004](adr/0004-manage-models-separately.md) | Accepted | 模型与应用解耦并校验安装 |
 | [0005](adr/0005-select-default-asr-model-by-benchmark.md) | Accepted | 保留 Paraformer 默认，候选结果作为后续优化基线 |
 | [0006](adr/0006-move-asr-out-of-main.md) | Accepted | 使用单个 Electron utility process 隔离 ASR |
-| [0007](adr/0007-package-with-electron-forge.md) | Proposed | 使用 Electron Forge 打包发布 |
+| [0007](adr/0007-package-with-electron-forge.md) | Accepted | 使用 Electron Forge 打包发布 |
 | [0008](adr/0008-keep-benchmark-as-isolated-non-shipping-tool.md) | Accepted | 核心 benchmark 同仓库隔离保留，一次性数据流程归档 |
 
 ## 9. 文档维护规则

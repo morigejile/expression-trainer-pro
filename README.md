@@ -141,7 +141,7 @@ npm test
 - 麦克风权限
 - （可选）网络连接（用于AI反馈，词库分析可离线）
 
-首个 Tier 1 目标为 Windows 11 25H2+ x64；当前尚无安装制品，公开支持需待 PKG-02～PKG-04 验证。Windows ARM64、macOS 和 Linux 为 Experimental，详见[平台与硬件支持矩阵](docs/support-matrix.md)。
+首个 Tier 1 目标为 Windows 11 25H2+ x64；当前已有通过 packaged smoke 的未签名内部 Squirrel 制品，公开支持仍需 PKG-03/PKG-04 的安装、真实模型和升级验证。Windows ARM64、macOS 和 Linux 为 Experimental，详见[平台与硬件支持矩阵](docs/support-matrix.md)。
 
 ## License
 
