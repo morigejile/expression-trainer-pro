@@ -87,7 +87,7 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 | 输出 | Clipboard + Electron Save Dialog + Markdown | 原文与报告 |
 | 构建/测试 | scripts 为 `start`、`dev`、`test`、`benchmark:dry-run`、`spike:asr-boundary` | `node:test` 覆盖 Provider/Fake、ASR session/IPC/Renderer 过滤、有界队列与 process controller、Paraformer 固定配置、词库、设置、尾部文本、安全渲染、LLM、Electron smoke 和核心 benchmark；无 build/package/CI 配置 |
 
-开发工具基线固定为 Node 22.23.x/npm 12.0.x，与 Electron 内置 Node 24.18.1 明确区分。本轮只验证 Windows NT 10.0.26200.0 x64；Electron 38 起的 macOS 12+ 下限、Linux GTK/Wayland 和正式最低 Windows 版本仍没有 CI、打包配置或制品测试证明。
+开发工具基线固定为 Node 22.23.x/npm 12.0.x，与 Electron 内置 Node 24.18.1 明确区分。当前只验证 Windows 11 Home 25H2 build 26200 x64；PKG-01 已把 Windows 11 25H2+ x64 选为首个 Tier 1 目标。Windows ARM64、macOS 与 Linux 为 Experimental，仍没有 CI、打包配置或制品测试证明。
 
 ### 3.1 BM-02 harness（Completed）
 
@@ -307,7 +307,7 @@ Settings/Prompt Renderer
 - `package.json` 有 `start`、`dev`、`test`、`benchmark:dry-run`；无 build/package/make/publish scripts。
 - 没有 Electron Forge/electron-builder 配置，没有 GitHub Actions。
 - `models/` 跟踪版本化产品 registry；模型权重由首次 ASR 初始化自动下载、校验并安装到 `userData/models`。
-- 无安装包、签名、公证、自动更新、升级/卸载数据保留测试或正式支持矩阵。
+- 已有 canonical 支持矩阵和 Windows x64 首发选择；仍无安装包、签名、公证、自动更新或升级/卸载数据保留测试。
 - 原有 `package-lock.json` 清理已由负责人确认纳入 Phase 0；陈旧 `node-microphone` 条目已删除，lockfile 与 `package.json` 一致。
 - 开发基线为 Node 22.23.0/npm 12.0.2。T-08 的 Electron 43.4.1 JS 依赖经 clean `npm ci` 安装；Electron 42+ 改为首次 CLI 调用时下载 binary，本轮首次 43.4.1 下载成功，后续 clean install 从官方校验缓存恢复相同 executable（SHA-256 `E885FFC2A09DAB4C14DE706E3662A5929D1E65EA4EA347C56FD0964640EB923B`）。显式清空所有 npm/Electron 缓存后的复跑仍为 Runtime-TBD。
 
@@ -353,7 +353,7 @@ Settings/Prompt Renderer
 - 真实约 1 GB 模型下载/native-load 与制品内解包工具尚未闭环；
 - 非 ASR IPC 与完整训练状态仍缺少同等级边界；
 - 安全编码、密钥、超时和输入验证不足；
-- 构建、测试、打包、升级和支持矩阵不可复现。
+- 打包、升级和 Experimental 平台支持仍不可复现；Windows Tier 1 目标尚待制品闭环。
 
 结论：当前项目不是“架构过重”，而是“核心闭环已存在，产品工程边界尚未收敛”。推荐渐进重构，不推倒重写。
 
@@ -364,4 +364,4 @@ Settings/Prompt Renderer
 3. 自动 Electron smoke 已覆盖 BrowserWindow、17 项 Preload API、设置页、utility-process Fake ASR 的 session/event、stale feed、强制退出报告与重建、Fake LLM、粘贴分析以及 16/44.1/48 kHz graph fixture，并确认 Main 不加载真实 Sherpa。D-03 只验证 native addon 可在 utility process 加载；真实 Paraformer 模型循环、设置持久化、报告保存对话框、麦克风和人工交互仍需运行验证。
 4. 以真实可配置的 16/44.1/48 kHz 麦克风/驱动复核已记录的请求、context 与 track rate；该项为非阻塞 follow-up。
 5. profile TD-01～TD-04 的 Main 延迟、GC、CPU、RAM 和队列。
-6. 在目标 macOS/Linux/Windows 版本验证安装与运行；在证据前继续保持 TBD，不作支持承诺。
+6. 在 Windows 11 25H2+ x64 完成 Forge 安装/升级闭环；其他 OS/arch 在各自产生 package/smoke/native-model 证据前保持 Experimental。

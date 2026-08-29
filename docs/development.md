@@ -1,6 +1,6 @@
 # 开发与验证
 
-> 当前验证基线：Windows x64、Node.js 22.23.x、npm 12.0.x、Electron 43.4.1、sherpa-onnx-node 1.13.3
+> 当前验证基线：Windows 11 25H2 build 26200 x64、Node.js 22.23.x、npm 12.0.x、Electron 43.4.1、sherpa-onnx-node 1.13.3
 > 更新日期：2026-08-29
 > 当前用途：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞跟进，除非它们使当前技术实验无法运行或结论失效。
 
@@ -74,4 +74,4 @@ BM-01 已完成的数据采集、人工 review 和 freeze 工具已归档到 Git
 
 ## 人工与外部跟进
 
-以下事项保留为非阻塞后续工作：模型/数据集再分发权利、16/44.1/48 kHz 真实麦克风验证、Tier 1 平台和最低硬件、代码签名/公证凭据、macOS/Linux native addon 与制品行为、FireRedASR2 utterance/VAD 交互，以及公开隐私/LLM 披露和发布支持口径。
+以下事项保留为非阻塞后续工作：模型/数据集再分发权利、16/44.1/48 kHz 真实麦克风验证、接近资格线的性能验证、代码签名/公证凭据、Experimental 平台 native addon 与制品行为、FireRedASR2 utterance/VAD 交互，以及公开隐私/LLM 披露。首个 Tier 1 目标与待验证硬件线见[支持矩阵](support-matrix.md)。

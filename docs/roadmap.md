@@ -2,7 +2,7 @@
 
 > 状态：Active execution baseline
 > 更新日期：2026-08-29
-> 当前进度：Phase 0-2、D-01～D-03、R-01～R-09 与 C-01/C-02 最小集成已完成；D-04 未完成；下一主线为 PKG-01 与 D-04
+> 当前进度：Phase 0-2、D-01～D-04、R-01～R-09、PKG-01 与 C-01/C-02 最小集成已完成；下一主线为 PKG-02 Electron Forge
 > 当前模式：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞后续工作；只有它们使当前技术实验无法运行或结论失效时，才阻塞当前路径。
 
 ## 1. 目标与排序原则
@@ -74,7 +74,7 @@ flowchart LR
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
 | D-03 | P0 | 接受 ASR 执行边界 ADR（Completed） | 有界 spike 比较 worker thread 与 Electron utility process 的 native load、1,000×320-frame 传输、退出恢复和路径边界；选择单个 utility process | R-02,R-04；BM-07 spike | ADR-0006 Accepted；R-05 使用 10-block 有界队列，R-06 实现 utility process 隔离；真实模型/Forge 验证保留在对应节点 |
-| D-04 | P1 | 复审目标架构 | 用已接受的执行机制、性能证据和 Tier 1 平台更新 `target.md` 与 NFR | D-03,PKG-01 | 可由实测解决的 TBD 已关闭；未实现内容不写成事实 |
+| D-04 | P1 | 复审目标架构（Completed） | 已用 utility process、D-03 有界传输证据、R-07～R-09 当前实现和 Windows 11 25H2+ x64 Tier 1 目标复审 `target.md`/NFR；打包、最低硬件性能和 Experimental 平台仍明确为未实现 | D-03,PKG-01 | 当前/目标边界与支持矩阵一致；可运行事实和 PKG/OPS 计划分离 |
 
 ## 5. Phase 4 — 渐进重构 Audio / ASR / Model Manager
 
@@ -90,7 +90,7 @@ flowchart LR
 | R-08 | P1 | 激活版本化默认模型（Completed） | utility process 从 `userData/models` 解析或安装 registry 默认 Paraformer；使用 role→绝对路径配置，native 初始化成功后才原子激活；当前版本损坏或加载失败时只探测并切换一次上一版本 | R-06,R-07,D-02 | 聚焦测试覆盖首次安装、single-flight、取消、role config、激活时序、损坏 active 与失败回退；真实 1 GB 下载/native-load 留到 PKG-02 |
 | R-09 | P1 | 收敛设置/规则/日志（Completed） | settings 与 custom-prompt 使用同盘临时文件 + fsync + rename 原子写；旧 schema 自动迁移，未来 schema 只兼容读取而不降级覆盖；字幕与本地分析共用唯一规则源，customWords 作为有界 filler 生效；现有错误日志维持脱敏边界，不引入 keychain/native 依赖 | T-03,R-07 | 聚焦测试覆盖旧/当前/未来 schema、发布失败保留旧文件、规则同源、自定义 filler 与错误脱敏；API Key 明文和可导出诊断留给发布前权衡/OPS-05 |
 
-R-01～R-09 与 C-01/C-02 已完成当前最小边界。下一步进入 PKG-01 固定 Tier 1/支持口径，并据此完成 D-04 目标架构复审；Paraformer 默认不变。
+R-01～R-09、D-03/D-04、PKG-01 与 C-01/C-02 已完成当前最小边界。下一步接入 Electron Forge 并验证 Windows x64 package/make；Paraformer 默认不变。
 
 ### 5.1 内部 benchmark 候选（不改变产品默认）
 
@@ -105,7 +105,7 @@ Paraformer 继续是产品默认。上述候选仅用于内部技术验证和 be
 
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
-| PKG-01 | P0 | 选 Tier 1 平台 | 按主要用户和维护资源选择首发平台，其他平台保持 TBD/Experimental | D-02 | 平台与 OS/arch 下限明确 |
+| PKG-01 | P0 | 选 Tier 1 平台（Completed） | 首个目标固定 Windows 11 25H2+ x64；Windows ARM64/macOS/Linux 为 Experimental；4-core/8-GB/3-GB 硬件线留给 PKG-03 实测，不冒充已证明性能 | D-02 | `docs/support-matrix.md` 明确平台、OS/arch、硬件资格线与提升条件 |
 | PKG-02 | P0 | 接入 Electron Forge | 集中 forge config；验证 native rebuild、共享库、执行单元入口、ASAR unpack 和外部模型目录 | R-06,R-07,PKG-01 | `package`/`make` 在干净环境成功 |
 | PKG-03 | P0 | 首次安装闭环 | 安装制品启动、模型准备/校验/初始化和离线二次启动 | PKG-02,R-08 | 普通用户不安装 Node、Python 或编译器 |
 | PKG-04 | P0 | 升级/卸载验证 | 覆盖安装、升级、降级限制和卸载后数据策略 | PKG-03,R-09 | 升级不静默丢设置/模型；行为有文档 |
@@ -130,7 +130,7 @@ Paraformer 继续是产品默认。上述候选仅用于内部技术验证和 be
 | M0 基线可复现 | Completed | B-01～B-06 | 环境、依赖和说明一致 |
 | M1 可安全修改 | Completed | T-01～T-08 | 核心契约有测试，高风险缺陷受控 |
 | M2 选型有证据 | Completed | BM-01、BM-02、BM-04～BM-06、D-01、D-02 | 三候选结果和 Accepted 模型 ADR |
-| M3 架构收敛 | Active | R-01～R-09、D-03/D-04 | Audio/ASR/模型分离，Main 不推理，模型升级可回退 |
+| M3 架构收敛 | Completed | R-01～R-09、D-03/D-04 | Audio/ASR/模型分离，Main 不推理，模型升级可回退 |
 | M4 可安装发布 | Planned | PKG-01～PKG-06 | Tier 1 安装/升级闭环 |
 | M5 可长期维护 | Planned | OPS-01～OPS-06 | CI、版本、依赖、模型和诊断机制稳定 |
 

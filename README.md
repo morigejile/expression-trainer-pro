@@ -136,12 +136,12 @@ npm test
 
 ## 系统要求
 
-- 已验证开发基线：Windows NT 10.0.26200.0 x64
+- 已验证开发基线：Windows 11 25H2 build 26200 x64
 - Node.js 22.23.x、npm 12.0.x
 - 麦克风权限
 - （可选）网络连接（用于AI反馈，词库分析可离线）
 
-macOS/Linux 与正式最低 Windows 版本尚无 CI/制品证据，支持等级为 **TBD**。
+首个 Tier 1 目标为 Windows 11 25H2+ x64；当前尚无安装制品，公开支持需待 PKG-02～PKG-04 验证。Windows ARM64、macOS 和 Linux 为 Experimental，详见[平台与硬件支持矩阵](docs/support-matrix.md)。
 
 ## License
 

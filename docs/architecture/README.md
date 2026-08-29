@@ -14,6 +14,7 @@
 | [目标架构](target.md) | 本轮迁移准备变成什么？ | 仅在迁移期间存在 |
 | [ADR](adr/README.md) | 为什么做出关键决策？ | 永久保留，变更时 Supersede |
 | [Roadmap](../roadmap.md) | 按什么顺序落地？ | 随执行状态更新 |
+| [支持矩阵](../support-matrix.md) | 首发平台和验证边界是什么？ | 随制品证据提升等级 |
 
 迁移完成后，应把已实现的目标内容合并进 `current.md`，再归档或删除失去意义的 `target.md`；ADR 不删除。
 

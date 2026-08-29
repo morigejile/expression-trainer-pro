@@ -297,7 +297,7 @@ ADR-0005 已接受保留 Paraformer 为默认模型。当前仅为内部开发/�
 - 正确 rebuild/包含 native addon 与共享库；
 - 对需要的二进制/模型使用正确的 ASAR unpack 或外部资源路径；
 - 程序文件、用户数据和模型分离；
-- 先完成一个 Tier 1 平台的可重复安装/升级，再扩展矩阵；
+- 先完成 Windows 11 25H2+ x64 Tier 1 的可重复安装/升级，再扩展 Windows ARM64、macOS 或 Linux Experimental 矩阵；
 - 代码签名、公证和自动发布作为后续 release gate，不在无凭据时伪装完成。
 
 这些发布工作在内部开发/测试中不阻塞架构实验，除非缺失的发布、平台或再分发证据会使实验无法运行或结论失效。
@@ -345,8 +345,8 @@ ADR-0005 已接受保留 Paraformer 为默认模型。当前仅为内部开发/�
 
 ## 12. 未决问题
 
-1. Tier 1 平台和最低支持硬件。
-2. 真实 Paraformer 负载和 Forge 制品中的 utility entry/native addon/模型路径是否满足目标平台要求。
+1. 4-core/8-GB/3-GB 资格线是否满足真实 Paraformer Audio/utility/UI 性能预算。
+2. Forge 制品中的 utility entry/native addon/模型路径是否满足 Windows 11 25H2+ x64 要求。
 3. 未来是否接受 utterance-only UX 并重开默认模型选择。
 4. 模型 registry 的托管位置、许可证与更新信任链。
 5. API Key 是否需要系统凭据库，以及跨平台成本是否可接受。
