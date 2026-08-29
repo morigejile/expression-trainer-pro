@@ -36,6 +36,6 @@
 ## Validation Before Accepting
 
 - [ ] 对候选模型完成许可证和分发来源审查。
-- [ ] spike 覆盖中断、错误 hash、磁盘不足、解压失败和原子回退。
+- [x] R-07 聚焦测试覆盖中断、错误 hash、磁盘不足、解压失败、成功升级和原子 pointer 回退。
 - [ ] 升级/卸载测试证明用户数据与模型不会被意外删除。
 - [ ] registry schema 与 AsrProvider 配置能表示最终 benchmark 候选。

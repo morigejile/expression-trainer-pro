@@ -180,7 +180,7 @@ D-03 spike 表明 10 个在途上限下 utility process 的 structured-clone cop
 
 ### 5.5 Model Manager
 
-轻量职责：
+R-07 已实现以下轻量职责：
 
 ```text
 读取 registry
@@ -193,23 +193,25 @@ D-03 spike 表明 10 个在途上限下 utility process 的 structured-clone cop
 → 返回模型路径
 ```
 
-建议清单字段：
+当前产品清单字段：
 
 ```json
 {
-  "modelId": "candidate-id",
-  "version": "source-version",
+  "id": "paraformer-bilingual-zh-en",
+  "version": "2024-03-10",
   "engine": "sherpa-onnx",
-  "architecture": "zipformer-or-sensevoice",
-  "languages": ["zh"],
-  "mode": "streaming-or-utterance",
-  "sampleRate": 16000,
-  "files": [{ "url": "https://...", "sha256": "..." }],
-  "minAppVersion": "0.x"
+  "architecture": "paraformer",
+  "languages": ["zh", "en"],
+  "mode": "streaming",
+  "sampleRateHz": 16000,
+  "minAppVersion": "1.0.0",
+  "archive": {"url": "https://...", "sha256": "...", "bytes": 1047319737, "format": "tar.bz2", "rootDirectory": "sherpa-onnx-streaming-paraformer-bilingual-zh-en"},
+  "files": [{"relativePath": "encoder.int8.onnx", "sha256": "...", "bytes": 165462184, "role": "encoder"}],
+  "license": {"redistribution": "not-approved"}
 }
 ```
 
-示例值不是最终 registry。真实 URL、hash、许可证、体积和采样率必须来自获准分发的模型版本。模型安装失败时保留上一版本。
+`models/registry.json` 只登记 ADR-0005 接受的 Paraformer，不承载 benchmark 候选数据库。archive 与 runtime 文件使用已核验的 URL、byte size 和 SHA-256；再分发仍为 `not-approved`。安装器限制下载字节数、只提取白名单文件、校验后发布不可变版本目录，并通过 active pointer 保存上一版本以显式回退。内部阶段默认调用系统 `tar`；真实 1 GB archive 和 Forge/Tier 1 环境是否具备该工具在 PKG-02 验证，失败时再替换为随应用提供的最小 extractor。
 
 ### 5.6 Settings Store
 
@@ -327,7 +329,7 @@ ADR-0005 已接受保留 Paraformer 为默认模型。当前仅为内部开发/�
 迁移必须保持每个阶段可运行：
 
 1. 构建/测试基线、三候选 benchmark、默认模型 ADR、最小 Paraformer Provider 和 session/event 契约已完成。
-2. R-03～R-06 已完成 AudioCapture、AudioWorklet、10-block 有界发送与 utility-process 执行边界；Zipformer Large 与 FireRedASR2 的 pending benchmark 最小集成已完成，下一步处理 Model Manager。
+2. R-03～R-07 已完成 AudioCapture、AudioWorklet、10-block 有界发送、utility-process 执行边界与独立 Model Manager；Zipformer Large 与 FireRedASR2 的 pending benchmark 最小集成也已完成，下一步用 R-08 接入已激活 Paraformer 版本目录。
 3. 每次迁移保留独立回归证据，最后建立 Forge 制品、支持矩阵和发布机制。
 
 当下列条件全部满足时，本目标可合并为 Current：

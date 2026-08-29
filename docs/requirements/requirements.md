@@ -64,8 +64,8 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 
 | ID | 状态 | 需求 | 验收标准 |
 |---|---|---|---|
-| FR-P05 | Planned | 应提供轻量 Model Manager。 | 当前模型仍手工管理；目标为依据模型清单检查、下载、SHA-256 校验、原子安装、选择和返回本地模型路径，且失败不破坏上一可用模型。 |
-| FR-P06 | Planned | 模型与应用版本应解耦。 | 模型清单至少包含 `modelId`、`version`、`engine`、`languages`、文件来源、`sha256` 和兼容版本信息。 |
+| FR-P05 | Partial | 应提供轻量 Model Manager。 | R-07 已实现独立清单、HTTPS 下载、archive/runtime SHA-256、白名单解压、原子安装/激活和上一版本回退；R-08 尚未把 active 模型接入生产 Provider。 |
+| FR-P06 | Existing | 模型与应用版本应解耦。 | 产品清单包含 model ID、version、engine、languages、mode、采样率、兼容应用版本、archive/runtime 来源与 hash；安装目录按 model/version 不可变。 |
 | FR-P08 | Planned | 应用应能生成普通用户可安装的桌面制品。 | 当前无 Forge 配置；目标为通过 Electron Forge 生成目标平台制品，终端用户无需安装 Node.js、Python、CMake 或编译器。 |
 | FR-P09 | Partial | 设置、用户数据、模型、缓存和日志应与程序文件分离。 | 设置已在 Electron `userData`；模型、缓存、日志的完整分离及升级/重装保护仍未实现。 |
 | FR-P10 | Existing | 本地训练在 LLM 不可用时仍应工作。 | 离线、无 API Key 或 LLM 请求失败时，录音、本地 ASR 和基础词库分析仍可完成。 |
@@ -79,12 +79,12 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | NFR-03 | Partial | 响应性 | ASR 初始化与同步 decode 已移入 utility process；D-03 空载传输和 Fake smoke 证明 Main 路由可响应，但真实 Paraformer 推理下的定量预算仍待有模型环境测量，不虚构 p95。 |
 | NFR-04 | Partial | 音频正确性 | 固定 Electron 的 OfflineAudioContext/AudioBufferSource graph 已用确定性双声道时变 fixture 验证 16/44.1/48 kHz 缓冲适配到 16 kHz；AudioWorklet 输出带明确格式的 320 帧 chunk 并 flush tail。生产 MediaStreamAudioSourceNode 与真实麦克风/驱动仍待非阻塞验证。 |
 | NFR-05 | Planned | 性能 | 默认模型应在项目定义的最低支持设备上满足实时或近实时体验；阈值、设备和场景在 benchmark 方案中冻结。 |
-| NFR-06 | Partial | 可靠性 | ASR session 的旧/迟到事件、安全错误、10-block overrun、执行单元退出报告与下一 start 重建已有受控路径；模型下载校验、原子替换和完整诊断导出仍待实现。 |
+| NFR-06 | Partial | 可靠性 | ASR session、10-block overrun 和执行单元退出重建已有受控路径；Model Manager 已覆盖下载大小/hash、解压/运行文件校验、原子激活与回退，完整诊断导出仍待实现。 |
 | NFR-07 | Partial | 隐私与安全 | 本地 ASR 音频不上传，且错误已避免暴露密钥；用户告知与完整日志边界仍待发布前确认。 |
 | NFR-08 | Existing | 权限隔离 | Renderer 不获得不受限的 Node.js 权限；当前 BrowserWindow 使用 `contextIsolation: true`、`nodeIntegration: false`，Preload 只暴露显式能力。后续新增 IPC 时继续维持该边界。 |
-| NFR-09 | Partial | 可测试性 | 词库、设置、Provider、ASR session/IPC/Renderer 过滤、AudioCapture/collector、有界队列、process controller、utility-process 退出重建和 Electron 16/44.1/48 kHz graph fixture 已有测试；模型清单、其他 IPC schema 和真实模型/麦克风冒烟仍待补齐。 |
+| NFR-09 | Partial | 可测试性 | 词库、设置、Provider、ASR session/IPC/Renderer 过滤、AudioCapture/collector、有界队列、process controller、Model Manager 和 Electron 16/44.1/48 kHz graph fixture 已有测试；真实模型/麦克风与制品冒烟仍待补齐。 |
 | NFR-10 | Planned | 可移植性 | 支持矩阵按实际 CI 和人工验证定义 Tier 1/2/Experimental；在验证前不宣称 Windows/macOS/Linux 全部同等级支持。 |
-| NFR-11 | Partial | 可升级性 | 设置已有 schemaVersion 和旧配置迁移；模型版本、原子升级和回退仍待实现。自动更新服务不属于首个基线。 |
+| NFR-11 | Partial | 可升级性 | 设置已有 schemaVersion 和旧配置迁移；模型已具备不可变版本目录、原子 active pointer 和上一版本回退，R-08/PKG 阶段仍需验证运行中切换与安装制品升级。自动更新服务不属于首个基线。 |
 | NFR-12 | Planned | 可观测性 | 当前没有满足该契约的诊断日志；目标日志包含应用/OS/架构、ASR Provider、模型 ID/版本、输入采样率、初始化耗时和脱敏错误，且不得包含密钥。 |
 
 ## 6. 约束
