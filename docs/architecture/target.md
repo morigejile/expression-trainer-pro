@@ -174,18 +174,9 @@ Preload 公开 API 固定为 `startASR`、`feedAudio`、`stopASR`、`cancelASR`�
 
 ### 5.4 独立 ASR 执行单元
 
-目标是让 Main 只管理生命周期和路由，不加载模型或执行推理。隔离候选：
+ADR-0006 已选择单个 Electron `utilityProcess`：它拥有 Provider、native addon、模型对象与推理循环；Main 只保留生命周期、R-02 消息路由、退出检测和一次受控重建。`worker_threads` 虽有 ArrayBuffer transfer 和更高空载吞吐，但 native fatal fault 与 Main 共享进程，未满足主要隔离目标。
 
-1. Electron `utilityProcess`/Node 子进程：优先验证，native 崩溃隔离更强；
-2. Node `worker_threads`：消息和部署较轻，但需验证 native addon 兼容性及崩溃边界。
-
-在 spike 前不把二者之一写成 Accepted。选择标准：
-
-- `sherpa-onnx-node` 能稳定加载和释放；
-- 打包后跨平台可定位共享库/模型；
-- 音频吞吐不堆积；
-- 进程退出可发现、可重启、不会丢失设置/模型；
-- Main 事件循环延迟满足基线预算。
+D-03 spike 表明 10 个在途上限下 utility process 的 structured-clone copy 仍远高于实时 50 chunks/s；R-05/R-06 因此优先保证有界队列、session 顺序和故障可见性，不为 1,280-byte chunk 引入共享内存或通用 supervisor。真实模型循环和 Forge 制品路径分别在 R-06、PKG-02 验证。
 
 ### 5.5 Model Manager
 

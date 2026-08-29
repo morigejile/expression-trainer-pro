@@ -2,7 +2,7 @@
 
 > 状态：Active execution baseline
 > 更新日期：2026-08-29
-> 当前进度：Phase 0-2、D-01/D-02 与 R-01～R-04 已完成；D-03/D-04 未完成；下一主线为 D-03 执行边界 spike
+> 当前进度：Phase 0-2、D-01～D-03 与 R-01～R-04 已完成；D-04 未完成；下一主线为 R-05 有界音频传输
 > 当前模式：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞后续工作；只有它们使当前技术实验无法运行或结论失效时，才阻塞当前路径。
 
 ## 1. 目标与排序原则
@@ -66,14 +66,14 @@ flowchart LR
 
 - BM-01 数据 intake、review、质量报告和 freeze 工具已归档到 Git 历史；核心 harness 继续保留。
 - BM-03 工作树已归档，分支 `codex/benchmark/bm03-audio-baseline` 保留；其证据不作为模型选择门禁，后续音频兼容性由 R-03/R-04 接手。
-- BM-07 尚未执行，只在 D-03 前做最小执行边界 spike，不提前扩张。
+- BM-07 已以 D-03 最小执行边界 spike 完成：只比较 native load、有界小块传输、退出恢复与进程隔离，不扩张为通用性能框架。
 - 仅重开 Zipformer Large CTC INT8 候选准备与 FireRedASR2 CTC INT8 utterance spike；不进行通用的新模型扩张。新语料和新的 review 流程仍不在当前关键路径。
 
 ## 4. Phase 3 未完成决策
 
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
-| D-03 | P0 | 接受 ASR 执行边界 ADR | 在 R-04 后做有界 spike，比较 utility/child process 与 worker thread 的 native load、吞吐、退出恢复和打包边界 | R-02,R-04；BM-07 spike | ADR-0006 Accepted；消息协议、故障恢复和打包方式明确 |
+| D-03 | P0 | 接受 ASR 执行边界 ADR（Completed） | 有界 spike 比较 worker thread 与 Electron utility process 的 native load、1,000×320-frame 传输、退出恢复和路径边界；选择单个 utility process | R-02,R-04；BM-07 spike | ADR-0006 Accepted；R-05 使用 10-block 有界队列，R-06 实现 utility process 隔离；真实模型/Forge 验证保留在对应节点 |
 | D-04 | P1 | 复审目标架构 | 用已接受的执行机制、性能证据和 Tier 1 平台更新 `target.md` 与 NFR | D-03,PKG-01 | 可由实测解决的 TBD 已关闭；未实现内容不写成事实 |
 
 ## 5. Phase 4 — 渐进重构 Audio / ASR / Model Manager
@@ -90,7 +90,7 @@ flowchart LR
 | R-08 | P1 | 激活版本化默认模型 | 用 registry 激活 ADR-0005 接受的 Paraformer；不增加普通用户多模型选择 | R-06,R-07,D-02 | 端到端模型文件/config 与 ADR-0005 一致 |
 | R-09 | P1 | 收敛设置/规则/日志 | 演进 schemaVersion、原子写和脱敏日志；凭据库仅在收益超过 native 成本时采用 | T-03,R-07 | 升级保留配置；日志不含 Key 或完整敏感文本 |
 
-当前关键路径是 `D-03 → R-05 → R-06`；已完成的 R-02～R-04 继续作为 session/event 与标准化音频输入依赖。下一步先做 D-03 有界执行边界 spike；R-07 可独立准备但不阻塞关键路径。
+当前关键路径是 `R-05 → R-06`；D-03 已通过 spike 选择单个 Electron utility process。下一步先把 Renderer 音频发送收敛为 10-block 有界队列，再把 Provider/native 推理移出 Main；R-07 可独立准备但不阻塞关键路径。
 
 ### 5.1 内部 benchmark 候选（不改变产品默认）
 

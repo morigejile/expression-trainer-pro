@@ -13,7 +13,8 @@
     "start": "electron .",
     "dev": "electron . --dev",
     "test": "node --test",
-    "benchmark:dry-run": "node benchmark/run.js --dry-run --manifest benchmark/datasets/example/manifest.json --dataset-root benchmark/datasets/example --candidate fake"
+    "benchmark:dry-run": "node benchmark/run.js --dry-run --manifest benchmark/datasets/example/manifest.json --dataset-root benchmark/datasets/example --candidate fake",
+    "spike:asr-boundary": "electron benchmark/spikes/asr-execution-boundary.js"
   },
   "keywords": ["expression", "training", "speech", "asr", "chinese"],
   "author": "sisi",
