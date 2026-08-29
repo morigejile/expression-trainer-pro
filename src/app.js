@@ -27,9 +27,16 @@ const {
   filterAsrEvent,
   invalidateAsrSession
 } = AsrEventState;
+const AudioCapture = typeof module !== 'undefined' && module.exports
+  ? require('./audio-capture')
+  : window.AudioCapture;
+const { createAudioCapture } = AudioCapture;
 
 class ExpressionTrainer {
-  constructor() {
+  constructor({ audioCaptureFactory = createAudioCapture } = {}) {
+    this.audioCaptureFactory = audioCaptureFactory;
+    this.audioCapture = null;
+    this.audioCaptureStopPromise = null;
     this.isRecording = false;
     this.isPaused = false;
     this.startTime = null;
@@ -43,7 +50,6 @@ class ExpressionTrainer {
     this.lastReport = '';
     this.llmGeneration = 0;
     this.asrEventState = createAsrEventState();
-    this.asrInputSequence = 0;
     this.asrStartAttempt = null;
     this.asrGeneration = 0;
 
@@ -120,7 +126,6 @@ class ExpressionTrainer {
 
     const sessionId = globalThis.crypto.randomUUID();
     this.asrEventState = beginAsrSession(this.asrEventState, sessionId);
-    this.asrInputSequence = 0;
     const ownsSession = () => this.asrStartAttempt === startAttempt
       && this.asrEventState.activeSessionId === sessionId;
 
@@ -153,58 +158,20 @@ class ExpressionTrainer {
       return;
     }
 
-    let stream = null;
-    let audioContext = null;
-    let audioProcessor = null;
+    const audioCapture = this.audioCaptureFactory();
     try {
-      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      await audioCapture.start({
+        sessionId,
+        onChunk: chunk => this.handleCapturedChunk(chunk)
+      });
       if (!ownsSession()) {
-        stream.getTracks().forEach(track => track.stop());
+        await audioCapture.stop();
         await this.cancelActiveAsrSession(sessionId, () => false);
         return;
       }
-      audioContext = new AudioContext({ sampleRate: 16000 });
-      const source = audioContext.createMediaStreamSource(stream);
-      audioProcessor = audioContext.createScriptProcessor(4096, 1, 1);
-      audioProcessor.onaudioprocess = async (e) => {
-        if (!this.isRecording
-            || this.isPaused
-            || this.asrEventState.activeSessionId !== sessionId) return;
-        const samples = e.inputBuffer.getChannelData(0);
-        const sequence = this.asrInputSequence;
-        this.asrInputSequence += 1;
-        try {
-          const response = await window.api.feedAudio({ sessionId, sequence, samples });
-          if (!response || response.ok !== true) {
-            this.failActiveRecording(sessionId);
-            return;
-          }
-          await this.processASRResponse(
-            response,
-            '语音识别处理失败',
-            '语音识别结果处理失败',
-            () => this.asrEventState.activeSessionId === sessionId
-          );
-        } catch (error) {
-          this.failActiveRecording(sessionId);
-        }
-      };
-      source.connect(audioProcessor);
-      audioProcessor.connect(audioContext.destination);
-      if (!ownsSession()) {
-        audioProcessor.disconnect();
-        await audioContext.close();
-        stream.getTracks().forEach(track => track.stop());
-        await this.cancelActiveAsrSession(sessionId, () => false);
-        return;
-      }
-      this.audioContext = audioContext;
-      this.audioProcessor = audioProcessor;
-      this.mediaStream = stream;
+      this.audioCapture = audioCapture;
     } catch (err) {
-      try { audioProcessor?.disconnect(); } catch {}
-      try { await audioContext?.close(); } catch {}
-      try { stream?.getTracks().forEach(track => track.stop()); } catch {}
+      try { await audioCapture.stop(); } catch {}
       const failureOwned = ownsSession();
       await this.cancelActiveAsrSession(
         sessionId,
@@ -241,10 +208,12 @@ class ExpressionTrainer {
     this.timer.classList.add('active');
 
     this.timerInterval = setInterval(() => this.updateTimer(), 1000);
+    this.audioCapture.setEnabled(true);
   }
 
   pauseRecording() {
     this.isPaused = true;
+    this.audioCapture?.setEnabled(false);
     this.pauseStart = Date.now();
     this.btnPause.classList.add('hidden');
     this.btnResume.classList.remove('hidden');
@@ -253,6 +222,7 @@ class ExpressionTrainer {
 
   resumeRecording() {
     this.isPaused = false;
+    this.audioCapture?.setEnabled(true);
     this.pausedTime += Date.now() - this.pauseStart;
     this.pauseStart = null;
     this.btnResume.classList.add('hidden');
@@ -261,31 +231,7 @@ class ExpressionTrainer {
   }
 
   teardownRecordingCapture() {
-    const processor = this.audioProcessor;
-    this.audioProcessor = null;
-    if (processor) {
-      processor.onaudioprocess = null;
-      try { processor.disconnect(); } catch {}
-    }
-
-    const audioContext = this.audioContext;
-    this.audioContext = null;
-    if (audioContext) {
-      try {
-        const closeResult = audioContext.close();
-        if (closeResult?.catch) closeResult.catch(() => {});
-      } catch {}
-    }
-
-    const mediaStream = this.mediaStream;
-    this.mediaStream = null;
-    if (mediaStream) {
-      let tracks = [];
-      try { tracks = mediaStream.getTracks(); } catch {}
-      for (const track of tracks) {
-        try { track.stop(); } catch {}
-      }
-    }
+    void this.releaseAudioCapture().catch(() => {});
 
     clearInterval(this.timerInterval);
     this.timerInterval = null;
@@ -306,6 +252,40 @@ class ExpressionTrainer {
     this.timer.classList.remove('active');
   }
 
+  releaseAudioCapture(options) {
+    const capture = this.audioCapture;
+    if (!capture) return this.audioCaptureStopPromise ?? Promise.resolve();
+    this.audioCapture = null;
+    try {
+      this.audioCaptureStopPromise = Promise.resolve(capture.stop(options));
+    } catch (error) {
+      this.audioCaptureStopPromise = Promise.reject(error);
+    }
+    return this.audioCaptureStopPromise;
+  }
+
+  async handleCapturedChunk(chunk) {
+    const { sessionId, sequence, samples } = chunk;
+    if (!this.isRecording
+        || this.isPaused
+        || this.asrEventState.activeSessionId !== sessionId) return;
+    try {
+      const response = await window.api.feedAudio({ sessionId, sequence, samples });
+      if (!response || response.ok !== true) {
+        this.failActiveRecording(sessionId);
+        return;
+      }
+      await this.processASRResponse(
+        response,
+        '语音识别处理失败',
+        '语音识别结果处理失败',
+        () => this.asrEventState.activeSessionId === sessionId
+      );
+    } catch {
+      this.failActiveRecording(sessionId);
+    }
+  }
+
   failActiveRecording(sessionId) {
     if (this.asrEventState.activeSessionId !== sessionId) return false;
 
@@ -322,10 +302,8 @@ class ExpressionTrainer {
   async stopRecording() {
     this.advanceLLMGeneration();
     const sessionId = this.asrEventState.activeSessionId;
-    if (this.audioProcessor) { this.audioProcessor.disconnect(); this.audioProcessor = null; }
-    if (this.audioContext) { this.audioContext.close(); this.audioContext = null; }
-    if (this.mediaStream) { this.mediaStream.getTracks().forEach(t => t.stop()); this.mediaStream = null; }
     try {
+      await this.releaseAudioCapture();
       if (sessionId) {
         const stopResponse = await window.api.stopASR({ sessionId });
         await this.processASRResponse(

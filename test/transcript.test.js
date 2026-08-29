@@ -4,6 +4,7 @@ const assert = require('node:assert/strict');
 global.document = { addEventListener() {} };
 const { mergeFinalText, ExpressionTrainer } = require('../src/app');
 const { beginAsrSession, createAsrEventState, filterAsrEvent } = require('../src/asr-event-state');
+const { createAudioCapture } = require('../src/audio-capture');
 delete global.document;
 
 function createClassList() {
@@ -33,9 +34,9 @@ function createElement() {
 
 function createTrainer() {
   const trainer = Object.create(ExpressionTrainer.prototype);
-  trainer.audioProcessor = null;
-  trainer.audioContext = null;
-  trainer.mediaStream = null;
+  trainer.audioCaptureFactory = createAudioCapture;
+  trainer.audioCapture = null;
+  trainer.audioCaptureStopPromise = null;
   trainer.isRecording = true;
   trainer.isPaused = false;
   trainer.startTime = Date.now();
@@ -48,7 +49,6 @@ function createTrainer() {
   trainer.lastFeedbackText = '';
   trainer.llmGeneration = 0;
   trainer.asrEventState = createAsrEventState();
-  trainer.asrInputSequence = 0;
   trainer.asrStartAttempt = null;
   trainer.asrGeneration = 0;
   trainer.renderSubtitle = () => {};
@@ -80,6 +80,29 @@ function createDeferred() {
     reject = rejectPromise;
   });
   return { promise, reject, resolve };
+}
+
+function createAudioCaptureFactoryFake({ start, stop } = {}) {
+  const calls = { start: [], enabled: [], stop: [] };
+  let handlers;
+  const capture = {
+    async start(options) {
+      handlers = options;
+      calls.start.push(options.sessionId);
+      if (start) return start(options);
+    },
+    setEnabled(value) { calls.enabled.push(value); },
+    async stop(options) {
+      calls.stop.push(options ?? {});
+      if (stop) return stop(options);
+    }
+  };
+  return {
+    calls,
+    capture,
+    factory: () => capture,
+    emit(chunk) { return handlers.onChunk(chunk); }
+  };
 }
 
 function activateAsrSession(trainer, sessionId = 'session-a') {
@@ -332,39 +355,10 @@ test('blank stop final text leaves transcript state unchanged', async (t) => {
   assert.equal(trainer.stats.totalWords, 4);
 });
 
-test('start creates a UUID session before microphone capture and feeds contiguous input sequences', async (t) => {
+test('renderer routes an active recording through the injected audio capture', async (t) => {
   const calls = [];
   const feedCommands = [];
-  let processor;
-  const stream = { getTracks: () => [{ stop() {} }] };
-  const originalNavigator = Object.getOwnPropertyDescriptor(global, 'navigator');
-  const originalAudioContext = global.AudioContext;
-  Object.defineProperty(global, 'navigator', {
-    configurable: true,
-    value: {
-      mediaDevices: {
-        async getUserMedia() {
-          calls.push('microphone');
-          return stream;
-        }
-      }
-    }
-  });
-  global.AudioContext = class {
-    constructor(options) {
-      calls.push(['audio-context', options]);
-      this.destination = {};
-    }
-    createMediaStreamSource() {
-      return { connect() {} };
-    }
-    createScriptProcessor(frames, inputs, outputs) {
-      calls.push(['script-processor', frames, inputs, outputs]);
-      processor = { connect() {}, disconnect() {}, onaudioprocess: null };
-      return processor;
-    }
-    close() {}
-  };
+  const audio = createAudioCaptureFactoryFake();
   global.window = {
     api: {
       cancelLLMRequests: async () => ({ success: true }),
@@ -377,65 +371,48 @@ test('start creates a UUID session before microphone capture and feeds contiguou
       },
       async feedAudio(command) {
         feedCommands.push(command);
-        return {
-          ok: true,
-          events: [{
-            type: command.sequence === 0 ? 'partial' : 'final',
-            sessionId: command.sessionId,
-            sequence: command.sequence + 1,
-            text: command.sequence === 0 ? '草稿' : '定稿'
-          }]
-        };
-      },
-      analyzeText: async () => ({ totalWords: 2, fillers: [], hedges: [], vagueWords: [] })
+        return { ok: true, events: [] };
+      }
     }
   };
-  t.after(() => {
-    delete global.window;
-    if (originalNavigator) Object.defineProperty(global, 'navigator', originalNavigator);
-    else delete global.navigator;
-    if (originalAudioContext === undefined) delete global.AudioContext;
-    else global.AudioContext = originalAudioContext;
-  });
+  t.after(() => { delete global.window; });
   const trainer = createTrainer();
+  trainer.audioCaptureFactory = audio.factory;
+  trainer.audioCapture = null;
+  trainer.audioCaptureStopPromise = null;
 
   await trainer.startRecording();
-  await processor.onaudioprocess({
-    inputBuffer: { getChannelData: () => new Float32Array([0.1]) }
-  });
-  await processor.onaudioprocess({
-    inputBuffer: { getChannelData: () => new Float32Array([0.2]) }
-  });
-
-  const startCommand = calls.find(call => Array.isArray(call) && call[0] === 'start')[1];
+  const startCommand = calls[0][1];
   assert.match(startCommand.sessionId, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
   assert.deepEqual(startCommand, { sessionId: startCommand.sessionId, sampleRateHz: 16000 });
-  assert.ok(calls.findIndex(call => Array.isArray(call) && call[0] === 'start') < calls.indexOf('microphone'));
-  assert.deepEqual(calls.find(call => Array.isArray(call) && call[0] === 'script-processor'), [
-    'script-processor', 4096, 1, 1
-  ]);
-  assert.deepEqual(feedCommands.map(command => command.sequence), [0, 1]);
-  assert.deepEqual(feedCommands.map(command => command.sessionId), [
-    startCommand.sessionId,
-    startCommand.sessionId
-  ]);
-  assert.equal(trainer.fullText, '定稿');
+  await audio.emit({
+    sessionId: startCommand.sessionId,
+    sequence: 0,
+    sampleRateHz: 16000,
+    channels: 1,
+    format: 'f32',
+    frames: 2,
+    samples: new Float32Array([0.25, -0.5])
+  });
+
+  assert.deepEqual(audio.calls.start, [startCommand.sessionId]);
+  assert.deepEqual(audio.calls.enabled, [true]);
+  assert.deepEqual(feedCommands, [{
+    sessionId: startCommand.sessionId,
+    sequence: 0,
+    samples: new Float32Array([0.25, -0.5])
+  }]);
+  trainer.pauseRecording();
+  trainer.resumeRecording();
+  assert.deepEqual(audio.calls.enabled, [true, false, true]);
   clearInterval(trainer.timerInterval);
 });
 
 test('microphone failure invalidates locally before cancellation completes', async (t) => {
   let cancelCommand;
   let resolveCancel;
-  const originalNavigator = Object.getOwnPropertyDescriptor(global, 'navigator');
-  Object.defineProperty(global, 'navigator', {
-    configurable: true,
-    value: {
-      mediaDevices: {
-        async getUserMedia() {
-          throw new Error('permission denied');
-        }
-      }
-    }
+  const audio = createAudioCaptureFactoryFake({
+    async start() { throw new Error('permission denied'); }
   });
   global.window = {
     api: {
@@ -455,10 +432,9 @@ test('microphone failure invalidates locally before cancellation completes', asy
   t.after(() => {
     resolveCancel?.({ ok: true, events: [] });
     delete global.window;
-    if (originalNavigator) Object.defineProperty(global, 'navigator', originalNavigator);
-    else delete global.navigator;
   });
   const trainer = createTrainer();
+  trainer.audioCaptureFactory = audio.factory;
   const shownErrors = [];
   trainer.showError = message => shownErrors.push(message);
 
@@ -615,35 +591,10 @@ test('only the latest of two overlapping starts may pass the initial await', asy
   assert.deepEqual(trainer.asrEventState, createAsrEventState());
 });
 
-test('microphone graph failure cleans local processor, context, and stream', async (t) => {
-  let processorDisconnects = 0;
-  let contextCloses = 0;
-  let trackStops = 0;
-  const stream = { getTracks: () => [{ stop() { trackStops += 1; } }] };
-  const originalNavigator = Object.getOwnPropertyDescriptor(global, 'navigator');
-  const originalAudioContext = global.AudioContext;
-  Object.defineProperty(global, 'navigator', {
-    configurable: true,
-    value: { mediaDevices: { getUserMedia: async () => stream } }
+test('audio capture setup failure releases the local capture and leaves no owner', async (t) => {
+  const audio = createAudioCaptureFactoryFake({
+    async start() { throw new Error('graph connection failed'); }
   });
-  global.AudioContext = class {
-    constructor() {
-      this.destination = {};
-    }
-    createMediaStreamSource() {
-      return { connect() { throw new Error('graph connection failed'); } };
-    }
-    createScriptProcessor() {
-      return {
-        connect() {},
-        disconnect() { processorDisconnects += 1; },
-        onaudioprocess: null
-      };
-    }
-    close() {
-      contextCloses += 1;
-    }
-  };
   global.window = {
     api: {
       cancelLLMRequests: async () => ({ success: true }),
@@ -658,22 +609,15 @@ test('microphone graph failure cleans local processor, context, and stream', asy
   };
   t.after(() => {
     delete global.window;
-    if (originalNavigator) Object.defineProperty(global, 'navigator', originalNavigator);
-    else delete global.navigator;
-    if (originalAudioContext === undefined) delete global.AudioContext;
-    else global.AudioContext = originalAudioContext;
   });
   const trainer = createTrainer();
+  trainer.audioCaptureFactory = audio.factory;
   trainer.showError = () => {};
 
   await trainer.startRecording();
 
-  assert.equal(processorDisconnects, 1);
-  assert.equal(contextCloses, 1);
-  assert.equal(trackStops, 1);
-  assert.equal(trainer.audioProcessor, null);
-  assert.equal(trainer.audioContext, null);
-  assert.equal(trainer.mediaStream, null);
+  assert.equal(audio.calls.stop.length, 1);
+  assert.equal(trainer.audioCapture, null);
 });
 
 test('microphone rejection from a replaced start does not display a stale error', async (t) => {
@@ -683,16 +627,10 @@ test('microphone rejection from a replaced start does not display a stale error'
   let cancelLlmCalls = 0;
   let startCalls = 0;
   const shownErrors = [];
-  const originalNavigator = Object.getOwnPropertyDescriptor(global, 'navigator');
-  Object.defineProperty(global, 'navigator', {
-    configurable: true,
-    value: {
-      mediaDevices: {
-        getUserMedia() {
-          microphoneRequested.resolve();
-          return firstMicrophone.promise;
-        }
-      }
+  const audio = createAudioCaptureFactoryFake({
+    start() {
+      microphoneRequested.resolve();
+      return firstMicrophone.promise;
     }
   });
   global.window = {
@@ -720,10 +658,9 @@ test('microphone rejection from a replaced start does not display a stale error'
     firstMicrophone.reject(new Error('old permission failure'));
     secondCancellation.resolve({ success: true });
     delete global.window;
-    if (originalNavigator) Object.defineProperty(global, 'navigator', originalNavigator);
-    else delete global.navigator;
   });
   const trainer = createTrainer();
+  trainer.audioCaptureFactory = audio.factory;
   trainer.showError = message => shownErrors.push(message);
 
   const firstStart = trainer.startRecording();
@@ -824,45 +761,10 @@ test('stop rejection after clear does not display a stale error', async (t) => {
 });
 
 async function startActiveRecordingHarness(t, { feedAudio, cancelASR } = {}) {
-  let processor;
-  let processorDisconnects = 0;
-  let contextCloses = 0;
-  let trackStops = 0;
   let sessionId;
   const feedCommands = [];
   const cancelCommands = [];
-  const tracks = [
-    { stop() { trackStops += 1; } },
-    { stop() { trackStops += 1; } }
-  ];
-  const stream = { getTracks: () => tracks };
-  const originalNavigator = Object.getOwnPropertyDescriptor(global, 'navigator');
-  const originalAudioContext = global.AudioContext;
-
-  Object.defineProperty(global, 'navigator', {
-    configurable: true,
-    value: { mediaDevices: { getUserMedia: async () => stream } }
-  });
-  global.AudioContext = class {
-    constructor() {
-      this.destination = {};
-    }
-    createMediaStreamSource() {
-      return { connect() {} };
-    }
-    createScriptProcessor() {
-      processor = {
-        connect() {},
-        disconnect() { processorDisconnects += 1; },
-        onaudioprocess: null
-      };
-      return processor;
-    }
-    close() {
-      contextCloses += 1;
-      return Promise.resolve();
-    }
-  };
+  const audio = createAudioCaptureFactoryFake();
   global.document = { createElement };
   global.window = {
     api: {
@@ -891,25 +793,19 @@ async function startActiveRecordingHarness(t, { feedAudio, cancelASR } = {}) {
   };
 
   const trainer = createTrainer();
+  trainer.audioCaptureFactory = audio.factory;
   t.after(() => {
     clearInterval(trainer.timerInterval);
     delete global.document;
     delete global.window;
-    if (originalNavigator) Object.defineProperty(global, 'navigator', originalNavigator);
-    else delete global.navigator;
-    if (originalAudioContext === undefined) delete global.AudioContext;
-    else global.AudioContext = originalAudioContext;
   });
   await trainer.startRecording();
 
   return {
+    audio,
     cancelCommands,
     feedCommands,
-    get contextCloses() { return contextCloses; },
-    get processor() { return processor; },
-    get processorDisconnects() { return processorDisconnects; },
     get sessionId() { return sessionId; },
-    get trackStops() { return trackStops; },
     trainer
   };
 }
@@ -922,7 +818,6 @@ test('a completed-session restart can be cleared back to an inert idle state', a
   });
   const { trainer } = harness;
   trainer.showError = message => shownErrors.push(message);
-  const lateAudioCallback = harness.processor.onaudioprocess;
 
   assert.equal(trainer.btnReport.classList.contains('hidden'), true);
   assert.equal(trainer.btnCopyText.classList.contains('hidden'), true);
@@ -934,12 +829,8 @@ test('a completed-session restart can be cleared back to an inert idle state', a
 
   assert.deepEqual(harness.cancelCommands, [{ sessionId: harness.sessionId }]);
   assert.deepEqual(trainer.asrEventState, createAsrEventState());
-  assert.equal(harness.processorDisconnects, 1);
-  assert.equal(harness.contextCloses, 1);
-  assert.equal(harness.trackStops, 2);
-  assert.equal(trainer.audioProcessor, null);
-  assert.equal(trainer.audioContext, null);
-  assert.equal(trainer.mediaStream, null);
+  assert.equal(harness.audio.calls.stop.length, 1);
+  assert.equal(trainer.audioCapture, null);
   assert.equal(trainer.timerInterval, null);
   assert.equal(trainer.isRecording, false);
   assert.equal(trainer.isPaused, false);
@@ -948,8 +839,10 @@ test('a completed-session restart can be cleared back to an inert idle state', a
   assert.equal(trainer.btnPause.classList.contains('hidden'), true);
   assert.equal(trainer.btnResume.classList.contains('hidden'), true);
 
-  await lateAudioCallback({
-    inputBuffer: { getChannelData: () => new Float32Array([0.25]) }
+  await harness.audio.emit({
+    sessionId: harness.sessionId,
+    sequence: 0,
+    samples: new Float32Array([0.25])
   });
   await trainer.processASRResponse({
     ok: true,
@@ -990,24 +883,23 @@ for (const feedFailure of [
     });
     const { trainer } = harness;
     trainer.showError = message => shownErrors.push(message);
-    const lateAudioCallback = harness.processor.onaudioprocess;
 
-    await lateAudioCallback({
-      inputBuffer: { getChannelData: () => new Float32Array([0.5]) }
+    await harness.audio.emit({
+      sessionId: harness.sessionId,
+      sequence: 0,
+      samples: new Float32Array([0.5])
     });
-    await lateAudioCallback({
-      inputBuffer: { getChannelData: () => new Float32Array([0.75]) }
+    await harness.audio.emit({
+      sessionId: harness.sessionId,
+      sequence: 1,
+      samples: new Float32Array([0.75])
     });
 
     assert.deepEqual(harness.feedCommands.map(command => command.sequence), [0]);
     assert.deepEqual(harness.cancelCommands, [{ sessionId: harness.sessionId }]);
     assert.deepEqual(trainer.asrEventState, createAsrEventState());
-    assert.equal(harness.processorDisconnects, 1);
-    assert.equal(harness.contextCloses, 1);
-    assert.equal(harness.trackStops, 2);
-    assert.equal(trainer.audioProcessor, null);
-    assert.equal(trainer.audioContext, null);
-    assert.equal(trainer.mediaStream, null);
+    assert.equal(harness.audio.calls.stop.length, 1);
+    assert.equal(trainer.audioCapture, null);
     assert.equal(trainer.timerInterval, null);
     assert.equal(trainer.isRecording, false);
     assert.equal(trainer.isPaused, false);
