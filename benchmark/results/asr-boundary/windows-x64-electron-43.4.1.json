@@ -1,0 +1,51 @@
+{
+  "recordedAt": "2026-08-29T07:24:42.935Z",
+  "runtime": {
+    "platform": "win32",
+    "arch": "x64",
+    "electron": "43.4.1",
+    "node": "24.18.1",
+    "modules": "148"
+  },
+  "constraints": {
+    "chunkFrames": 320,
+    "chunkCount": 1000,
+    "maxInFlight": 10,
+    "realModelLoop": false,
+    "packagedApp": false
+  },
+  "results": [
+    {
+      "kind": "worker",
+      "processIsolation": false,
+      "nativeLoadMs": 16.4628,
+      "rssBytes": 129716224,
+      "elapsedMs": 22.9445,
+      "chunksPerSecond": 43583.4296,
+      "peakInFlight": 10,
+      "detachedBuffers": 1000,
+      "bufferDelivery": "transferred",
+      "mainEventLoopMaxDelayMs": 2.1749,
+      "forcedExitCode": 73,
+      "replacementNativeLoadMs": 17.0527,
+      "disposeExitCode": 0,
+      "recoveredAfterForcedExit": true
+    },
+    {
+      "kind": "utility-process",
+      "processIsolation": true,
+      "nativeLoadMs": 18.0567,
+      "rssBytes": 68665344,
+      "elapsedMs": 38.2517,
+      "chunksPerSecond": 26142.629,
+      "peakInFlight": 10,
+      "detachedBuffers": 0,
+      "bufferDelivery": "structured-clone-copy",
+      "mainEventLoopMaxDelayMs": 4.8079,
+      "forcedExitCode": 73,
+      "replacementNativeLoadMs": 19.0227,
+      "disposeExitCode": 0,
+      "recoveredAfterForcedExit": true
+    }
+  ]
+}

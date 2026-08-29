@@ -1,7 +1,7 @@
 {
   "name": "expression-trainer",
   "productName": "宇宙无敌表达训练",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "packageManager": "npm@12.0.2",
   "description": "宇宙无敌表达训练系统 - 本地桌面版",
   "main": "main.js",
@@ -9,23 +9,39 @@
     "node": ">=22.23.0 <23",
     "npm": ">=12.0.2 <13"
   },
-  "allowScripts": {
-    "electron@43.4.1": true
-  },
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
     "test": "node --test",
-    "check": "node --check main.js && node --check preload.js && node --check lib/ai-feedback.js && node --check lib/asr.js && node --check lib/asr-provider.js && node --check lib/fake-asr-provider.js && node --check lib/lexicon.js && node --check lib/prompts.js && node --check lib/settings-config.js && node --check benchmark/lib/dataset-manifest.js && node --check benchmark/lib/dataset-quality.js && node --check benchmark/lib/dataset-quality-report.js && node --check benchmark/lib/benchmark-dataset-freeze.js && node --check benchmark/lib/assisted-review-batch.js && node --check benchmark/lib/internal-review-store.js && node --check benchmark/lib/assisted-review-server.js && node --check benchmark/lib/model-root.js && node --check benchmark/lib/candidate-registry.js && node --check benchmark/lib/transcript.js && node --check benchmark/lib/cer.js && node --check benchmark/lib/metrics.js && node --check benchmark/lib/candidate-config.js && node --check benchmark/lib/environment.js && node --check benchmark/lib/output-root.js && node --check benchmark/lib/results.js && node --check benchmark/lib/adapter.js && node --check benchmark/adapters/fake.js && node --check benchmark/adapters/sherpa.js && node --check benchmark/assisted-review/review-ui.js && node --check benchmark/scripts/generate-quality-report.js && node --check benchmark/scripts/generate-fleurs-intake-inventory.js && node --check benchmark/scripts/internal-benchmark-dataset.js && node --check benchmark/scripts/internal-benchmark-review.js && node --check benchmark/models/verify-candidate.js && node --check benchmark/models/load-candidate.js && node --check benchmark/run.js && node --check src/app.js && node --check src/safe-rendering.js && node --check src/settings.js && node --check smoke/electron-smoke-runner.js && node --check test/electron-smoke.test.js",
-    "benchmark:dry-run": "node benchmark/run.js --dry-run --manifest benchmark/datasets/example/manifest.json --dataset-root benchmark/datasets/example --candidate fake"
+    "package": "electron-forge package --platform=win32 --arch=x64",
+    "make": "electron-forge make --platform=win32 --arch=x64",
+    "smoke:package": "node scripts/verify-packaged-app.js",
+    "smoke:first-install": "node scripts/verify-first-install.js",
+    "smoke:upgrade": "node scripts/verify-upgrade.js",
+    "benchmark:dry-run": "node benchmark/run.js --dry-run --manifest benchmark/datasets/example/manifest.json --dataset-root benchmark/datasets/example --candidate fake",
+    "spike:asr-boundary": "electron benchmark/spikes/asr-execution-boundary.js"
   },
-  "keywords": ["expression", "training", "speech", "asr", "chinese"],
+  "keywords": [
+    "expression",
+    "training",
+    "speech",
+    "asr",
+    "chinese"
+  ],
   "author": "sisi",
   "license": "MIT",
+  "allowScripts": {
+    "electron@43.4.1": true,
+    "electron-winstaller@5.4.4": true
+  },
   "devDependencies": {
+    "@electron-forge/cli": "7.5.0",
+    "@electron-forge/maker-squirrel": "7.5.0",
+    "@electron/rebuild": "3.6.0",
     "electron": "43.4.1"
   },
   "dependencies": {
-    "sherpa-onnx-node": "^1.10.0"
+    "electron-squirrel-startup": "1.0.1",
+    "sherpa-onnx-node": "1.13.3"
   }
 }

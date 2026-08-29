@@ -1,10 +1,8 @@
 node_modules/
+.worktrees/
 models/*.onnx
 models/sherpa-onnx-*/
 dist/
+out/
 .DS_Store
 .idea/
-
-demo-*.html
-prompt-playground.html
-listenhub-*.png

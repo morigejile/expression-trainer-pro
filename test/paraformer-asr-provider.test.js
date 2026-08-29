@@ -2,6 +2,29 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
+function createProviderWithCapturedAdapter(options) {
+  const asrPath = require.resolve('../lib/asr');
+  const sessionPath = require.resolve('../lib/asr-session');
+  const sessionModule = require(sessionPath);
+  const originalCreateSessionProvider = sessionModule.createAsrSessionProvider;
+  let adapter;
+
+  sessionModule.createAsrSessionProvider = (sessionOptions) => {
+    adapter = sessionOptions.adapter;
+    return originalCreateSessionProvider(sessionOptions);
+  };
+  delete require.cache[asrPath];
+  try {
+    const { createParaformerAsrProvider } = require(asrPath);
+    const provider = createParaformerAsrProvider(options);
+    return { adapter, provider };
+  } finally {
+    sessionModule.createAsrSessionProvider = originalCreateSessionProvider;
+    delete require.cache[asrPath];
+    require(asrPath);
+  }
+}
+
 test('Paraformer provider preserves the current model and decoding configuration', async () => {
   const { createParaformerAsrProvider } = require('../lib/asr');
   const modelRoot = path.join('C:', 'fixture-models');
@@ -10,7 +33,8 @@ test('Paraformer provider preserves the current model and decoding configuration
     'sherpa-onnx-streaming-paraformer-bilingual-zh-en'
   );
   let receivedConfig;
-  const stream = {};
+  let recognizerCount = 0;
+  let streamCount = 0;
 
   const provider = createParaformerAsrProvider({
     modelRoot,
@@ -18,16 +42,19 @@ test('Paraformer provider preserves the current model and decoding configuration
     loadSherpa: () => ({
       OnlineRecognizer: class {
         constructor(config) {
+          recognizerCount += 1;
           receivedConfig = config;
         }
 
         createStream() {
-          return stream;
+          streamCount += 1;
+          return {};
         }
       }
     })
   });
 
+  await provider.initialize();
   await provider.initialize();
 
   assert.deepEqual(receivedConfig, {
@@ -52,6 +79,53 @@ test('Paraformer provider preserves the current model and decoding configuration
     rule2MinTrailingSilence: 1.2,
     rule3MinUtteranceLength: 20
   });
+  assert.equal(recognizerCount, 1);
+  assert.equal(streamCount, 0);
+
+  assert.deepEqual(await provider.start({
+    sessionId: 'session-a',
+    sampleRateHz: 16000
+  }), {
+    type: 'ready',
+    sessionId: 'session-a',
+    sequence: 0
+  });
+  assert.equal(streamCount, 1);
+
+  assert.deepEqual(await provider.start({
+    sessionId: 'session-b',
+    sampleRateHz: 16000
+  }), {
+    type: 'ready',
+    sessionId: 'session-b',
+    sequence: 0
+  });
+  assert.equal(streamCount, 2);
+});
+
+test('Paraformer provider accepts activated model files by role', async () => {
+  const { createParaformerAsrProvider } = require('../lib/asr');
+  const modelDir = path.join('C:', 'user-data', 'models', 'paraformer-bilingual-zh-en', '2024-03-10');
+  const modelFiles = {
+    encoder: path.join(modelDir, 'encoder.int8.onnx'),
+    decoder: path.join(modelDir, 'decoder.int8.onnx'),
+    tokens: path.join(modelDir, 'tokens.txt')
+  };
+  let config;
+  const provider = createParaformerAsrProvider({
+    modelFiles,
+    fileExists: () => true,
+    loadSherpa: () => ({
+      OnlineRecognizer: class {
+        constructor(value) { config = value; }
+      }
+    })
+  });
+
+  await provider.initialize();
+  assert.equal(config.modelConfig.paraformer.encoder, modelFiles.encoder);
+  assert.equal(config.modelConfig.paraformer.decoder, modelFiles.decoder);
+  assert.equal(config.modelConfig.tokens, modelFiles.tokens);
 });
 
 test('Paraformer provider feeds 16 kHz samples and returns trimmed partial text', async () => {
@@ -83,10 +157,20 @@ test('Paraformer provider feeds 16 kHz samples and returns trimmed partial text'
   });
 
   await provider.initialize();
-  const result = provider.feed(samples);
+  await provider.start({ sessionId: 'partial-session', sampleRateHz: 16000 });
+  const result = provider.feed({
+    sessionId: 'partial-session',
+    sequence: 0,
+    samples
+  });
 
   assert.deepEqual(acceptedWaveform, { samples, sampleRate: 16000 });
-  assert.deepEqual(result, { text: 'partial text', isFinal: false });
+  assert.deepEqual(result, {
+    type: 'partial',
+    sessionId: 'partial-session',
+    sequence: 1,
+    text: 'partial text'
+  });
 });
 
 test('Paraformer provider finalizes and resets a non-empty endpoint result', async () => {
@@ -115,10 +199,20 @@ test('Paraformer provider finalizes and resets a non-empty endpoint result', asy
   });
 
   await provider.initialize();
-  const result = provider.feed(new Float32Array([0.1]));
+  await provider.start({ sessionId: 'endpoint-session', sampleRateHz: 16000 });
+  const result = provider.feed({
+    sessionId: 'endpoint-session',
+    sequence: 0,
+    samples: new Float32Array([0.1])
+  });
 
   assert.equal(resetStream, stream);
-  assert.deepEqual(result, { text: 'endpoint text', isFinal: true });
+  assert.deepEqual(result, {
+    type: 'final',
+    sessionId: 'endpoint-session',
+    sequence: 1,
+    text: 'endpoint text'
+  });
 });
 
 test('Paraformer provider flushes and returns trimmed final text when stopped', async () => {
@@ -148,37 +242,131 @@ test('Paraformer provider flushes and returns trimmed final text when stopped', 
   });
 
   await provider.initialize();
-  const finalText = provider.stop();
+  await provider.start({ sessionId: 'stop-session', sampleRateHz: 16000 });
+  const stopped = provider.stop({ sessionId: 'stop-session' });
 
   assert.equal(inputFinished, true);
-  assert.equal(finalText, 'tail text');
+  assert.deepEqual(stopped, [
+    {
+      type: 'final',
+      sessionId: 'stop-session',
+      sequence: 1,
+      text: 'tail text'
+    },
+    {
+      type: 'stopped',
+      sessionId: 'stop-session',
+      sequence: 2
+    }
+  ]);
+  assert.deepEqual(provider.stop({ sessionId: 'stop-session' }), []);
 });
 
-test('Paraformer provider reuses its recognizer when initialized again', async () => {
-  const { createParaformerAsrProvider } = require('../lib/asr');
-  let recognizerCount = 0;
-  let streamCount = 0;
-  const provider = createParaformerAsrProvider({
+test('Paraformer provider releases its stream when stop finalization throws', async () => {
+  let inputFinishedCalls = 0;
+  const stream = {
+    inputFinished() {
+      inputFinishedCalls += 1;
+      throw new Error('input finalization failed');
+    }
+  };
+  const recognizer = {
+    createStream: () => stream,
+    isReady: () => false,
+    decode() {},
+    getResult: () => ({ text: 'unreachable tail' })
+  };
+  const { adapter, provider } = createProviderWithCapturedAdapter({
     fileExists: () => true,
     loadSherpa: () => ({
       OnlineRecognizer: class {
         constructor() {
-          recognizerCount += 1;
-        }
-
-        createStream() {
-          streamCount += 1;
-          return {};
+          return recognizer;
         }
       }
     })
   });
 
   await provider.initialize();
-  await provider.initialize();
+  await provider.start({ sessionId: 'failed-stop-session', sampleRateHz: 16000 });
 
-  assert.equal(recognizerCount, 1);
-  assert.equal(streamCount, 2);
+  assert.deepEqual(provider.stop({ sessionId: 'failed-stop-session' }), [
+    {
+      type: 'error',
+      sessionId: 'failed-stop-session',
+      sequence: 1,
+      code: 'asr-stop-failed',
+      message: 'input finalization failed'
+    },
+    {
+      type: 'stopped',
+      sessionId: 'failed-stop-session',
+      sequence: 2
+    }
+  ]);
+  assert.doesNotThrow(() => adapter.stop());
+  assert.equal(inputFinishedCalls, 1);
+});
+
+test('Paraformer provider cancels without flushing and disposes repeatably', async () => {
+  const { createParaformerAsrProvider } = require('../lib/asr');
+  const streams = [];
+  let inputFinishedCount = 0;
+  const recognizer = {
+    createStream() {
+      const stream = {
+        acceptWaveform() {},
+        inputFinished() {
+          inputFinishedCount += 1;
+        }
+      };
+      streams.push(stream);
+      return stream;
+    },
+    isReady: () => false,
+    decode() {},
+    getResult: () => ({ text: 'tail that must be discarded' }),
+    isEndpoint: () => false
+  };
+  const provider = createParaformerAsrProvider({
+    fileExists: () => true,
+    loadSherpa: () => ({
+      OnlineRecognizer: class {
+        constructor() {
+          return recognizer;
+        }
+      }
+    })
+  });
+
+  await provider.initialize();
+  await provider.start({ sessionId: 'cancel-session', sampleRateHz: 16000 });
+
+  assert.deepEqual(provider.cancel({ sessionId: 'cancel-session' }), [
+    {
+      type: 'stopped',
+      sessionId: 'cancel-session',
+      sequence: 1
+    }
+  ]);
+  assert.equal(inputFinishedCount, 0);
+  assert.equal(provider.feed({
+    sessionId: 'cancel-session',
+    sequence: 0,
+    samples: new Float32Array([0.1])
+  }), null);
+  assert.deepEqual(provider.cancel({ sessionId: 'cancel-session' }), []);
+
+  await provider.start({ sessionId: 'next-session', sampleRateHz: 16000 });
+  assert.equal(streams.length, 2);
+
+  await provider.dispose();
+  await provider.dispose();
+  await assert.rejects(
+    provider.start({ sessionId: 'disposed-session', sampleRateHz: 16000 }),
+    /ASR provider has been disposed/
+  );
+  assert.equal(streams.length, 2);
 });
 
 test('Paraformer provider reports the first missing model file before loading Sherpa', async () => {
@@ -218,6 +406,11 @@ test('Paraformer provider returns null for an empty recognition result', async (
   });
 
   await provider.initialize();
+  await provider.start({ sessionId: 'empty-session', sampleRateHz: 16000 });
 
-  assert.equal(provider.feed(new Float32Array([0.1])), null);
+  assert.equal(provider.feed({
+    sessionId: 'empty-session',
+    sequence: 0,
+    samples: new Float32Array([0.1])
+  }), null);
 });

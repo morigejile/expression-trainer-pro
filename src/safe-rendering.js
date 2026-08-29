@@ -1,20 +1,19 @@
 (function initializeSafeRendering(root, factory) {
-  const api = factory();
+  const rules = typeof module === 'object' && module.exports
+    ? require('../shared/expression-rules')
+    : root.ExpressionRules;
+  const api = factory(rules);
 
   if (typeof module === 'object' && module.exports) {
     module.exports = api;
   } else {
     root.SafeRendering = api;
   }
-})(typeof globalThis !== 'undefined' ? globalThis : this, () => {
+})(typeof globalThis !== 'undefined' ? globalThis : this, (rules) => {
   'use strict';
 
-  const VAGUE_WORDS = [
-    '开心', '难过', '害怕', '生气', '不舒服', '很好', '很多', '很快',
-    '很大', '很小', '好看', '不好', '喜欢', '讨厌', '觉得', '想想'
-  ];
-  const FILLER_PATTERN = /(嗯|啊|呃|额|那个|就是|然后|这个|对吧|是吧|反正|基本上)/g;
-  const HEDGE_PATTERN = /(可能|也许|大概|应该|我觉得|好像|似乎|或许|不一定|差不多|感觉)/g;
+  if (!rules) throw new Error('Expression rules are required');
+  const VAGUE_WORDS = Object.keys(rules.VAGUE_TO_PRECISE);
 
   function escapeHtml(text) {
     return String(text ?? '')
@@ -27,6 +26,10 @@
 
   function escapeRegExp(text) {
     return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function wordPattern(words) {
+    return new RegExp([...words].sort((a, b) => b.length - a.length).map(escapeRegExp).join('|'), 'g');
   }
 
   function markTextTokens(tokens, pattern, type) {
@@ -57,11 +60,13 @@
 
   function tokenizeHighlightedText(text) {
     const input = String(text ?? '');
-    const vaguePattern = new RegExp(VAGUE_WORDS.map(escapeRegExp).join('|'), 'g');
+    const vaguePattern = wordPattern(VAGUE_WORDS);
+    const fillerPattern = wordPattern(rules.FILLER_WORDS);
+    const hedgePattern = wordPattern(rules.HEDGE_WORDS);
     let tokens = [{ type: 'text', text: input }];
     tokens = markTextTokens(tokens, vaguePattern, 'vague');
-    tokens = markTextTokens(tokens, FILLER_PATTERN, 'filler');
-    tokens = markTextTokens(tokens, HEDGE_PATTERN, 'hedge');
+    tokens = markTextTokens(tokens, fillerPattern, 'filler');
+    tokens = markTextTokens(tokens, hedgePattern, 'hedge');
     return tokens;
   }
 

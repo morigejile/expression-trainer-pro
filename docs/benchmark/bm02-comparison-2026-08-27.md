@@ -24,7 +24,7 @@
 
 ## 原始结果
 
-外部结果根目录：`D:\Codex_projects\expression-trainer-pro-benchmark-results`
+外部结果根目录由运行者配置；以下 run ID 是 canonical 标识，不依赖某台开发机的绝对路径：
 
 - `2026-08-27T09-45-58-385Z-paraformer-bilingual-zh-en-control`
 - `2026-08-27T09-47-25-021Z-zipformer-small-ctc-zh-int8-2025-04-01`

@@ -3,6 +3,8 @@ const assert = require('node:assert/strict');
 
 global.document = { addEventListener() {} };
 const { mergeFinalText, ExpressionTrainer } = require('../src/app');
+const { beginAsrSession, createAsrEventState, filterAsrEvent } = require('../src/asr-event-state');
+const { createAudioCapture } = require('../src/audio-capture');
 delete global.document;
 
 function createClassList() {
@@ -20,15 +22,25 @@ function createElement() {
     style: {},
     textContent: '',
     children: [],
-    replaceChildren() {}
+    appendChild(node) {
+      this.children.push(node);
+      return node;
+    },
+    replaceChildren(...nodes) {
+      this.children = [...nodes];
+    }
   };
 }
 
 function createTrainer() {
   const trainer = Object.create(ExpressionTrainer.prototype);
-  trainer.audioProcessor = null;
-  trainer.audioContext = null;
-  trainer.mediaStream = null;
+  trainer.audioCaptureFactory = createAudioCapture;
+  trainer.audioCapture = null;
+  trainer.audioCaptureStopPromise = null;
+  trainer.audioFeedTracker = null;
+  trainer.recordingStopOperation = null;
+  trainer.lastAudioCaptureRates = null;
+  trainer.lastAudioFeedMetrics = null;
   trainer.isRecording = true;
   trainer.isPaused = false;
   trainer.startTime = Date.now();
@@ -40,6 +52,9 @@ function createTrainer() {
   trainer.stats = { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 4, duration: 0 };
   trainer.lastFeedbackText = '';
   trainer.llmGeneration = 0;
+  trainer.asrEventState = createAsrEventState();
+  trainer.asrStartAttempt = null;
+  trainer.asrGeneration = 0;
   trainer.renderSubtitle = () => {};
   trainer.btnStop = createElement();
   trainer.btnPause = createElement();
@@ -59,6 +74,123 @@ function createTrainer() {
   trainer.reportBody = createElement();
   trainer.reportModal = createElement();
   return trainer;
+}
+
+async function startAudioCaptureHarness(t, {
+  captureStop,
+  feedAudio,
+  stopASR,
+  cancelASR
+} = {}) {
+  const order = [];
+  const calls = { captureStop: 0, feedAudio: 0, stopASR: 0, cancelASR: 0 };
+  let handlers;
+  let sessionId;
+  const capture = {
+    async start(options) {
+      handlers = options;
+      return {
+        requestedSampleRateHz: 16000,
+        contextSampleRateHz: 16000,
+        trackSampleRateHz: 48000
+      };
+    },
+    setEnabled() {},
+    stop(stopOptions) {
+      calls.captureStop += 1;
+      return captureStop
+        ? captureStop({ stopOptions, handlers, order })
+        : Promise.resolve();
+    }
+  };
+  global.document = { createElement };
+  global.window = {
+    api: {
+      cancelLLMRequests: async () => ({ success: true }),
+      async startASR(command) {
+        sessionId = command.sessionId;
+        return { ok: true, events: [{ type: 'ready', sessionId, sequence: 0 }] };
+      },
+      feedAudio(command) {
+        calls.feedAudio += 1;
+        return feedAudio ? feedAudio(command, order) : Promise.resolve({ ok: true, events: [] });
+      },
+      stopASR(command) {
+        calls.stopASR += 1;
+        return stopASR ? stopASR(command, order) : Promise.resolve(stopEnvelope(command.sessionId, ''));
+      },
+      cancelASR(command) {
+        calls.cancelASR += 1;
+        return cancelASR ? cancelASR(command, order) : Promise.resolve({ ok: true, events: [] });
+      },
+      analyzeText: async () => ({ totalWords: 2, fillers: [], hedges: [], vagueWords: [] })
+    }
+  };
+  const trainer = createTrainer();
+  trainer.audioCaptureFactory = () => capture;
+  t.after(() => {
+    clearInterval(trainer.timerInterval);
+    delete global.document;
+    delete global.window;
+  });
+  await trainer.startRecording();
+  return { trainer, capture, get handlers() { return handlers; }, get sessionId() { return sessionId; }, order, calls };
+}
+
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
+}
+
+function createAudioCaptureFactoryFake({ start, stop } = {}) {
+  const calls = { start: [], enabled: [], stop: [] };
+  let handlers;
+  const capture = {
+    async start(options) {
+      handlers = options;
+      calls.start.push(options.sessionId);
+      if (start) return start(options);
+    },
+    setEnabled(value) { calls.enabled.push(value); },
+    async stop(options) {
+      calls.stop.push(options ?? {});
+      if (stop) return stop(options);
+    }
+  };
+  return {
+    calls,
+    capture,
+    factory: () => capture,
+    emit(chunk) { return handlers.onChunk(chunk); }
+  };
+}
+
+function activateAsrSession(trainer, sessionId = 'session-a') {
+  trainer.asrEventState = beginAsrSession(trainer.asrEventState, sessionId);
+  trainer.asrEventState = filterAsrEvent(trainer.asrEventState, {
+    type: 'ready',
+    sessionId,
+    sequence: 0
+  }).state;
+  return sessionId;
+}
+
+function stopEnvelope(sessionId, text = '尾部文本') {
+  const events = [];
+  if (text.trim()) {
+    events.push({ type: 'final', sessionId, sequence: 1, text });
+  }
+  events.push({
+    type: 'stopped',
+    sessionId,
+    sequence: text.trim() ? 2 : 1
+  });
+  return { ok: true, events };
 }
 
 test('stop final text is appended exactly once', () => {
@@ -87,7 +219,7 @@ test('stop final text reaches transcript, analysis, and the next report', async 
   global.document = { createElement };
   global.window = {
     api: {
-      stopASR: async () => ({ success: true, finalText: '尾部文本' }),
+      stopASR: async () => stopEnvelope('session-a'),
       cancelLLMRequests: async () => ({ success: true }),
       analyzeText: async () => new Promise(resolve => { resolveAnalysis = resolve; }),
       getFinalReport: async (payload) => {
@@ -102,6 +234,7 @@ test('stop final text reaches transcript, analysis, and the next report', async 
     delete global.window;
   });
   const trainer = createTrainer();
+  activateAsrSession(trainer);
 
   let stopResolved = false;
   const stopPromise = trainer.stopRecording().then(() => { stopResolved = true; });
@@ -180,7 +313,7 @@ test('stop suppresses pending feedback before final analysis completes', async (
   const feedbackItems = [];
   global.window = {
     api: {
-      stopASR: async () => ({ success: true, finalText: '尾部文本' }),
+      stopASR: async () => stopEnvelope('session-a'),
       cancelLLMRequests: async () => ({ success: true }),
       analyzeText: async () => new Promise(resolve => { resolveAnalysis = resolve; }),
       getRealtimeFeedback: async () => new Promise(resolve => { resolveFeedback = resolve; })
@@ -192,6 +325,7 @@ test('stop suppresses pending feedback before final analysis completes', async (
     delete global.window;
   });
   const trainer = createTrainer();
+  activateAsrSession(trainer);
   trainer.fullText = '旧会话已经积累了足够长的逐字稿内容';
   trainer.addFeedbackItem = (text) => feedbackItems.push(text);
 
@@ -211,7 +345,7 @@ test('stop finalizes recording when final-text analysis fails', async (t) => {
   const shownErrors = [];
   global.window = {
     api: {
-      stopASR: async () => ({ success: true, finalText: '尾部文本' }),
+      stopASR: async () => stopEnvelope('session-a'),
       cancelLLMRequests: async () => {
         cancelCalls += 1;
         return { success: true };
@@ -223,6 +357,7 @@ test('stop finalizes recording when final-text analysis fails', async (t) => {
   };
   t.after(() => { delete global.window; });
   const trainer = createTrainer();
+  activateAsrSession(trainer);
   trainer.btnStart.classList.add('hidden');
   trainer.showError = (message) => shownErrors.push(message);
 
@@ -239,7 +374,7 @@ test('stop finalizes recording when final-text analysis fails', async (t) => {
 test('an endpoint final and the matching stop final update state only once', async (t) => {
   global.window = {
     api: {
-      stopASR: async () => ({ success: true, finalText: '尾部文本' }),
+      stopASR: async () => stopEnvelope('session-a'),
       cancelLLMRequests: async () => ({ success: true }),
       analyzeText: async () => ({
         totalWords: 4,
@@ -251,6 +386,7 @@ test('an endpoint final and the matching stop final update state only once', asy
   };
   t.after(() => { delete global.window; });
   const trainer = createTrainer();
+  activateAsrSession(trainer);
 
   trainer.handleASRResult({ text: '尾部文本', isFinal: true });
   await new Promise(resolve => setImmediate(resolve));
@@ -265,7 +401,7 @@ test('an endpoint final and the matching stop final update state only once', asy
 test('blank stop final text leaves transcript state unchanged', async (t) => {
   global.window = {
     api: {
-      stopASR: async () => ({ success: true, finalText: ' \n\t ' }),
+      stopASR: async () => stopEnvelope('session-a', ' \n\t '),
       cancelLLMRequests: async () => ({ success: true }),
       analyzeText: async () => {
         throw new Error('blank final text must not be analyzed');
@@ -274,6 +410,7 @@ test('blank stop final text leaves transcript state unchanged', async (t) => {
   };
   t.after(() => { delete global.window; });
   const trainer = createTrainer();
+  activateAsrSession(trainer);
 
   await trainer.stopRecording();
   await new Promise(resolve => setImmediate(resolve));
@@ -281,4 +418,746 @@ test('blank stop final text leaves transcript state unchanged', async (t) => {
   assert.equal(trainer.fullText, '已经确认');
   assert.deepEqual(trainer.sentences, ['已经确认']);
   assert.equal(trainer.stats.totalWords, 4);
+});
+
+test('renderer routes an active recording through the injected audio capture', async (t) => {
+  const calls = [];
+  const feedCommands = [];
+  const audio = createAudioCaptureFactoryFake();
+  global.window = {
+    api: {
+      cancelLLMRequests: async () => ({ success: true }),
+      async startASR(command) {
+        calls.push(['start', command]);
+        return {
+          ok: true,
+          events: [{ type: 'ready', sessionId: command.sessionId, sequence: 0 }]
+        };
+      },
+      async feedAudio(command) {
+        feedCommands.push(command);
+        return { ok: true, events: [] };
+      }
+    }
+  };
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  trainer.audioCaptureFactory = audio.factory;
+  trainer.audioCapture = null;
+  trainer.audioCaptureStopPromise = null;
+
+  await trainer.startRecording();
+  const startCommand = calls[0][1];
+  assert.match(startCommand.sessionId, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
+  assert.deepEqual(startCommand, { sessionId: startCommand.sessionId, sampleRateHz: 16000 });
+  await audio.emit({
+    sessionId: startCommand.sessionId,
+    sequence: 0,
+    sampleRateHz: 16000,
+    channels: 1,
+    format: 'f32',
+    frames: 2,
+    samples: new Float32Array([0.25, -0.5])
+  });
+
+  assert.deepEqual(audio.calls.start, [startCommand.sessionId]);
+  assert.deepEqual(audio.calls.enabled, [true]);
+  assert.deepEqual(feedCommands, [{
+    sessionId: startCommand.sessionId,
+    sequence: 0,
+    samples: new Float32Array([0.25, -0.5])
+  }]);
+  trainer.pauseRecording();
+  trainer.resumeRecording();
+  assert.deepEqual(audio.calls.enabled, [true, false, true]);
+  clearInterval(trainer.timerInterval);
+});
+
+test('microphone failure invalidates locally before cancellation completes', async (t) => {
+  let cancelCommand;
+  let resolveCancel;
+  const audio = createAudioCaptureFactoryFake({
+    async start() { throw new Error('permission denied'); }
+  });
+  global.window = {
+    api: {
+      cancelLLMRequests: async () => ({ success: true }),
+      async startASR(command) {
+        return {
+          ok: true,
+          events: [{ type: 'ready', sessionId: command.sessionId, sequence: 0 }]
+        };
+      },
+      cancelASR(command) {
+        cancelCommand = command;
+        return new Promise(resolve => { resolveCancel = resolve; });
+      }
+    }
+  };
+  t.after(() => {
+    resolveCancel?.({ ok: true, events: [] });
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.audioCaptureFactory = audio.factory;
+  const shownErrors = [];
+  trainer.showError = message => shownErrors.push(message);
+
+  const startPromise = trainer.startRecording();
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.ok(cancelCommand.sessionId);
+  assert.deepEqual(trainer.asrEventState, createAsrEventState());
+  resolveCancel({ ok: true, events: [{
+    type: 'stopped', sessionId: cancelCommand.sessionId, sequence: 1
+  }] });
+  await startPromise;
+  assert.deepEqual(shownErrors, ['麦克风访问失败: permission denied']);
+});
+
+test('clear invalidates ASR before cancel resolves and late final events stay ignored', async (t) => {
+  let resolveCancel;
+  let cancelCommand;
+  global.document = { createElement };
+  global.window = {
+    api: {
+      cancelLLMRequests: async () => ({ success: true }),
+      cancelASR(command) {
+        cancelCommand = command;
+        return new Promise(resolve => { resolveCancel = resolve; });
+      }
+    }
+  };
+  t.after(() => {
+    resolveCancel?.({ ok: true, events: [] });
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  activateAsrSession(trainer);
+
+  trainer.clearAll();
+
+  assert.deepEqual(cancelCommand, { sessionId: 'session-a' });
+  assert.deepEqual(trainer.asrEventState, createAsrEventState());
+  await trainer.processASRResponse({
+    ok: true,
+    events: [{ type: 'final', sessionId: 'session-a', sequence: 1, text: '迟到文本' }]
+  }, '语音识别失败');
+  assert.equal(trainer.fullText, '');
+  resolveCancel({ ok: true, events: [] });
+});
+
+test('command errors are rendered as text content', async (t) => {
+  global.document = { createElement };
+  t.after(() => { delete global.document; });
+  const trainer = createTrainer();
+  activateAsrSession(trainer);
+
+  await trainer.processASRResponse({
+    ok: false,
+    error: { code: 'asr-start-failed', message: '<img src=x onerror=evil()>' }
+  }, '语音识别启动失败');
+
+  assert.equal(trainer.subtitleContainer.children.length, 1);
+  assert.equal(
+    trainer.subtitleContainer.children[0].textContent,
+    '语音识别启动失败: <img src=x onerror=evil()>'
+  );
+});
+
+test('clear during initial cancellation await prevents the stale start from claiming a session', async (t) => {
+  const initialCancellation = createDeferred();
+  let cancelCalls = 0;
+  let startCalls = 0;
+  let microphoneCalls = 0;
+  const originalNavigator = Object.getOwnPropertyDescriptor(global, 'navigator');
+  Object.defineProperty(global, 'navigator', {
+    configurable: true,
+    value: {
+      mediaDevices: {
+        async getUserMedia() {
+          microphoneCalls += 1;
+          throw new Error('must not reach microphone');
+        }
+      }
+    }
+  });
+  global.document = { createElement };
+  global.window = {
+    api: {
+      cancelLLMRequests() {
+        cancelCalls += 1;
+        return cancelCalls === 1
+          ? initialCancellation.promise
+          : Promise.resolve({ success: true });
+      },
+      async startASR() {
+        startCalls += 1;
+        return { ok: false, error: { code: 'unexpected', message: 'unexpected start' } };
+      }
+    }
+  };
+  t.after(() => {
+    initialCancellation.resolve({ success: true });
+    delete global.document;
+    delete global.window;
+    if (originalNavigator) Object.defineProperty(global, 'navigator', originalNavigator);
+    else delete global.navigator;
+  });
+  const trainer = createTrainer();
+  trainer.showError = () => {};
+
+  const startPromise = trainer.startRecording();
+  trainer.clearAll();
+  initialCancellation.resolve({ success: true });
+  await startPromise;
+
+  assert.equal(startCalls, 0);
+  assert.equal(microphoneCalls, 0);
+  assert.deepEqual(trainer.asrEventState, createAsrEventState());
+});
+
+test('only the latest of two overlapping starts may pass the initial await', async (t) => {
+  const firstCancellation = createDeferred();
+  const secondCancellation = createDeferred();
+  const gates = [firstCancellation, secondCancellation];
+  const startCommands = [];
+  let cancellationCalls = 0;
+  global.window = {
+    api: {
+      cancelLLMRequests() {
+        const gate = gates[cancellationCalls];
+        cancellationCalls += 1;
+        return gate.promise;
+      },
+      async startASR(command) {
+        startCommands.push(command);
+        return { ok: false, error: { code: 'test-stop', message: 'stop after ownership check' } };
+      }
+    }
+  };
+  t.after(() => {
+    firstCancellation.resolve({ success: true });
+    secondCancellation.resolve({ success: true });
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.showError = () => {};
+
+  const firstStart = trainer.startRecording();
+  const secondStart = trainer.startRecording();
+  firstCancellation.resolve({ success: true });
+  await new Promise(resolve => setImmediate(resolve));
+  secondCancellation.resolve({ success: true });
+  await Promise.all([firstStart, secondStart]);
+
+  assert.equal(startCommands.length, 1);
+  assert.deepEqual(trainer.asrEventState, createAsrEventState());
+});
+
+test('audio capture setup failure releases the local capture and leaves no owner', async (t) => {
+  const rateError = new Error('AudioContext output rate 48000 Hz; expected 16000 Hz');
+  rateError.code = 'unsupported-audio-context-rate';
+  rateError.audioRates = Object.freeze({
+    requestedSampleRateHz: 16000,
+    contextSampleRateHz: 48000,
+    trackSampleRateHz: 44100
+  });
+  const audio = createAudioCaptureFactoryFake({
+    async start() { throw rateError; }
+  });
+  global.window = {
+    api: {
+      cancelLLMRequests: async () => ({ success: true }),
+      async startASR(command) {
+        return {
+          ok: true,
+          events: [{ type: 'ready', sessionId: command.sessionId, sequence: 0 }]
+        };
+      },
+      cancelASR: async () => ({ ok: true, events: [] })
+    }
+  };
+  t.after(() => {
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.audioCaptureFactory = audio.factory;
+  trainer.showError = () => {};
+
+  await trainer.startRecording();
+
+  assert.equal(audio.calls.stop.length, 1);
+  assert.equal(trainer.audioCapture, null);
+  assert.deepEqual(trainer.lastAudioCaptureRates, rateError.audioRates);
+});
+
+test('microphone rejection from a replaced start does not display a stale error', async (t) => {
+  const firstMicrophone = createDeferred();
+  const microphoneRequested = createDeferred();
+  const secondCancellation = createDeferred();
+  let cancelLlmCalls = 0;
+  let startCalls = 0;
+  const shownErrors = [];
+  const audio = createAudioCaptureFactoryFake({
+    start() {
+      microphoneRequested.resolve();
+      return firstMicrophone.promise;
+    }
+  });
+  global.window = {
+    api: {
+      cancelLLMRequests() {
+        cancelLlmCalls += 1;
+        return cancelLlmCalls === 1
+          ? Promise.resolve({ success: true })
+          : secondCancellation.promise;
+      },
+      async startASR(command) {
+        startCalls += 1;
+        if (startCalls === 1) {
+          return {
+            ok: true,
+            events: [{ type: 'ready', sessionId: command.sessionId, sequence: 0 }]
+          };
+        }
+        return { ok: false, error: { code: 'second-stopped', message: 'second stopped' } };
+      },
+      cancelASR: async () => ({ ok: true, events: [] })
+    }
+  };
+  t.after(() => {
+    firstMicrophone.reject(new Error('old permission failure'));
+    secondCancellation.resolve({ success: true });
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.audioCaptureFactory = audio.factory;
+  trainer.showError = message => shownErrors.push(message);
+
+  const firstStart = trainer.startRecording();
+  await microphoneRequested.promise;
+  const secondStart = trainer.startRecording();
+  firstMicrophone.reject(new Error('old permission failure'));
+  await firstStart;
+
+  assert.equal(shownErrors.some(message => message.includes('old permission failure')), false);
+  secondCancellation.resolve({ success: true });
+  await secondStart;
+});
+
+test('clear during stop-final analysis prevents stale analysis side effects', async (t) => {
+  const analysis = createDeferred();
+  global.document = { createElement };
+  global.window = {
+    api: {
+      stopASR: async () => stopEnvelope('session-a'),
+      cancelASR: async () => ({ ok: true, events: [] }),
+      cancelLLMRequests: async () => ({ success: true }),
+      analyzeText: async () => analysis.promise
+    }
+  };
+  t.after(() => {
+    analysis.resolve({ totalWords: 4, fillers: [], hedges: [], vagueWords: [] });
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  activateAsrSession(trainer);
+
+  const stopPromise = trainer.stopRecording();
+  await new Promise(resolve => setImmediate(resolve));
+  trainer.clearAll();
+  analysis.resolve({ totalWords: 4, fillers: [], hedges: [], vagueWords: [] });
+  await stopPromise;
+
+  assert.equal(trainer.fullText, '');
+  assert.deepEqual(trainer.sentences, []);
+  assert.equal(trainer.stats.totalWords, 0);
+  assert.equal(trainer.feedbackContent.children.length, 0);
+});
+
+test('LLM cancellation alone does not discard analysis owned by the active ASR session', async (t) => {
+  const analysis = createDeferred();
+  global.window = {
+    api: {
+      analyzeText: async () => analysis.promise
+    }
+  };
+  t.after(() => {
+    analysis.resolve({ totalWords: 4, fillers: [], hedges: [], vagueWords: [] });
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  activateAsrSession(trainer);
+
+  const resultPromise = trainer.processASRResponse({
+    ok: true,
+    events: [{ type: 'final', sessionId: 'session-a', sequence: 1, text: '同一会话定稿' }]
+  }, '语音识别失败');
+  await new Promise(resolve => setImmediate(resolve));
+  trainer.advanceLLMGeneration();
+  analysis.resolve({ totalWords: 4, fillers: [], hedges: [], vagueWords: [] });
+  await resultPromise;
+
+  assert.equal(trainer.stats.totalWords, 8);
+});
+
+test('stop rejection after clear does not display a stale error', async (t) => {
+  const stopped = createDeferred();
+  const shownErrors = [];
+  global.document = { createElement };
+  global.window = {
+    api: {
+      stopASR: async () => stopped.promise,
+      cancelASR: async () => ({ ok: true, events: [] }),
+      cancelLLMRequests: async () => ({ success: true })
+    }
+  };
+  t.after(() => {
+    stopped.reject(new Error('old stop failed'));
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  activateAsrSession(trainer);
+  trainer.showError = message => shownErrors.push(message);
+
+  const stopPromise = trainer.stopRecording();
+  await new Promise(resolve => setImmediate(resolve));
+  trainer.clearAll();
+  stopped.reject(new Error('old stop failed'));
+  await stopPromise;
+
+  assert.equal(shownErrors.some(message => message.includes('old stop failed')), false);
+});
+
+async function startActiveRecordingHarness(t, { feedAudio, cancelASR } = {}) {
+  let sessionId;
+  const feedCommands = [];
+  const cancelCommands = [];
+  const audio = createAudioCaptureFactoryFake();
+  global.document = { createElement };
+  global.window = {
+    api: {
+      cancelLLMRequests: async () => ({ success: true }),
+      async startASR(command) {
+        sessionId = command.sessionId;
+        return {
+          ok: true,
+          events: [{ type: 'ready', sessionId, sequence: 0 }]
+        };
+      },
+      async feedAudio(command) {
+        feedCommands.push(command);
+        return feedAudio
+          ? feedAudio(command)
+          : { ok: true, events: [] };
+      },
+      cancelASR(command) {
+        cancelCommands.push(command);
+        return cancelASR
+          ? cancelASR(command)
+          : Promise.resolve({ ok: true, events: [] });
+      },
+      analyzeText: async () => ({ totalWords: 0, fillers: [], hedges: [], vagueWords: [] })
+    }
+  };
+
+  const trainer = createTrainer();
+  trainer.audioCaptureFactory = audio.factory;
+  t.after(() => {
+    clearInterval(trainer.timerInterval);
+    delete global.document;
+    delete global.window;
+  });
+  await trainer.startRecording();
+
+  return {
+    audio,
+    cancelCommands,
+    feedCommands,
+    get sessionId() { return sessionId; },
+    trainer
+  };
+}
+
+test('a completed-session restart can be cleared back to an inert idle state', async (t) => {
+  const cancel = createDeferred();
+  const shownErrors = [];
+  const harness = await startActiveRecordingHarness(t, {
+    cancelASR: () => cancel.promise
+  });
+  const { trainer } = harness;
+  trainer.showError = message => shownErrors.push(message);
+
+  assert.equal(trainer.btnReport.classList.contains('hidden'), true);
+  assert.equal(trainer.btnCopyText.classList.contains('hidden'), true);
+  assert.equal(trainer.btnSaveText.classList.contains('hidden'), true);
+  assert.equal(trainer.btnClear.classList.contains('hidden'), true);
+
+  trainer.clearAll();
+  trainer.clearAll();
+
+  assert.deepEqual(harness.cancelCommands, [{ sessionId: harness.sessionId }]);
+  assert.deepEqual(trainer.asrEventState, createAsrEventState());
+  assert.equal(harness.audio.calls.stop.length, 1);
+  assert.equal(trainer.audioCapture, null);
+  assert.equal(trainer.timerInterval, null);
+  assert.equal(trainer.isRecording, false);
+  assert.equal(trainer.isPaused, false);
+  assert.equal(trainer.btnStart.classList.contains('hidden'), false);
+  assert.equal(trainer.btnStop.classList.contains('hidden'), true);
+  assert.equal(trainer.btnPause.classList.contains('hidden'), true);
+  assert.equal(trainer.btnResume.classList.contains('hidden'), true);
+
+  await harness.audio.emit({
+    sessionId: harness.sessionId,
+    sequence: 0,
+    samples: new Float32Array([0.25])
+  });
+  await trainer.processASRResponse({
+    ok: true,
+    events: [{
+      type: 'final',
+      sessionId: harness.sessionId,
+      sequence: 1,
+      text: '迟到文本'
+    }]
+  }, '语音识别失败');
+  cancel.reject(new Error('late cancellation failed'));
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(harness.feedCommands.length, 0);
+  assert.equal(trainer.fullText, '');
+  assert.deepEqual(shownErrors, []);
+});
+
+for (const feedFailure of [
+  {
+    name: 'rejection',
+    run: async () => { throw new Error('transport rejected'); }
+  },
+  {
+    name: 'command-error envelope',
+    run: async () => ({
+      ok: false,
+      error: { code: 'asr-feed-failed', message: 'sanitized feed failure' }
+    })
+  }
+]) {
+  test(`feed ${feedFailure.name} fails the recording closed once`, async (t) => {
+    const cancel = createDeferred();
+    const shownErrors = [];
+    const harness = await startActiveRecordingHarness(t, {
+      feedAudio: feedFailure.run,
+      cancelASR: () => cancel.promise
+    });
+    const { trainer } = harness;
+    trainer.showError = message => shownErrors.push(message);
+
+    const firstFeed = harness.audio.emit({
+      sessionId: harness.sessionId,
+      sequence: 0,
+      samples: new Float32Array([0.5])
+    });
+    await new Promise(resolve => setImmediate(resolve));
+    await harness.audio.emit({
+      sessionId: harness.sessionId,
+      sequence: 1,
+      samples: new Float32Array([0.75])
+    });
+
+    assert.deepEqual(harness.feedCommands.map(command => command.sequence), [0]);
+    assert.deepEqual(harness.cancelCommands, [{ sessionId: harness.sessionId }]);
+    assert.deepEqual(trainer.asrEventState, createAsrEventState());
+    assert.equal(harness.audio.calls.stop.length, 1);
+    assert.equal(trainer.audioCapture, null);
+    assert.equal(trainer.timerInterval, null);
+    assert.equal(trainer.isRecording, false);
+    assert.equal(trainer.isPaused, false);
+    assert.equal(trainer.btnStart.classList.contains('hidden'), false);
+    assert.equal(trainer.btnStop.classList.contains('hidden'), true);
+    assert.deepEqual(shownErrors, ['语音识别处理失败，录音已停止，请重新开始']);
+
+    cancel.resolve({
+      ok: false,
+      error: { code: 'asr-cancel-failed', message: 'late cancel failure' }
+    });
+    await firstFeed;
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(shownErrors, ['语音识别处理失败，录音已停止，请重新开始']);
+  });
+}
+
+test('the eleventh pending audio chunk fails the active recording with observable overrun metrics', async (t) => {
+  const firstFeed = createDeferred();
+  const harness = await startActiveRecordingHarness(t, {
+    feedAudio: () => firstFeed.promise
+  });
+
+  for (let sequence = 0; sequence < 11; sequence += 1) {
+    void harness.audio.emit({
+      sessionId: harness.sessionId,
+      sequence,
+      samples: new Float32Array(320)
+    });
+  }
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.deepEqual(harness.feedCommands.map(command => command.sequence), [0]);
+  assert.deepEqual(harness.cancelCommands, [{ sessionId: harness.sessionId }]);
+  assert.deepEqual(harness.trainer.asrEventState, createAsrEventState());
+  assert.equal(harness.trainer.lastAudioFeedMetrics.maxChunks, 10);
+  assert.equal(harness.trainer.lastAudioFeedMetrics.peakDepth, 10);
+  assert.equal(harness.trainer.lastAudioFeedMetrics.overruns, 1);
+  assert.equal(harness.trainer.lastAudioFeedMetrics.discarded, 9);
+  assert.equal(harness.trainer.audioCapture, null);
+
+  firstFeed.resolve({ ok: true, events: [] });
+});
+
+test('concurrent normal stops share one flush, tail drain, and stopASR flight', async (t) => {
+  const feedStarted = createDeferred();
+  const feedGate = createDeferred();
+  const harness = await startAudioCaptureHarness(t, {
+    captureStop({ stopOptions, handlers, order }) {
+      assert.deepEqual(stopOptions, { flush: true });
+      order.push('capture-flush');
+      handlers.onChunk({
+        sessionId: handlers.sessionId,
+        sequence: 0,
+        sampleRateHz: 16000,
+        channels: 1,
+        format: 'f32',
+        frames: 17,
+        samples: new Float32Array(17).fill(0.5)
+      });
+      return Promise.resolve();
+    },
+    feedAudio(command, order) {
+      order.push(`feed:${command.sequence}`);
+      feedStarted.resolve();
+      return feedGate.promise;
+    },
+    stopASR(command, order) {
+      order.push('stop-asr');
+      return stopEnvelope(command.sessionId, '尾块后的定稿');
+    }
+  });
+
+  const firstStop = harness.trainer.stopRecording();
+  const secondStop = harness.trainer.stopRecording();
+  assert.equal(firstStop, secondStop);
+  await feedStarted.promise;
+  assert.deepEqual(harness.calls, { captureStop: 1, feedAudio: 1, stopASR: 0, cancelASR: 0 });
+  assert.deepEqual(harness.order, ['capture-flush', 'feed:0']);
+  feedGate.resolve({ ok: true, events: [] });
+  await Promise.all([firstStop, secondStop]);
+  assert.deepEqual(harness.order, ['capture-flush', 'feed:0', 'stop-asr']);
+  assert.deepEqual(harness.calls, { captureStop: 1, feedAudio: 1, stopASR: 1, cancelASR: 0 });
+  assert.equal(harness.trainer.fullText, '尾块后的定稿');
+});
+
+test('flush failure cancels once and never calls stopASR', async (t) => {
+  const flushFailure = createDeferred();
+  const shownErrors = [];
+  const harness = await startAudioCaptureHarness(t, {
+    captureStop: () => flushFailure.promise,
+    cancelASR: async () => ({ ok: true, events: [] }),
+    stopASR: assert.fail
+  });
+  harness.trainer.showError = message => shownErrors.push(message);
+
+  const firstStop = harness.trainer.stopRecording();
+  const secondStop = harness.trainer.stopRecording();
+  assert.equal(firstStop, secondStop);
+  flushFailure.reject(new Error('AudioWorklet flush timed out'));
+  await firstStop;
+
+  assert.equal(harness.calls.captureStop, 1);
+  assert.equal(harness.calls.cancelASR, 1);
+  assert.equal(harness.calls.stopASR, 0);
+  assert.equal(shownErrors.filter(message => message === '语音识别处理失败，录音已停止，请重新开始').length, 1);
+});
+
+test('tail feed failure during stop fails the owning session closed', async (t) => {
+  const feedFailure = createDeferred();
+  const shownErrors = [];
+  const harness = await startAudioCaptureHarness(t, {
+    captureStop({ handlers }) {
+      handlers.onChunk({
+        sessionId: handlers.sessionId,
+        sequence: 0,
+        sampleRateHz: 16000,
+        channels: 1,
+        format: 'f32',
+        frames: 17,
+        samples: new Float32Array(17)
+      });
+      return Promise.resolve();
+    },
+    feedAudio: () => feedFailure.promise,
+    cancelASR: async () => ({ ok: true, events: [] }),
+    stopASR: assert.fail
+  });
+  harness.trainer.showError = message => shownErrors.push(message);
+
+  const stop = harness.trainer.stopRecording();
+  feedFailure.reject(new Error('tail feed failed'));
+  await stop;
+
+  assert.equal(harness.calls.feedAudio, 1);
+  assert.equal(harness.calls.cancelASR, 1);
+  assert.equal(harness.calls.stopASR, 0);
+  assert.equal(shownErrors.length, 1);
+  assert.equal(harness.trainer.asrEventState.activeSessionId, null);
+});
+
+test('pause during normal stop cannot suppress the flushed tail chunk', async (t) => {
+  const flushStarted = createDeferred();
+  const flushGate = createDeferred();
+  const harness = await startAudioCaptureHarness(t, {
+    captureStop() {
+      flushStarted.resolve();
+      return flushGate.promise;
+    }
+  });
+
+  const stop = harness.trainer.stopRecording();
+  await flushStarted.promise;
+  harness.trainer.pauseRecording();
+  assert.equal(harness.trainer.isPaused, false);
+  await harness.handlers.onChunk({
+    sessionId: harness.sessionId,
+    sequence: 0,
+    sampleRateHz: 16000,
+    channels: 1,
+    format: 'f32',
+    frames: 17,
+    samples: new Float32Array(17)
+  });
+  flushGate.resolve();
+  await stop;
+
+  assert.equal(harness.calls.feedAudio, 1);
+  assert.equal(harness.calls.stopASR, 1);
+});
+
+test('an older session stop operation cannot mask stopping the active session', async (t) => {
+  const harness = await startAudioCaptureHarness(t);
+  const oldStop = createDeferred();
+  harness.trainer.recordingStopOperation = {
+    sessionId: 'old-session',
+    feedTracker: null,
+    promise: oldStop.promise
+  };
+
+  const activeStop = harness.trainer.stopRecording();
+  assert.notEqual(activeStop, oldStop.promise);
+  await activeStop;
+  assert.equal(harness.calls.captureStop, 1);
+  assert.equal(harness.calls.stopASR, 1);
+  oldStop.resolve();
 });

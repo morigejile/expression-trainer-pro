@@ -134,3 +134,17 @@ test('unknown provider blocks survive normalization while selection falls back',
     token: 'future-token'
   });
 });
+
+test('future settings schema is read without requesting a destructive downgrade', () => {
+  const {parseSettingsJson} = require('../lib/settings-config');
+  const result = parseSettingsJson(JSON.stringify({
+    schemaVersion: 99,
+    provider: 'deepseek',
+    providers: {deepseek: {apiKey: 'kept-key', model: 'future-model'}},
+    futureTopLevel: {keep: true}
+  }));
+
+  assert.equal(result.settings.providers.deepseek.apiKey, 'kept-key');
+  assert.equal(result.shouldPersist, false);
+  assert.equal(result.error, null);
+});

@@ -1,7 +1,7 @@
 const { before, test } = require('node:test');
 const assert = require('node:assert/strict');
 
-const { loadLexicon, analyzeText } = require('../lib/lexicon');
+const { loadLexicon, analyzeText, FILLER_WORDS } = require('../lib/lexicon');
 
 before(() => {
   loadLexicon();
@@ -100,4 +100,11 @@ test('suggestions follow vague-word and repetition thresholds', () => {
   for (const { input, suggestions } of cases) {
     assert.deepEqual(analyzeText(input).suggestions, suggestions, input);
   }
+});
+
+test('custom words participate in local filler statistics without changing global rules', () => {
+  const result = analyzeText('这个属于是确实不错', {extraFillers: ['属于是', '确实', '属于是']});
+
+  assert.deepEqual(result.fillers.map(({word}) => word), ['这个', '属于是', '确实']);
+  assert.equal(FILLER_WORDS.includes('属于是'), false);
 });

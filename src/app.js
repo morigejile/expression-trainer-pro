@@ -1,4 +1,4 @@
-// 宇宙无敌表达训练系统 V2
+// 宇宙无敌表达训练系统
 
 function mergeFinalText(fullText, finalText) {
   const currentText = typeof fullText === 'string' ? fullText : '';
@@ -18,9 +18,33 @@ const SafeRendering = typeof module !== 'undefined' && module.exports
   ? require('./safe-rendering')
   : window.SafeRendering;
 const { renderHighlightedText, renderReportContent } = SafeRendering;
+const AsrEventState = typeof module !== 'undefined' && module.exports
+  ? require('./asr-event-state')
+  : window.AsrEventState;
+const {
+  beginAsrSession,
+  createAsrEventState,
+  filterAsrEvent,
+  invalidateAsrSession
+} = AsrEventState;
+const AudioCapture = typeof module !== 'undefined' && module.exports
+  ? require('./audio-capture')
+  : window.AudioCapture;
+const { createAudioCapture } = AudioCapture;
+const AudioFeedQueue = typeof module !== 'undefined' && module.exports
+  ? require('./audio-feed-queue')
+  : window.AudioFeedQueue;
+const { createAudioFeedQueue } = AudioFeedQueue;
 
 class ExpressionTrainer {
-  constructor() {
+  constructor({ audioCaptureFactory = createAudioCapture } = {}) {
+    this.audioCaptureFactory = audioCaptureFactory;
+    this.audioCapture = null;
+    this.audioCaptureStopPromise = null;
+    this.audioFeedTracker = null;
+    this.recordingStopOperation = null;
+    this.lastAudioCaptureRates = null;
+    this.lastAudioFeedMetrics = null;
     this.isRecording = false;
     this.isPaused = false;
     this.startTime = null;
@@ -33,6 +57,9 @@ class ExpressionTrainer {
     this.lastFeedbackText = '';
     this.lastReport = '';
     this.llmGeneration = 0;
+    this.asrEventState = createAsrEventState();
+    this.asrStartAttempt = null;
+    this.asrGeneration = 0;
 
     this.initElements();
     this.bindEvents();
@@ -46,6 +73,7 @@ class ExpressionTrainer {
     this.btnStop = document.getElementById('btn-stop');
     this.btnReport = document.getElementById('btn-report');
     this.btnSettings = document.getElementById('btn-settings');
+    this.btnDiagnostics = document.getElementById('btn-diagnostics');
     this.btnCloseReport = document.getElementById('btn-close-report');
     this.btnClosePaste = document.getElementById('btn-close-paste');
     this.btnAnalyzePaste = document.getElementById('btn-analyze-paste');
@@ -75,6 +103,7 @@ class ExpressionTrainer {
     this.btnStop.addEventListener('click', () => this.stopRecording());
     this.btnReport.addEventListener('click', () => this.generateReport());
     this.btnSettings.addEventListener('click', () => window.api.openSettings());
+    this.btnDiagnostics.addEventListener('click', () => this.exportDiagnostics());
     document.getElementById('btn-prompt-editor').addEventListener('click', () => window.api.openPromptEditor());
     this.btnCloseReport.addEventListener('click', () => this.reportModal.classList.add('hidden'));
     this.btnCopyReport.addEventListener('click', () => {
@@ -91,35 +120,113 @@ class ExpressionTrainer {
     this.btnClear.addEventListener('click', () => this.clearAll());
   }
 
+  async exportDiagnostics() {
+    const original = this.btnDiagnostics.textContent;
+    try {
+      const result = await window.api.exportDiagnostics(this.lastAudioCaptureRates);
+      if (!result?.success) return;
+      this.btnDiagnostics.textContent = '✓';
+      setTimeout(() => { this.btnDiagnostics.textContent = original; }, 2000);
+    } catch (error) {
+      alert(`导出诊断失败: ${error.message}`);
+    }
+  }
+
   // ===== 录制控制 =====
 
   async startRecording() {
+    const startAttempt = {};
+    this.asrStartAttempt = startAttempt;
+    this.asrGeneration = (this.asrGeneration ?? 0) + 1;
+    const replacedSessionId = this.asrEventState.activeSessionId;
+    if (replacedSessionId) {
+      this.audioFeedTracker?.queue.cancel();
+      this.audioFeedTracker = null;
+      void this.releaseAudioCapture({ flush: false }).catch(() => {});
+      this.cancelActiveAsrSession(replacedSessionId, () => false);
+    }
     this.advanceLLMGeneration();
     await window.api.cancelLLMRequests();
-    const initResult = await window.api.initASR();
-    if (!initResult.success) {
-      this.showError(`语音识别启动失败: ${initResult.error}`);
+    if (this.asrStartAttempt !== startAttempt) return;
+
+    const sessionId = globalThis.crypto.randomUUID();
+    this.asrEventState = beginAsrSession(this.asrEventState, sessionId);
+    const ownsSession = () => this.asrStartAttempt === startAttempt
+      && this.asrEventState.activeSessionId === sessionId;
+
+    let startResponse;
+    try {
+      startResponse = await window.api.startASR({ sessionId, sampleRateHz: 16000 });
+    } catch (error) {
+      if (ownsSession()) {
+        this.asrEventState = invalidateAsrSession(this.asrEventState);
+        this.showError(`语音识别启动失败: ${error.message}`);
+        this.asrStartAttempt = null;
+      }
+      return;
+    }
+    await this.processASRResponse(
+      startResponse,
+      '语音识别启动失败',
+      '语音识别结果处理失败',
+      ownsSession
+    );
+    if (!startResponse?.ok || !ownsSession()) {
+      if (this.asrEventState.activeSessionId === sessionId) {
+        this.asrEventState = invalidateAsrSession(this.asrEventState);
+      }
+      if (this.asrStartAttempt === startAttempt) {
+        this.asrStartAttempt = null;
+      } else if (startResponse?.ok) {
+        await this.cancelActiveAsrSession(sessionId, () => false);
+      }
       return;
     }
 
+    const tracker = this.createAudioFeedTracker(sessionId);
+    this.audioFeedTracker = tracker;
+    const audioCapture = this.audioCaptureFactory();
+    this.audioCapture = audioCapture;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      this.audioContext = new AudioContext({ sampleRate: 16000 });
-      const source = this.audioContext.createMediaStreamSource(stream);
-      this.audioProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
-      this.audioProcessor.onaudioprocess = async (e) => {
-        if (!this.isRecording || this.isPaused) return;
-        const samples = e.inputBuffer.getChannelData(0);
-        const result = await window.api.feedAudio(samples);
-        if (result) this.handleASRResult(result);
-      };
-      source.connect(this.audioProcessor);
-      this.audioProcessor.connect(this.audioContext.destination);
-      this.mediaStream = stream;
+      const rates = await audioCapture.start({
+        sessionId,
+        onChunk: chunk => this.handleCapturedChunk(chunk),
+        onError: () => { void this.failActiveRecording(sessionId); }
+      });
+      if (!ownsSession()) {
+        await audioCapture.stop({ flush: false });
+        await this.cancelActiveAsrSession(sessionId, () => false);
+        return;
+      }
+      this.lastAudioCaptureRates = rates;
     } catch (err) {
-      this.showError(`麦克风访问失败: ${err.message}`);
+      if (ownsSession()
+          && err?.code === 'unsupported-audio-context-rate'
+          && err.audioRates) {
+        this.lastAudioCaptureRates = err.audioRates;
+      }
+      tracker.queue.cancel();
+      if (this.audioFeedTracker === tracker) this.audioFeedTracker = null;
+      try {
+        if (this.audioCapture === audioCapture) {
+          await this.releaseAudioCapture({ flush: false });
+        } else {
+          await audioCapture.stop({ flush: false });
+        }
+      } catch {}
+      const failureOwned = ownsSession();
+      await this.cancelActiveAsrSession(
+        sessionId,
+        () => failureOwned && this.asrStartAttempt === startAttempt
+      );
+      if (failureOwned && this.asrStartAttempt === startAttempt) {
+        this.showError(`麦克风访问失败: ${err.message}`);
+        this.asrStartAttempt = null;
+      }
       return;
     }
+
+    this.asrStartAttempt = null;
 
     this.isRecording = true;
     this.isPaused = false;
@@ -136,14 +243,20 @@ class ExpressionTrainer {
     this.btnPause.classList.remove('hidden');
     this.btnStop.classList.remove('hidden');
     this.btnReport.classList.add('hidden');
+    this.btnCopyText.classList.add('hidden');
+    this.btnSaveText.classList.add('hidden');
+    this.btnClear.classList.add('hidden');
     this.btnResume.classList.add('hidden');
     this.timer.classList.add('active');
 
     this.timerInterval = setInterval(() => this.updateTimer(), 1000);
+    this.audioCapture.setEnabled(true);
   }
 
   pauseRecording() {
+    if (this.recordingStopOperation?.sessionId === this.asrEventState.activeSessionId) return;
     this.isPaused = true;
+    this.audioCapture?.setEnabled(false);
     this.pauseStart = Date.now();
     this.btnPause.classList.add('hidden');
     this.btnResume.classList.remove('hidden');
@@ -151,7 +264,9 @@ class ExpressionTrainer {
   }
 
   resumeRecording() {
+    if (this.recordingStopOperation?.sessionId === this.asrEventState.activeSessionId) return;
     this.isPaused = false;
+    this.audioCapture?.setEnabled(true);
     this.pausedTime += Date.now() - this.pauseStart;
     this.pauseStart = null;
     this.btnResume.classList.add('hidden');
@@ -159,23 +274,150 @@ class ExpressionTrainer {
     this.timer.classList.add('active');
   }
 
-  async stopRecording() {
-    this.advanceLLMGeneration();
-    if (this.audioProcessor) { this.audioProcessor.disconnect(); this.audioProcessor = null; }
-    if (this.audioContext) { this.audioContext.close(); this.audioContext = null; }
-    if (this.mediaStream) { this.mediaStream.getTracks().forEach(t => t.stop()); this.mediaStream = null; }
+  teardownRecordingCapture() {
+    void this.releaseAudioCapture({ flush: false }).catch(() => {});
+
+    clearInterval(this.timerInterval);
+    this.timerInterval = null;
+    this.isRecording = false;
+    this.isPaused = false;
+    this.startTime = null;
+    this.pausedTime = 0;
+    this.pauseStart = null;
+
+    this.btnStop.classList.add('hidden');
+    this.btnPause.classList.add('hidden');
+    this.btnResume.classList.add('hidden');
+    this.btnStart.classList.remove('hidden');
+    this.btnReport.classList.add('hidden');
+    this.btnCopyText.classList.add('hidden');
+    this.btnSaveText.classList.add('hidden');
+    this.btnClear.classList.add('hidden');
+    this.timer.classList.remove('active');
+  }
+
+  releaseAudioCapture(options) {
+    const capture = this.audioCapture;
+    if (!capture) return this.audioCaptureStopPromise ?? Promise.resolve();
+    this.audioCapture = null;
     try {
-      const stopResult = await window.api.stopASR();
-      if (stopResult && stopResult.success && stopResult.finalText) {
-        try {
-          await this.handleASRResult({ text: stopResult.finalText, isFinal: true });
-        } catch (error) {
-          this.showError(`尾部文本分析失败: ${error.message}`);
+      this.audioCaptureStopPromise = Promise.resolve(capture.stop(options));
+    } catch (error) {
+      this.audioCaptureStopPromise = Promise.reject(error);
+    }
+    return this.audioCaptureStopPromise;
+  }
+
+  handleCapturedChunk(chunk) {
+    const { sessionId } = chunk;
+    const tracker = this.audioFeedTracker;
+    const stoppingOwned = this.recordingStopOperation?.sessionId === sessionId
+      && this.recordingStopOperation.feedTracker === tracker;
+    if (!this.isRecording
+        || (this.isPaused && !stoppingOwned)
+        || this.asrEventState.activeSessionId !== sessionId) return Promise.resolve();
+    if (!tracker || tracker.sessionId !== sessionId) return Promise.resolve();
+    return Promise.resolve(tracker.queue.enqueue(chunk));
+  }
+
+  createAudioFeedTracker(sessionId) {
+    const queue = createAudioFeedQueue({
+      maxChunks: 10,
+      send: async ({ sequence, samples }) => {
+        const response = await window.api.feedAudio({ sessionId, sequence, samples });
+        if (!response || response.ok !== true) {
+          const error = new Error(response?.error?.message || 'ASR feed failed');
+          error.code = response?.error?.code || 'asr-feed-failed';
+          throw error;
         }
+        await this.processASRResponse(
+          response,
+          '语音识别处理失败',
+          '语音识别结果处理失败',
+          () => this.asrEventState.activeSessionId === sessionId
+        );
+      },
+      onFailure: () => {
+        this.lastAudioFeedMetrics = queue.snapshot();
+        return this.failActiveRecording(sessionId);
+      }
+    });
+    return { sessionId, queue };
+  }
+
+  failActiveRecording(sessionId) {
+    if (this.asrEventState.activeSessionId !== sessionId) return Promise.resolve(false);
+
+    this.asrStartAttempt = null;
+    this.asrGeneration = (this.asrGeneration ?? 0) + 1;
+    this.asrEventState = invalidateAsrSession(this.asrEventState);
+    this.advanceLLMGeneration();
+    if (this.audioFeedTracker?.sessionId === sessionId) {
+      this.lastAudioFeedMetrics = this.audioFeedTracker.queue.snapshot();
+    }
+    this.audioFeedTracker?.queue.cancel();
+    this.audioFeedTracker = null;
+    this.teardownRecordingCapture();
+    this.showError('语音识别处理失败，录音已停止，请重新开始');
+    return this.cancelActiveAsrSession(sessionId, () => false).then(() => true);
+  }
+
+  stopRecording() {
+    const activeSessionId = this.asrEventState.activeSessionId;
+    if (this.recordingStopOperation?.sessionId === activeSessionId) {
+      return this.recordingStopOperation.promise;
+    }
+    const operation = {
+      sessionId: activeSessionId,
+      feedTracker: this.audioFeedTracker,
+      promise: null
+    };
+    this.recordingStopOperation = operation;
+    operation.promise = this.completeRecordingStop(operation);
+    return operation.promise;
+  }
+
+  async completeRecordingStop(operation) {
+    const { sessionId, feedTracker } = operation;
+    this.advanceLLMGeneration();
+    try {
+      await this.releaseAudioCapture({ flush: true });
+      if (feedTracker?.sessionId === sessionId) {
+        feedTracker.queue.close();
+        await feedTracker.queue.drain();
+        this.lastAudioFeedMetrics = feedTracker.queue.snapshot();
+      }
+      if (this.asrEventState.activeSessionId !== sessionId) return;
+      this.audioFeedTracker = null;
+      await this.finishOwnedAsrStopAndUi(sessionId);
+    } catch {
+      await this.failActiveRecording(sessionId);
+    } finally {
+      if (this.recordingStopOperation === operation) {
+        this.recordingStopOperation = null;
+      }
+    }
+  }
+
+  async finishOwnedAsrStopAndUi(sessionId) {
+    try {
+      if (sessionId) {
+        const stopResponse = await window.api.stopASR({ sessionId });
+        await this.processASRResponse(
+          stopResponse,
+          '语音识别停止失败',
+          '尾部文本分析失败',
+          () => this.asrEventState.activeSessionId === sessionId
+        );
       }
     } catch (error) {
-      this.showError(`语音识别停止失败: ${error.message}`);
+      if (this.asrEventState.activeSessionId === sessionId) {
+        this.showError(`语音识别停止失败: ${error.message}`);
+      }
     } finally {
+      if (this.asrEventState.activeSessionId === sessionId) {
+        this.asrEventState = invalidateAsrSession(this.asrEventState);
+      }
       this.advanceLLMGeneration();
       try {
         await window.api.cancelLLMRequests();
@@ -209,7 +451,71 @@ class ExpressionTrainer {
 
   // ===== ASR结果处理 =====
 
-  handleASRResult({ text, isFinal }) {
+  async processASRResponse(
+    response,
+    commandErrorPrefix,
+    resultErrorPrefix = '语音识别结果处理失败',
+    canApplySideEffects = () => true
+  ) {
+    if (!response || response.ok !== true) {
+      const message = typeof response?.error?.message === 'string'
+        ? response.error.message
+        : '未知错误';
+      if (canApplySideEffects()) {
+        this.showError(`${commandErrorPrefix}: ${message}`);
+      }
+      return false;
+    }
+
+    const events = Array.isArray(response.events) ? response.events : [];
+    for (const event of events) {
+      const filtered = filterAsrEvent(this.asrEventState, event);
+      this.asrEventState = filtered.state;
+      if (filtered.effect?.type === 'result') {
+        const resultGeneration = this.asrGeneration;
+        const resultSessionId = event.sessionId;
+        try {
+          await this.handleASRResult(filtered.effect.result, resultGeneration);
+        } catch (error) {
+          if (resultGeneration === this.asrGeneration
+              && this.asrEventState.activeSessionId === resultSessionId
+              && canApplySideEffects()) {
+            this.showError(`${resultErrorPrefix}: ${error.message}`);
+          }
+        }
+      } else if (filtered.effect?.type === 'error') {
+        if (canApplySideEffects()) {
+          this.showError(`语音识别错误: ${filtered.effect.message}`);
+        }
+      }
+    }
+    return true;
+  }
+
+  async cancelActiveAsrSession(
+    expectedSessionId = this.asrEventState.activeSessionId,
+    canApplySideEffects = () => true
+  ) {
+    if (!expectedSessionId) return;
+    if (this.asrEventState.activeSessionId === expectedSessionId) {
+      this.asrEventState = invalidateAsrSession(this.asrEventState);
+    }
+    try {
+      const response = await window.api.cancelASR({ sessionId: expectedSessionId });
+      await this.processASRResponse(
+        response,
+        '语音识别取消失败',
+        '语音识别结果处理失败',
+        canApplySideEffects
+      );
+    } catch (error) {
+      if (canApplySideEffects()) {
+        this.showError(`语音识别取消失败: ${error.message}`);
+      }
+    }
+  }
+
+  handleASRResult({ text, isFinal }, resultGeneration = this.asrGeneration) {
     let analysisPromise;
     if (isFinal) {
       const merged = mergeFinalText(this.fullText, text);
@@ -218,7 +524,7 @@ class ExpressionTrainer {
       text = merged.appendedText;
       this.fullText = merged.fullText;
       this.sentences.push(text);
-      analysisPromise = this.analyzeCurrentSentence(text);
+      analysisPromise = this.analyzeCurrentSentence(text, resultGeneration);
 
       // 每30字触发一次AI反馈（语境化精准词建议）
       if (this.fullText.length - this.lastFeedbackText.length >= 30) {
@@ -261,8 +567,9 @@ class ExpressionTrainer {
 
   // ===== 分析 =====
 
-  async analyzeCurrentSentence(text) {
+  async analyzeCurrentSentence(text, resultGeneration = this.asrGeneration) {
     const analysis = await window.api.analyzeText(text);
+    if (resultGeneration !== this.asrGeneration) return;
     if (analysis) {
       this.stats.fillers += analysis.fillers.length;
       this.stats.hedges += analysis.hedges.length;
@@ -476,8 +783,23 @@ class ExpressionTrainer {
   }
 
   clearAll() {
+    const sessionId = this.asrEventState.activeSessionId;
+    this.asrStartAttempt = null;
+    this.asrGeneration = (this.asrGeneration ?? 0) + 1;
+    this.audioFeedTracker?.queue.cancel();
+    this.audioFeedTracker = null;
+    if (sessionId) {
+      this.asrEventState = invalidateAsrSession(this.asrEventState);
+    }
+    this.teardownRecordingCapture();
     this.advanceLLMGeneration();
-    window.api.cancelLLMRequests();
+    if (sessionId) {
+      void this.cancelActiveAsrSession(sessionId, () => false);
+    }
+    try {
+      const cancellation = window.api.cancelLLMRequests();
+      if (cancellation?.catch) cancellation.catch(() => {});
+    } catch {}
     this.fullText = '';
     this.sentences = [];
     this.lastFeedbackText = '';

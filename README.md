@@ -11,6 +11,7 @@
 - [架构决策记录（ADR）](docs/architecture/adr/README.md)
 - [开发路线图](docs/roadmap.md)
 - [开发与可复现安装](docs/development.md)
+- [版本变更记录](CHANGELOG.md)
 
 一个帮你训练口语表达精准度的本地桌面应用。实时语音识别与词库分析在本地完成；AI 反馈是可选能力，除 Ollama 外通常需要网络。
 
@@ -21,6 +22,7 @@
 - 🔍 **词库分析**：自动检测填充词、犹豫词、笼统词，给出精准替代
 - 🤖 **AI反馈**：支持 OpenAI、DeepSeek、Ollama 与自定义 OpenAI-compatible 后端
 - 📊 **分析报告**：6维度深度分析（逻辑/直接性/填充词/密度/词汇/亮点）
+- 🩺 **诊断导出**：主动导出不含密钥、路径、音频或逐字稿的运行环境与 ASR 诊断 JSON
 
 ## 安装
 
@@ -35,36 +37,15 @@ npm ci
 
 完整的版本、install-script 策略、验证证据与 TBD 见[开发与可复现安装](docs/development.md)。
 
-### 2. 下载语音识别模型
-
-需要下载 Sherpa-ONNX 的 streaming paraformer 中英双语模型：
-
-```bash
-cd models
-
-# 方法一：使用 wget
-wget https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-paraformer-bilingual-zh-en.tar.bz2
-tar xvf sherpa-onnx-streaming-paraformer-bilingual-zh-en.tar.bz2
-
-# 方法二：使用 huggingface
-# https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-bilingual-zh-en
-```
-
-下载后 `models/` 目录应包含：
-```
-models/
-└── sherpa-onnx-streaming-paraformer-bilingual-zh-en/
-    ├── encoder.int8.onnx
-    ├── decoder.int8.onnx
-    └── tokens.txt
-```
-### 3. 启动应用
+### 2. 启动应用
 
 ```bash
 npm start
 ```
 
-### 4. 配置 AI 后端
+首次开始录音时，应用会自动下载并校验 Sherpa-ONNX streaming Paraformer 中英双语模型（archive 约 1.05 GB），安装到 Electron `userData/models`。请预留下载与解包空间；内部开发阶段需要系统提供 `tar`。模型文件不进入 Git，详细边界见[开发与可复现安装](docs/development.md)。
+
+### 3. 配置 AI 后端
 
 启动后点击右上角 ⚙️ 进入设置页面。
 
@@ -126,11 +107,11 @@ npm start
 ## 开发
 
 ```bash
-# JavaScript语法检查
-npm run check
-
 # 开发模式（带DevTools）
 npm run dev
+
+# 测试
+npm test
 
 # 目录结构
 ├── main.js              # Electron主进程
@@ -143,25 +124,26 @@ npm run dev
 │   └── settings.js      # 设置逻辑
 ├── lib/
 │   ├── asr.js           # 语音识别
+│   ├── asr-provider.js  # ASR provider 契约
 │   ├── lexicon.js       # 词库匹配
 │   ├── ai-feedback.js   # AI反馈
 │   └── prompts.js       # Prompt模板
 ├── data/
 │   ├── emotion-lexicon.json
 │   └── tiered-lexicon.json # 候选分层词库，当前未启用
-└── models/              # Sherpa-ONNX模型（需下载）
+└── models/              # 版本化产品模型 registry（权重位于 userData）
 ```
 
 `tiered-lexicon.json` 作为候选数据资产保留；其 schema 与当前分析器不同，必须在独立测试任务中设计合并规则后才能启用。
 
 ## 系统要求
 
-- 已验证开发基线：Windows NT 10.0.26200.0 x64
+- 已验证开发基线：Windows 11 25H2 build 26200 x64
 - Node.js 22.23.x、npm 12.0.x
 - 麦克风权限
 - （可选）网络连接（用于AI反馈，词库分析可离线）
 
-macOS/Linux 与正式最低 Windows 版本尚无 CI/制品证据，支持等级为 **TBD**。
+首个 Tier 1 目标为 Windows 11 25H2+ x64；当前未签名内部 Squirrel 制品已通过 packaged smoke、静默安装、真实模型首次准备、离线二次启动和 1.0.0→1.0.1 升级/卸载数据保留验证。公开支持仍需签名、真实设备及对应环境待办。Windows ARM64、macOS 和 Linux 为 Experimental，详见[平台与硬件支持矩阵](docs/support-matrix.md)。
 
 ## License
 

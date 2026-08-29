@@ -1,13 +1,14 @@
 # ADR-0007: 使用 Electron Forge 形成发布制品
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-19
+- Accepted: 2026-08-29
 
 ## Context
 
 当前项目的安装、native module、模型放置和升级尚未形成可复现闭环。普通用户不应安装 Node、npm、Sherpa、Python 或编译器。项目需要统一 package/make 入口，并按真实支持矩阵生成平台制品。
 
-## Proposed Decision
+## Decision
 
 采用 Electron Forge 管理 Electron packaging、native module rebuild 和平台 makers。先选定一个 Tier 1 平台打通：干净构建、安装、首次模型下载、升级保留数据、卸载和启动 smoke；通过后再扩展平台矩阵。
 
@@ -33,13 +34,13 @@
 - 不同平台通常仍应在对应平台构建和签名。
 - `sherpa-onnx-node` 共享库、ASAR unpack 和外部模型路径必须显式验证。
 
-## Validation Before Accepting
+## Validation and follow-up
 
-- [ ] 干净环境 `npm ci` 后执行 Forge package/make 成功。
-- [ ] 安装制品在 Tier 1 的最低支持系统启动并加载 native addon。
-- [ ] 首次模型下载、错误 hash 回退和离线二次启动通过。
-- [ ] 覆盖安装/升级保留设置与模型；卸载行为有文档。
-- [ ] 制品生成 SBOM/许可证清单的方式已确定，或明确延后责任。
+- [x] 干净环境 `npm ci` 后执行 Forge package/make 成功；packaged Fake smoke 和 utility-only Sherpa native-load smoke 通过。
+- [x] 安装制品在当前 Windows 11 25H2+ x64 开发机启动并加载 native addon；接近最低资格线环境保留为非阻塞 follow-up。
+- [x] 首次模型下载、完整性门禁、native 初始化和强制离线二次启动通过；中途网络错误支持严格 Range 续传。
+- [x] PKG-04 覆盖 1.0.0→1.0.1 升级、旧完整 Setup 降级/当前版本恢复及卸载；设置、自定义规则与模型位于外部 userData 并保持不变，行为已有文档。
+- [x] SBOM/许可证清单延后到正式发布阶段；内部测试制品不增加独立审计流程。
 
 ## References
 

@@ -1,9 +1,9 @@
 # Expression Trainer 需求基线
 
-> 状态：Draft Baseline  
-> 基线日期：2026-08-22
-> 适用范围：当前版本（Existing）与下一阶段工程化目标（Planned）
-> 源码基线：`https://github.com/morigejile/expression-trainer-pro.git`，Phase 0 实现 `b16a1d0bf799887cf7ece1283d73463961346030`（本地 `chore/reproducible-build`）；已确认并纳入原有 lockfile 清理
+> 状态：Existing / Partial / Planned
+> 基线日期：2026-08-29
+> 适用范围：内部开发/测试中的当前实现（Existing/Partial）与下一阶段工程化目标（Planned）
+> 源码基线：当前开发分支，已包含 Phase 4 / R-01～R-09 Paraformer Provider/session/Audio/utility-process/Model Manager/config 适配
 
 ## 1. 文档目的
 
@@ -12,6 +12,7 @@
 ### 1.1 事实与假设标记
 
 - **Existing**：已从上述本地源码基线确认存在的行为；不等同于已完成端到端运行验收。
+- **Partial**：当前源码已实现需求的一部分边界或前置条件，但尚未满足完整验收标准。
 - **Planned**：已明确的目标需求，不表示当前已经实现。
 - **TBD**：缺少源码、产品选择或测试数据，不能可靠确定。
 - **Assumption**：为形成可执行基线而采用的假设，必须在实施前验证。
@@ -44,48 +45,47 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 |---|---|---|
 | FR-E01 | 应用应提供 Electron 桌面界面和训练操作入口。 | `npm start` 应打开主窗口；运行验收仍需在有模型/麦克风环境执行。 |
 | FR-E02 | 用户应能开始、暂停、继续和结束一次录音训练。 | 开始后采集麦克风；暂停期间不送入 ASR；继续后恢复；结束时释放 processor、AudioContext 和 MediaStream tracks。 |
-| FR-E03 | 应用应使用本地 `sherpa-onnx-node` 与 streaming Paraformer 中英双语 INT8 模型识别。 | 从 `models/sherpa-onnx-streaming-paraformer-bilingual-zh-en/` 加载 `encoder.int8.onnx`、`decoder.int8.onnx`、`tokens.txt`；缺失时返回可理解错误。 |
+| FR-E03 | 应用应使用本地 `sherpa-onnx-node` 与 streaming Paraformer 中英双语 INT8 模型识别。 | utility process 从 `userData/models/<id>/<version>/` 按 registry role 加载 encoder、decoder、tokens 的绝对路径；首次缺失时自动安装，native 初始化成功后才激活。 |
 | FR-E04 | 应用应展示 partial 和 endpoint/final 识别文本。 | partial 更新临时字幕；endpoint 结果进入完整文本、统计和高亮；停止时尚未 endpoint 的 `finalText` 已由 Renderer 去重合并并有自动化测试。 |
 | FR-E05 | 应用应分析填充词、犹豫词、笼统词、情绪词和表达密度。 | 返回计数、位置、精准替代和建议，并在左右面板更新统计/反馈。 |
 | FR-E06 | 用户应能粘贴逐字稿并复用本地分析和 LLM 反馈。 | 粘贴文本按句展示和分析，无需麦克风或 ASR 模型。 |
 | FR-E07 | 用户配置 LLM 后，应用应生成实时反馈和最终报告。 | 当前实现支持 OpenAI、DeepSeek、Ollama 与自定义 OpenAI-compatible endpoint；每新增约 30 个字符触发实时反馈，用户可手动生成最终报告。 |
-| FR-E08 | 应用应保存各 LLM Provider 配置并兼容旧版扁平配置。 | 配置写入 Electron `userData/settings.json`，按 provider 保存；旧字段在读取时迁移。API Key 当前为明文，属于安全债。 |
-| FR-E09 | 用户应能编辑训练目标、自定义规则、风格参考和额外口癖词。 | 内容保存到 `userData/custom-prompt.json`，后续实时/报告 prompt 读取。 |
+| FR-E08 | 应用应保存各 LLM Provider 配置并兼容旧版扁平配置。 | 配置原子写入 Electron `userData/settings.json`，按 provider 保存；旧字段在读取时迁移，未来 schema 不被旧版本自动降级覆盖。API Key 当前为明文，属于发布前安全权衡。 |
+| FR-E09 | 用户应能编辑训练目标、自定义规则、风格参考和额外口癖词。 | versioned 内容原子写入 `userData/custom-prompt.json`；实时/报告 prompt 读取，额外口癖词也作为最多 64 个有界 filler 参与本地统计。 |
 | FR-E10 | 用户应能复制或保存原文与报告。 | 原文可复制/保存为 Markdown；报告可复制/保存为 Markdown；保存路径通过系统对话框选择。 |
+| FR-E11 | 当前 Paraformer 应通过轻量 ASR Provider 边界访问。 | Main 只依赖 initialize/start/feed/stop/cancel/dispose 契约；Fake Provider 可在不加载真实 Paraformer/Sherpa 模块时验证业务与 Electron smoke 路径。 |
+| FR-E12 | 默认中文模型选择应由项目数据 benchmark 和明确产品取舍支持。 | 三候选比较结果可复跑；ADR-0005 记录继续使用 Paraformer 的 streaming UX 与渐进迁移理由。 |
+| FR-P01 | 音频采集与 ASR 推理应成为独立职责。 | AudioCapture 独立持有权限、track/context/worklet 与 chunk 元数据；Renderer 只编排训练/session，Provider 隔离 Sherpa 配置。 |
+| FR-P02 | 音频链路应使用 16 kHz AudioContext、Electron/Chromium graph 采样率适配与 AudioWorklet collector。 | 已记录请求/context/track rate，固定 Electron OfflineAudioContext/AudioBufferSource fixture 覆盖 16/44.1/48 kHz 确定性缓冲；worklet 下混并汇集 320 帧 mono Float32 chunk，正常停止 flush 非空 tail，ScriptProcessor 已移除。真实 MediaStream 麦克风仍为非阻塞 follow-up。 |
+| FR-P03 | ASR Provider 应提供 session 和规范事件语义。 | `startASR/feedAudio/stopASR/cancelASR` 使用 `sessionId` 和 sequence，返回 `ready/partial/final/error/stopped` 事件的安全 envelope；旧 session、迟到/倒序事件不污染当前训练，stop/cancel/dispose 可重复处理。 |
+| FR-P04 | ASR 初始化和推理应移出 Electron Main。 | Main 只持有 Router 与 `AsrProcessController`；utility process 加载 Provider/Sherpa，退出使当前命令安全失败，下一次 start 可重建；退出 dispose 最多等待 5 秒。真实模型负载与 Forge 制品路径仍按后续验收验证。 |
 
-### 4.2 Planned
+### 4.2 Partial / Planned
 
-| ID | 需求 | 验收标准 |
-|---|---|---|
-| FR-P01 | 音频采集与 ASR 推理应成为独立职责。 | Audio 模块只输出带明确采样率/声道/格式的音频块；业务和 UI 不直接依赖 Sherpa 配置。 |
-| FR-P02 | 音频链路应使用 AudioWorklet，并按模型要求正确重采样。 | 44.1 kHz、48 kHz 等常见输入经测试后以模型声明的采样率送入 ASR；不再使用 `ScriptProcessorNode`。 |
-| FR-P03 | ASR 应通过轻量 Provider 契约访问。 | 至少提供 `start`、`feed`、`stop`/`dispose` 等等价能力；业务测试可使用 Fake Provider，无需加载真实模型。 |
-| FR-P04 | ASR 初始化和推理应移出 Electron Main。 | 长时间初始化/推理不阻塞 Main 事件循环；执行单元失败可检测并向 UI 返回可恢复错误。具体隔离机制由 ADR 决定。 |
-| FR-P05 | 应提供轻量 Model Manager。 | 可依据模型清单检查、下载、SHA-256 校验、原子安装、选择和返回本地模型路径；失败不破坏上一可用模型。 |
-| FR-P06 | 模型与应用版本应解耦。 | 模型清单至少包含 `modelId`、`version`、`engine`、`languages`、文件来源、`sha256` 和兼容版本信息。 |
-| FR-P07 | 默认中文模型应由项目数据 benchmark 决定。 | 在同一设备/语料/参数下比较当前 Paraformer、新 Zipformer 与 SenseVoiceSmall；记录 CER、延迟、RTF、CPU、RAM、模型大小和初始化时间，不预设胜者。 |
-| FR-P08 | 应用应能生成普通用户可安装的桌面制品。 | 通过 Electron Forge 生成目标平台制品；终端用户无需安装 Node.js、Python、CMake 或编译器。 |
-| FR-P09 | 设置、用户数据、模型、缓存和日志应与程序文件分离。 | 应用升级或重装不应默认删除用户数据和已下载模型；实际目录遵循 Electron `userData` 等平台目录。 |
-| FR-P10 | 本地训练在 LLM 不可用时仍应工作。 | 离线、无 API Key 或 LLM 请求失败时，录音、本地 ASR 和基础词库分析仍可完成。 |
-| FR-P11 | 停止训练时不得丢失最后一个未形成 endpoint 的识别结果。 | `stop` 返回的 final text 经去重后合并到当前 session，并进入展示与分析。 |
-| FR-P12 | 展示 ASR、粘贴文本和 LLM 输出前应安全编码/消毒。 | 恶意 HTML/事件属性不得通过 `innerHTML` 执行；高亮和报告格式化测试覆盖脚本/标签输入。 |
+| ID | 状态 | 需求 | 验收标准 |
+|---|---|---|---|
+| FR-P05 | Existing | 应提供轻量 Model Manager。 | R-07/R-08 已实现独立清单、HTTPS 下载、archive/runtime SHA-256、白名单解压、安装锁、原子发布/激活，并把 active/default 路径接入生产 Provider；回退版本先通过 native 初始化才切换指针。 |
+| FR-P06 | Existing | 模型与应用版本应解耦。 | 产品清单包含 model ID、version、engine、languages、mode、采样率、兼容应用版本、archive/runtime 来源与 hash；安装目录按 model/version 不可变。 |
+| FR-P08 | Existing | 应用应能生成普通用户可安装的桌面制品。 | Electron Forge/Squirrel 已生成 Windows x64 Setup/nupkg/RELEASES；PKG-03/PKG-04 证明安装、启动、真实模型、升级与卸载路径不要求终端用户安装 Node.js、Python、CMake 或编译器。公开发布仍需签名与目标环境证据。 |
+| FR-P09 | Existing | 设置、用户数据、模型、缓存和日志应与程序文件分离。 | 设置与版本化模型位于 Electron `userData`；PKG-04 已验证应用升级、手工旧安装器降级、恢复当前版本及卸载均不静默删除这些数据。日志与模型资产缓存仍按各自开发/运行目录管理。 |
+| FR-P10 | Existing | 本地训练在 LLM 不可用时仍应工作。 | 离线、无 API Key 或 LLM 请求失败时，录音、本地 ASR 和基础词库分析仍可完成。 |
 
 ## 5. 非功能需求（NFR）
 
-| ID | 类别 | 需求与验证方式 |
-|---|---|---|
-| NFR-01 | 可维护性与范围收敛 | 默认保持 Electron + 原生 JS/HTML/CSS + Sherpa-ONNX；持续遵循不过度扩散、不过度设计、不把内部工作升级为不必要的审计审核，并减少不能改变决策或发现实质回归的验证。只有能明确降低总代码、风险或长期成本时才增加依赖、流程或门禁；依赖变更需 ADR 或变更说明。 |
-| NFR-02 | 可复现性 | 锁文件与 `package.json` 一致；固定开发工具 Node 22.23.x/npm 12.0.x；当前 lock/安装树为精确 Electron 43.4.1、Sherpa 1.13.3。Electron 43 首次 CLI 下载与 clean `npm ci` 后的校验缓存恢复均已实测；Forge 构建仍按 Roadmap Phase 5 建立。 |
-| NFR-03 | 响应性 | 录音和 ASR 期间 UI 与 Main 应保持可响应。定量预算在基线 benchmark 后确定，不虚构当前 p95 指标。 |
-| NFR-04 | 音频正确性 | 每个音频块携带或继承明确的采样率、声道和样本格式；重采样用自动化测试验证时长和频率行为。 |
-| NFR-05 | 性能 | 默认模型应在项目定义的最低支持设备上满足实时或近实时体验；阈值、设备和场景在 benchmark 方案中冻结。 |
-| NFR-06 | 可靠性 | 模型下载使用校验和与原子替换；ASR/LLM/麦克风错误应可诊断，不得导致未捕获崩溃或损坏上一可用状态。 |
-| NFR-07 | 隐私与安全 | 本地 ASR 音频默认不上传；向 LLM 发送文本前应让用户明确知情。API Key、完整音频和敏感文本不得写入普通日志。 |
-| NFR-08 | 权限隔离 | Renderer 不获得不受限的 Node.js 权限；Preload 仅暴露按能力划分的最小 API。`contextIsolation` 等当前配置需源码复核。 |
-| NFR-09 | 可测试性 | 词库/配置/模型清单/重采样/Provider 契约有单元测试；IPC/ASR 有集成测试；至少有启动、录音、模型初始化冒烟检查。首阶段不设虚假覆盖率目标。 |
-| NFR-10 | 可移植性 | 支持矩阵按实际 CI 和人工验证定义 Tier 1/2/Experimental；在验证前不宣称 Windows/macOS/Linux 全部同等级支持。 |
-| NFR-11 | 可升级性 | 应用、设置 schema 和模型均有版本；升级失败时保留用户数据和上一可用模型。自动更新服务不属于首个基线。 |
-| NFR-12 | 可观测性 | 日志包含应用/OS/架构、ASR Provider、模型 ID/版本、输入采样率、初始化耗时和脱敏错误；不得包含密钥。 |
+| ID | 状态 | 类别 | 需求与验证方式 |
+|---|---|---|---|
+| NFR-01 | Existing | 可维护性与范围收敛 | 默认保持 Electron + 原生 JS/HTML/CSS + Sherpa-ONNX；持续遵循不过度扩散、不过度设计、不把内部工作升级为不必要的审计审核，并减少不能改变决策或发现实质回归的验证。只有能明确降低总代码、风险或长期成本时才增加依赖、流程或门禁；依赖变更需 ADR 或变更说明。 |
+| NFR-02 | Partial | 可复现性 | 锁文件与 `package.json` 一致；固定开发工具 Node 22.23.x/npm 12.0.x；当前 lock/安装树为精确 Electron 43.4.1、Sherpa 1.13.3。Electron 43 首次 CLI 下载与 clean `npm ci` 后的校验缓存恢复均已实测；Forge 构建仍按 Roadmap Phase 5 建立。 |
+| NFR-03 | Partial | 响应性 | ASR 初始化与同步 decode 已移入 utility process；D-03 空载传输、Fake smoke 与 packaged 真实 Paraformer 最小会话均通过，但尚无真实麦克风/UI 的 p95 定量预算。 |
+| NFR-04 | Partial | 音频正确性 | 固定 Electron 的 OfflineAudioContext/AudioBufferSource graph 已用确定性双声道时变 fixture 验证 16/44.1/48 kHz 缓冲适配到 16 kHz；AudioWorklet 输出带明确格式的 320 帧 chunk 并 flush tail。生产 MediaStreamAudioSourceNode 与真实麦克风/驱动仍待非阻塞验证。 |
+| NFR-05 | Partial | 性能 | Windows x64 首个硬件资格线暂定 4-core CPU、8 GB RAM、3 GB 可用磁盘；当前高配开发机 Paraformer benchmark 平均 RTF 0.0540，PKG-03 首次模型闭环约 563.664 s、离线二次启动约 3.672 s；接近资格线的真实 Audio/utility/UI 测量仍是非阻塞环境待办。 |
+| NFR-06 | Partial | 可靠性 | ASR session、10-block overrun 和执行单元退出重建已有受控路径；Model Manager 已覆盖下载大小/hash、严格 Range 有限续传、解压/运行文件校验、原子激活与回退，并通过真实约 1 GB 下载闭环；固定 schema 诊断导出已实现，真实设备性能预算仍待确认。 |
+| NFR-07 | Partial | 隐私与安全 | 本地 ASR 音频不上传；LLM 错误与当前应用日志不记录 Key、Authorization、完整响应或 transcript，安全错误格式有测试；API Key 明文和公开用户告知仍待发布前确认。 |
+| NFR-08 | Existing | 权限隔离 | Renderer 不获得不受限的 Node.js 权限；当前 BrowserWindow 使用 `contextIsolation: true`、`nodeIntegration: false`，Preload 只暴露显式能力。后续新增 IPC 时继续维持该边界。 |
+| NFR-09 | Partial | 可测试性 | 词库/共享规则、设置与自定义规则迁移/原子写、Provider、ASR session/IPC/Renderer 过滤、AudioCapture/collector、有界队列、process controller、Model Manager 和 Electron 16/44.1/48 kHz graph fixture 已有测试；packaged 真实模型 smoke 已补齐，真实麦克风仍待环境验证。 |
+| NFR-10 | Partial | 可移植性 | 首个 Tier 1 目标选定 Windows 11 25H2+ x64；Windows ARM64、macOS、Linux 保持 Experimental，只有对应 package/smoke/native-model 证据才能升级支持等级。 |
+| NFR-11 | Existing | 可升级性 | 设置/自定义规则已有 schemaVersion、旧配置迁移、未来 schema 防降级覆盖与原子写；模型具备不可变版本目录、原子 active pointer 和上一版本回退。PKG-04 已验证 1.0.0→1.0.1 安装制品升级与卸载保留 userData；旧完整 Setup 仍可降级二进制，重装当前 Setup 可恢复。自动更新服务不属于首个基线。 |
+| NFR-12 | Existing | 可观测性 | 用户可主动导出 app/OS/arch、active 模型、请求/context/track sample rate、ASR 初始化耗时和受控错误类别；固定白名单不含设置、密钥、路径、stack、音频、逐字稿或 LLM 内容，且不后台持久化或上传。 |
 
 ## 6. 约束
 
@@ -94,20 +94,23 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 - 目标是降低总体维护和交付复杂度，而不是机械减少文件数、模块数或安装包体积。
 - ASR Provider 和 Model Manager 必须保持轻量；不建设通用框架、模型数据库或模型市场。
 - ADR-0005 已根据三候选 benchmark 接受保留 Paraformer 为默认；Zipformer 与 SenseVoiceSmall 的结果作为后续复审基线，不向普通用户暴露多模型选择。
+- 仅重开 Zipformer Large CTC INT8 与 FireRedASR2 CTC INT8 两个内部候选：前者保持 streaming，后者仅做 utterance spike；不进行通用模型扩张，Paraformer 仍为默认。
 - 架构迁移采用渐进重构，不推倒重写，不以切换 Electron/Tauri/WASM 为默认路径。
 
 ## 7. 发布级验收场景
+
+这些场景是后续发布判断，而非当前内部技术实验的默认门槛。发布级 review、审计、签名、广泛平台支持和未解决的再分发权利在本阶段均为非阻塞跟进，除非它们使实验无法运行或其结论失效。
 
 | ID | 场景 | 通过条件 |
 |---|---|---|
 | AC-01 | 干净环境构建 | 按开发文档安装唯一必要的开发运行时，`npm ci` 成功，测试和打包命令可重复执行。 |
 | AC-02 | 首次运行 | 普通用户安装制品后可启动；若模型缺失，应用能引导下载、校验并启用模型。 |
-| AC-03 | 常见麦克风采样率 | 44.1/48 kHz 输入被正确转换为模型要求，不出现因错误声明 16 kHz 导致的速度/识别异常。 |
+| AC-03 | 常见麦克风采样率 | 16/44.1/48 kHz 确定性缓冲 fixture 证明固定 Electron OfflineAudioContext/AudioBufferSource graph 向 16 kHz context 正确适配；请求/实际/track rate 可诊断，生产 MediaStream 与真实可配置麦克风验证作为非阻塞 follow-up。 |
 | AC-04 | 本地训练闭环 | 无网络时仍能开始/结束训练、完成本地识别和基础分析。 |
 | AC-05 | LLM 降级 | 无 Key、超时、限流或服务错误时显示可操作错误，本地训练结果仍保留。 |
-| AC-06 | ASR 隔离 | 模型初始化或识别高负载时 Main/UI 保持响应；ASR 执行单元退出时可报告并重新初始化。 |
+| AC-06 | ASR 隔离 | Fake ASR 的真实 utility-process 退出已能安全报告并在下一 start 重建；真实模型初始化/识别高负载下的 Main/UI 响应仍在有模型环境验收。 |
 | AC-07 | 模型完整性 | 下载被中断或校验失败时不激活损坏模型，也不覆盖上一可用模型。 |
-| AC-08 | 升级保护 | 升级应用后设置和已下载模型仍可用，或通过明确迁移恢复；不得静默丢失。 |
+| AC-08 | 升级保护 | PKG-04 已证明 1.0.0→1.0.1 升级及卸载后设置、自定义规则和外部模型目录仍在；旧完整 Setup 的二进制降级行为及当前版本恢复路径已有文档。 |
 | AC-09 | 模型选型 | benchmark 原始结果、环境和汇总可复跑；ADR 只依据实测数据形成 Accepted 结论。 |
 
 ## 8. Out of Scope
@@ -116,19 +119,19 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 - 默认引入 Python/FunASR、GPU/CUDA 或云端 ASR 运行栈。
 - 引入 React/Vue、Vite、TypeScript 或复杂状态管理以“现代化”界面。
 - 用户账户、云同步、多人协作、数据库、模型市场和通用插件系统。
-- 在没有真实语料 benchmark 前承诺特定模型准确率、延迟或模型排名。
+- 把当前内部三候选结果外推为公开权威 benchmark、跨设备性能承诺或未测试模型的排名。
 - 首阶段建设自动更新服务、遥测平台或完整崩溃上报后端。
 - 把 SenseVoice 情绪/事件标签直接解释为表达质量评分。
 
 ## 9. 待确认事项
 
-1. 当前 `package.json` 为应用 `1.0.0`、Electron `43.4.1`（精确版本）、sherpa-onnx-node `^1.10.0`；lock/安装树为 43.4.1/1.13.3，开发基线为 Node 22.23.0/npm 12.0.2。Electron runtime 实测为 Node 24.18.1、Chromium 150.0.7871.224、modules ABI 148；显式清空所有 npm/Electron 缓存后的复跑仍为非阻塞 Runtime-TBD。
-2. README 已把 macOS/Linux 与正式最低 Windows 版本标为 TBD；正式支持等级仍需 CI/制品证据。
+1. 当前 `package.json` 为应用 `1.0.1`、Electron `43.4.1` 与 sherpa-onnx-node `1.13.3`（均为精确版本），开发基线为 Node 22.23.0/npm 12.0.2。Electron runtime 实测为 Node 24.18.1、Chromium 150.0.7871.224、modules ABI 148；显式清空所有 npm/Electron 缓存后的复跑仍为非阻塞 Runtime-TBD。
+2. PKG-01 已选择 Windows 11 25H2+ x64 作为首个 Tier 1 目标；PKG-03/PKG-04 已形成未签名内部制品的安装、真实模型、离线二次启动、升级和卸载数据保留证据，正式支持仍需签名、真实设备及对应环境证据，其他平台保持 Experimental。
 3. Paraformer 的版本、运行文件 hash 与大小已记录；模型再分发许可证仍待发布前确认。
 4. 词库计数/密度是否属于产品认可的评分定义；训练历史目前不持久化，是否需要持久化待产品决定。
-5. 产品最低支持硬件及正式性能预算。
+5. 4-core/8-GB/3-GB 资格线上的真实录音、RTF、峰值 RAM 与 UI 响应预算。
 6. 模型与 LLM 服务的许可证、分发与隐私告知要求。
-7. T-08 已通过 Electron 43.4.1 受控升级关闭 Electron 33 基线的两个 high audit 节点；当前 audit 为 0。真实模型/麦克风、macOS/Linux 和 Forge 制品兼容性仍需后续验收。
+7. 生产依赖 audit 为 0；Forge 7.5/Squirrel 的仅开发传递依赖仍有 19 high/1 critical，留给 OPS-03 在保持 registry-only 安装与 package smoke 的前提下受控升级。真实麦克风、接近资格线设备、macOS/Linux 和签名仍需后续验收。
 
 ## 10. 追踪关系
 

@@ -1,9 +1,9 @@
 # Expression Trainer 架构入口
 
 > 方法：arc42-lite + C4（Context/Container）+ ADR  
-> 状态：Draft Baseline  
-> 基线日期：2026-08-22
-> 源码基线：`morigejile/expression-trainer-pro`，Phase 0 实现 `b16a1d0bf799887cf7ece1283d73463961346030`（本地 `chore/reproducible-build`）
+> 状态：Current Documentation Index
+> 基线日期：2026-08-29
+> 源码基线：当前开发分支，已包含 Phase 4 / R-01～R-09
 
 ## 1. 如何阅读
 
@@ -14,6 +14,7 @@
 | [目标架构](target.md) | 本轮迁移准备变成什么？ | 仅在迁移期间存在 |
 | [ADR](adr/README.md) | 为什么做出关键决策？ | 永久保留，变更时 Supersede |
 | [Roadmap](../roadmap.md) | 按什么顺序落地？ | 随执行状态更新 |
+| [支持矩阵](../support-matrix.md) | 首发平台和验证边界是什么？ | 随制品证据提升等级 |
 
 迁移完成后，应把已实现的目标内容合并进 `current.md`，再归档或删除失去意义的 `target.md`；ADR 不删除。
 
@@ -68,21 +69,21 @@ flowchart LR
 源码确认当前链路为：
 
 ```text
-Renderer/Web Audio → Preload/IPC → Main → sherpa-onnx-node/Paraformer
-                                              ↓
-                                      词库分析 / LLM fetch
-                                              ↓
-                                             UI
+Renderer/Web Audio → 10-block 有界队列 → Preload/IPC → Main Router
+                                                        ↓
+                                            ASR utility process
+                                                        ↓
+                                          sherpa-onnx-node/Paraformer
 ```
 
-主要技术债集中在 `ScriptProcessorNode`、缺少显式重采样、高频数组复制/IPC、ASR 位于 Main、模型路径和参数耦合、停止时 final text 丢失、LLM/文本渲染安全、测试缺失以及打包交付未闭环。详情见 [current.md](current.md)。
+停止尾部文本、LLM 请求控制、安全渲染、ASR session/Provider、AudioCapture、AudioWorklet、10-block 有界音频发送、utility-process 推理隔离、版本化模型自动准备和原子配置持久化已完成；真实 Electron smoke 覆盖执行单元退出报告与下一 session 重建。剩余技术债主要是逐块 invoke/structured-clone 复制、真实模型与设备性能证据、可导出诊断以及打包交付未闭环。详情见 [current.md](current.md)。
 
 ## 7. 目标状态摘要
 
 目标保留 Electron 和原生 Web UI，同时形成：
 
 ```text
-Renderer UI + AudioWorklet/Resampler
+Renderer UI + Chromium graph/AudioWorklet collector
                 ↓ 有界音频流
 Preload 最小桥接 → Main（窗口/设置/生命周期/模型协调）
                               ↓
@@ -101,11 +102,12 @@ Preload 最小桥接 → Main（窗口/设置/生命周期/模型协调）
 |---|---|---|
 | [0001](adr/0001-retain-electron-and-native-web-stack.md) | Accepted | 保留 Electron + 原生 Web 技术栈 |
 | [0002](adr/0002-retain-sherpa-onnx.md) | Accepted | 保留 Sherpa-ONNX 作为默认 ASR 引擎 |
-| [0003](adr/0003-separate-audio-and-asr.md) | Proposed | 分离 Audio 与 ASR，使用轻量契约 |
-| [0004](adr/0004-manage-models-separately.md) | Proposed | 模型与应用解耦并校验安装 |
+| [0003](adr/0003-separate-audio-and-asr.md) | Accepted | 分离 Audio 与 ASR，使用轻量契约 |
+| [0004](adr/0004-manage-models-separately.md) | Accepted | 模型与应用解耦并校验安装 |
 | [0005](adr/0005-select-default-asr-model-by-benchmark.md) | Accepted | 保留 Paraformer 默认，候选结果作为后续优化基线 |
-| [0006](adr/0006-move-asr-out-of-main.md) | Proposed | ASR 移出 Main |
-| [0007](adr/0007-package-with-electron-forge.md) | Proposed | 使用 Electron Forge 打包发布 |
+| [0006](adr/0006-move-asr-out-of-main.md) | Accepted | 使用单个 Electron utility process 隔离 ASR |
+| [0007](adr/0007-package-with-electron-forge.md) | Accepted | 使用 Electron Forge 打包发布 |
+| [0008](adr/0008-keep-benchmark-as-isolated-non-shipping-tool.md) | Accepted | 核心 benchmark 同仓库隔离保留，一次性数据流程归档 |
 
 ## 9. 文档维护规则
 
