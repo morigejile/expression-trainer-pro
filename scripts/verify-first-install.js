@@ -5,6 +5,7 @@ const {spawn, spawnSync} = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 
+const APP_VERSION = require('../package.json').version;
 const INSTALL_TIMEOUT_MS = 5 * 60_000;
 const MODEL_TIMEOUT_MS = 45 * 60_000;
 const HEADLESS_SWITCHES = ['--headless', '--disable-gpu', '--no-sandbox'];
@@ -85,7 +86,7 @@ async function main() {
     const installStarted = Date.now();
     setupStarted = true;
     await runProcess(setup, ['--silent'], {timeoutMs: INSTALL_TIMEOUT_MS});
-    const executable = path.join(installRoot, 'app-1.0.0', 'ExpressionTrainer.exe');
+    const executable = path.join(installRoot, `app-${APP_VERSION}`, 'ExpressionTrainer.exe');
     assert.equal(fs.existsSync(executable), true, 'Installed version executable is missing');
     assert.equal(fs.existsSync(path.join(installRoot, 'Update.exe')), true, 'Installed Update.exe is missing');
     console.log(`PKG03_INSTALL_OK ${Date.now() - installStarted}ms ${executable}`);
@@ -138,7 +139,7 @@ async function main() {
     }
     try {
       if (fs.existsSync(installRoot)) {
-        const installedExecutable = path.join(installRoot, 'app-1.0.0', 'ExpressionTrainer.exe');
+        const installedExecutable = path.join(installRoot, `app-${APP_VERSION}`, 'ExpressionTrainer.exe');
         for (let attempt = 0; attempt < 20 && fs.existsSync(installedExecutable); attempt += 1) {
           await delay(250);
         }

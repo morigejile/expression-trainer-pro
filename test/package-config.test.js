@@ -2,6 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('node:path');
 
 const forgeConfig = require('../forge.config');
@@ -37,4 +38,10 @@ test('first-install smoke remains an explicit non-default command', () => {
   const manifest = require('../package.json');
   assert.equal(manifest.scripts['smoke:first-install'], 'node scripts/verify-first-install.js');
   assert.doesNotMatch(manifest.scripts.test, /first-install/);
+});
+
+test('first-install smoke follows the current package version', () => {
+  const source = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'verify-first-install.js'), 'utf8');
+  assert.match(source, /require\('\.\.\/package\.json'\)\.version/);
+  assert.doesNotMatch(source, /app-1\.0\.0/);
 });
