@@ -115,6 +115,9 @@ test('clear and replacement sessions invalidate all earlier-session events', () 
   assert.equal(consume(replacement, {
     type: 'final', sessionId: 'session-a', sequence: 0, text: '旧会话迟到'
   }).effect, null);
+  assert.equal(consume(replacement, {
+    type: 'stopped', sessionId: 'session-a', sequence: 1
+  }).effect, null);
   assert.deepEqual(consume(replacement, {
     type: 'partial', sessionId: 'session-b', sequence: 0, text: '新会话'
   }).effect, {

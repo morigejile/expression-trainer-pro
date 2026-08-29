@@ -49,6 +49,8 @@ function createTrainer() {
   trainer.llmGeneration = 0;
   trainer.asrEventState = createAsrEventState();
   trainer.asrInputSequence = 0;
+  trainer.asrStartAttempt = null;
+  trainer.asrGeneration = 0;
   trainer.renderSubtitle = () => {};
   trainer.btnStop = createElement();
   trainer.btnPause = createElement();
@@ -68,6 +70,16 @@ function createTrainer() {
   trainer.reportBody = createElement();
   trainer.reportModal = createElement();
   return trainer;
+}
+
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
+  });
+  return { promise, reject, resolve };
 }
 
 function activateAsrSession(trainer, sessionId = 'session-a') {
@@ -511,4 +523,302 @@ test('command errors are rendered as text content', async (t) => {
     trainer.subtitleContainer.children[0].textContent,
     '语音识别启动失败: <img src=x onerror=evil()>'
   );
+});
+
+test('clear during initial cancellation await prevents the stale start from claiming a session', async (t) => {
+  const initialCancellation = createDeferred();
+  let cancelCalls = 0;
+  let startCalls = 0;
+  let microphoneCalls = 0;
+  const originalNavigator = Object.getOwnPropertyDescriptor(global, 'navigator');
+  Object.defineProperty(global, 'navigator', {
+    configurable: true,
+    value: {
+      mediaDevices: {
+        async getUserMedia() {
+          microphoneCalls += 1;
+          throw new Error('must not reach microphone');
+        }
+      }
+    }
+  });
+  global.document = { createElement };
+  global.window = {
+    api: {
+      cancelLLMRequests() {
+        cancelCalls += 1;
+        return cancelCalls === 1
+          ? initialCancellation.promise
+          : Promise.resolve({ success: true });
+      },
+      async startASR() {
+        startCalls += 1;
+        return { ok: false, error: { code: 'unexpected', message: 'unexpected start' } };
+      }
+    }
+  };
+  t.after(() => {
+    initialCancellation.resolve({ success: true });
+    delete global.document;
+    delete global.window;
+    if (originalNavigator) Object.defineProperty(global, 'navigator', originalNavigator);
+    else delete global.navigator;
+  });
+  const trainer = createTrainer();
+  trainer.showError = () => {};
+
+  const startPromise = trainer.startRecording();
+  trainer.clearAll();
+  initialCancellation.resolve({ success: true });
+  await startPromise;
+
+  assert.equal(startCalls, 0);
+  assert.equal(microphoneCalls, 0);
+  assert.deepEqual(trainer.asrEventState, createAsrEventState());
+});
+
+test('only the latest of two overlapping starts may pass the initial await', async (t) => {
+  const firstCancellation = createDeferred();
+  const secondCancellation = createDeferred();
+  const gates = [firstCancellation, secondCancellation];
+  const startCommands = [];
+  let cancellationCalls = 0;
+  global.window = {
+    api: {
+      cancelLLMRequests() {
+        const gate = gates[cancellationCalls];
+        cancellationCalls += 1;
+        return gate.promise;
+      },
+      async startASR(command) {
+        startCommands.push(command);
+        return { ok: false, error: { code: 'test-stop', message: 'stop after ownership check' } };
+      }
+    }
+  };
+  t.after(() => {
+    firstCancellation.resolve({ success: true });
+    secondCancellation.resolve({ success: true });
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.showError = () => {};
+
+  const firstStart = trainer.startRecording();
+  const secondStart = trainer.startRecording();
+  firstCancellation.resolve({ success: true });
+  await new Promise(resolve => setImmediate(resolve));
+  secondCancellation.resolve({ success: true });
+  await Promise.all([firstStart, secondStart]);
+
+  assert.equal(startCommands.length, 1);
+  assert.deepEqual(trainer.asrEventState, createAsrEventState());
+});
+
+test('microphone graph failure cleans local processor, context, and stream', async (t) => {
+  let processorDisconnects = 0;
+  let contextCloses = 0;
+  let trackStops = 0;
+  const stream = { getTracks: () => [{ stop() { trackStops += 1; } }] };
+  const originalNavigator = Object.getOwnPropertyDescriptor(global, 'navigator');
+  const originalAudioContext = global.AudioContext;
+  Object.defineProperty(global, 'navigator', {
+    configurable: true,
+    value: { mediaDevices: { getUserMedia: async () => stream } }
+  });
+  global.AudioContext = class {
+    constructor() {
+      this.destination = {};
+    }
+    createMediaStreamSource() {
+      return { connect() { throw new Error('graph connection failed'); } };
+    }
+    createScriptProcessor() {
+      return {
+        connect() {},
+        disconnect() { processorDisconnects += 1; },
+        onaudioprocess: null
+      };
+    }
+    close() {
+      contextCloses += 1;
+    }
+  };
+  global.window = {
+    api: {
+      cancelLLMRequests: async () => ({ success: true }),
+      async startASR(command) {
+        return {
+          ok: true,
+          events: [{ type: 'ready', sessionId: command.sessionId, sequence: 0 }]
+        };
+      },
+      cancelASR: async () => ({ ok: true, events: [] })
+    }
+  };
+  t.after(() => {
+    delete global.window;
+    if (originalNavigator) Object.defineProperty(global, 'navigator', originalNavigator);
+    else delete global.navigator;
+    if (originalAudioContext === undefined) delete global.AudioContext;
+    else global.AudioContext = originalAudioContext;
+  });
+  const trainer = createTrainer();
+  trainer.showError = () => {};
+
+  await trainer.startRecording();
+
+  assert.equal(processorDisconnects, 1);
+  assert.equal(contextCloses, 1);
+  assert.equal(trackStops, 1);
+  assert.equal(trainer.audioProcessor, null);
+  assert.equal(trainer.audioContext, null);
+  assert.equal(trainer.mediaStream, null);
+});
+
+test('microphone rejection from a replaced start does not display a stale error', async (t) => {
+  const firstMicrophone = createDeferred();
+  const microphoneRequested = createDeferred();
+  const secondCancellation = createDeferred();
+  let cancelLlmCalls = 0;
+  let startCalls = 0;
+  const shownErrors = [];
+  const originalNavigator = Object.getOwnPropertyDescriptor(global, 'navigator');
+  Object.defineProperty(global, 'navigator', {
+    configurable: true,
+    value: {
+      mediaDevices: {
+        getUserMedia() {
+          microphoneRequested.resolve();
+          return firstMicrophone.promise;
+        }
+      }
+    }
+  });
+  global.window = {
+    api: {
+      cancelLLMRequests() {
+        cancelLlmCalls += 1;
+        return cancelLlmCalls === 1
+          ? Promise.resolve({ success: true })
+          : secondCancellation.promise;
+      },
+      async startASR(command) {
+        startCalls += 1;
+        if (startCalls === 1) {
+          return {
+            ok: true,
+            events: [{ type: 'ready', sessionId: command.sessionId, sequence: 0 }]
+          };
+        }
+        return { ok: false, error: { code: 'second-stopped', message: 'second stopped' } };
+      },
+      cancelASR: async () => ({ ok: true, events: [] })
+    }
+  };
+  t.after(() => {
+    firstMicrophone.reject(new Error('old permission failure'));
+    secondCancellation.resolve({ success: true });
+    delete global.window;
+    if (originalNavigator) Object.defineProperty(global, 'navigator', originalNavigator);
+    else delete global.navigator;
+  });
+  const trainer = createTrainer();
+  trainer.showError = message => shownErrors.push(message);
+
+  const firstStart = trainer.startRecording();
+  await microphoneRequested.promise;
+  const secondStart = trainer.startRecording();
+  firstMicrophone.reject(new Error('old permission failure'));
+  await firstStart;
+
+  assert.equal(shownErrors.some(message => message.includes('old permission failure')), false);
+  secondCancellation.resolve({ success: true });
+  await secondStart;
+});
+
+test('clear during stop-final analysis prevents stale analysis side effects', async (t) => {
+  const analysis = createDeferred();
+  global.document = { createElement };
+  global.window = {
+    api: {
+      stopASR: async () => stopEnvelope('session-a'),
+      cancelASR: async () => ({ ok: true, events: [] }),
+      cancelLLMRequests: async () => ({ success: true }),
+      analyzeText: async () => analysis.promise
+    }
+  };
+  t.after(() => {
+    analysis.resolve({ totalWords: 4, fillers: [], hedges: [], vagueWords: [] });
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  activateAsrSession(trainer);
+
+  const stopPromise = trainer.stopRecording();
+  await new Promise(resolve => setImmediate(resolve));
+  trainer.clearAll();
+  analysis.resolve({ totalWords: 4, fillers: [], hedges: [], vagueWords: [] });
+  await stopPromise;
+
+  assert.equal(trainer.fullText, '');
+  assert.deepEqual(trainer.sentences, []);
+  assert.equal(trainer.stats.totalWords, 0);
+  assert.equal(trainer.feedbackContent.children.length, 0);
+});
+
+test('LLM cancellation alone does not discard analysis owned by the active ASR session', async (t) => {
+  const analysis = createDeferred();
+  global.window = {
+    api: {
+      analyzeText: async () => analysis.promise
+    }
+  };
+  t.after(() => {
+    analysis.resolve({ totalWords: 4, fillers: [], hedges: [], vagueWords: [] });
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  activateAsrSession(trainer);
+
+  const resultPromise = trainer.processASRResponse({
+    ok: true,
+    events: [{ type: 'final', sessionId: 'session-a', sequence: 1, text: '同一会话定稿' }]
+  }, '语音识别失败');
+  await new Promise(resolve => setImmediate(resolve));
+  trainer.advanceLLMGeneration();
+  analysis.resolve({ totalWords: 4, fillers: [], hedges: [], vagueWords: [] });
+  await resultPromise;
+
+  assert.equal(trainer.stats.totalWords, 8);
+});
+
+test('stop rejection after clear does not display a stale error', async (t) => {
+  const stopped = createDeferred();
+  const shownErrors = [];
+  global.document = { createElement };
+  global.window = {
+    api: {
+      stopASR: async () => stopped.promise,
+      cancelASR: async () => ({ ok: true, events: [] }),
+      cancelLLMRequests: async () => ({ success: true })
+    }
+  };
+  t.after(() => {
+    stopped.reject(new Error('old stop failed'));
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  activateAsrSession(trainer);
+  trainer.showError = message => shownErrors.push(message);
+
+  const stopPromise = trainer.stopRecording();
+  await new Promise(resolve => setImmediate(resolve));
+  trainer.clearAll();
+  stopped.reject(new Error('old stop failed'));
+  await stopPromise;
+
+  assert.equal(shownErrors.some(message => message.includes('old stop failed')), false);
 });
