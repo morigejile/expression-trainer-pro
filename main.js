@@ -1,6 +1,14 @@
 const { app, BrowserWindow, ipcMain, Menu, utilityProcess } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const {atomicWriteJsonSync} = require('./lib/atomic-json-store');
+const {
+  createDefaultCustomPrompt,
+  customWordsToFillers,
+  normalizeCustomPrompt,
+  parseCustomPromptJson
+} = require('./lib/custom-prompt-config');
+const {formatSafeError} = require('./lib/safe-log');
 const { loadLexicon, analyzeText } = require('./lib/lexicon');
 const {
   createDefaultSettings,
@@ -58,13 +66,19 @@ function getCustomPromptPath() {
 function loadCustomPrompt() {
   const p = getCustomPromptPath();
   if (fs.existsSync(p)) {
-    try { return JSON.parse(fs.readFileSync(p, 'utf-8')); } catch(e) { return null; }
+    const parsed = parseCustomPromptJson(fs.readFileSync(p, 'utf-8'));
+    if (parsed.error) {
+      console.warn('[规则] custom-prompt.json 无法解析，使用默认规则并保留原文件');
+      return parsed.prompt;
+    }
+    if (parsed.shouldPersist) saveCustomPrompt(parsed.prompt);
+    return parsed.prompt;
   }
-  return null;
+  return createDefaultCustomPrompt();
 }
 
 function saveCustomPrompt(data) {
-  fs.writeFileSync(getCustomPromptPath(), JSON.stringify(data, null, 2));
+  atomicWriteJsonSync(getCustomPromptPath(), normalizeCustomPrompt(data));
 }
 
 // 设置文件路径
@@ -90,7 +104,7 @@ function loadSettings() {
 
 function saveSettings(settings) {
   const settingsPath = getSettingsPath();
-  fs.writeFileSync(settingsPath, JSON.stringify(normalizeSettings(settings), null, 2));
+  atomicWriteJsonSync(settingsPath, normalizeSettings(settings));
 }
 
 function createMainWindow() {
@@ -217,7 +231,7 @@ app.whenReady().then(() => {
       mainWindow: createdMainWindow
     }).catch(error => {
       console.error('[electron-smoke] FAILED');
-      console.error(error && error.stack ? error.stack : error);
+      console.error(formatSafeError(error));
       app.exit(1);
     });
   }
@@ -322,7 +336,8 @@ ipcMain.handle('cancel-llm-requests', (event) => {
 
 // 词库分析
 ipcMain.handle('analyze-text', (event, text) => {
-  return analyzeText(text);
+  const customPrompt = loadCustomPrompt();
+  return analyzeText(text, {extraFillers: customWordsToFillers(customPrompt.customWords)});
 });
 
 // 文件保存

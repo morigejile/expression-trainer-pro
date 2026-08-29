@@ -3,7 +3,7 @@
 > 方法：arc42-lite + C4（Context/Container）+ ADR  
 > 状态：Current Documentation Index
 > 基线日期：2026-08-29
-> 源码基线：当前开发分支，已包含 Phase 4 / R-01～R-08
+> 源码基线：当前开发分支，已包含 Phase 4 / R-01～R-09
 
 ## 1. 如何阅读
 
@@ -75,7 +75,7 @@ Renderer/Web Audio → 10-block 有界队列 → Preload/IPC → Main Router
                                           sherpa-onnx-node/Paraformer
 ```
 
-停止尾部文本、LLM 请求控制、安全渲染、ASR session/Provider、AudioCapture、AudioWorklet、10-block 有界音频发送、utility-process 推理隔离和版本化模型自动准备已完成；真实 Electron smoke 覆盖执行单元退出报告与下一 session 重建。剩余技术债主要是逐块 invoke/structured-clone 复制、真实模型与设备性能证据、设置/日志收敛以及打包交付未闭环。详情见 [current.md](current.md)。
+停止尾部文本、LLM 请求控制、安全渲染、ASR session/Provider、AudioCapture、AudioWorklet、10-block 有界音频发送、utility-process 推理隔离、版本化模型自动准备和原子配置持久化已完成；真实 Electron smoke 覆盖执行单元退出报告与下一 session 重建。剩余技术债主要是逐块 invoke/structured-clone 复制、真实模型与设备性能证据、可导出诊断以及打包交付未闭环。详情见 [current.md](current.md)。
 
 ## 7. 目标状态摘要
 

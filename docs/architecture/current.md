@@ -1,9 +1,9 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 Smoke；内部开发/测试，BM-02/D-03 Completed，Phase 4 / R-01～R-08 Completed（保留 Paraformer 默认）
+> 状态：Verified from Source + Electron 43 Smoke；内部开发/测试，BM-02/D-03 Completed，Phase 4 / R-01～R-09 Completed（保留 Paraformer 默认）
 > 基线日期：2026-08-29
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
-> 描述对象：截至 Phase 4 / R-08；保留 Electron 43 与 T-04～T-08 行为基线
+> 描述对象：截至 Phase 4 / R-09；保留 Electron 43 与 T-04～T-08 行为基线
 
 ## 1. 证据边界
 
@@ -24,6 +24,7 @@ src/index.html / app.js         主 UI、录音、训练状态和展示
 src/safe-rendering.js           安全高亮 token、DOM 渲染、报告允许列表和 HTML 转义
 src/settings.html / settings.js LLM 设置
 src/prompt-editor.html          自定义训练规则
+shared/expression-rules.js      Renderer 高亮与 Main 分析共用的确定性规则
 lib/asr-provider.js             initialize/start/feed/stop/cancel/dispose 契约校验
 lib/asr-session.js              单 active session、输入/事件 sequence 与规范事件
 lib/asr-ipc.js                  ASR command 校验、安全 envelope 与错误归一化
@@ -43,6 +44,9 @@ lib/lexicon.js                  本地确定性文本分析
 lib/ai-feedback.js              多 LLM 后端 fetch
 lib/prompts.js                  实时反馈/报告 prompt
 lib/settings-config.js          设置默认值、解析和 schema 迁移纯函数
+lib/custom-prompt-config.js     自定义规则 schema、迁移与有界口癖解析
+lib/atomic-json-store.js        userData JSON 的同盘原子写
+lib/safe-log.js                 有界错误文本与凭据模式脱敏
 data/*.json                     词库数据
 package.json / package-lock.json
 test/electron-smoke.test.js      Node 测试父进程、超时、日志和清理
@@ -79,7 +83,7 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 | ASR 模型 | `paraformer-bilingual-zh-en/2024-03-10` | registry 固定 archive/runtime；INT8 encoder/decoder + tokens 安装到 `userData/models`，权重不纳入 Git |
 | 本地分析 | `lib/lexicon.js` + `data/emotion-lexicon.json` | 最大正向词表匹配；`tiered-lexicon.json` 保留为未启用候选数据，不参与运行时分析 |
 | LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接/实时/报告分别为 10/15/60 秒超时，并支持 AbortSignal、按 Renderer 取消和异常响应验证 |
-| 设置 | `userData/settings.json`、`userData/custom-prompt.json` | settings schema version 1；纯函数迁移旧扁平结构；文件同步写入且 API Key 明文 |
+| 设置 | `userData/settings.json`、`userData/custom-prompt.json` | 两者 schema version 1；旧结构迁移、未来 schema 防降级覆盖；小文件同步但以同盘临时文件/fsync/rename 原子发布；API Key 明文 |
 | 输出 | Clipboard + Electron Save Dialog + Markdown | 原文与报告 |
 | 构建/测试 | scripts 为 `start`、`dev`、`test`、`benchmark:dry-run`、`spike:asr-boundary` | `node:test` 覆盖 Provider/Fake、ASR session/IPC/Renderer 过滤、有界队列与 process controller、Paraformer 固定配置、词库、设置、尾部文本、安全渲染、LLM、Electron smoke 和核心 benchmark；无 build/package/CI 配置 |
 
@@ -134,7 +138,7 @@ flowchart LR
   M <--> UserData
 ```
 
-Main 负责 Electron 控制面、词库分析、同步文件 I/O 和 LLM 请求编排；ASR 初始化与同步 decode 已移入单个 utility process。
+Main 负责 Electron 控制面、词库分析、小型 userData JSON 原子文件 I/O 和 LLM 请求编排；ASR 初始化与同步 decode 已移入单个 utility process。
 
 ## 5. 模块职责
 
@@ -165,8 +169,8 @@ R-02 已建立 ASR session/event 状态，R-03/R-04 已把采集生命周期和 
 ### 5.3 Main / `main.js`
 
 - 创建主窗口、设置 modal 和 Prompt 编辑窗口；设置应用菜单和生命周期。
-- 同步读写 `settings.json` 与 `custom-prompt.json`。
-- 通过 `lib/settings-config.js` 规范化设置、迁移 schema；损坏的 settings JSON 回退默认配置且不自动覆盖原文件。
+- 同步读取并原子写入 `settings.json` 与 `custom-prompt.json`。
+- 通过 settings/custom-prompt config 模块规范化、迁移旧 schema；损坏 JSON 回退默认值且不覆盖原文件，未来 schema 兼容读取但不被旧版本自动写回。
 - 在启动时同步加载词库。
 - 注册所有 IPC handlers。
 - 仅在显式 `--smoke-test` 参数下让 utility process 组合最小 Fake ASR，并在 Main 组合 Fake LLM、临时 `userData` 和自动驱动；正常启动向 utility process 传入 `userData`/app version 并组合 managed Paraformer Provider。
@@ -175,7 +179,7 @@ R-02 已建立 ASR session/event 状态，R-03/R-04 已把采集生命周期和 
 - `get-realtime-feedback`、`get-final-report` 和连接测试在 Main 中发起受超时约束的 fetch；同一 Renderer 的同类新请求会取消旧请求，显式取消可终止该 Renderer 的全部 LLM 请求。
 - `save-file` 通过系统对话框把 Markdown 写到用户选择的位置。
 
-设置和 Prompt 文件读写仍使用同步 API。它不是当前首要性能瓶颈，但反映了 Main 职责持续累积。
+设置和 Prompt 文件仍使用同步 API，但数据量很小，写入通过同目录临时文件、fsync 与 rename 防止中断留下半文件；只有实测 Main 卡顿时才改异步 store。
 
 ### 5.4 ASR Provider / `lib/asr-provider.js`、`lib/asr-session.js`、`lib/asr.js`
 
@@ -198,7 +202,7 @@ T-04/R-02 后，`src/app.js` 会把当前 session 的 `final` 事件经 `mergeFi
 - `density`；
 - 替代和提醒 suggestions。
 
-UI 通过 `src/safe-rendering.js` 的 `renderHighlightedText` 使用另一套硬编码词表/正则生成受控高亮 token；它与 `lib/lexicon.js` 不完全同源，仍存在规则漂移风险。`data/tiered-lexicon.json` 当前未发现 import；它使用分层替代词 schema，与运行时 `emotion-lexicon.json` 不兼容，按维护者决定保留为未启用候选数据。启用前必须单独设计合并规则并建立行为测试。
+UI 的 `src/safe-rendering.js` 与 Main 的 `lib/lexicon.js` 共用 `shared/expression-rules.js`，以最长优先词匹配保持高亮与统计分类一致；自定义 `customWords` 经去重、长度和 64 项上限后作为本地 filler 参与统计，同时继续进入 LLM prompt。`data/tiered-lexicon.json` 当前未发现 import；它使用分层替代词 schema，与运行时 `emotion-lexicon.json` 不兼容，按维护者决定保留为未启用候选数据。启用前必须单独设计合并规则并建立行为测试。
 
 ### 5.6 LLM / `lib/ai-feedback.js`、`lib/prompts.js`
 
@@ -228,7 +232,7 @@ providers.ollama     { ollamaUrl, model }
 providers.custom     { apiKey, baseUrl, model, customModel }
 ```
 
-旧版扁平字段和缺失 provider 字段在加载时迁移为 schema version 1；损坏 JSON 使用默认配置运行并保留原文件，未知 provider 配置块不会在规范化时被删除。API Key 仍为明文，文件写入仍为同步且非原子；这些风险留给 R-09。`custom-prompt.json` 保存 goals、customRules、styleRef、customWords。训练文本、统计和报告仅在 Renderer 内存中，除非用户手动复制/保存。
+旧版扁平字段和缺失 provider 字段在加载时迁移为 schema version 1；损坏 JSON 使用默认配置运行并保留原文件，未知 provider 配置块不会在规范化时被删除。future schema 可读取已知子集但不会被旧应用降级写回。settings 与 custom-prompt 都使用同盘原子写，发布失败保留旧文件并清理临时文件。API Key 仍为明文；当前内部阶段不为此增加 native keychain 依赖，发布前再按平台成本评估。`custom-prompt.json` 保存 versioned goals、customRules、styleRef、customWords。训练文本、统计和报告仅在 Renderer 内存中，除非用户手动复制/保存。
 
 ### 5.8 Benchmark dataset boundary (BM-01)
 
@@ -294,7 +298,7 @@ Phase 0 已把 README 的反馈触发口径改为源码实际的约 30 字，并
 ```text
 Settings/Prompt Renderer
 → Preload invoke
-→ Main 同步 JSON 读写 userData
+→ Main 同步读取、同盘原子写入 userData JSON
 → LLM 请求前重新读取
 ```
 
@@ -321,11 +325,11 @@ Settings/Prompt Renderer
 | TD-06 | **R-07/R-08 已关闭内部开发边界** | registry、校验、安装锁、原子安装/激活、native 成功后切换和一次安全回退已接入 utility process | Model Manager/managed provider 聚焦测试与产品 registry | PKG-02 验证真实 archive/system tar、native model 与 Forge 制品 |
 | TD-07 | **T-04/R-02/R-04 已缓解**：stop 单飞执行 worklet tail flush、feed drain、ASR final 与分析；旧 session、迟到/倒序事件和清空/重启竞态受过滤 | 尾部语音进入字幕、统计、分析和报告；完整训练阶段状态机仍未建立 | AudioCapture、ASR event state 与 transcript 竞态回归测试 | 后续只在实际状态复杂度需要时收敛状态机 |
 | TD-08 | 已有 Node 测试和 Electron 自动化 smoke，但无 CI 和打包脚本 | 已可发现启动、页面、Preload/IPC、ASR session/event、设置窗口和粘贴分析回归；仍无法证明真实模型/麦克风、跨平台或发布制品可用 | 集成测试基线、仓库配置 | 后续接真实设备/模型验收、CI 与 Forge，并在目标平台运行 smoke |
-| TD-09 | API Key 明文保存、设置同步且非原子写入 | 凭据暴露；写入中断可能损坏设置 | 源码确认；schema version 1 和损坏 JSON 运行回退已由 T-03 建立 | R-09 处理原子写、脱敏日志，并评估凭据策略 |
+| TD-09 | **R-09 已关闭配置损坏/降级覆盖风险**；API Key 仍明文 | settings/custom-prompt 原子发布，损坏文件保留，future schema 不降级；明文凭据仍是发布前权衡 | atomic store、older/current/future schema 与脱敏测试 | PKG-04 验证安装升级；只有收益超过 native/跨平台成本时才采用 keychain |
 | TD-10 | **R-02 已部分缓解**：ASR command 已校验精确字段、session、sequence、16 kHz 与有限样本；其他 IPC payload 仍缺少同等级校验 | settings、文本、filename 等大 payload 或类型错误仍可能影响 Main | ASR IPC 测试与其余 handler 源码确认 | 后续按当前具体风险逐 channel 限定类型/长度，不建设通用 schema 框架 |
 | TD-11 | **T-05 已缓解**：ASR/粘贴文本使用受控 DOM token，LLM 报告使用严格允许列表，错误使用纯文本 | 主应用不再从不可信文本创建标签或事件属性 | `src/safe-rendering.js`、安全渲染测试、Electron smoke、`src/app.js` 无 `innerHTML` | 后续若词库改为外部数据，继续按不可信输入处理 |
 | TD-12 | LLM fetch 控制风险已由 T-06 缓解；仍无自动重试 | 请求已有超时、取消、Main/Renderer 双层迟到抑制、结构验证和脱敏错误；瞬时失败仍需用户重试 | 25 项 fake-fetch 与 3 项 Renderer 竞态测试、源码确认 | 保留错误契约回归测试；是否重试需单独产品策略，不在请求层盲目加入 |
-| TD-13 | UI 高亮词表与 lexicon 规则重复 | 显示和统计不一致 | 源码确认 | 统一由分析结果驱动高亮或共享规则 |
+| TD-13 | **R-09 已关闭**：UI 高亮与 lexicon 使用唯一共享规则源 | 内置 filler/hedge/vague 分类一致；customWords 进入有界本地 filler 统计 | shared rule 与 lexicon 聚焦测试 | 新规则只修改 canonical shared 文件；候选 tiered lexicon 仍独立设计 |
 | TD-14 | README 与实现漂移风险 | 用户预期错误 | Phase 0 已修正触发字数、联网边界和平台口径 | 后续行为变更同步 README 与架构文档 |
 | TD-15 | 未启用候选词库容易被误认为运行时数据 | 维护者可能误删或直接接入不兼容 schema | `tiered-lexicon.json` 无 import，Phase 0 决定保留 | 明确标记未启用；在 T-01/T-02 后以独立任务设计 schema、合并规则和测试 |
 | TD-16 | 版本口径不一致 | 发布历史和兼容性不清 | package 1.0.0、代码 V2、历史提交 v1.1 | SemVer + CHANGELOG + release policy |

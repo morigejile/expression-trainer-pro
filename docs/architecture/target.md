@@ -3,11 +3,11 @@
 > 状态：Proposed  
 > 基线日期：2026-08-29
 > 目标：在保持功能闭环的前提下降低总体维护、依赖、跨平台安装和升级复杂度
-> 当前源码基线：当前开发分支，已完成 benchmark 选型和 Phase 4 / R-01～R-08 Audio/Provider/utility-process/Model Manager 适配
+> 当前源码基线：当前开发分支，已完成 benchmark 选型和 Phase 4 / R-01～R-09 Audio/Provider/utility-process/Model Manager/config 适配
 
 ## 1. 范围与设计约束
 
-本目标架构描述 R-09、打包发布及后续迁移方向，不表示整体已经实现；R-01～R-08 的 Provider/session、AudioCapture/AudioWorklet、有界传输、utility-process 隔离与版本化默认模型已移入当前架构。它保留：
+本目标架构描述打包发布及后续迁移方向，不表示整体已经实现；R-01～R-09 的 Provider/session、AudioCapture/AudioWorklet、有界传输、utility-process 隔离、版本化默认模型与原子配置持久化已移入当前架构。它保留：
 
 - Electron；
 - 原生 JavaScript/HTML/CSS；
@@ -215,9 +215,9 @@ R-07/R-08 已实现以下轻量职责：
 
 ### 5.6 Settings Store
 
-配置位于 Electron 的用户数据目录，而非安装目录，至少包含 `schemaVersion`。配置迁移必须可测试。敏感 Key 不记录到日志；是否使用系统凭据库需要单独权衡，不能为了加密盲目增加 native 依赖。
+配置位于 Electron 的用户数据目录，而非安装目录，包含 `schemaVersion`。旧 schema 迁移、未来 schema 防降级写回与同盘原子发布已有测试。敏感 Key 不记录到日志；是否使用系统凭据库需要单独权衡，不能为了加密盲目增加 native 依赖。
 
-当前实现已经使用 `userData/settings.json`，迁移重点是 schemaVersion、原子写、损坏恢复和明文 API Key 风险，而不是重新选择目录。
+当前实现使用 `userData/settings.json` 与 `custom-prompt.json`；R-09 已完成 schema/原子写/损坏恢复，剩余重点是制品升级保留和明文 API Key 的发布前权衡，而不是重新选择目录。
 
 ### 5.7 LLM Provider
 
@@ -329,7 +329,7 @@ ADR-0005 已接受保留 Paraformer 为默认模型。当前仅为内部开发/�
 迁移必须保持每个阶段可运行：
 
 1. 构建/测试基线、三候选 benchmark、默认模型 ADR、最小 Paraformer Provider 和 session/event 契约已完成。
-2. R-03～R-08 已完成 AudioCapture、AudioWorklet、10-block 有界发送、utility-process 执行边界、独立 Model Manager 与版本化 Paraformer 生产接入；Zipformer Large 与 FireRedASR2 的 pending benchmark 最小集成也已完成，下一步是 R-09 与打包闭环。
+2. R-03～R-09 已完成 AudioCapture、AudioWorklet、10-block 有界发送、utility-process 执行边界、独立 Model Manager、版本化 Paraformer 生产接入和配置/规则收敛；Zipformer Large 与 FireRedASR2 的 pending benchmark 最小集成也已完成，下一步是 Tier 1 决策与打包闭环。
 3. 每次迁移保留独立回归证据，最后建立 Forge 制品、支持矩阵和发布机制。
 
 当下列条件全部满足时，本目标可合并为 Current：
