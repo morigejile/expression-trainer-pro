@@ -3,11 +3,11 @@
 > 状态：Proposed  
 > 基线日期：2026-08-29
 > 目标：在保持功能闭环的前提下降低总体维护、依赖、跨平台安装和升级复杂度
-> 当前源码基线：当前开发分支，已完成 benchmark 选型和 Phase 4 / R-01～R-06 Audio/Provider/utility-process 适配
+> 当前源码基线：当前开发分支，已完成 benchmark 选型和 Phase 4 / R-01～R-08 Audio/Provider/utility-process/Model Manager 适配
 
 ## 1. 范围与设计约束
 
-本目标架构描述 R-07 及后续迁移方向，不表示整体已经实现；R-01～R-06 的 Provider/session、AudioCapture/AudioWorklet、有界传输与 utility-process 隔离已移入当前架构。它保留：
+本目标架构描述 R-09、打包发布及后续迁移方向，不表示整体已经实现；R-01～R-08 的 Provider/session、AudioCapture/AudioWorklet、有界传输、utility-process 隔离与版本化默认模型已移入当前架构。它保留：
 
 - Electron；
 - 原生 JavaScript/HTML/CSS；
@@ -170,7 +170,7 @@ cancel({ sessionId })
 await dispose()
 ```
 
-Preload 公开 API 固定为 `startASR`、`feedAudio`、`stopASR`、`cancelASR`，返回 `{ok:true,events:[...]}` 或安全错误 envelope。Provider 输出规范化事件，不把 Sherpa 对象泄漏给 UI；Fake Provider 用于业务测试，生产仍只有默认 Paraformer 实现。R-05/R-06 已完成有界队列和 utility-process 执行边界，模型路径/config 由后续 Model Manager 接入。
+Preload 公开 API 固定为 `startASR`、`feedAudio`、`stopASR`、`cancelASR`，返回 `{ok:true,events:[...]}` 或安全错误 envelope。Provider 输出规范化事件，不把 Sherpa 对象泄漏给 UI；Fake Provider 用于业务测试，生产仍只有默认 Paraformer 实现。R-05～R-08 已完成有界队列、utility-process 执行边界，以及 active/default 模型 role 路径与 config 接入。
 
 ### 5.4 独立 ASR 执行单元
 
@@ -180,7 +180,7 @@ D-03 spike 表明 10 个在途上限下 utility process 的 structured-clone cop
 
 ### 5.5 Model Manager
 
-R-07 已实现以下轻量职责：
+R-07/R-08 已实现以下轻量职责：
 
 ```text
 读取 registry
@@ -189,8 +189,8 @@ R-07 已实现以下轻量职责：
 → SHA-256 校验
 → 解压/安装到临时目录
 → 原子重命名为版本目录
-→ 更新当前模型指针/设置
-→ 返回模型路径
+→ 返回 role→绝对路径
+→ native 初始化成功后更新当前模型指针
 ```
 
 当前产品清单字段：
@@ -211,7 +211,7 @@ R-07 已实现以下轻量职责：
 }
 ```
 
-`models/registry.json` 只登记 ADR-0005 接受的 Paraformer，不承载 benchmark 候选数据库。archive 与 runtime 文件使用已核验的 URL、byte size 和 SHA-256；再分发仍为 `not-approved`。安装器限制下载字节数、只提取白名单文件、校验后发布不可变版本目录，并通过 active pointer 保存上一版本以显式回退。内部阶段默认调用系统 `tar`；真实 1 GB archive 和 Forge/Tier 1 环境是否具备该工具在 PKG-02 验证，失败时再替换为随应用提供的最小 extractor。
+`models/registry.json` 只登记 ADR-0005 接受的 Paraformer，不承载 benchmark 候选数据库。archive 与 runtime 文件使用已核验的 URL、byte size 和 SHA-256；再分发仍为 `not-approved`。安装器限制下载字节数、只提取白名单文件、校验后发布不可变版本目录，并通过 active pointer 保存上一版本以显式回退。跨进程安装锁避免多个 utility 同时清理/发布；下载、hash、解包和校验均接受取消信号。首次版本和回退版本都先通过 native 初始化才切换 active。内部阶段默认调用系统 `tar`；真实 1 GB archive 和 Forge/Tier 1 环境是否具备该工具在 PKG-02 验证，失败时再替换为随应用提供的最小 extractor。
 
 ### 5.6 Settings Store
 
@@ -329,7 +329,7 @@ ADR-0005 已接受保留 Paraformer 为默认模型。当前仅为内部开发/�
 迁移必须保持每个阶段可运行：
 
 1. 构建/测试基线、三候选 benchmark、默认模型 ADR、最小 Paraformer Provider 和 session/event 契约已完成。
-2. R-03～R-07 已完成 AudioCapture、AudioWorklet、10-block 有界发送、utility-process 执行边界与独立 Model Manager；Zipformer Large 与 FireRedASR2 的 pending benchmark 最小集成也已完成，下一步用 R-08 接入已激活 Paraformer 版本目录。
+2. R-03～R-08 已完成 AudioCapture、AudioWorklet、10-block 有界发送、utility-process 执行边界、独立 Model Manager 与版本化 Paraformer 生产接入；Zipformer Large 与 FireRedASR2 的 pending benchmark 最小集成也已完成，下一步是 R-09 与打包闭环。
 3. 每次迁移保留独立回归证据，最后建立 Forge 制品、支持矩阵和发布机制。
 
 当下列条件全部满足时，本目标可合并为 Current：
@@ -338,10 +338,10 @@ ADR-0005 已接受保留 Paraformer 为默认模型。当前仅为内部开发/�
 - [x] 16/44.1/48 kHz OfflineAudioContext/AudioBufferSource graph fixture 与 AudioWorklet collector 自动化通过，生产 MediaStream/真实设备 follow-up 已记录；
 - [x] 业务只依赖轻量 ASR 契约，session/event 与迟到事件过滤已完成；
 - [x] ASR 不在 Main 内执行，Fake 执行单元退出可报告且下一 start 可重建；真实模型负载 follow-up 已记录；
-- [ ] 模型可校验安装且失败不破坏上一版本；
+- [x] 模型可校验安装且失败不破坏上一版本；真实 1 GB 下载/native-load 与 Forge 路径 follow-up 已记录；
 - [x] 默认模型由可复跑 benchmark 和 Accepted ADR 支持；
 - [ ] 安装/升级保留设置与模型；
-- [ ] `current.md` 已按实际实现更新。
+- [x] `current.md` 已按实际实现更新。
 
 ## 12. 未决问题
 

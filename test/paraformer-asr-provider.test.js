@@ -103,6 +103,31 @@ test('Paraformer provider preserves the current model and decoding configuration
   assert.equal(streamCount, 2);
 });
 
+test('Paraformer provider accepts activated model files by role', async () => {
+  const { createParaformerAsrProvider } = require('../lib/asr');
+  const modelDir = path.join('C:', 'user-data', 'models', 'paraformer-bilingual-zh-en', '2024-03-10');
+  const modelFiles = {
+    encoder: path.join(modelDir, 'encoder.int8.onnx'),
+    decoder: path.join(modelDir, 'decoder.int8.onnx'),
+    tokens: path.join(modelDir, 'tokens.txt')
+  };
+  let config;
+  const provider = createParaformerAsrProvider({
+    modelFiles,
+    fileExists: () => true,
+    loadSherpa: () => ({
+      OnlineRecognizer: class {
+        constructor(value) { config = value; }
+      }
+    })
+  });
+
+  await provider.initialize();
+  assert.equal(config.modelConfig.paraformer.encoder, modelFiles.encoder);
+  assert.equal(config.modelConfig.paraformer.decoder, modelFiles.decoder);
+  assert.equal(config.modelConfig.tokens, modelFiles.tokens);
+});
+
 test('Paraformer provider feeds 16 kHz samples and returns trimmed partial text', async () => {
   const { createParaformerAsrProvider } = require('../lib/asr');
   const samples = new Float32Array([0.1, 0.2]);

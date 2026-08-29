@@ -35,36 +35,15 @@ npm ci
 
 完整的版本、install-script 策略、验证证据与 TBD 见[开发与可复现安装](docs/development.md)。
 
-### 2. 下载语音识别模型
-
-需要下载 Sherpa-ONNX 的 streaming paraformer 中英双语模型：
-
-```bash
-cd models
-
-# 方法一：使用 wget
-wget https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-paraformer-bilingual-zh-en.tar.bz2
-tar xvf sherpa-onnx-streaming-paraformer-bilingual-zh-en.tar.bz2
-
-# 方法二：使用 huggingface
-# https://huggingface.co/csukuangfj/sherpa-onnx-streaming-paraformer-bilingual-zh-en
-```
-
-下载后 `models/` 目录应包含：
-```
-models/
-└── sherpa-onnx-streaming-paraformer-bilingual-zh-en/
-    ├── encoder.int8.onnx
-    ├── decoder.int8.onnx
-    └── tokens.txt
-```
-### 3. 启动应用
+### 2. 启动应用
 
 ```bash
 npm start
 ```
 
-### 4. 配置 AI 后端
+首次开始录音时，应用会自动下载并校验 Sherpa-ONNX streaming Paraformer 中英双语模型（archive 约 1.05 GB），安装到 Electron `userData/models`。请预留下载与解包空间；内部开发阶段需要系统提供 `tar`。模型文件不进入 Git，详细边界见[开发与可复现安装](docs/development.md)。
+
+### 3. 配置 AI 后端
 
 启动后点击右上角 ⚙️ 进入设置页面。
 
@@ -150,7 +129,7 @@ npm test
 ├── data/
 │   ├── emotion-lexicon.json
 │   └── tiered-lexicon.json # 候选分层词库，当前未启用
-└── models/              # Sherpa-ONNX模型（需下载）
+└── models/              # 版本化产品模型 registry（权重位于 userData）
 ```
 
 `tiered-lexicon.json` 作为候选数据资产保留；其 schema 与当前分析器不同，必须在独立测试任务中设计合并规则后才能启用。

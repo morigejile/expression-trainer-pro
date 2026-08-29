@@ -151,9 +151,30 @@ test('a successful upgrade replaces the pointer while preserving the previous ve
   assert.equal(active.modelPath, installed.modelPath);
   assert.equal(fs.existsSync(previousPath), true);
 
+  await next.activate(data.model.id, '2024-03-11');
+  assert.equal((await next.getActive(data.model.id)).previousVersion, '2024-03-10');
   const rolledBack = await next.rollback(data.model.id);
   assert.equal(rolledBack.version, '2024-03-10');
   assert.equal((await next.getActive(data.model.id)).version, '2024-03-10');
+});
+
+test('rollback can recover the previous version when the active files are corrupt', async (t) => {
+  const {createModelManager} = require('../lib/model-manager');
+  const data = fixture(t);
+  const first = createModelManager({...data, appVersion: '1.0.0'});
+  await first.install(data.model.id, {activate: true});
+
+  const registry = structuredClone(data.registry);
+  const nextModel = structuredClone(registry.models[0]);
+  nextModel.version = '2024-03-11';
+  registry.models.push(nextModel);
+  const manager = createModelManager({...data, registry, appVersion: '1.0.0'});
+  await manager.install(data.model.id, {activate: true});
+  fs.writeFileSync(path.join(data.userDataPath, 'models', data.model.id, '2024-03-11', 'encoder.int8.onnx'), 'corrupt');
+
+  await assert.rejects(manager.getActive(data.model.id), /Byte-size mismatch|SHA-256 mismatch/);
+  assert.equal((await manager.rollback(data.model.id)).version, '2024-03-10');
+  assert.equal((await manager.getActive(data.model.id)).version, '2024-03-10');
 });
 
 test('download byte limit rejects an oversized body without trusting headers', async (t) => {
@@ -210,4 +231,47 @@ test('insufficient free space fails before download and preserves installed stat
   await assert.rejects(manager.install(data.model.id), /free space/);
   assert.equal(fetched, false);
   assert.deepEqual(fs.readdirSync(path.join(data.userDataPath, 'models', '.staging')), []);
+});
+
+test('a new manager removes stale staging left by a killed utility before installing', async (t) => {
+  const {createModelManager} = require('../lib/model-manager');
+  const data = fixture(t);
+  const stale = path.join(data.userDataPath, 'models', '.staging', 'stale-operation');
+  fs.mkdirSync(stale, {recursive: true});
+  fs.writeFileSync(path.join(stale, 'partial.tar.bz2'), 'partial');
+  const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60_000);
+  fs.utimesSync(stale, twoDaysAgo, twoDaysAgo);
+
+  const manager = createModelManager({...data, appVersion: '1.0.0'});
+  await manager.install(data.model.id);
+
+  assert.equal(fs.existsSync(stale), false);
+  assert.deepEqual(fs.readdirSync(path.join(data.userDataPath, 'models', '.staging')), []);
+});
+
+test('fresh staging from another utility is preserved', async (t) => {
+  const {createModelManager} = require('../lib/model-manager');
+  const data = fixture(t);
+  const fresh = path.join(data.userDataPath, 'models', '.staging', 'active-operation');
+  fs.mkdirSync(fresh, {recursive: true});
+  fs.writeFileSync(path.join(fresh, 'partial.tar.bz2'), 'partial');
+
+  const manager = createModelManager({...data, appVersion: '1.0.0'});
+  await manager.install(data.model.id);
+
+  assert.equal(fs.existsSync(fresh), true);
+});
+
+test('a live cross-process installation lock rejects a second installer', async (t) => {
+  const {createModelManager} = require('../lib/model-manager');
+  const data = fixture(t);
+  const lockPath = path.join(data.userDataPath, 'models', '.install-lock');
+  fs.mkdirSync(lockPath, {recursive: true});
+  fs.writeFileSync(path.join(lockPath, 'owner.json'), JSON.stringify({pid: process.pid}));
+  let fetched = false;
+
+  const manager = createModelManager({...data, appVersion: '1.0.0', fetchImpl: async () => { fetched = true; }});
+  await assert.rejects(manager.install(data.model.id), /Another model installation is already running/);
+  assert.equal(fetched, false);
+  assert.equal(fs.existsSync(lockPath), true);
 });

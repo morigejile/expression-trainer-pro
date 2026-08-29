@@ -2,7 +2,7 @@
 
 > 状态：Active execution baseline
 > 更新日期：2026-08-29
-> 当前进度：Phase 0-2、D-01～D-03、R-01～R-07 与 C-01/C-02 最小集成已完成；D-04 未完成；下一主线为 R-08 版本化默认模型
+> 当前进度：Phase 0-2、D-01～D-03、R-01～R-08 与 C-01/C-02 最小集成已完成；D-04 未完成；下一主线为 R-09 设置/规则/日志收敛
 > 当前模式：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞后续工作；只有它们使当前技术实验无法运行或结论失效时，才阻塞当前路径。
 
 ## 1. 目标与排序原则
@@ -60,7 +60,7 @@ flowchart LR
 | Phase 1 — T-01～T-08 | 核心测试、设置迁移、stop final、安全渲染、LLM 控制、Electron smoke、Electron 43 升级 | `test/`、[当前架构](architecture/current.md) |
 | Phase 2 — BM-01/BM-02/BM-04～BM-06 | 100 条冻结 FLEURS 数据、可复跑 harness、三候选同机比较 | [数据集来源](../benchmark/datasets/SOURCES.md)、[Harness](benchmark/harness.md)、[比较结果](benchmark/bm02-comparison-2026-08-27.md) |
 | Phase 3 — D-01/D-02 | 冻结比较规则；ADR-0005 接受继续使用 Paraformer 默认 | [ADR-0005](architecture/adr/0005-select-default-asr-model-by-benchmark.md) |
-| Phase 4 — R-01～R-06 | session/event 与安全 IPC envelope 已建立；AudioCapture/AudioWorklet 输出 320 帧单声道 Float32 chunk；Renderer 使用 10-block 串行队列且 overrun 失败关闭；Main 通过 Controller 路由到单个 ASR utility process，真实 Electron smoke 覆盖退出报告与重建 | [当前架构](architecture/current.md) |
+| Phase 4 — R-01～R-08 | session/event、安全 IPC、AudioCapture/AudioWorklet、有界传输与 utility process 已建立；Model Manager 从 `userData` 提供经校验的版本化 Paraformer，native 初始化成功后才切换 active，失败可安全回退上一版本 | [当前架构](architecture/current.md) |
 
 补充边界：
 
@@ -87,10 +87,10 @@ flowchart LR
 | R-05 | P0 | 改音频传输与背压（Completed） | 320-frame TypedArray 由单发送者按序发送；总深度最多 10 块，记录 accepted/completed/rejected/discarded/overrun/peak，溢出以 `audio-overrun` 终止 session | R-04,D-03 | 队列与 Renderer 测试证明不会无限增长或静默丢音频；D-03 已接受当前小块 structured-clone copy |
 | R-06 | P0 | ASR 移出 Main（Completed） | 单个 utility process 持有 Provider/Sherpa；Main Controller 关联请求、检测退出、下一 start 重建并以 5 秒上限完成 quit dispose | R-02,R-05,D-03 | Controller 测试与真实 Electron Fake smoke 覆盖强制退出、安全失败、重建和有界关闭；真实模型负载留作非阻塞环境验证 |
 | R-07 | P1 | 实现轻量 Model Manager（Completed） | 独立产品 registry 固定 Paraformer 版本与 archive/runtime hash；HTTPS 下载有流式字节上限，系统 `tar` 只提取白名单文件；同盘 staging、不可变版本目录、active pointer 与显式 rollback 均位于 `userData/models` | D-02,R-01 | 聚焦测试覆盖中断、错误 hash、解压失败、空间不足、成功升级和上一版本回退；真实 1 GB archive/system tar 与 Forge 制品验证留到 PKG-02 |
-| R-08 | P1 | 激活版本化默认模型 | 用 registry 激活 ADR-0005 接受的 Paraformer；不增加普通用户多模型选择 | R-06,R-07,D-02 | 端到端模型文件/config 与 ADR-0005 一致 |
+| R-08 | P1 | 激活版本化默认模型（Completed） | utility process 从 `userData/models` 解析或安装 registry 默认 Paraformer；使用 role→绝对路径配置，native 初始化成功后才原子激活；当前版本损坏或加载失败时只探测并切换一次上一版本 | R-06,R-07,D-02 | 聚焦测试覆盖首次安装、single-flight、取消、role config、激活时序、损坏 active 与失败回退；真实 1 GB 下载/native-load 留到 PKG-02 |
 | R-09 | P1 | 收敛设置/规则/日志 | 演进 schemaVersion、原子写和脱敏日志；凭据库仅在收益超过 native 成本时采用 | T-03,R-07 | 升级保留配置；日志不含 Key 或完整敏感文本 |
 
-R-01～R-07 与 C-01/C-02 已完成当前最小边界。下一步用 R-08 把已激活的版本化 Paraformer 路径接入 utility process，再继续 R-09；Paraformer 默认不变。
+R-01～R-08 与 C-01/C-02 已完成当前最小边界。下一步执行 R-09 的设置原子写与脱敏日志收敛；Paraformer 默认不变。
 
 ### 5.1 内部 benchmark 候选（不改变产品默认）
 

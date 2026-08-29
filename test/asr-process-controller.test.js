@@ -127,3 +127,22 @@ test('ASR process controller bounds shutdown wait and kills an unresponsive util
   assert.equal(controller.snapshot().disposed, true);
   assert.equal(controller.snapshot().running, false);
 });
+
+test('ASR process controller gives first model initialization its own longer timeout', async () => {
+  let child;
+  const controller = createAsrProcessController({
+    requestTimeoutMs: 5,
+    initializeTimeoutMs: 100,
+    spawn() {
+      child = new FakeUtilityProcess((message, reply) => {
+        if (message.command === 'initialize') setTimeout(() => reply(null), 20);
+        if (message.command === 'dispose') reply(null);
+      });
+      return child;
+    }
+  });
+
+  await controller.initialize();
+  assert.equal(controller.snapshot().initialized, true);
+  await controller.dispose();
+});

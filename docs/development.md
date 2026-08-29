@@ -51,16 +51,9 @@ $expressionTrainerRuntime = 'C:\Users\mr\AppData\Local\hermes\node'
 
 ## ASR 模型
 
-模型权重不进入 Git。当前产品默认从下列目录加载：
+模型权重不进入 Git。首次启动 ASR 时，utility process 根据 `models/registry.json` 自动下载并校验默认 Paraformer，安装到 Electron `userData/models/paraformer-bilingual-zh-en/2024-03-10/`；native 初始化成功后才更新 active pointer。archive/runtime 的固定大小、hash 与再分发状态见 registry 和 ADR-0004/0005。
 
-```text
-models/sherpa-onnx-streaming-paraformer-bilingual-zh-en/
-├── encoder.int8.onnx
-├── decoder.int8.onnx
-└── tokens.txt
-```
-
-没有模型时仍可运行不依赖真实 ASR 的测试与 Electron smoke。真实麦克风、真实模型、macOS/Linux 和正式制品验证仍需对应环境证据。
+内部开发阶段 `.tar.bz2` 解包调用系统 `tar`。真实约 1 GB 下载、native-load、Forge 制品中的工具可用性及安装升级行为仍在 PKG-02/PKG-03 验证；这些事项不阻塞不依赖真实 ASR 的测试和 Electron Fake smoke。真实麦克风、macOS/Linux 和正式制品验证仍需对应环境证据。
 
 ## Benchmark 边界
 

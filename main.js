@@ -14,11 +14,16 @@ const { createAsrProcessController } = require('./lib/asr-process-controller');
 const isSmokeTest = process.argv.includes('--smoke-test');
 const smokeTest = isSmokeTest ? require('./smoke/electron-smoke-runner') : null;
 const asrProvider = createAsrProcessController({
-  spawn: () => utilityProcess.fork(
-    path.join(__dirname, 'lib', 'asr-utility-process.js'),
-    isSmokeTest ? ['--fake-asr'] : [],
-    { serviceName: 'expression-trainer-asr', stdio: 'pipe' }
-  )
+  spawn: () => {
+    const args = isSmokeTest
+      ? ['--fake-asr']
+      : ['--user-data-path', app.getPath('userData'), '--app-version', app.getVersion()];
+    return utilityProcess.fork(
+      path.join(__dirname, 'lib', 'asr-utility-process.js'),
+      args,
+      { serviceName: 'expression-trainer-asr', stdio: 'pipe' }
+    );
+  }
 });
 const asrIpc = createAsrIpcRouter({ provider: asrProvider });
 const {

@@ -1,13 +1,13 @@
 # ADR-0004: 模型与应用解耦，由 Model Manager 管理
 
-- Status: Proposed
+- Status: Accepted
 - Date: 2026-08-19
 
 ## Context
 
 此前分析显示模型目录、文件名和 Paraformer 参数与 `lib/asr.js` 耦合，用户可能需要手工下载/解压/放置。把所有模型打进安装包会放大制品和应用升级成本；不校验的在线下载又会产生损坏与供应链风险。
 
-## Proposed Decision
+## Decision
 
 应用仅携带版本化模型 registry 和可选的最小恢复策略；Model Manager 负责：存在性/兼容性检查、HTTPS 下载、SHA-256 校验、临时目录解压、原子安装、版本选择和返回模型路径。
 
@@ -33,9 +33,9 @@
 - 必须维护稳定下载源、hash、磁盘空间和清理策略。
 - 模型许可证与托管成为发布责任。
 
-## Validation Before Accepting
+## Validation
 
-- [ ] 对候选模型完成许可证和分发来源审查。
+- [ ] 在公开分发前完成模型许可证和托管来源审查；内部开发不阻塞。
 - [x] R-07 聚焦测试覆盖中断、错误 hash、磁盘不足、解压失败、成功升级和原子 pointer 回退。
 - [ ] 升级/卸载测试证明用户数据与模型不会被意外删除。
-- [ ] registry schema 与 AsrProvider 配置能表示最终 benchmark 候选。
+- [x] 产品 registry 与 AsrProvider role 配置可表达 ADR-0005 选定的默认模型；benchmark 候选保持独立。

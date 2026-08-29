@@ -1,9 +1,9 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 Smoke；内部开发/测试，BM-02/D-03 Completed，Phase 4 / R-01～R-06 Completed（保留 Paraformer 默认）
+> 状态：Verified from Source + Electron 43 Smoke；内部开发/测试，BM-02/D-03 Completed，Phase 4 / R-01～R-08 Completed（保留 Paraformer 默认）
 > 基线日期：2026-08-29
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
-> 描述对象：截至 Phase 4 / R-06；保留 Electron 43 与 T-04～T-08 行为基线
+> 描述对象：截至 Phase 4 / R-08；保留 Electron 43 与 T-04～T-08 行为基线
 
 ## 1. 证据边界
 
@@ -29,8 +29,11 @@ lib/asr-session.js              单 active session、输入/事件 sequence 与�
 lib/asr-ipc.js                  ASR command 校验、安全 envelope 与错误归一化
 lib/asr-process-controller.js   utility process 请求、退出、重建与有界关闭
 lib/asr-utility-process.js      独立 Provider/Sherpa 执行入口
+lib/managed-asr-provider.js     版本化默认模型准备、native 探测、激活与一次回退
 lib/fake-asr-provider.js        业务与 smoke 使用的 session-aware Fake Provider
-lib/asr.js                      Paraformer adapter；封装 Sherpa、模型路径和固定配置
+lib/asr.js                      Paraformer adapter；封装 Sherpa、role 文件路径和固定配置
+lib/model-manager.js            模型下载、校验、安装锁、原子发布/激活和回退
+models/registry.json            默认产品模型的版本、兼容性、来源与 hash
 src/asr-event-state.js          Renderer 侧 session/sequence 过滤与失效
 src/audio-capture.js            麦克风、16 kHz context、AudioWorklet、epoch/flush 与资源生命周期
 src/audio-chunk-collector.mjs   可变量子下混、320 帧汇集和非空 tail
@@ -73,7 +76,7 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 | 音频节点 | AudioWorklet + 320 帧 mono Float32 collector | capture epoch 隔离暂停前旧块；正常 stop flush tail；固定 Electron fixture 覆盖 16/44.1/48 kHz |
 | 权限桥接 | Preload `contextBridge` + `ipcRenderer.invoke` | `contextIsolation:true`、`nodeIntegration:false` |
 | ASR 引擎 | `sherpa-onnx-node` `^1.10.0` | 当前 lock 与 `node_modules` 为 1.13.3；仅由 utility process 内的 Paraformer Provider 延迟加载，Main 不 require |
-| ASR 模型 | `sherpa-onnx-streaming-paraformer-bilingual-zh-en` | 固定目录；INT8 encoder/decoder + tokens；模型未纳入 Git |
+| ASR 模型 | `paraformer-bilingual-zh-en/2024-03-10` | registry 固定 archive/runtime；INT8 encoder/decoder + tokens 安装到 `userData/models`，权重不纳入 Git |
 | 本地分析 | `lib/lexicon.js` + `data/emotion-lexicon.json` | 最大正向词表匹配；`tiered-lexicon.json` 保留为未启用候选数据，不参与运行时分析 |
 | LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接/实时/报告分别为 10/15/60 秒超时，并支持 AbortSignal、按 Renderer 取消和异常响应验证 |
 | 设置 | `userData/settings.json`、`userData/custom-prompt.json` | settings schema version 1；纯函数迁移旧扁平结构；文件同步写入且 API Key 明文 |
@@ -88,11 +91,11 @@ BM-02 提供独立 benchmark CLI，用 manifest 输出每个 sample/repetition �
 
 当前源码已把 Zipformer Large CTC INT8 与 FireRedASR2 CTC INT8 加入 pending benchmark registry。前者通过现有 `zipformer-ctc` / `zipformer2Ctc` 在线适配契约；后者使用 `OfflineRecognizer` 的 `fireRedAsrCtc` 单模型配置，整段 16 kHz 单声道 utterance 只解码一次、只输出 final，并覆盖取消后下一调用的隔离。两者均尚未下载，没有文件 hash、native-load 或 benchmark 证据，也未进入生产模型选择；Paraformer 默认不变。
 
-### 3.2 R-07 Model Manager（Completed, not yet wired to ASR）
+### 3.2 R-07/R-08 Model Manager 与生产接入（Completed）
 
-产品层已有独立 `models/registry.json` 与 `lib/model-manager.js`，不依赖 `benchmark/`。registry 只固定 ADR-0005 接受的 Paraformer archive/runtime 文件 URL、大小和 SHA-256；模型安装位于 `userData/models`，使用同盘 `.staging`、流式下载大小上限、archive/runtime 双重校验、白名单解压、不可变 `model/version` 目录、active pointer 和显式上一版本 rollback。中断、错误 hash、解压失败或空间不足不会替换旧 active。
+产品层已有独立 `models/registry.json` 与 `lib/model-manager.js`，不依赖 `benchmark/`。registry 只固定 ADR-0005 接受的 Paraformer archive/runtime 文件 URL、大小和 SHA-256；模型安装位于 `userData/models`，使用跨 utility 安装锁、按年龄清理的同盘 `.staging`、流式下载大小上限、archive/runtime 双重校验、白名单解压、不可变 `model/version` 目录、active pointer 和显式上一版本 rollback。中断、错误 hash、解压失败或空间不足不会替换旧 active。
 
-R-07 尚未改变生产 ASR 路径：`lib/asr.js` 仍使用仓库 `models/`，R-08 才会在 utility process 启动前解析 active Paraformer 版本。内部阶段 `.tar.bz2` 默认调用系统 `tar`；真实 1 GB archive、系统工具可用性和 Forge 制品内 extractor 策略是 PKG-02 非阻塞待办。
+R-08 已由 Main 向正常 utility process 传入 `userData` 与 app version；Fake smoke 分支仍先行且不加载 Sherpa/Model Manager。生产 provider 解析 active 版本，无 active 时安装但不立即激活；只有 role 路径通过 Paraformer native 初始化后才更新 active。当前版本损坏或 native 加载失败时，上一版本也先 native 探测，成功后才切换指针，且不循环回退。初始化可取消并使用独立 30 分钟预算。内部阶段 `.tar.bz2` 默认调用系统 `tar`；真实 1 GB archive、系统工具可用性和 Forge 制品内 extractor 策略是 PKG-02 非阻塞待办。
 
 ## 4. C4 Level 2：当前容器/运行边界
 
@@ -100,7 +103,7 @@ R-07 尚未改变生产 ASR 路径：`lib/asr.js` 仍使用仓库 `models/`，R-
 flowchart LR
   Mic[系统麦克风]
   LLM[OpenAI / DeepSeek / Ollama / Custom]
-  Model[(仓库 models/ 下的固定模型目录)]
+  Model[(userData/models\n版本目录 + active pointer)]
   UserData[(userData/settings.json\ncustom-prompt.json)]
 
   subgraph Electron[Expression Trainer / Electron]
@@ -166,7 +169,7 @@ R-02 已建立 ASR session/event 状态，R-03/R-04 已把采集生命周期和 
 - 通过 `lib/settings-config.js` 规范化设置、迁移 schema；损坏的 settings JSON 回退默认配置且不自动覆盖原文件。
 - 在启动时同步加载词库。
 - 注册所有 IPC handlers。
-- 仅在显式 `--smoke-test` 参数下让 utility process 组合最小 Fake ASR，并在 Main 组合 Fake LLM、临时 `userData` 和自动驱动；正常启动的 utility process 组合 Paraformer Provider。
+- 仅在显式 `--smoke-test` 参数下让 utility process 组合最小 Fake ASR，并在 Main 组合 Fake LLM、临时 `userData` 和自动驱动；正常启动向 utility process 传入 `userData`/app version 并组合 managed Paraformer Provider。
 - `start-asr`、`feed-audio`、`stop-asr`、`cancel-asr` 通过 ASR Router 与 Controller 返回安全 envelope；Main 不加载 `lib/asr.js` 或 Sherpa。执行单元退出会拒绝 pending 命令，下一次 start 重新创建；应用退出最多等待 5 秒 dispose 后强杀。
 - `analyze-text` 在 Main 中执行本地分析。
 - `get-realtime-feedback`、`get-final-report` 和连接测试在 Main 中发起受超时约束的 fetch；同一 Renderer 的同类新请求会取消旧请求，显式取消可终止该 Renderer 的全部 LLM 请求。
@@ -176,10 +179,9 @@ R-02 已建立 ASR session/event 状态，R-03/R-04 已把采集生命周期和 
 
 ### 5.4 ASR Provider / `lib/asr-provider.js`、`lib/asr-session.js`、`lib/asr.js`
 
-R-06 后，Main 只持有同一 Provider 契约形状的 `AsrProcessController`；实际 session wrapper、Paraformer adapter、Sherpa 对象和模型均位于 utility process。`lib/asr-session.js` 维护单一 active session：start 创建 session 并发出 `ready`，feed 验证连续 input sequence 并发出 `partial/final/error`，stop flush 后发出可选 `final` 和必有 `stopped`，cancel 不 flush 且发出 `stopped`。生产 `createParaformerAsrProvider()` 仍只支持一个并发识别流，其固定配置包括：
+R-08 后，Main 只持有同一 Provider 契约形状的 `AsrProcessController`；实际 session wrapper、managed provider、Paraformer adapter、Sherpa 对象和模型均位于 utility process。`lib/asr-session.js` 维护单一 active session：start 创建 session 并发出 `ready`，feed 验证连续 input sequence 并发出 `partial/final/error`，stop flush 后发出可选 `final` 和必有 `stopped`，cancel 不 flush 且发出 `stopped`。生产 `createParaformerAsrProvider()` 仍只支持一个并发识别流，其固定配置包括：
 
-- 模型目录 `models/sherpa-onnx-streaming-paraformer-bilingual-zh-en`；
-- `encoder.int8.onnx`、`decoder.int8.onnx`、`tokens.txt`；
+- 从 active/default 版本取得 encoder、decoder、tokens 的绝对 role 路径；
 - feat sample rate 16000、feature dim 80；
 - CPU、2 threads、greedy search、endpoint rules。
 
@@ -300,7 +302,7 @@ Settings/Prompt Renderer
 
 - `package.json` 有 `start`、`dev`、`test`、`benchmark:dry-run`；无 build/package/make/publish scripts。
 - 没有 Electron Forge/electron-builder 配置，没有 GitHub Actions。
-- `models/` 已跟踪版本化产品 registry，但 R-08 尚未接入，README 当前仍要求用户手工下载和解压生产模型。
+- `models/` 跟踪版本化产品 registry；模型权重由首次 ASR 初始化自动下载、校验并安装到 `userData/models`。
 - 无安装包、签名、公证、自动更新、升级/卸载数据保留测试或正式支持矩阵。
 - 原有 `package-lock.json` 清理已由负责人确认纳入 Phase 0；陈旧 `node-microphone` 条目已删除，lockfile 与 `package.json` 一致。
 - 开发基线为 Node 22.23.0/npm 12.0.2。T-08 的 Electron 43.4.1 JS 依赖经 clean `npm ci` 安装；Electron 42+ 改为首次 CLI 调用时下载 binary，本轮首次 43.4.1 下载成功，后续 clean install 从官方校验缓存恢复相同 executable（SHA-256 `E885FFC2A09DAB4C14DE706E3662A5929D1E65EA4EA347C56FD0964640EB923B`）。显式清空所有 npm/Electron 缓存后的复跑仍为 Runtime-TBD。
@@ -316,7 +318,7 @@ Settings/Prompt Renderer
 | TD-03 | **R-04 已缓解**：请求/context/track rate 可诊断，固定 Electron graph 已覆盖 16/44.1/48 kHz | 确定性图适配已有证据；真实麦克风/驱动差异仍未知 | AudioCapture tests 与 Electron graph fixture | 真实可配置设备作为非阻塞 follow-up；实测失败才评估 WASM 备选 |
 | TD-04 | **R-05 已缓解**：逐块 TypedArray/invoke/structured-clone 仍复制，但队列为 10 块且可观测 | 不再无限增长或静默丢音频；复制成本仍需真实推理 profile | Queue/Renderer tests 与 D-03 spike | 只有真实 profile 证明必要时再换通道 |
 | TD-05 | **R-06 已关闭当前边界**：Main 只持有 Controller，Provider/Sherpa/模型在 utility process | 退出可见、下一 start 重建；单实例/单 stream 符合当前产品 | Controller tests 与 Electron smoke | Forge 和真实模型路径分别在 PKG-02/R-06 follow-up 验证 |
-| TD-06 | **R-07 已关闭管理能力缺口，R-08 待接生产路径** | registry、校验、原子安装/激活和回退已具备；当前默认 Provider 仍读取仓库模型 | Model Manager 聚焦测试与产品 registry | R-08 解析 active 模型并传入 utility process；PKG-02 验证真实 archive/system tar |
+| TD-06 | **R-07/R-08 已关闭内部开发边界** | registry、校验、安装锁、原子安装/激活、native 成功后切换和一次安全回退已接入 utility process | Model Manager/managed provider 聚焦测试与产品 registry | PKG-02 验证真实 archive/system tar、native model 与 Forge 制品 |
 | TD-07 | **T-04/R-02/R-04 已缓解**：stop 单飞执行 worklet tail flush、feed drain、ASR final 与分析；旧 session、迟到/倒序事件和清空/重启竞态受过滤 | 尾部语音进入字幕、统计、分析和报告；完整训练阶段状态机仍未建立 | AudioCapture、ASR event state 与 transcript 竞态回归测试 | 后续只在实际状态复杂度需要时收敛状态机 |
 | TD-08 | 已有 Node 测试和 Electron 自动化 smoke，但无 CI 和打包脚本 | 已可发现启动、页面、Preload/IPC、ASR session/event、设置窗口和粘贴分析回归；仍无法证明真实模型/麦克风、跨平台或发布制品可用 | 集成测试基线、仓库配置 | 后续接真实设备/模型验收、CI 与 Forge，并在目标平台运行 smoke |
 | TD-09 | API Key 明文保存、设置同步且非原子写入 | 凭据暴露；写入中断可能损坏设置 | 源码确认；schema version 1 和损坏 JSON 运行回退已由 T-03 建立 | R-09 处理原子写、脱敏日志，并评估凭据策略 |
@@ -344,7 +346,7 @@ Settings/Prompt Renderer
 
 - Audio 逐块 invoke、TypedArray 规范化与跨进程 structured-clone 复制；
 - 真实模型路径/性能与 utility-process 制品打包尚未闭环；
-- 用户手工模型管理；
+- 真实约 1 GB 模型下载/native-load 与制品内解包工具尚未闭环；
 - 非 ASR IPC 与完整训练状态仍缺少同等级边界；
 - 安全编码、密钥、超时和输入验证不足；
 - 构建、测试、打包、升级和支持矩阵不可复现。

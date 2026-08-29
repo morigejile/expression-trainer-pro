@@ -3,7 +3,7 @@
 > 状态：Existing / Partial / Planned
 > 基线日期：2026-08-29
 > 适用范围：内部开发/测试中的当前实现（Existing/Partial）与下一阶段工程化目标（Planned）
-> 源码基线：当前开发分支，已包含 Phase 4 / R-01～R-06 Paraformer Provider/session/Audio/utility-process 适配
+> 源码基线：当前开发分支，已包含 Phase 4 / R-01～R-08 Paraformer Provider/session/Audio/utility-process/Model Manager 适配
 
 ## 1. 文档目的
 
@@ -45,7 +45,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 |---|---|---|
 | FR-E01 | 应用应提供 Electron 桌面界面和训练操作入口。 | `npm start` 应打开主窗口；运行验收仍需在有模型/麦克风环境执行。 |
 | FR-E02 | 用户应能开始、暂停、继续和结束一次录音训练。 | 开始后采集麦克风；暂停期间不送入 ASR；继续后恢复；结束时释放 processor、AudioContext 和 MediaStream tracks。 |
-| FR-E03 | 应用应使用本地 `sherpa-onnx-node` 与 streaming Paraformer 中英双语 INT8 模型识别。 | 从 `models/sherpa-onnx-streaming-paraformer-bilingual-zh-en/` 加载 `encoder.int8.onnx`、`decoder.int8.onnx`、`tokens.txt`；缺失时返回可理解错误。 |
+| FR-E03 | 应用应使用本地 `sherpa-onnx-node` 与 streaming Paraformer 中英双语 INT8 模型识别。 | utility process 从 `userData/models/<id>/<version>/` 按 registry role 加载 encoder、decoder、tokens 的绝对路径；首次缺失时自动安装，native 初始化成功后才激活。 |
 | FR-E04 | 应用应展示 partial 和 endpoint/final 识别文本。 | partial 更新临时字幕；endpoint 结果进入完整文本、统计和高亮；停止时尚未 endpoint 的 `finalText` 已由 Renderer 去重合并并有自动化测试。 |
 | FR-E05 | 应用应分析填充词、犹豫词、笼统词、情绪词和表达密度。 | 返回计数、位置、精准替代和建议，并在左右面板更新统计/反馈。 |
 | FR-E06 | 用户应能粘贴逐字稿并复用本地分析和 LLM 反馈。 | 粘贴文本按句展示和分析，无需麦克风或 ASR 模型。 |
@@ -64,10 +64,10 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 
 | ID | 状态 | 需求 | 验收标准 |
 |---|---|---|---|
-| FR-P05 | Partial | 应提供轻量 Model Manager。 | R-07 已实现独立清单、HTTPS 下载、archive/runtime SHA-256、白名单解压、原子安装/激活和上一版本回退；R-08 尚未把 active 模型接入生产 Provider。 |
+| FR-P05 | Existing | 应提供轻量 Model Manager。 | R-07/R-08 已实现独立清单、HTTPS 下载、archive/runtime SHA-256、白名单解压、安装锁、原子发布/激活，并把 active/default 路径接入生产 Provider；回退版本先通过 native 初始化才切换指针。 |
 | FR-P06 | Existing | 模型与应用版本应解耦。 | 产品清单包含 model ID、version、engine、languages、mode、采样率、兼容应用版本、archive/runtime 来源与 hash；安装目录按 model/version 不可变。 |
 | FR-P08 | Planned | 应用应能生成普通用户可安装的桌面制品。 | 当前无 Forge 配置；目标为通过 Electron Forge 生成目标平台制品，终端用户无需安装 Node.js、Python、CMake 或编译器。 |
-| FR-P09 | Partial | 设置、用户数据、模型、缓存和日志应与程序文件分离。 | 设置已在 Electron `userData`；模型、缓存、日志的完整分离及升级/重装保护仍未实现。 |
+| FR-P09 | Partial | 设置、用户数据、模型、缓存和日志应与程序文件分离。 | 设置与版本化模型已在 Electron `userData`；缓存、日志及安装制品升级/重装保护仍未完整验证。 |
 | FR-P10 | Existing | 本地训练在 LLM 不可用时仍应工作。 | 离线、无 API Key 或 LLM 请求失败时，录音、本地 ASR 和基础词库分析仍可完成。 |
 
 ## 5. 非功能需求（NFR）

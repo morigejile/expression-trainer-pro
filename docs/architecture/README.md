@@ -2,8 +2,8 @@
 
 > 方法：arc42-lite + C4（Context/Container）+ ADR  
 > 状态：Current Documentation Index
-> 基线日期：2026-08-28
-> 源码基线：当前开发分支，已包含 Phase 4 / R-01～R-06
+> 基线日期：2026-08-29
+> 源码基线：当前开发分支，已包含 Phase 4 / R-01～R-08
 
 ## 1. 如何阅读
 
@@ -75,7 +75,7 @@ Renderer/Web Audio → 10-block 有界队列 → Preload/IPC → Main Router
                                           sherpa-onnx-node/Paraformer
 ```
 
-停止尾部文本、LLM 请求控制、安全渲染、ASR session/Provider、AudioCapture、AudioWorklet、10-block 有界音频发送和 utility-process 推理隔离已完成；真实 Electron smoke 覆盖执行单元退出报告与下一 session 重建。剩余技术债主要是逐块 invoke/structured-clone 复制、真实模型与设备性能证据、模型手工管理以及打包交付未闭环。详情见 [current.md](current.md)。
+停止尾部文本、LLM 请求控制、安全渲染、ASR session/Provider、AudioCapture、AudioWorklet、10-block 有界音频发送、utility-process 推理隔离和版本化模型自动准备已完成；真实 Electron smoke 覆盖执行单元退出报告与下一 session 重建。剩余技术债主要是逐块 invoke/structured-clone 复制、真实模型与设备性能证据、设置/日志收敛以及打包交付未闭环。详情见 [current.md](current.md)。
 
 ## 7. 目标状态摘要
 
@@ -101,8 +101,8 @@ Preload 最小桥接 → Main（窗口/设置/生命周期/模型协调）
 |---|---|---|
 | [0001](adr/0001-retain-electron-and-native-web-stack.md) | Accepted | 保留 Electron + 原生 Web 技术栈 |
 | [0002](adr/0002-retain-sherpa-onnx.md) | Accepted | 保留 Sherpa-ONNX 作为默认 ASR 引擎 |
-| [0003](adr/0003-separate-audio-and-asr.md) | Proposed | 分离 Audio 与 ASR，使用轻量契约 |
-| [0004](adr/0004-manage-models-separately.md) | Proposed | 模型与应用解耦并校验安装 |
+| [0003](adr/0003-separate-audio-and-asr.md) | Accepted | 分离 Audio 与 ASR，使用轻量契约 |
+| [0004](adr/0004-manage-models-separately.md) | Accepted | 模型与应用解耦并校验安装 |
 | [0005](adr/0005-select-default-asr-model-by-benchmark.md) | Accepted | 保留 Paraformer 默认，候选结果作为后续优化基线 |
 | [0006](adr/0006-move-asr-out-of-main.md) | Accepted | 使用单个 Electron utility process 隔离 ASR |
 | [0007](adr/0007-package-with-electron-forge.md) | Proposed | 使用 Electron Forge 打包发布 |

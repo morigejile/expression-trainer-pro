@@ -16,8 +16,8 @@ ADR 记录“为什么”，架构文档记录“是什么”。ADR 一旦 Accep
 |---|---|---|---|
 | [0001](0001-retain-electron-and-native-web-stack.md) | 保留 Electron 与原生 Web 技术栈 | Accepted | 打包/性能证据若否定总体成本优势则复审 |
 | [0002](0002-retain-sherpa-onnx.md) | 保留 Sherpa-ONNX 作为默认 ASR 引擎 | Accepted | native addon 跨平台打包失败或候选引擎显著降低总成本时复审 |
-| [0003](0003-separate-audio-and-asr.md) | 分离 Audio 与 ASR，使用轻量 Provider 契约 | Proposed | Provider contract 测试与一次无行为变化的 Paraformer 适配 |
-| [0004](0004-manage-models-separately.md) | 模型与应用解耦，由 Model Manager 管理 | Proposed | 下载/校验/原子回退 spike 与许可证审查 |
+| [0003](0003-separate-audio-and-asr.md) | 分离 Audio 与 ASR，使用轻量 Provider 契约 | Accepted | R-01～R-06 已完成契约、Fake、Audio 与 utility-process 边界 |
+| [0004](0004-manage-models-separately.md) | 模型与应用解耦，由 Model Manager 管理 | Accepted | R-07/R-08 已完成下载、校验、原子激活与安全回退；发布许可仍待办 |
 | [0005](0005-select-default-asr-model-by-benchmark.md) | 通过 benchmark 选择默认中文 ASR 模型 | Accepted | 保留 Paraformer 默认；utterance UX、目标平台或许可变化时复审 |
 | [0006](0006-move-asr-out-of-main.md) | 将 ASR 初始化与推理移出 Electron Main | Accepted | 采用单个 utility process；R-06 验证真实模型循环，PKG-02 验证制品路径 |
 | [0007](0007-package-with-electron-forge.md) | 使用 Electron Forge 形成发布制品 | Proposed | Tier 1 平台安装/升级/卸载验证 |
