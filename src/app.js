@@ -303,8 +303,7 @@ class ExpressionTrainer {
         || (this.isPaused && !stoppingOwned)
         || this.asrEventState.activeSessionId !== sessionId) return Promise.resolve();
     if (!tracker || tracker.sessionId !== sessionId) return Promise.resolve();
-    tracker.queue.enqueue(chunk);
-    return tracker.queue.drain().catch(() => {});
+    return Promise.resolve(tracker.queue.enqueue(chunk));
   }
 
   createAudioFeedTracker(sessionId) {

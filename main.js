@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, Menu, utilityProcess } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const { loadLexicon, analyzeText } = require('./lib/lexicon');
@@ -9,12 +9,17 @@ const {
   getCurrentProviderSettings
 } = require('./lib/settings-config');
 const { createAsrIpcRouter } = require('./lib/asr-ipc');
+const { createAsrProcessController } = require('./lib/asr-process-controller');
 
 const isSmokeTest = process.argv.includes('--smoke-test');
 const smokeTest = isSmokeTest ? require('./smoke/electron-smoke-runner') : null;
-const asrProvider = isSmokeTest
-  ? smokeTest.fakeAsrProvider
-  : require('./lib/asr').createParaformerAsrProvider();
+const asrProvider = createAsrProcessController({
+  spawn: () => utilityProcess.fork(
+    path.join(__dirname, 'lib', 'asr-utility-process.js'),
+    isSmokeTest ? ['--fake-asr'] : [],
+    { serviceName: 'expression-trainer-asr', stdio: 'pipe' }
+  )
+});
 const asrIpc = createAsrIpcRouter({ provider: asrProvider });
 const {
   createRequestCoordinator,
@@ -37,6 +42,8 @@ let mainWindow;
 let settingsWindow;
 let promptEditorWindow;
 const llmRequests = createRequestCoordinator();
+let asrShutdownStarted = false;
+let asrShutdownComplete = false;
 
 // Custom prompt 文件路径
 function getCustomPromptPath() {
@@ -198,7 +205,12 @@ app.whenReady().then(() => {
   const createdMainWindow = createMainWindow();
 
   if (smokeTest) {
-    smokeTest.run({ app, BrowserWindow, mainWindow: createdMainWindow }).catch(error => {
+    smokeTest.run({
+      app,
+      asrProvider,
+      BrowserWindow,
+      mainWindow: createdMainWindow
+    }).catch(error => {
       console.error('[electron-smoke] FAILED');
       console.error(error && error.stack ? error.stack : error);
       app.exit(1);
@@ -256,6 +268,19 @@ ipcMain.handle('close-current-window', (event) => {
 // 语音识别相关 - Web Audio方案
 ipcMain.handle('start-asr', (event, command) => {
   return asrIpc.start(command);
+});
+
+app.on('before-quit', event => {
+  if (asrShutdownComplete) return;
+  event.preventDefault();
+  if (asrShutdownStarted) return;
+  asrShutdownStarted = true;
+  void asrProvider.dispose()
+    .catch(() => {})
+    .finally(() => {
+      asrShutdownComplete = true;
+      app.quit();
+    });
 });
 
 // 接收渲染进程发来的音频数据

@@ -110,7 +110,7 @@ test('start sanitizes initialization failures without exposing paths or stacks',
   assert.equal(JSON.stringify(result).includes('stack'), false);
 });
 
-test('feed copies finite Float32Array chunks through the transitional size cap', () => {
+test('feed copies finite Float32Array chunks through the transitional size cap', async () => {
   const { createAsrIpcRouter } = require('../lib/asr-ipc');
   const received = [];
   const partial = {
@@ -130,12 +130,12 @@ test('feed copies finite Float32Array chunks through the transitional size cap',
   const currentChunk = new Float32Array(4096).fill(0.25);
   const cappedChunk = new Float32Array(16384).fill(-0.5);
 
-  assert.deepEqual(router.feed({
+  assert.deepEqual(await router.feed({
     sessionId: 'session-a',
     sequence: 0,
     samples: currentChunk
   }), { ok: true, events: [partial] });
-  assert.deepEqual(router.feed({
+  assert.deepEqual(await router.feed({
     sessionId: 'session-a',
     sequence: 1,
     samples: cappedChunk
@@ -148,7 +148,7 @@ test('feed copies finite Float32Array chunks through the transitional size cap',
   assert.equal(received[1].samples.length, 16384);
 });
 
-test('feed rejects malformed, oversized, and non-finite commands before routing', () => {
+test('feed rejects malformed, oversized, and non-finite commands before routing', async () => {
   const { createAsrIpcRouter } = require('../lib/asr-ipc');
   let calls = 0;
   const router = createAsrIpcRouter({
@@ -175,12 +175,12 @@ test('feed rejects malformed, oversized, and non-finite commands before routing'
   ];
 
   for (const command of commands) {
-    assert.deepEqual(router.feed(command), failure(INVALID_ERRORS.feed));
+    assert.deepEqual(await router.feed(command), failure(INVALID_ERRORS.feed));
   }
   assert.equal(calls, 0);
 });
 
-test('stop and cancel require session IDs and pass provider event arrays through', () => {
+test('stop and cancel require session IDs and pass provider event arrays through', async () => {
   const { createAsrIpcRouter } = require('../lib/asr-ipc');
   const stopped = [{ type: 'stopped', sessionId: 'stop-a', sequence: 1 }];
   const cancelled = [{ type: 'stopped', sessionId: 'cancel-a', sequence: 2 }];
@@ -198,12 +198,12 @@ test('stop and cancel require session IDs and pass provider event arrays through
     })
   });
 
-  assert.deepEqual(router.stop({}), failure(INVALID_ERRORS.stop));
-  assert.deepEqual(router.cancel({ sessionId: '   ' }), failure(INVALID_ERRORS.cancel));
+  assert.deepEqual(await router.stop({}), failure(INVALID_ERRORS.stop));
+  assert.deepEqual(await router.cancel({ sessionId: '   ' }), failure(INVALID_ERRORS.cancel));
   assert.deepEqual(calls, []);
 
-  const stopResult = router.stop({ sessionId: 'stop-a' });
-  const cancelResult = router.cancel({ sessionId: 'cancel-a' });
+  const stopResult = await router.stop({ sessionId: 'stop-a' });
+  const cancelResult = await router.cancel({ sessionId: 'cancel-a' });
   assert.deepEqual(stopResult, { ok: true, events: stopped });
   assert.deepEqual(cancelResult, { ok: true, events: cancelled });
   assert.equal(stopResult.events, stopped);
@@ -214,20 +214,20 @@ test('stop and cancel require session IDs and pass provider event arrays through
   ]);
 });
 
-test('well-formed stale session results stay successful no-op envelopes', () => {
+test('well-formed stale session results stay successful no-op envelopes', async () => {
   const { createAsrIpcRouter } = require('../lib/asr-ipc');
   const router = createAsrIpcRouter({ provider: createProvider() });
 
-  assert.deepEqual(router.feed({
+  assert.deepEqual(await router.feed({
     sessionId: 'stale-session',
     sequence: 0,
     samples: new Float32Array(1)
   }), { ok: true, events: [] });
-  assert.deepEqual(router.stop({ sessionId: 'stale-session' }), {
+  assert.deepEqual(await router.stop({ sessionId: 'stale-session' }), {
     ok: true,
     events: []
   });
-  assert.deepEqual(router.cancel({ sessionId: 'stale-session' }), {
+  assert.deepEqual(await router.cancel({ sessionId: 'stale-session' }), {
     ok: true,
     events: []
   });
@@ -257,16 +257,16 @@ test('provider command exceptions return sanitized errors rather than fabricated
     sessionId: 'session-a',
     sampleRateHz: 16000
   }), failure({ code: 'asr-start-failed', message: 'ASR start failed' }));
-  assert.deepEqual(router.feed({
+  assert.deepEqual(await router.feed({
     sessionId: 'session-a',
     sequence: 0,
     samples: new Float32Array(1)
   }), failure({ code: 'asr-feed-failed', message: 'ASR feed failed' }));
-  assert.deepEqual(router.stop({ sessionId: 'session-a' }), failure({
+  assert.deepEqual(await router.stop({ sessionId: 'session-a' }), failure({
     code: 'asr-stop-failed',
     message: 'ASR stop failed'
   }));
-  assert.deepEqual(router.cancel({ sessionId: 'session-a' }), failure({
+  assert.deepEqual(await router.cancel({ sessionId: 'session-a' }), failure({
     code: 'asr-cancel-failed',
     message: 'ASR cancel failed'
   }));
