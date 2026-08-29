@@ -18,6 +18,15 @@ const SafeRendering = typeof module !== 'undefined' && module.exports
   ? require('./safe-rendering')
   : window.SafeRendering;
 const { renderHighlightedText, renderReportContent } = SafeRendering;
+const AsrEventState = typeof module !== 'undefined' && module.exports
+  ? require('./asr-event-state')
+  : window.AsrEventState;
+const {
+  beginAsrSession,
+  createAsrEventState,
+  filterAsrEvent,
+  invalidateAsrSession
+} = AsrEventState;
 
 class ExpressionTrainer {
   constructor() {
@@ -33,6 +42,8 @@ class ExpressionTrainer {
     this.lastFeedbackText = '';
     this.lastReport = '';
     this.llmGeneration = 0;
+    this.asrEventState = createAsrEventState();
+    this.asrInputSequence = 0;
 
     this.initElements();
     this.bindEvents();
@@ -96,27 +107,60 @@ class ExpressionTrainer {
   async startRecording() {
     this.advanceLLMGeneration();
     await window.api.cancelLLMRequests();
-    const initResult = await window.api.initASR();
-    if (!initResult.success) {
-      this.showError(`语音识别启动失败: ${initResult.error}`);
+    const sessionId = globalThis.crypto.randomUUID();
+    this.asrEventState = beginAsrSession(this.asrEventState, sessionId);
+    this.asrInputSequence = 0;
+
+    let startResponse;
+    try {
+      startResponse = await window.api.startASR({ sessionId, sampleRateHz: 16000 });
+    } catch (error) {
+      if (this.asrEventState.activeSessionId === sessionId) {
+        this.asrEventState = invalidateAsrSession(this.asrEventState);
+        this.showError(`语音识别启动失败: ${error.message}`);
+      }
+      return;
+    }
+    if (this.asrEventState.activeSessionId !== sessionId) return;
+    await this.processASRResponse(startResponse, '语音识别启动失败');
+    if (!startResponse?.ok || this.asrEventState.activeSessionId !== sessionId) {
+      if (this.asrEventState.activeSessionId === sessionId) {
+        this.asrEventState = invalidateAsrSession(this.asrEventState);
+      }
       return;
     }
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      if (this.asrEventState.activeSessionId !== sessionId) {
+        stream.getTracks().forEach(track => track.stop());
+        return;
+      }
       this.audioContext = new AudioContext({ sampleRate: 16000 });
       const source = this.audioContext.createMediaStreamSource(stream);
       this.audioProcessor = this.audioContext.createScriptProcessor(4096, 1, 1);
       this.audioProcessor.onaudioprocess = async (e) => {
-        if (!this.isRecording || this.isPaused) return;
+        if (!this.isRecording
+            || this.isPaused
+            || this.asrEventState.activeSessionId !== sessionId) return;
         const samples = e.inputBuffer.getChannelData(0);
-        const result = await window.api.feedAudio(samples);
-        if (result) this.handleASRResult(result);
+        const sequence = this.asrInputSequence;
+        this.asrInputSequence += 1;
+        try {
+          const response = await window.api.feedAudio({ sessionId, sequence, samples });
+          if (this.asrEventState.activeSessionId !== sessionId) return;
+          await this.processASRResponse(response, '语音识别处理失败');
+        } catch (error) {
+          if (this.asrEventState.activeSessionId === sessionId) {
+            this.showError(`语音识别处理失败: ${error.message}`);
+          }
+        }
       };
       source.connect(this.audioProcessor);
       this.audioProcessor.connect(this.audioContext.destination);
       this.mediaStream = stream;
     } catch (err) {
+      await this.cancelActiveAsrSession(sessionId);
       this.showError(`麦克风访问失败: ${err.message}`);
       return;
     }
@@ -161,21 +205,27 @@ class ExpressionTrainer {
 
   async stopRecording() {
     this.advanceLLMGeneration();
+    const sessionId = this.asrEventState.activeSessionId;
     if (this.audioProcessor) { this.audioProcessor.disconnect(); this.audioProcessor = null; }
     if (this.audioContext) { this.audioContext.close(); this.audioContext = null; }
     if (this.mediaStream) { this.mediaStream.getTracks().forEach(t => t.stop()); this.mediaStream = null; }
     try {
-      const stopResult = await window.api.stopASR();
-      if (stopResult && stopResult.success && stopResult.finalText) {
-        try {
-          await this.handleASRResult({ text: stopResult.finalText, isFinal: true });
-        } catch (error) {
-          this.showError(`尾部文本分析失败: ${error.message}`);
+      if (sessionId) {
+        const stopResponse = await window.api.stopASR({ sessionId });
+        if (this.asrEventState.activeSessionId === sessionId) {
+          await this.processASRResponse(
+            stopResponse,
+            '语音识别停止失败',
+            '尾部文本分析失败'
+          );
         }
       }
     } catch (error) {
       this.showError(`语音识别停止失败: ${error.message}`);
     } finally {
+      if (this.asrEventState.activeSessionId === sessionId) {
+        this.asrEventState = invalidateAsrSession(this.asrEventState);
+      }
       this.advanceLLMGeneration();
       try {
         await window.api.cancelLLMRequests();
@@ -208,6 +258,43 @@ class ExpressionTrainer {
   }
 
   // ===== ASR结果处理 =====
+
+  async processASRResponse(response, commandErrorPrefix, resultErrorPrefix = '语音识别结果处理失败') {
+    if (!response || response.ok !== true) {
+      const message = typeof response?.error?.message === 'string'
+        ? response.error.message
+        : '未知错误';
+      this.showError(`${commandErrorPrefix}: ${message}`);
+      return false;
+    }
+
+    const events = Array.isArray(response.events) ? response.events : [];
+    for (const event of events) {
+      const filtered = filterAsrEvent(this.asrEventState, event);
+      this.asrEventState = filtered.state;
+      if (filtered.effect?.type === 'result') {
+        try {
+          await this.handleASRResult(filtered.effect.result);
+        } catch (error) {
+          this.showError(`${resultErrorPrefix}: ${error.message}`);
+        }
+      } else if (filtered.effect?.type === 'error') {
+        this.showError(`语音识别错误: ${filtered.effect.message}`);
+      }
+    }
+    return true;
+  }
+
+  async cancelActiveAsrSession(expectedSessionId = this.asrEventState.activeSessionId) {
+    if (!expectedSessionId || this.asrEventState.activeSessionId !== expectedSessionId) return;
+    this.asrEventState = invalidateAsrSession(this.asrEventState);
+    try {
+      const response = await window.api.cancelASR({ sessionId: expectedSessionId });
+      await this.processASRResponse(response, '语音识别取消失败');
+    } catch (error) {
+      this.showError(`语音识别取消失败: ${error.message}`);
+    }
+  }
 
   handleASRResult({ text, isFinal }) {
     let analysisPromise;
@@ -477,6 +564,7 @@ class ExpressionTrainer {
 
   clearAll() {
     this.advanceLLMGeneration();
+    this.cancelActiveAsrSession();
     window.api.cancelLLMRequests();
     this.fullText = '';
     this.sentences = [];
