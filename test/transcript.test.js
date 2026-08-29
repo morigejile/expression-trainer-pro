@@ -40,6 +40,7 @@ function createTrainer() {
   trainer.audioFeedTracker = null;
   trainer.recordingStopOperation = null;
   trainer.lastAudioCaptureRates = null;
+  trainer.lastAudioFeedMetrics = null;
   trainer.isRecording = true;
   trainer.isPaused = false;
   trainer.startTime = Date.now();
@@ -989,6 +990,33 @@ for (const feedFailure of [
     assert.deepEqual(shownErrors, ['语音识别处理失败，录音已停止，请重新开始']);
   });
 }
+
+test('the eleventh pending audio chunk fails the active recording with observable overrun metrics', async (t) => {
+  const firstFeed = createDeferred();
+  const harness = await startActiveRecordingHarness(t, {
+    feedAudio: () => firstFeed.promise
+  });
+
+  for (let sequence = 0; sequence < 11; sequence += 1) {
+    void harness.audio.emit({
+      sessionId: harness.sessionId,
+      sequence,
+      samples: new Float32Array(320)
+    });
+  }
+  await new Promise(resolve => setImmediate(resolve));
+
+  assert.deepEqual(harness.feedCommands.map(command => command.sequence), [0]);
+  assert.deepEqual(harness.cancelCommands, [{ sessionId: harness.sessionId }]);
+  assert.deepEqual(harness.trainer.asrEventState, createAsrEventState());
+  assert.equal(harness.trainer.lastAudioFeedMetrics.maxChunks, 10);
+  assert.equal(harness.trainer.lastAudioFeedMetrics.peakDepth, 10);
+  assert.equal(harness.trainer.lastAudioFeedMetrics.overruns, 1);
+  assert.equal(harness.trainer.lastAudioFeedMetrics.discarded, 9);
+  assert.equal(harness.trainer.audioCapture, null);
+
+  firstFeed.resolve({ ok: true, events: [] });
+});
 
 test('concurrent normal stops share one flush, tail drain, and stopASR flight', async (t) => {
   const feedStarted = createDeferred();

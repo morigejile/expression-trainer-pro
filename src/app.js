@@ -31,6 +31,10 @@ const AudioCapture = typeof module !== 'undefined' && module.exports
   ? require('./audio-capture')
   : window.AudioCapture;
 const { createAudioCapture } = AudioCapture;
+const AudioFeedQueue = typeof module !== 'undefined' && module.exports
+  ? require('./audio-feed-queue')
+  : window.AudioFeedQueue;
+const { createAudioFeedQueue } = AudioFeedQueue;
 
 class ExpressionTrainer {
   constructor({ audioCaptureFactory = createAudioCapture } = {}) {
@@ -40,6 +44,7 @@ class ExpressionTrainer {
     this.audioFeedTracker = null;
     this.recordingStopOperation = null;
     this.lastAudioCaptureRates = null;
+    this.lastAudioFeedMetrics = null;
     this.isRecording = false;
     this.isPaused = false;
     this.startTime = null;
@@ -121,6 +126,7 @@ class ExpressionTrainer {
     this.asrGeneration = (this.asrGeneration ?? 0) + 1;
     const replacedSessionId = this.asrEventState.activeSessionId;
     if (replacedSessionId) {
+      this.audioFeedTracker?.queue.cancel();
       this.audioFeedTracker = null;
       void this.releaseAudioCapture({ flush: false }).catch(() => {});
       this.cancelActiveAsrSession(replacedSessionId, () => false);
@@ -163,6 +169,8 @@ class ExpressionTrainer {
       return;
     }
 
+    const tracker = this.createAudioFeedTracker(sessionId);
+    this.audioFeedTracker = tracker;
     const audioCapture = this.audioCaptureFactory();
     this.audioCapture = audioCapture;
     try {
@@ -177,14 +185,14 @@ class ExpressionTrainer {
         return;
       }
       this.lastAudioCaptureRates = rates;
-      this.audioFeedTracker = { sessionId, pending: new Set() };
     } catch (err) {
       if (ownsSession()
           && err?.code === 'unsupported-audio-context-rate'
           && err.audioRates) {
         this.lastAudioCaptureRates = err.audioRates;
       }
-      this.audioFeedTracker = null;
+      tracker.queue.cancel();
+      if (this.audioFeedTracker === tracker) this.audioFeedTracker = null;
       try {
         if (this.audioCapture === audioCapture) {
           await this.releaseAudioCapture({ flush: false });
@@ -287,7 +295,7 @@ class ExpressionTrainer {
   }
 
   handleCapturedChunk(chunk) {
-    const { sessionId, sequence, samples } = chunk;
+    const { sessionId } = chunk;
     const tracker = this.audioFeedTracker;
     const stoppingOwned = this.recordingStopOperation?.sessionId === sessionId
       && this.recordingStopOperation.feedTracker === tracker;
@@ -295,14 +303,19 @@ class ExpressionTrainer {
         || (this.isPaused && !stoppingOwned)
         || this.asrEventState.activeSessionId !== sessionId) return Promise.resolve();
     if (!tracker || tracker.sessionId !== sessionId) return Promise.resolve();
+    tracker.queue.enqueue(chunk);
+    return tracker.queue.drain().catch(() => {});
+  }
 
-    let operation;
-    operation = (async () => {
-      try {
+  createAudioFeedTracker(sessionId) {
+    const queue = createAudioFeedQueue({
+      maxChunks: 10,
+      send: async ({ sequence, samples }) => {
         const response = await window.api.feedAudio({ sessionId, sequence, samples });
         if (!response || response.ok !== true) {
-          await this.failActiveRecording(sessionId);
-          return;
+          const error = new Error(response?.error?.message || 'ASR feed failed');
+          error.code = response?.error?.code || 'asr-feed-failed';
+          throw error;
         }
         await this.processASRResponse(
           response,
@@ -310,14 +323,13 @@ class ExpressionTrainer {
           '语音识别结果处理失败',
           () => this.asrEventState.activeSessionId === sessionId
         );
-      } catch {
-        await this.failActiveRecording(sessionId);
-      } finally {
-        tracker.pending.delete(operation);
+      },
+      onFailure: () => {
+        this.lastAudioFeedMetrics = queue.snapshot();
+        return this.failActiveRecording(sessionId);
       }
-    })();
-    tracker.pending.add(operation);
-    return operation;
+    });
+    return { sessionId, queue };
   }
 
   failActiveRecording(sessionId) {
@@ -327,6 +339,10 @@ class ExpressionTrainer {
     this.asrGeneration = (this.asrGeneration ?? 0) + 1;
     this.asrEventState = invalidateAsrSession(this.asrEventState);
     this.advanceLLMGeneration();
+    if (this.audioFeedTracker?.sessionId === sessionId) {
+      this.lastAudioFeedMetrics = this.audioFeedTracker.queue.snapshot();
+    }
+    this.audioFeedTracker?.queue.cancel();
     this.audioFeedTracker = null;
     this.teardownRecordingCapture();
     this.showError('语音识别处理失败，录音已停止，请重新开始');
@@ -354,7 +370,9 @@ class ExpressionTrainer {
     try {
       await this.releaseAudioCapture({ flush: true });
       if (feedTracker?.sessionId === sessionId) {
-        await Promise.all([...feedTracker.pending]);
+        feedTracker.queue.close();
+        await feedTracker.queue.drain();
+        this.lastAudioFeedMetrics = feedTracker.queue.snapshot();
       }
       if (this.asrEventState.activeSessionId !== sessionId) return;
       this.audioFeedTracker = null;
@@ -755,6 +773,7 @@ class ExpressionTrainer {
     const sessionId = this.asrEventState.activeSessionId;
     this.asrStartAttempt = null;
     this.asrGeneration = (this.asrGeneration ?? 0) + 1;
+    this.audioFeedTracker?.queue.cancel();
     this.audioFeedTracker = null;
     if (sessionId) {
       this.asrEventState = invalidateAsrSession(this.asrEventState);
