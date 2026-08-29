@@ -2,6 +2,29 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
 
+function createProviderWithCapturedAdapter(options) {
+  const asrPath = require.resolve('../lib/asr');
+  const sessionPath = require.resolve('../lib/asr-session');
+  const sessionModule = require(sessionPath);
+  const originalCreateSessionProvider = sessionModule.createAsrSessionProvider;
+  let adapter;
+
+  sessionModule.createAsrSessionProvider = (sessionOptions) => {
+    adapter = sessionOptions.adapter;
+    return originalCreateSessionProvider(sessionOptions);
+  };
+  delete require.cache[asrPath];
+  try {
+    const { createParaformerAsrProvider } = require(asrPath);
+    const provider = createParaformerAsrProvider(options);
+    return { adapter, provider };
+  } finally {
+    sessionModule.createAsrSessionProvider = originalCreateSessionProvider;
+    delete require.cache[asrPath];
+    require(asrPath);
+  }
+}
+
 test('Paraformer provider preserves the current model and decoding configuration', async () => {
   const { createParaformerAsrProvider } = require('../lib/asr');
   const modelRoot = path.join('C:', 'fixture-models');
@@ -212,6 +235,52 @@ test('Paraformer provider flushes and returns trimmed final text when stopped', 
     }
   ]);
   assert.deepEqual(provider.stop({ sessionId: 'stop-session' }), []);
+});
+
+test('Paraformer provider releases its stream when stop finalization throws', async () => {
+  let inputFinishedCalls = 0;
+  const stream = {
+    inputFinished() {
+      inputFinishedCalls += 1;
+      throw new Error('input finalization failed');
+    }
+  };
+  const recognizer = {
+    createStream: () => stream,
+    isReady: () => false,
+    decode() {},
+    getResult: () => ({ text: 'unreachable tail' })
+  };
+  const { adapter, provider } = createProviderWithCapturedAdapter({
+    fileExists: () => true,
+    loadSherpa: () => ({
+      OnlineRecognizer: class {
+        constructor() {
+          return recognizer;
+        }
+      }
+    })
+  });
+
+  await provider.initialize();
+  await provider.start({ sessionId: 'failed-stop-session', sampleRateHz: 16000 });
+
+  assert.deepEqual(provider.stop({ sessionId: 'failed-stop-session' }), [
+    {
+      type: 'error',
+      sessionId: 'failed-stop-session',
+      sequence: 1,
+      code: 'asr-stop-failed',
+      message: 'input finalization failed'
+    },
+    {
+      type: 'stopped',
+      sessionId: 'failed-stop-session',
+      sequence: 2
+    }
+  ]);
+  assert.doesNotThrow(() => adapter.stop());
+  assert.equal(inputFinishedCalls, 1);
 });
 
 test('Paraformer provider cancels without flushing and disposes repeatably', async () => {
