@@ -87,6 +87,22 @@ test('committed registry contains the hash-verified small Chinese Zipformer cand
   assert.equal(candidate.files.every(({ relativePath }) => !path.isAbsolute(relativePath)), true);
 });
 
+test('committed registry contains the exact pending Zipformer Large CTC INT8 candidate', () => {
+  const { loadCandidateRegistry } = require('../benchmark/lib/candidate-registry');
+  const registry = loadCandidateRegistry(path.join(__dirname, '..', 'benchmark', 'models', 'candidates.json'));
+  const candidate = registry.candidates.find(({ id }) => id === 'zipformer-large-ctc-zh-int8-2025-06-30');
+
+  assert.ok(candidate);
+  assert.equal(candidate.family, 'zipformer-ctc');
+  assert.equal(candidate.mode, 'streaming');
+  assert.equal(candidate.status, 'pending');
+  assert.equal(candidate.sourceUrl, 'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30.tar.bz2');
+  assert.deepEqual(candidate.files, []);
+  assert.deepEqual(candidate.pending.missing, [
+    'archive-download', 'runtime-file-hashes', 'native-load', 'benchmark'
+  ]);
+});
+
 test('committed registry represents all downloaded candidates as hash-verified without approving redistribution', () => {
   const { loadCandidateRegistry, listCandidatesByStatus } = require('../benchmark/lib/candidate-registry');
   const registry = loadCandidateRegistry(path.join(__dirname, '..', 'benchmark', 'models', 'candidates.json'));
@@ -96,12 +112,17 @@ test('committed registry represents all downloaded candidates as hash-verified w
     [
       ['paraformer-bilingual-zh-en-control', 'verified'],
       ['zipformer-small-ctc-zh-int8-2025-04-01', 'verified'],
+      ['zipformer-large-ctc-zh-int8-2025-06-30', 'pending'],
       ['sensevoice-small-int8-2024-07-17', 'verified']
     ]
   );
   assert.deepEqual(
     listCandidatesByStatus(registry, 'pending').map(({ id }) => id),
-    []
+    ['zipformer-large-ctc-zh-int8-2025-06-30']
   );
-  assert.equal(registry.candidates.every(({ files, license }) => files.length > 0 && license.redistribution === 'not-approved'), true);
+  assert.equal(
+    listCandidatesByStatus(registry, 'verified').every(({ files, license }) => files.length > 0 && license.redistribution === 'not-approved'),
+    true
+  );
+  assert.equal(registry.candidates.every(({ license }) => license.redistribution === 'not-approved'), true);
 });

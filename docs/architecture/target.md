@@ -282,7 +282,7 @@ ADR-0005 已接受保留 Paraformer 为默认模型。当前仅为内部开发/�
 
 本里程碑只重开两个具名候选，不做通用模型扩张：
 
-- **Zipformer Large CTC INT8**：在基础工作完成后，准备 `sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30` 的 pending benchmark candidate。它是 16 kHz streaming 路径，使用 `model.int8.onnx` 与 `tokens.txt`；只需沿用现有 `zipformer-ctc` adapter，并补足 allowlist、候选列表和契约测试。它不进入生产模型选择。
+- **Zipformer Large CTC INT8**：`sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30` 已作为 pending benchmark candidate 登记。它沿用 16 kHz streaming `zipformer-ctc` / `zipformer2Ctc` 路径，registry、allowlist 和契约测试已完成；模型下载、文件 hash、native-load 与 benchmark 仍是外部证据待办。它不进入生产模型选择。
 - **FireRedASR2 CTC INT8**：只在 R-02/R-04 后，对 `sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25` 做 utterance-only spike。路径累计一段标准化 16 kHz 单声道样本，结束时解码一次且只发 final；不得通过重复解码增长缓冲区伪造 partial。它是否适合产品仍取决于后续基准与 utterance/VAD 交互判断。
 
 两者都保持 `pending`，模型文件留在 Git 外；下载、文件 hash、native-load 结果及再分发结论只能在实际验证后记录。Paraformer 仍是默认模型，直到后续基准证据和明确决定推翻 ADR-0005。
@@ -327,7 +327,7 @@ ADR-0005 已接受保留 Paraformer 为默认模型。当前仅为内部开发/�
 迁移必须保持每个阶段可运行：
 
 1. 构建/测试基线、三候选 benchmark、默认模型 ADR、最小 Paraformer Provider 和 session/event 契约已完成。
-2. R-03～R-06 已完成 AudioCapture、AudioWorklet、10-block 有界发送与 utility-process 执行边界；下一步完成两个已重开模型候选的最小集成，再处理 Model Manager。
+2. R-03～R-06 已完成 AudioCapture、AudioWorklet、10-block 有界发送与 utility-process 执行边界；Zipformer Large pending 候选准备已完成，下一步完成 FireRedASR2 utterance spike，再处理 Model Manager。
 3. 每次迁移保留独立回归证据，最后建立 Forge 制品、支持矩阵和发布机制。
 
 当下列条件全部满足时，本目标可合并为 Current：

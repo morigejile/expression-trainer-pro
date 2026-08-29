@@ -86,7 +86,7 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 
 BM-02 提供独立 benchmark CLI，用 manifest 输出每个 sample/repetition 的 JSONL、汇总 JSON/CSV、环境快照及 tag 分层统计；失败的 init、sample、timeout 和 dispose 事件也会被落盘。它不改动生产 `lib/asr.js`、Audio、IPC、Main 或默认模型，且没有新增依赖。2026-08-27，harness 在 clean commit `703f1630ba2bbcfcb98c914bc67c95e0b120ddc1` 上完成 Paraformer、small Zipformer 与 SenseVoiceSmall 各一轮 100 条比较，全部 0 失败；结果见 `docs/benchmark/bm02-comparison-2026-08-27.md`。维护者接受 ADR-0005 并保留现有 Paraformer 默认，因此生产代码无需切换；模型再分发许可仍是后续发布门禁。
 
-当前源码没有 Zipformer Large CTC INT8 或 FireRedASR2 CTC INT8 的生产 adapter、registry entry 或本地运行验证。它们只是在路线图中重新打开的内部候选，尚未改变 Paraformer 默认或当前实现事实。
+当前源码已把 Zipformer Large CTC INT8 加入 pending benchmark registry，并通过现有 `zipformer-ctc` / `zipformer2Ctc` 在线适配契约测试；模型尚未下载，也没有文件 hash、native-load 或 benchmark 证据。FireRedASR2 CTC INT8 尚未加入 adapter 或 registry。两者均未进入生产模型选择，Paraformer 默认不变。
 
 ## 4. C4 Level 2：当前容器/运行边界
 

@@ -58,6 +58,34 @@
       ]
     },
     {
+      "id": "zipformer-large-ctc-zh-int8-2025-06-30",
+      "displayName": "Zipformer Large CTC Chinese INT8",
+      "family": "zipformer-ctc",
+      "mode": "streaming",
+      "status": "pending",
+      "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30.tar.bz2",
+      "upstreamVersion": "2025-06-30",
+      "license": {
+        "model": { "status": "unverified", "reason": "The official Sherpa page maps this archive to the upstream Zipformer Large checkpoint; artifact and model redistribution terms remain unverified for this internal candidate.", "source": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-ctc/zipformer-ctc-models.html" },
+        "code": { "spdx": "Apache-2.0", "location": "https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE" },
+        "redistribution": "not-approved"
+      },
+      "evidence": {
+        "source": { "status": "verified", "checkedAt": "2026-08-29T00:00:00.000Z" },
+        "license": { "status": "pending", "checkedAt": "2026-08-29T00:00:00.000Z" },
+        "files": { "status": "pending", "reason": "Official archive has not been downloaded or hashed in this worktree.", "verifiedAt": "2026-08-29T00:00:00.000Z" },
+        "nativeLoad": { "status": "pending", "reason": "Sherpa native initialization awaits external model files.", "recordedAt": "2026-08-29T00:00:00.000Z" }
+      },
+      "sampleRateHz": 16000,
+      "numThreads": 2,
+      "provider": "cpu",
+      "files": [],
+      "pending": {
+        "reason": "Internal candidate contract is ready; external artifact evidence and benchmark execution remain.",
+        "missing": ["archive-download", "runtime-file-hashes", "native-load", "benchmark"]
+      }
+    },
+    {
       "id": "sensevoice-small-int8-2024-07-17",
       "displayName": "SenseVoiceSmall INT8 utterance candidate",
       "family": "sensevoice",

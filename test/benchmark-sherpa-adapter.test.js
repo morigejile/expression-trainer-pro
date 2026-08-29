@@ -78,6 +78,7 @@ function withFixture(run) {
     candidates: [
       candidate({ id: 'paraformer-bilingual-zh-en-control', family: 'paraformer', mode: 'streaming', version: '2024-03-10', files: makeFiles('paraformer', ['encoder', 'decoder', 'tokens']) }),
       candidate({ id: 'zipformer-small-ctc-zh-int8-2025-04-01', family: 'zipformer-ctc', mode: 'streaming', version: '2025-04-01', files: makeFiles('zipformer', ['model', 'tokens', 'bpe-vocab']) }),
+      candidate({ id: 'zipformer-large-ctc-zh-int8-2025-06-30', family: 'zipformer-ctc', mode: 'streaming', version: '2025-06-30', files: makeFiles('zipformer-large', ['model', 'tokens']) }),
       candidate({ id: 'sensevoice-small-int8-2024-07-17', family: 'sensevoice', mode: 'utterance', version: '2024-07-17', files: makeFiles('sensevoice', ['model', 'tokens']) })
     ]
   }));
@@ -143,6 +144,20 @@ test('Zipformer adapter selects the zipformer2Ctc online model config', async ()
 
     assert.match(sherpa.state.onlineConfig.modelConfig.zipformer2Ctc.model, /model\.bin$/);
     assert.equal(adapter.version, '2025-04-01');
+  });
+});
+
+test('Zipformer Large reuses the streaming zipformer2Ctc adapter contract', async () => {
+  const { createSherpaAdapter } = require('../benchmark/adapters/sherpa');
+  await withFixture(async ({ datasetRoot, modelRoot, registryPath }) => {
+    const sherpa = fakeSherpa();
+    const adapter = createSherpaAdapter({ candidateId: 'zipformer-large-ctc-zh-int8-2025-06-30', datasetRoot, modelRoot, registryPath, sherpa: sherpa.binding });
+    await adapter.init();
+    await adapter.dispose();
+
+    assert.match(sherpa.state.onlineConfig.modelConfig.zipformer2Ctc.model, /model\.bin$/);
+    assert.equal(adapter.version, '2025-06-30');
+    assert.equal(adapter.modelFiles.length, 2);
   });
 });
 
