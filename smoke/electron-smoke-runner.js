@@ -144,7 +144,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       'openPromptEditor', 'getCustomPrompt', 'saveCustomPrompt', 'closeWindow',
       'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText',
       'getRealtimeFeedback', 'getFinalReport', 'testLLMConnection',
-      'cancelLLMRequests', 'saveFile'
+      'cancelLLMRequests', 'saveFile', 'exportDiagnostics'
     ];
     return {
       title: document.title,

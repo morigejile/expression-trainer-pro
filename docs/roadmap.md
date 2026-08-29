@@ -2,7 +2,7 @@
 
 > 状态：Active execution baseline
 > 更新日期：2026-08-29
-> 当前进度：Phase 0-2、D-01～D-04、R-01～R-09、PKG-01～PKG-04、OPS-02 与 C-01/C-02 最小集成已完成；下一主线为候选模型资产缓存与其余 Phase 6 维护节点
+> 当前进度：Phase 0-2、D-01～D-04、R-01～R-09、PKG-01～PKG-04、OPS-02/OPS-05 与 C-01/C-02 最小集成已完成；下一主线为候选模型资产缓存与其余 Phase 6 维护节点
 > 当前模式：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞后续工作；只有它们使当前技术实验无法运行或结论失效时，才阻塞当前路径。
 
 ## 1. 目标与排序原则
@@ -89,7 +89,7 @@ flowchart LR
 | R-06 | P0 | ASR 移出 Main（Completed） | 单个 utility process 持有 Provider/Sherpa；Main Controller 关联请求、检测退出、下一 start 重建并以 5 秒上限完成 quit dispose | R-02,R-05,D-03 | Controller 测试与真实 Electron Fake smoke 覆盖强制退出、安全失败、重建和有界关闭；真实模型负载留作非阻塞环境验证 |
 | R-07 | P1 | 实现轻量 Model Manager（Completed） | 独立产品 registry 固定 Paraformer 版本与 archive/runtime hash；HTTPS 下载有流式字节上限和严格 Range 有限续传，系统 `tar` 只提取白名单文件；同盘 staging、不可变版本目录、active pointer 与显式 rollback 均位于 `userData/models` | D-02,R-01 | 聚焦测试覆盖中断/续传、错误 hash、解压失败、空间不足、成功升级和上一版本回退；PKG-03 已完成真实 1 GB archive/system tar 闭环 |
 | R-08 | P1 | 激活版本化默认模型（Completed） | utility process 从 `userData/models` 解析或安装 registry 默认 Paraformer；使用 role→绝对路径配置，native 初始化成功后才原子激活；当前版本损坏或加载失败时只探测并切换一次上一版本 | R-06,R-07,D-02 | 聚焦测试覆盖首次安装、single-flight、取消、role config、激活时序、损坏 active 与失败回退；PKG-03 已完成 packaged 真实模型初始化与离线二次启动 |
-| R-09 | P1 | 收敛设置/规则/日志（Completed） | settings 与 custom-prompt 使用同盘临时文件 + fsync + rename 原子写；旧 schema 自动迁移，未来 schema 只兼容读取而不降级覆盖；字幕与本地分析共用唯一规则源，customWords 作为有界 filler 生效；现有错误日志维持脱敏边界，不引入 keychain/native 依赖 | T-03,R-07 | 聚焦测试覆盖旧/当前/未来 schema、发布失败保留旧文件、规则同源、自定义 filler 与错误脱敏；API Key 明文和可导出诊断留给发布前权衡/OPS-05 |
+| R-09 | P1 | 收敛设置/规则/日志（Completed） | settings 与 custom-prompt 使用同盘临时文件 + fsync + rename 原子写；旧 schema 自动迁移，未来 schema 只兼容读取而不降级覆盖；字幕与本地分析共用唯一规则源，customWords 作为有界 filler 生效；现有错误日志维持脱敏边界，不引入 keychain/native 依赖 | T-03,R-07 | 聚焦测试覆盖旧/当前/未来 schema、发布失败保留旧文件、规则同源、自定义 filler 与错误脱敏；OPS-05 已补固定白名单诊断导出，API Key 明文仍留给发布前权衡 |
 
 R-01～R-09、D-03/D-04、PKG-01～PKG-04 与 C-01/C-02 已完成当前最小边界。下一步提前缓存两个具名候选资产并进入 Phase 6；Paraformer 默认不变。
 
@@ -121,7 +121,7 @@ Paraformer 继续是产品默认。上述候选仅用于内部技术验证和 be
 | OPS-02 | P1 | 版本/变更规范（Completed） | `package.json#version` 作为应用/制品唯一版本源；CHANGELOG 记录内部版本、默认模型和 ADR；最小 release checklist 合并进开发文档，不新增发布框架 | PKG-03 | 已记录 1.0.0/1.0.1 基线与提交、模型、ADR；源码 V2 注释不再制造第二版本口径 |
 | OPS-03 | P1 | 受控依赖升级 | Electron/Sherpa/Forge 按具体安全或兼容风险批次升级 | OPS-01 | 每次验证 native load、模型 smoke 和 Tier 1 制品 |
 | OPS-04 | P1 | 模型生命周期 | registry 标记 current/deprecated/removed，定义兼容期和回退 | R-07,OPS-01 | 模型替换有数据、决策和弃用记录 |
-| OPS-05 | P1 | 诊断基线 | 脱敏记录 app/OS/arch、模型、sample rate、初始化时间和错误类别 | R-09 | 用户可导出不含密钥的诊断信息 |
+| OPS-05 | P1 | 诊断基线（Completed） | 单一固定 JSON schema 由 Main 组合 app/OS/arch、active 模型、Renderer 三项采样率、controller 初始化耗时和受控错误类别；只在用户点击时写文件，不建日志框架/历史库/上传 | R-09 | 主窗口可导出；白名单测试证明不含设置、密钥、路径、stack、音频、逐字稿或 LLM 内容 |
 | OPS-06 | P2 | 自动更新评估 | 至少两个稳定手工发布后再评估 updater、托管、签名和回滚成本 | PKG-05,OPS-02 | 新 ADR 说明是否采用，不默认引入 |
 
 ## 8. 里程碑
@@ -133,7 +133,7 @@ Paraformer 继续是产品默认。上述候选仅用于内部技术验证和 be
 | M2 选型有证据 | Completed | BM-01、BM-02、BM-04～BM-06、D-01、D-02 | 三候选结果和 Accepted 模型 ADR |
 | M3 架构收敛 | Completed | R-01～R-09、D-03/D-04 | Audio/ASR/模型分离，Main 不推理，模型升级可回退 |
 | M4 可安装发布 | In Progress | PKG-01～PKG-06（PKG-01～PKG-04 Completed；PKG-05/PKG-06 为外部发布跟进） | Windows x64 内部安装/升级闭环已完成；公开发布仍需签名与对应平台证据 |
-| M5 可长期维护 | In Progress | OPS-01～OPS-06（OPS-02 Completed） | 版本口径已统一；CI、依赖、模型生命周期和诊断节点待按实际风险推进 |
+| M5 可长期维护 | In Progress | OPS-01～OPS-06（OPS-02/OPS-05 Completed） | 版本与脱敏诊断基线已完成；CI、依赖和模型生命周期待按实际风险推进 |
 
 ## 9. 明确不做
 

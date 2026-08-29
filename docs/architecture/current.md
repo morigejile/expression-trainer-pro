@@ -47,6 +47,7 @@ lib/settings-config.js          设置默认值、解析和 schema 迁移纯函�
 lib/custom-prompt-config.js     自定义规则 schema、迁移与有界口癖解析
 lib/atomic-json-store.js        userData JSON 的同盘原子写
 lib/safe-log.js                 有界错误文本与凭据模式脱敏
+lib/diagnostics.js              固定白名单的 app/OS/model/audio/ASR 诊断快照
 data/*.json                     词库数据
 package.json / package-lock.json
 test/electron-smoke.test.js      Node 测试父进程、超时、日志和清理
@@ -326,6 +327,7 @@ Settings/Prompt Renderer
 - Electron Forge 7.5/Squirrel 已固定为 Windows x64 最小打包配置；没有 GitHub Actions。
 - `models/` 跟踪版本化产品 registry；模型权重由首次 ASR 初始化自动下载、校验并安装到 `userData/models`。
 - 已有 canonical 支持矩阵、Windows x64 首发选择、未签名内部安装制品，以及真实首次安装/模型和 1.0.0→1.0.1 升级/卸载数据保留闭环；仍无签名、公证或自动更新。
+- 主窗口可按需导出固定 JSON 诊断；Main 组合系统/active 模型/controller 状态，Renderer 只提供经过严格字段校验的采样率，不后台记录或上传用户内容。
 - 原有 `package-lock.json` 清理已由负责人确认纳入 Phase 0；陈旧 `node-microphone` 条目已删除，lockfile 与 `package.json` 一致。
 - 开发基线为 Node 22.23.0/npm 12.0.2。T-08 的 Electron 43.4.1 JS 依赖经 clean `npm ci` 安装；Electron 42+ 改为首次 CLI 调用时下载 binary，本轮首次 43.4.1 下载成功，后续 clean install 从官方校验缓存恢复相同 executable（SHA-256 `E885FFC2A09DAB4C14DE706E3662A5929D1E65EA4EA347C56FD0964640EB923B`）。显式清空所有 npm/Electron 缓存后的复跑仍为 Runtime-TBD。
 
@@ -378,7 +380,7 @@ Settings/Prompt Renderer
 
 1. 在显式清空 npm 与 Electron 下载缓存的独立环境复跑 Electron 43 首次 CLI 下载；当前首次 43.4.1 下载和后续校验缓存恢复均成功。
 2. 验证当前模型下载源、大小、hash、许可证和三个文件的兼容性。
-3. 自动 Electron smoke 已覆盖 BrowserWindow、17 项 Preload API、设置页、utility-process Fake ASR 的 session/event、stale feed、强制退出报告与重建、Fake LLM、粘贴分析以及 16/44.1/48 kHz graph fixture，并确认 Main 不加载真实 Sherpa。PKG-02 进一步证明打包后的 utility process 可加载 native addon；真实 Paraformer 模型循环、设置持久化、报告保存对话框、麦克风和人工交互仍需运行验证。
+3. 自动 Electron smoke 已覆盖 BrowserWindow、18 项 Preload API（含诊断导出入口）、设置页、utility-process Fake ASR 的 session/event、stale feed、强制退出报告与重建、Fake LLM、粘贴分析以及 16/44.1/48 kHz graph fixture，并确认 Main 不加载真实 Sherpa。PKG-02/PKG-03 进一步证明打包后的 utility process 可加载 native addon 并运行真实 Paraformer 最小会话；真实麦克风和人工交互仍需运行验证。
 4. 以真实可配置的 16/44.1/48 kHz 麦克风/驱动复核已记录的请求、context 与 track rate；该项为非阻塞 follow-up。
 5. profile TD-01～TD-04 的 Main 延迟、GC、CPU、RAM 和队列。
 6. 其他 OS/arch 在各自产生 package/smoke/native-model 证据前保持 Experimental；Windows x64 公开发布仍需签名与真实设备证据。

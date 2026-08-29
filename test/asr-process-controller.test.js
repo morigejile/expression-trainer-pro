@@ -146,3 +146,45 @@ test('ASR process controller gives first model initialization its own longer tim
   assert.equal(controller.snapshot().initialized, true);
   await controller.dispose();
 });
+
+test('ASR process controller snapshots the latest initialization duration', async () => {
+  let clock = 100;
+  const controller = createAsrProcessController({
+    now: () => clock,
+    spawn() {
+      return new FakeUtilityProcess((message, reply) => {
+        if (message.command === 'initialize') clock = 145;
+        reply(null);
+      });
+    }
+  });
+
+  await controller.initialize();
+  assert.equal(controller.snapshot().lastInitializationElapsedMs, 45);
+  assert.equal(controller.snapshot().lastErrorCategory, null);
+});
+
+test('ASR process controller snapshots only the initialization error category', async () => {
+  let clock = 200;
+  const controller = createAsrProcessController({
+    now: () => clock,
+    spawn() {
+      const child = new FakeUtilityProcess();
+      child.postMessage = message => {
+        clock = 230;
+        child.emit('message', {
+          id: message.id,
+          ok: false,
+          error: {code: 'model-runtime-missing', message: 'C:\\private\\model failed'}
+        });
+      };
+      return child;
+    }
+  });
+
+  await assert.rejects(controller.initialize(), /private/);
+  const snapshot = controller.snapshot();
+  assert.equal(snapshot.lastInitializationElapsedMs, 30);
+  assert.equal(snapshot.lastErrorCategory, 'model-runtime-missing');
+  assert.doesNotMatch(JSON.stringify(snapshot), /private|model failed/);
+});

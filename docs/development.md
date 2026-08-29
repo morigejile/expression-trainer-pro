@@ -94,6 +94,10 @@ BM-01 已完成的数据采集、人工 review 和 freeze 工具已归档到 Git
 
 仓库已有 Windows x64 Electron Forge/Squirrel package/make 配置和 packaged smoke；PKG-03 已完成静默安装、真实模型首次准备及离线二次启动，PKG-04 已完成 1.0.0→1.0.1 升级、数据保留与卸载验证。手工运行旧完整 Setup 仍可降级应用二进制，重新运行当前 Setup 可恢复；userData 保持不变。当前产物仍是未签名内部测试制品，不代表公开支持；签名、模型再分发许可和其他平台属于后续发布工作，除非使当前技术实验无法运行或结论失效，否则不阻塞内部开发。
 
+## 诊断导出
+
+主窗口的“🩺”按钮按用户操作导出固定 schema 的 JSON：应用版本、OS/platform/arch、active 模型 ID/版本、请求/context/track 采样率、最近 ASR 初始化耗时和受控错误类别。文件不包含设置、API Key、Authorization、绝对路径、stack、音频、逐字稿或 LLM 内容；不在后台持续写日志，也不自动上传。未开始录音或未安装模型时，对应字段明确为 `null`/`not-installed`。
+
 ## 人工与外部跟进
 
 以下事项保留为非阻塞后续工作：模型/数据集再分发权利、16/44.1/48 kHz 真实麦克风验证、接近资格线的性能验证、代码签名/公证凭据、Experimental 平台 native addon 与制品行为、FireRedASR2 utterance/VAD 交互，以及公开隐私/LLM 披露。首个 Tier 1 目标与待验证硬件线见[支持矩阵](support-matrix.md)。

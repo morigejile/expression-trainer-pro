@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, Menu, utilityProcess } = require('electron');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
 const {atomicWriteJsonSync} = require('./lib/atomic-json-store');
 const {
   createDefaultCustomPrompt,
@@ -9,6 +10,7 @@ const {
   parseCustomPromptJson
 } = require('./lib/custom-prompt-config');
 const {formatSafeError} = require('./lib/safe-log');
+const {createDiagnosticSnapshot} = require('./lib/diagnostics');
 const { loadLexicon, analyzeText } = require('./lib/lexicon');
 const {
   createDefaultSettings,
@@ -74,6 +76,20 @@ let promptEditorWindow;
 const llmRequests = createRequestCoordinator();
 let asrShutdownStarted = false;
 let asrShutdownComplete = false;
+let lastAsrErrorCategory = null;
+
+async function trackAsrResult(operation) {
+  try {
+    const result = await operation;
+    if (result?.ok === false && typeof result.error?.code === 'string') {
+      lastAsrErrorCategory = result.error.code;
+    }
+    return result;
+  } catch (error) {
+    lastAsrErrorCategory = typeof error?.code === 'string' ? error.code : 'asr-command-failed';
+    throw error;
+  }
+}
 
 function runNativeAddonSmoke() {
   return new Promise((resolve, reject) => {
@@ -361,7 +377,7 @@ ipcMain.handle('close-current-window', (event) => {
 
 // 语音识别相关 - Web Audio方案
 ipcMain.handle('start-asr', (event, command) => {
-  return asrIpc.start(command);
+  return trackAsrResult(asrIpc.start(command));
 });
 
 app.on('before-quit', event => {
@@ -379,15 +395,15 @@ app.on('before-quit', event => {
 
 // 接收渲染进程发来的音频数据
 ipcMain.handle('feed-audio', (event, command) => {
-  return asrIpc.feed(command);
+  return trackAsrResult(asrIpc.feed(command));
 });
 
 ipcMain.handle('stop-asr', (event, command) => {
-  return asrIpc.stop(command);
+  return trackAsrResult(asrIpc.stop(command));
 });
 
 ipcMain.handle('cancel-asr', (event, command) => {
-  return asrIpc.cancel(command);
+  return trackAsrResult(asrIpc.cancel(command));
 });
 
 // LLM 连通性测试
@@ -429,6 +445,32 @@ ipcMain.handle('save-file', async (event, content, filename) => {
     return { success: true, path: result.filePath };
   }
   return { success: false };
+});
+
+ipcMain.handle('export-diagnostics', async (event, audioRates) => {
+  const {dialog} = require('electron');
+  const controller = asrProvider.snapshot();
+  const snapshot = createDiagnosticSnapshot({
+    appVersion: app.getVersion(),
+    userDataPath: app.getPath('userData'),
+    platform: process.platform,
+    arch: process.arch,
+    osRelease: os.release(),
+    audioRates,
+    asr: {
+      initializationElapsedMs: controller.lastInitializationElapsedMs,
+      lastErrorCategory: lastAsrErrorCategory ?? controller.lastErrorCategory
+    }
+  });
+  const date = snapshot.generatedAt.slice(0, 10).replaceAll('-', '');
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: '导出诊断信息',
+    defaultPath: path.join(app.getPath('desktop'), `expression-trainer-diagnostics-${date}.json`),
+    filters: [{name: 'JSON', extensions: ['json']}]
+  });
+  if (result.canceled || !result.filePath) return {success: false};
+  fs.writeFileSync(result.filePath, `${JSON.stringify(snapshot, null, 2)}\n`, 'utf8');
+  return {success: true, path: result.filePath};
 });
 
 // AI反馈（传入customPrompt）

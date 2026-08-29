@@ -73,6 +73,7 @@ class ExpressionTrainer {
     this.btnStop = document.getElementById('btn-stop');
     this.btnReport = document.getElementById('btn-report');
     this.btnSettings = document.getElementById('btn-settings');
+    this.btnDiagnostics = document.getElementById('btn-diagnostics');
     this.btnCloseReport = document.getElementById('btn-close-report');
     this.btnClosePaste = document.getElementById('btn-close-paste');
     this.btnAnalyzePaste = document.getElementById('btn-analyze-paste');
@@ -102,6 +103,7 @@ class ExpressionTrainer {
     this.btnStop.addEventListener('click', () => this.stopRecording());
     this.btnReport.addEventListener('click', () => this.generateReport());
     this.btnSettings.addEventListener('click', () => window.api.openSettings());
+    this.btnDiagnostics.addEventListener('click', () => this.exportDiagnostics());
     document.getElementById('btn-prompt-editor').addEventListener('click', () => window.api.openPromptEditor());
     this.btnCloseReport.addEventListener('click', () => this.reportModal.classList.add('hidden'));
     this.btnCopyReport.addEventListener('click', () => {
@@ -116,6 +118,18 @@ class ExpressionTrainer {
     this.btnCopyText.addEventListener('click', () => this.copyOriginalText());
     this.btnSaveText.addEventListener('click', () => this.saveOriginalText());
     this.btnClear.addEventListener('click', () => this.clearAll());
+  }
+
+  async exportDiagnostics() {
+    const original = this.btnDiagnostics.textContent;
+    try {
+      const result = await window.api.exportDiagnostics(this.lastAudioCaptureRates);
+      if (!result?.success) return;
+      this.btnDiagnostics.textContent = '✓';
+      setTimeout(() => { this.btnDiagnostics.textContent = original; }, 2000);
+    } catch (error) {
+      alert(`导出诊断失败: ${error.message}`);
+    }
   }
 
   // ===== 录制控制 =====

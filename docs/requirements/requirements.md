@@ -79,13 +79,13 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | NFR-03 | Partial | 响应性 | ASR 初始化与同步 decode 已移入 utility process；D-03 空载传输、Fake smoke 与 packaged 真实 Paraformer 最小会话均通过，但尚无真实麦克风/UI 的 p95 定量预算。 |
 | NFR-04 | Partial | 音频正确性 | 固定 Electron 的 OfflineAudioContext/AudioBufferSource graph 已用确定性双声道时变 fixture 验证 16/44.1/48 kHz 缓冲适配到 16 kHz；AudioWorklet 输出带明确格式的 320 帧 chunk 并 flush tail。生产 MediaStreamAudioSourceNode 与真实麦克风/驱动仍待非阻塞验证。 |
 | NFR-05 | Partial | 性能 | Windows x64 首个硬件资格线暂定 4-core CPU、8 GB RAM、3 GB 可用磁盘；当前高配开发机 Paraformer benchmark 平均 RTF 0.0540，PKG-03 首次模型闭环约 563.664 s、离线二次启动约 3.672 s；接近资格线的真实 Audio/utility/UI 测量仍是非阻塞环境待办。 |
-| NFR-06 | Partial | 可靠性 | ASR session、10-block overrun 和执行单元退出重建已有受控路径；Model Manager 已覆盖下载大小/hash、严格 Range 有限续传、解压/运行文件校验、原子激活与回退，并通过真实约 1 GB 下载闭环；完整诊断导出仍待实现。 |
+| NFR-06 | Partial | 可靠性 | ASR session、10-block overrun 和执行单元退出重建已有受控路径；Model Manager 已覆盖下载大小/hash、严格 Range 有限续传、解压/运行文件校验、原子激活与回退，并通过真实约 1 GB 下载闭环；固定 schema 诊断导出已实现，真实设备性能预算仍待确认。 |
 | NFR-07 | Partial | 隐私与安全 | 本地 ASR 音频不上传；LLM 错误与当前应用日志不记录 Key、Authorization、完整响应或 transcript，安全错误格式有测试；API Key 明文和公开用户告知仍待发布前确认。 |
 | NFR-08 | Existing | 权限隔离 | Renderer 不获得不受限的 Node.js 权限；当前 BrowserWindow 使用 `contextIsolation: true`、`nodeIntegration: false`，Preload 只暴露显式能力。后续新增 IPC 时继续维持该边界。 |
 | NFR-09 | Partial | 可测试性 | 词库/共享规则、设置与自定义规则迁移/原子写、Provider、ASR session/IPC/Renderer 过滤、AudioCapture/collector、有界队列、process controller、Model Manager 和 Electron 16/44.1/48 kHz graph fixture 已有测试；packaged 真实模型 smoke 已补齐，真实麦克风仍待环境验证。 |
 | NFR-10 | Partial | 可移植性 | 首个 Tier 1 目标选定 Windows 11 25H2+ x64；Windows ARM64、macOS、Linux 保持 Experimental，只有对应 package/smoke/native-model 证据才能升级支持等级。 |
 | NFR-11 | Existing | 可升级性 | 设置/自定义规则已有 schemaVersion、旧配置迁移、未来 schema 防降级覆盖与原子写；模型具备不可变版本目录、原子 active pointer 和上一版本回退。PKG-04 已验证 1.0.0→1.0.1 安装制品升级与卸载保留 userData；旧完整 Setup 仍可降级二进制，重装当前 Setup 可恢复。自动更新服务不属于首个基线。 |
-| NFR-12 | Partial | 可观测性 | 当前生产日志仅含固定状态或受控错误，不记录密钥/完整文本；OPS-05 仍需补齐可导出的 app/OS/arch、模型、sample rate、初始化时间和错误类别诊断。 |
+| NFR-12 | Existing | 可观测性 | 用户可主动导出 app/OS/arch、active 模型、请求/context/track sample rate、ASR 初始化耗时和受控错误类别；固定白名单不含设置、密钥、路径、stack、音频、逐字稿或 LLM 内容，且不后台持久化或上传。 |
 
 ## 6. 约束
 
