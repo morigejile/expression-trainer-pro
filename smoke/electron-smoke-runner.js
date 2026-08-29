@@ -153,6 +153,31 @@ async function run({ app, BrowserWindow, mainWindow }) {
   assert.equal(apiContract.title, '宇宙无敌表达训练系统');
   assert.deepEqual(apiContract.missing, []);
 
+  const graphWindow = new BrowserWindow({
+    show: false,
+    webPreferences: { contextIsolation: true, nodeIntegration: false }
+  });
+  await graphWindow.loadFile(path.join(__dirname, 'audio-graph-fixture.html'));
+  await waitForPage(graphWindow, 'audio-graph-fixture.html');
+  const graphResults = await graphWindow.webContents.executeJavaScript(`(async () => {
+    const results = [];
+    for (const rate of [16000, 44100, 48000]) {
+      results.push(await globalThis.runAudioGraphFixture(rate));
+    }
+    return results;
+  })()`);
+  assert.deepEqual(graphResults.map(result => result.inputSampleRateHz), [16000, 44100, 48000]);
+  for (const result of graphResults) {
+    assert.equal(result.contextSampleRateHz, 16000);
+    assert.deepEqual(result.chunkFrames, [320, 320]);
+    assert.equal(result.totalFrames, 640);
+    assert.equal(result.allFinite, true);
+    assert.ok(Math.abs(result.firstPlateauMean - 0.2) < 0.02);
+    assert.ok(Math.abs(result.secondPlateauMean - 0.8) < 0.02);
+    assert.ok(Math.abs(result.transitionFrame - 320) <= 16);
+  }
+  graphWindow.destroy();
+
   const asrResult = await mainWindow.webContents.executeJavaScript(`(async () => {
     const sessionId = '${SMOKE_SESSION_ID}';
     const start = await window.api.startASR({ sessionId, sampleRateHz: 16000 });

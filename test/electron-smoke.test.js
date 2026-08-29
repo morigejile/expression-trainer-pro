@@ -35,7 +35,7 @@ function diagnostics(stdout, stderr, code, signal) {
   ].join('\n');
 }
 
-test('real Electron loads the UI, honors the preload contract, and completes core smoke flows', {
+test('real Electron covers core flows and 16/44.1/48 kHz graph-rate adaptation', {
   timeout: PROCESS_TIMEOUT_MS + 15_000
 }, async () => {
   const projectRoot = path.resolve(__dirname, '..');

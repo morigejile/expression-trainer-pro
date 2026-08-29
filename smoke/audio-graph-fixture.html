@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Audio graph fixture</title></head>
+<body>
+  <script type="module">
+    const mean = samples => samples.reduce((sum, sample) => sum + sample, 0) / samples.length;
+
+    globalThis.runAudioGraphFixture = async inputSampleRateHz => {
+      const outputFrames = 640;
+      const context = new OfflineAudioContext(1, outputFrames, 16000);
+      await context.audioWorklet.addModule(
+        new URL('../src/audio-worklet.mjs', import.meta.url).href
+      );
+      const node = new AudioWorkletNode(
+        context,
+        'expression-trainer-audio-collector',
+        {
+          numberOfInputs: 1,
+          numberOfOutputs: 1,
+          outputChannelCount: [1],
+          processorOptions: { enabled: true, captureEpoch: 0 }
+        }
+      );
+      const inputFrames = inputSampleRateHz * 40 / 1000;
+      const buffer = context.createBuffer(2, inputFrames, inputSampleRateHz);
+      const left = buffer.getChannelData(0);
+      const right = buffer.getChannelData(1);
+      for (let frame = 0; frame < inputFrames; frame += 1) {
+        const firstHalf = frame < inputFrames / 2;
+        left[frame] = firstHalf ? 0.1 : 0.7;
+        right[frame] = firstHalf ? 0.3 : 0.9;
+      }
+
+      const chunks = [];
+      let resolveFlushed;
+      let rejectFlushed;
+      const flushed = new Promise((resolve, reject) => {
+        resolveFlushed = resolve;
+        rejectFlushed = reject;
+      });
+      const timeout = setTimeout(() => rejectFlushed(new Error('fixture flush timed out')), 5000);
+      node.port.onmessage = event => {
+        const message = event.data;
+        if (message?.type === 'chunk' && message.captureEpoch === 0) {
+          chunks.push(new Float32Array(message.samples));
+        } else if (message?.type === 'flushed'
+            && message.requestId === 0
+            && message.captureEpoch === 0) {
+          clearTimeout(timeout);
+          resolveFlushed();
+        }
+      };
+
+      const source = context.createBufferSource();
+      source.buffer = buffer;
+      source.connect(node);
+      node.connect(context.destination);
+      source.start();
+      await context.startRendering();
+      node.port.postMessage({ type: 'flush', requestId: 0, captureEpoch: 0 });
+      await flushed;
+
+      const allSamples = Float32Array.from(chunks.flatMap(chunk => [...chunk]));
+      return {
+        inputSampleRateHz,
+        contextSampleRateHz: context.sampleRate,
+        chunkFrames: chunks.map(chunk => chunk.length),
+        totalFrames: chunks.reduce((sum, chunk) => sum + chunk.length, 0),
+        firstPlateauMean: mean(allSamples.slice(64, 256)),
+        secondPlateauMean: mean(allSamples.slice(384, 576)),
+        transitionFrame: allSamples.findIndex(sample => sample >= 0.5),
+        allFinite: allSamples.every(Number.isFinite)
+      };
+    };
+  </script>
+</body>
+</html>
