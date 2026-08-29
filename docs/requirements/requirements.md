@@ -3,7 +3,7 @@
 > 状态：Existing / Partial / Planned
 > 基线日期：2026-08-29
 > 适用范围：内部开发/测试中的当前实现（Existing/Partial）与下一阶段工程化目标（Planned）
-> 源码基线：`main`，已包含 Phase 4 / R-01～R-02 Paraformer Provider/session 协议适配
+> 源码基线：当前开发分支，已包含 Phase 4 / R-01～R-04 Paraformer Provider/session/Audio 协议适配
 
 ## 1. 文档目的
 
@@ -55,14 +55,14 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | FR-E10 | 用户应能复制或保存原文与报告。 | 原文可复制/保存为 Markdown；报告可复制/保存为 Markdown；保存路径通过系统对话框选择。 |
 | FR-E11 | 当前 Paraformer 应通过轻量 ASR Provider 边界访问。 | Main 只依赖 initialize/start/feed/stop/cancel/dispose 契约；Fake Provider 可在不加载真实 Paraformer/Sherpa 模块时验证业务与 Electron smoke 路径。 |
 | FR-E12 | 默认中文模型选择应由项目数据 benchmark 和明确产品取舍支持。 | 三候选比较结果可复跑；ADR-0005 记录继续使用 Paraformer 的 streaming UX 与渐进迁移理由。 |
+| FR-P01 | 音频采集与 ASR 推理应成为独立职责。 | AudioCapture 独立持有权限、track/context/worklet 与 chunk 元数据；Renderer 只编排训练/session，Provider 隔离 Sherpa 配置。 |
+| FR-P02 | 音频链路应使用 16 kHz AudioContext、Electron/Chromium graph 采样率适配与 AudioWorklet collector。 | 已记录请求/context/track rate，固定 Electron OfflineAudioContext/AudioBufferSource fixture 覆盖 16/44.1/48 kHz 确定性缓冲；worklet 下混并汇集 320 帧 mono Float32 chunk，正常停止 flush 非空 tail，ScriptProcessor 已移除。真实 MediaStream 麦克风仍为非阻塞 follow-up。 |
 | FR-P03 | ASR Provider 应提供 session 和规范事件语义。 | `startASR/feedAudio/stopASR/cancelASR` 使用 `sessionId` 和 sequence，返回 `ready/partial/final/error/stopped` 事件的安全 envelope；旧 session、迟到/倒序事件不污染当前训练，stop/cancel/dispose 可重复处理。 |
 
 ### 4.2 Partial / Planned
 
 | ID | 状态 | 需求 | 验收标准 |
 |---|---|---|---|
-| FR-P01 | Partial | 音频采集与 ASR 推理应成为独立职责。 | 现有 Provider 已隔离 Sherpa 配置，但 Renderer 仍持有采集生命周期。Audio 模块最终只输出带明确采样率/声道/格式的音频块。 |
-| FR-P02 | Planned | 音频链路应使用 16 kHz AudioContext、Electron/Chromium graph 采样率适配与 AudioWorklet collector。 | 请求 `AudioContext({sampleRate:16000,latencyHint:'interactive'})`，记录请求值、实际 context rate 与可用的 track rate；16/44.1/48 kHz 确定性 fixture 在 16 kHz context 中通过；worklet 只下混可变 render quantum、汇集 320 帧单声道 Float32 chunk 并 flush 一次非空 final tail；直接移除 `ScriptProcessorNode`。真实设备验证是非阻塞 follow-up；仅在固定 Electron/设备证据显示 graph 适配实质失败时评估有状态 SpeexDSP/libsamplerate WASM 备选。 |
 | FR-P04 | Planned | ASR 初始化和推理应移出 Electron Main。 | 当前推理仍在 Main；目标为长时间初始化/推理不阻塞 Main，执行单元失败可检测并向 UI 返回可恢复错误。具体隔离机制由 ADR 决定。 |
 | FR-P05 | Planned | 应提供轻量 Model Manager。 | 当前模型仍手工管理；目标为依据模型清单检查、下载、SHA-256 校验、原子安装、选择和返回本地模型路径，且失败不破坏上一可用模型。 |
 | FR-P06 | Planned | 模型与应用版本应解耦。 | 模型清单至少包含 `modelId`、`version`、`engine`、`languages`、文件来源、`sha256` 和兼容版本信息。 |
@@ -77,12 +77,12 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | NFR-01 | Existing | 可维护性与范围收敛 | 默认保持 Electron + 原生 JS/HTML/CSS + Sherpa-ONNX；持续遵循不过度扩散、不过度设计、不把内部工作升级为不必要的审计审核，并减少不能改变决策或发现实质回归的验证。只有能明确降低总代码、风险或长期成本时才增加依赖、流程或门禁；依赖变更需 ADR 或变更说明。 |
 | NFR-02 | Partial | 可复现性 | 锁文件与 `package.json` 一致；固定开发工具 Node 22.23.x/npm 12.0.x；当前 lock/安装树为精确 Electron 43.4.1、Sherpa 1.13.3。Electron 43 首次 CLI 下载与 clean `npm ci` 后的校验缓存恢复均已实测；Forge 构建仍按 Roadmap Phase 5 建立。 |
 | NFR-03 | Partial | 响应性 | Renderer 在录音期间可继续响应，但 ASR 仍在 Main 同步运行；定量预算在基线 benchmark 后确定，不虚构当前 p95 指标。 |
-| NFR-04 | Partial | 音频正确性 | 当前使用 Float32 单声道输入并意图请求 16 kHz，但没有记录请求值、实际 context rate 或 track rate。目标为依赖固定 Electron 的 Chromium graph 适配，把 16/44.1/48 kHz 输入交给 16 kHz AudioWorklet；每块携带明确采样率/声道/格式/帧数，并用确定性 fixture 验证 chunk 与 final tail。 |
+| NFR-04 | Partial | 音频正确性 | 固定 Electron 的 OfflineAudioContext/AudioBufferSource graph 已用确定性双声道时变 fixture 验证 16/44.1/48 kHz 缓冲适配到 16 kHz；AudioWorklet 输出带明确格式的 320 帧 chunk 并 flush tail。生产 MediaStreamAudioSourceNode 与真实麦克风/驱动仍待非阻塞验证。 |
 | NFR-05 | Planned | 性能 | 默认模型应在项目定义的最低支持设备上满足实时或近实时体验；阈值、设备和场景在 benchmark 方案中冻结。 |
 | NFR-06 | Partial | 可靠性 | ASR session 的旧/迟到事件与安全错误、LLM/麦克风错误已有受控路径；模型下载校验、原子替换、执行单元恢复和完整可诊断性仍待实现。 |
 | NFR-07 | Partial | 隐私与安全 | 本地 ASR 音频不上传，且错误已避免暴露密钥；用户告知与完整日志边界仍待发布前确认。 |
 | NFR-08 | Existing | 权限隔离 | Renderer 不获得不受限的 Node.js 权限；当前 BrowserWindow 使用 `contextIsolation: true`、`nodeIntegration: false`，Preload 只暴露显式能力。后续新增 IPC 时继续维持该边界。 |
-| NFR-09 | Partial | 可测试性 | 词库、设置、Provider、ASR session/IPC/Renderer 过滤和 Electron Fake ASR smoke 已有测试；模型清单、16/44.1/48 kHz graph 适配 fixture、AudioWorklet collector、其他 IPC schema 和真实模型/录音冒烟仍待补齐。 |
+| NFR-09 | Partial | 可测试性 | 词库、设置、Provider、ASR session/IPC/Renderer 过滤、AudioCapture/collector 和 Electron 16/44.1/48 kHz graph fixture 已有测试；模型清单、其他 IPC schema 和真实模型/麦克风冒烟仍待补齐。 |
 | NFR-10 | Planned | 可移植性 | 支持矩阵按实际 CI 和人工验证定义 Tier 1/2/Experimental；在验证前不宣称 Windows/macOS/Linux 全部同等级支持。 |
 | NFR-11 | Partial | 可升级性 | 设置已有 schemaVersion 和旧配置迁移；模型版本、原子升级和回退仍待实现。自动更新服务不属于首个基线。 |
 | NFR-12 | Planned | 可观测性 | 当前没有满足该契约的诊断日志；目标日志包含应用/OS/架构、ASR Provider、模型 ID/版本、输入采样率、初始化耗时和脱敏错误，且不得包含密钥。 |
@@ -105,7 +105,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 |---|---|---|
 | AC-01 | 干净环境构建 | 按开发文档安装唯一必要的开发运行时，`npm ci` 成功，测试和打包命令可重复执行。 |
 | AC-02 | 首次运行 | 普通用户安装制品后可启动；若模型缺失，应用能引导下载、校验并启用模型。 |
-| AC-03 | 常见麦克风采样率 | 16/44.1/48 kHz 确定性 fixture 证明固定 Electron 的 Chromium graph 向 16 kHz context 正确适配；请求/实际/track rate 可诊断，真实可配置麦克风验证作为非阻塞 follow-up。 |
+| AC-03 | 常见麦克风采样率 | 16/44.1/48 kHz 确定性缓冲 fixture 证明固定 Electron OfflineAudioContext/AudioBufferSource graph 向 16 kHz context 正确适配；请求/实际/track rate 可诊断，生产 MediaStream 与真实可配置麦克风验证作为非阻塞 follow-up。 |
 | AC-04 | 本地训练闭环 | 无网络时仍能开始/结束训练、完成本地识别和基础分析。 |
 | AC-05 | LLM 降级 | 无 Key、超时、限流或服务错误时显示可操作错误，本地训练结果仍保留。 |
 | AC-06 | ASR 隔离 | 模型初始化或识别高负载时 Main/UI 保持响应；ASR 执行单元退出时可报告并重新初始化。 |

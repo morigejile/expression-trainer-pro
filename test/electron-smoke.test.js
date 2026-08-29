@@ -35,7 +35,7 @@ function diagnostics(stdout, stderr, code, signal) {
   ].join('\n');
 }
 
-test('real Electron covers core flows and 16/44.1/48 kHz graph-rate adaptation', {
+test('real Electron covers core flows and offline 16/44.1/48 kHz buffer graph adaptation', {
   timeout: PROCESS_TIMEOUT_MS + 15_000
 }, async () => {
   const projectRoot = path.resolve(__dirname, '..');

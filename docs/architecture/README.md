@@ -3,7 +3,7 @@
 > 方法：arc42-lite + C4（Context/Container）+ ADR  
 > 状态：Current Documentation Index
 > 基线日期：2026-08-28
-> 源码基线：`main`，已包含 Phase 4 / R-01～R-02
+> 源码基线：当前开发分支，已包含 Phase 4 / R-01～R-04
 
 ## 1. 如何阅读
 
@@ -75,7 +75,7 @@ Renderer/Web Audio → Preload/IPC → Main → sherpa-onnx-node/Paraformer
                                              UI
 ```
 
-停止尾部文本、LLM 请求控制、安全渲染、测试基线和 ASR session/Provider 已完成。剩余技术债主要是 `ScriptProcessorNode`、缺少采样率记录与 Chromium graph 适配证据、高频数组复制/IPC、ASR 仍位于 Main、模型手工管理以及打包交付未闭环。详情见 [current.md](current.md)。
+停止尾部文本、LLM 请求控制、安全渲染、ASR session/Provider、AudioCapture 与 AudioWorklet 已完成；固定 Electron 的 OfflineAudioContext/AudioBufferSource fixture 已验证 16/44.1/48 kHz 确定性缓冲进入 16 kHz graph，生产 MediaStream/真实麦克风仍待复核。剩余技术债主要是高频数组复制/逐块 invoke 与无界并发、ASR 仍位于 Main、模型手工管理以及打包交付未闭环。详情见 [current.md](current.md)。
 
 ## 7. 目标状态摘要
 

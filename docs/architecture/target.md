@@ -3,11 +3,11 @@
 > 状态：Proposed  
 > 基线日期：2026-08-29
 > 目标：在保持功能闭环的前提下降低总体维护、依赖、跨平台安装和升级复杂度
-> 当前源码基线：`main`，已完成 benchmark 选型和 Phase 4 / R-01～R-02 Provider/session 协议适配
+> 当前源码基线：当前开发分支，已完成 benchmark 选型和 Phase 4 / R-01～R-04 Provider/session/Audio 协议适配
 
 ## 1. 范围与设计约束
 
-本目标架构描述 R-03 及后续迁移方向，不表示整体已经实现；R-02 的 session/event、IPC envelope 与 Renderer 过滤已移入当前架构。它保留：
+本目标架构描述 R-05 及后续迁移方向，不表示整体已经实现；R-02 的 session/event 与 R-03/R-04 的 AudioCapture、AudioWorklet、采样率诊断和图适配证据已移入当前架构。它保留：
 
 - Electron；
 - 原生 JavaScript/HTML/CSS；
@@ -94,7 +94,8 @@ src/
 ├── renderer/
 │   ├── app.js                  # UI/训练流程
 │   ├── audio-capture.js        # AudioContext、权限、采样率记录与生命周期
-│   └── audio-worklet.js        # 下混、320 帧汇集与 final tail
+│   ├── audio-chunk-collector.mjs # 纯下混、320 帧汇集与 final tail
+│   └── audio-worklet.mjs       # AudioWorklet port/epoch 适配
 ├── asr/
 │   ├── contract.js             # 小型消息/Provider 契约
 │   ├── sherpa-provider.js      # Sherpa 具体实现
@@ -123,7 +124,7 @@ idle → requesting-permission → preparing-model → listening
                           ↘ recoverable-error
 ```
 
-R-02 已实现每次训练使用 `sessionId`、按 `sequence` 忽略旧会话和迟到/倒序结果，并让 UI 只消费规范化事件：`ready`、`partial`、`final`、`error`、`stopped`。权限、AudioCapture、分析和完成态尚未收敛为上述完整训练状态机。
+R-02 已实现每次训练使用 `sessionId`、按 `sequence` 忽略旧会话和迟到/倒序结果；R-03/R-04 已分离 AudioCapture 并用 capture epoch、tail flush 和 stop 单飞约束采集结束。权限、分析和完成态尚未收敛为上述完整训练状态机。
 
 ASR、粘贴文本和 LLM 返回均视为不可信文本。高亮通过 text node/token 渲染；报告只允许受控 Markdown 子集，不把原始内容直接赋给 `innerHTML`。
 
@@ -335,13 +336,13 @@ ADR-0005 已接受保留 Paraformer 为默认模型。当前仅为内部开发/�
 迁移必须保持每个阶段可运行：
 
 1. 构建/测试基线、三候选 benchmark、默认模型 ADR、最小 Paraformer Provider 和 session/event 契约已完成。
-2. 下一步按 R-03/R-04 分离 AudioCapture，以 Chromium graph 采样率适配和 AudioWorklet collector 直接替换 ScriptProcessor，再处理 ASR 执行边界和模型管理。
+2. R-03/R-04 已完成 AudioCapture、Chromium graph 采样率适配和 AudioWorklet collector；下一步先完成 D-03，再处理 R-05 有界传输与 R-06 ASR 执行边界。
 3. 每次迁移保留独立回归证据，最后建立 Forge 制品、支持矩阵和发布机制。
 
 当下列条件全部满足时，本目标可合并为 Current：
 
 - [ ] `npm ci`、测试和至少 Tier 1 平台打包可重复执行；
-- [ ] 16/44.1/48 kHz graph 适配 fixture 与 AudioWorklet collector 自动化通过，真实设备 follow-up 已记录；
+- [x] 16/44.1/48 kHz OfflineAudioContext/AudioBufferSource graph fixture 与 AudioWorklet collector 自动化通过，生产 MediaStream/真实设备 follow-up 已记录；
 - [x] 业务只依赖轻量 ASR 契约，session/event 与迟到事件过滤已完成；
 - [ ] ASR 不在 Main 内执行，退出可恢复；
 - [ ] 模型可校验安装且失败不破坏上一版本；
