@@ -1,9 +1,9 @@
 # Expression Trainer 需求基线
 
 > 状态：Existing / Partial / Planned
-> 基线日期：2026-08-29
+> 基线日期：2026-08-30
 > 适用范围：内部开发/测试中的当前实现（Existing/Partial）与下一阶段工程化目标（Planned）
-> 源码基线：当前开发分支，已包含 Phase 4 / R-01～R-09 Paraformer Provider/session/Audio/utility-process/Model Manager/config 适配
+> 源码基线：`main`，已包含 R-01～R-09 与 PKG-01～PKG-04
 
 ## 1. 文档目的
 
@@ -35,7 +35,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | 维护者 | 可复现构建、测试、替换模型、打包和诊断问题 |
 | 本地 ASR 引擎 | 使用本地模型把标准化音频转换为文本 |
 | LLM 服务 | 在用户配置并发起请求时，根据文本生成高级反馈 |
-| 模型分发源（Planned） | 提供带版本和校验信息的 ASR 模型文件 |
+| 模型分发源 | 提供 registry 固定版本、大小和 hash 的 ASR 模型 archive |
 
 ## 4. 功能需求（FR）
 
@@ -75,7 +75,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | ID | 状态 | 类别 | 需求与验证方式 |
 |---|---|---|---|
 | NFR-01 | Existing | 可维护性与范围收敛 | 默认保持 Electron + 原生 JS/HTML/CSS + Sherpa-ONNX；持续遵循不过度扩散、不过度设计、不把内部工作升级为不必要的审计审核，并减少不能改变决策或发现实质回归的验证。只有能明确降低总代码、风险或长期成本时才增加依赖、流程或门禁；依赖变更需 ADR 或变更说明。 |
-| NFR-02 | Partial | 可复现性 | 锁文件与 `package.json` 一致；固定开发工具 Node 22.23.x/npm 12.0.x；当前 lock/安装树为精确 Electron 43.4.1、Sherpa 1.13.3。Electron 43 首次 CLI 下载与 clean `npm ci` 后的校验缓存恢复均已实测；Forge 构建仍按 Roadmap Phase 5 建立。 |
+| NFR-02 | Existing | 可复现性 | `.nvmrc`、manifest 和 lockfile 已统一到 Node 24.20.0 Active LTS 与其官方捆绑 npm 11.19.0；Electron 43.4.1、Sherpa 1.13.3 保持精确版本。该精确基线已完成 clean `npm ci`、完整 Node/Electron 测试、Forge package/make 和 packaged native smoke。 |
 | NFR-03 | Partial | 响应性 | ASR 初始化与同步 decode 已移入 utility process；D-03 空载传输、Fake smoke 与 packaged 真实 Paraformer 最小会话均通过，但尚无真实麦克风/UI 的 p95 定量预算。 |
 | NFR-04 | Partial | 音频正确性 | 固定 Electron 的 OfflineAudioContext/AudioBufferSource graph 已用确定性双声道时变 fixture 验证 16/44.1/48 kHz 缓冲适配到 16 kHz；AudioWorklet 输出带明确格式的 320 帧 chunk 并 flush tail。生产 MediaStreamAudioSourceNode 与真实麦克风/驱动仍待非阻塞验证。 |
 | NFR-05 | Partial | 性能 | Windows x64 首个硬件资格线暂定 4-core CPU、8 GB RAM、3 GB 可用磁盘；当前高配开发机 Paraformer benchmark 平均 RTF 0.0540，PKG-03 首次模型闭环约 563.664 s、离线二次启动约 3.672 s；接近资格线的真实 Audio/utility/UI 测量仍是非阻塞环境待办。 |
@@ -125,7 +125,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 
 ## 9. 待确认事项
 
-1. 当前 `package.json` 为应用 `1.0.1`、Electron `43.4.1` 与 sherpa-onnx-node `1.13.3`（均为精确版本），开发基线为 Node 22.23.0/npm 12.0.2。Electron runtime 实测为 Node 24.18.1、Chromium 150.0.7871.224、modules ABI 148；显式清空所有 npm/Electron 缓存后的复跑仍为非阻塞 Runtime-TBD。
+1. 当前 `package.json` 为应用 `1.0.1`、Electron `43.4.1` 与 sherpa-onnx-node `1.13.3`（均为精确版本），开发基线为 Node 24.20.0/npm 11.19.0。Electron runtime 实测为 Node 24.18.1、Chromium 150.0.7871.224、modules ABI 148；开发工具链的 clean install、完整测试和 Forge 闭环已通过。
 2. PKG-01 已选择 Windows 11 25H2+ x64 作为首个 Tier 1 目标；PKG-03/PKG-04 已形成未签名内部制品的安装、真实模型、离线二次启动、升级和卸载数据保留证据，正式支持仍需签名、真实设备及对应环境证据，其他平台保持 Experimental。
 3. Paraformer 的版本、运行文件 hash 与大小已记录；模型再分发许可证仍待发布前确认。
 4. 词库计数/密度是否属于产品认可的评分定义；训练历史目前不持久化，是否需要持久化待产品决定。
@@ -136,6 +136,5 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 ## 10. 追踪关系
 
 - 当前实现：[Current Architecture](../architecture/current.md)
-- 目标方案：[Target Architecture](../architecture/target.md)
 - 决策记录：[ADR Index](../architecture/adr/README.md)
 - 交付顺序：[Roadmap](../roadmap.md)

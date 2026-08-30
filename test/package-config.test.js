@@ -19,12 +19,33 @@ test('package payload excludes development-only trees but keeps runtime assets',
   assert.equal(ignore('/benchmark/run.js'), true);
   assert.equal(ignore('/out/previous-package/resources/app.asar'), true);
   assert.equal(ignore('/test/asr-ipc.test.js'), true);
+  assert.equal(ignore('/scripts/verify-packaged-app.js'), true);
+  assert.equal(ignore('/data/tiered-lexicon.json'), true);
+  assert.equal(ignore('/models/.gitkeep'), true);
+  assert.equal(ignore('/.nvmrc'), true);
+  assert.equal(ignore('/.npmrc'), true);
+  assert.equal(ignore('/forge.config.js'), true);
+  assert.equal(ignore('/package-lock.json'), true);
+  assert.equal(ignore('/README.md'), true);
+  assert.equal(ignore('/CHANGELOG.md'), true);
   assert.equal(ignore('/node_modules/electron/dist/electron.exe'), true);
   assert.equal(ignore('/node_modules/sherpa-onnx-win-x64/sherpa-onnx.node'), false);
   assert.equal(ignore('/lib/asr-utility-process.js'), false);
   assert.equal(ignore('/models/registry.json'), false);
   assert.equal(ignore('/smoke/electron-smoke-runner.js'), false);
   assert.equal(ignore('/src/index.html'), false);
+});
+
+test('development toolchain follows the current Node Active LTS bundle', () => {
+  const manifest = require('../package.json');
+  const nvmVersion = fs.readFileSync(path.join(__dirname, '..', '.nvmrc'), 'utf8').trim();
+
+  assert.equal(nvmVersion, '24.20.0');
+  assert.equal(manifest.packageManager, 'npm@11.19.0');
+  assert.deepEqual(manifest.engines, {
+    node: '>=24.20.0 <25',
+    npm: '>=11.19.0 <12'
+  });
 });
 
 test('first packaging closure targets only Windows x64 Squirrel', () => {

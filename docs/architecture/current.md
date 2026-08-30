@@ -1,13 +1,13 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 Smoke；内部开发/测试，BM-02/D-03 Completed，Phase 4 / R-01～R-09 Completed（保留 Paraformer 默认）
-> 基线日期：2026-08-29
+> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09 与 PKG-01～PKG-04 Completed（保留 Paraformer 默认）
+> 基线日期：2026-08-30
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
 > 描述对象：截至 Phase 4 / R-09；保留 Electron 43 与 T-04～T-08 行为基线
 
 ## 1. 证据边界
 
-本文件检查了当前源码、README、依赖清单和 Git 状态，并完成 Node 测试、自动化 Electron smoke 与 D-03 native-load spike。smoke 实际加载 Main、Preload、主页面和设置页，通过真实 utility-process IPC 验证 Fake ASR session/event、活动执行单元退出后的安全失败和下一 session 重建，并覆盖协调式 Fake LLM 与粘贴分析；隐藏 fixture 窗口还在真实 Electron 43 AudioWorklet/OfflineAudioContext 中验证 16/44.1/48 kHz 双声道时变输入适配到 16 kHz、320 帧分块和时序过渡。尚未连接真实麦克风、初始化/运行真实 Paraformer 模型或请求真实 LLM，因此隔离/固定图证据与真实设备/完整识别运行严格区分。
+本文件检查了当前源码、README、依赖清单和 Git 状态，并以 Node 测试、自动化 Electron smoke、packaged native-load、真实 Paraformer 首次安装及升级 smoke 建立证据。smoke 实际加载 Main、Preload、主页面和设置页，通过真实 utility-process IPC 验证 Fake ASR session/event、活动执行单元退出后的安全失败和下一 session 重建，并覆盖协调式 Fake LLM 与粘贴分析；隐藏 fixture 窗口还在真实 Electron 43 AudioWorklet/OfflineAudioContext 中验证 16/44.1/48 kHz 双声道时变输入适配到 16 kHz、320 帧分块和时序过渡。真实可配置麦克风、真实外部 LLM、接近资格线硬件及非 Windows x64 制品仍未形成证据。
 
 | 标记 | 含义 |
 |---|---|
@@ -48,7 +48,7 @@ lib/custom-prompt-config.js     自定义规则 schema、迁移与有界口癖�
 lib/atomic-json-store.js        userData JSON 的同盘原子写
 lib/safe-log.js                 有界错误文本与凭据模式脱敏
 lib/diagnostics.js              固定白名单的 app/OS/model/audio/ASR 诊断快照
-data/*.json                     词库数据
+data/emotion-lexicon.json       运行时情绪词数据
 package.json / package-lock.json
 test/electron-smoke.test.js      Node 测试父进程、超时、日志和清理
 smoke/electron-smoke-runner.js  Electron 内 smoke 驱动与 Fake ASR/LLM
@@ -82,13 +82,13 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 | 权限桥接 | Preload `contextBridge` + `ipcRenderer.invoke` | `contextIsolation:true`、`nodeIntegration:false` |
 | ASR 引擎 | `sherpa-onnx-node` `1.13.3`（精确版本） | 仅由 utility process 内的 Paraformer Provider 延迟加载，Main 不 require；packaged native-load smoke 已通过 |
 | ASR 模型 | `paraformer-bilingual-zh-en/2024-03-10` | registry 固定 archive/runtime；INT8 encoder/decoder + tokens 安装到 `userData/models`，权重不纳入 Git |
-| 本地分析 | `lib/lexicon.js` + `data/emotion-lexicon.json` | 最大正向词表匹配；`tiered-lexicon.json` 保留为未启用候选数据，不参与运行时分析 |
+| 本地分析 | `lib/lexicon.js` + `data/emotion-lexicon.json` + `shared/expression-rules.js` | 146 个情绪词；16 个填充词、14 个犹豫词、20 组笼统词映射由 Renderer/Main 共用；未启用数据不放入活跃 `data/` 目录 |
 | LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接/实时/报告分别为 10/15/60 秒超时，并支持 AbortSignal、按 Renderer 取消和异常响应验证 |
 | 设置 | `userData/settings.json`、`userData/custom-prompt.json` | 两者 schema version 1；旧结构迁移、未来 schema 防降级覆盖；小文件同步但以同盘临时文件/fsync/rename 原子发布；API Key 明文 |
 | 输出 | Clipboard + Electron Save Dialog + Markdown | 原文与报告 |
 | 构建/测试 | Node test + Electron smoke + Electron Forge 7.5/Squirrel | `package`/`make` 固定 Windows x64；packaged smoke 覆盖 Fake 产品流、utility-only Sherpa native load、完整 DLL unpack 和外部模型目录；尚无 CI |
 
-开发工具基线固定为 Node 22.23.x/npm 12.0.x，与 Electron 内置 Node 24.18.1 明确区分。当前只验证 Windows 11 Home 25H2 build 26200 x64；PKG-01 已把 Windows 11 25H2+ x64 选为首个 Tier 1 目标。Windows ARM64、macOS 与 Linux 为 Experimental，仍没有 CI、打包配置或制品测试证明。
+开发工具基线固定为 Node 24.20.0/npm 11.19.0；npm 版本跟随 Node Active LTS 官方捆绑版本，与 Electron 内置 Node 24.18.1 明确区分。当前只验证 Windows 11 Home 25H2 build 26200 x64；PKG-01 已把 Windows 11 25H2+ x64 选为首个 Tier 1 目标。Windows ARM64、macOS 与 Linux 为 Experimental，仍没有 CI、打包配置或制品测试证明。
 
 ### 3.1 BM-02 harness（Completed）
 
@@ -221,7 +221,7 @@ T-04/R-02 后，`src/app.js` 会把当前 session 的 `final` 事件经 `mergeFi
 - `density`；
 - 替代和提醒 suggestions。
 
-UI 的 `src/safe-rendering.js` 与 Main 的 `lib/lexicon.js` 共用 `shared/expression-rules.js`，以最长优先词匹配保持高亮与统计分类一致；自定义 `customWords` 经去重、长度和 64 项上限后作为本地 filler 参与统计，同时继续进入 LLM prompt。`data/tiered-lexicon.json` 当前未发现 import；它使用分层替代词 schema，与运行时 `emotion-lexicon.json` 不兼容，按维护者决定保留为未启用候选数据。启用前必须单独设计合并规则并建立行为测试。
+UI 的 `src/safe-rendering.js` 与 Main 的 `lib/lexicon.js` 共用唯一运行时规则源 `shared/expression-rules.js`，以最长优先词匹配保持高亮与统计分类一致；自定义 `customWords` 经去重、长度和 64 项上限后作为本地 filler 参与统计，同时继续进入 LLM prompt。`data/emotion-lexicon.json` 只保留 `lib/lexicon.js` 实际读取的情绪词与元数据；未启用且 schema 不兼容的分层候选词库已从活跃数据树和发布载荷移除。
 
 ### 5.6 LLM / `lib/ai-feedback.js`、`lib/prompts.js`
 
@@ -329,7 +329,7 @@ Settings/Prompt Renderer
 - 已有 canonical 支持矩阵、Windows x64 首发选择、未签名内部安装制品，以及真实首次安装/模型和 1.0.0→1.0.1 升级/卸载数据保留闭环；仍无签名、公证或自动更新。
 - 主窗口可按需导出固定 JSON 诊断；Main 组合系统/active 模型/controller 状态，Renderer 只提供经过严格字段校验的采样率，不后台记录或上传用户内容。
 - 原有 `package-lock.json` 清理已由负责人确认纳入 Phase 0；陈旧 `node-microphone` 条目已删除，lockfile 与 `package.json` 一致。
-- 开发基线为 Node 22.23.0/npm 12.0.2。T-08 的 Electron 43.4.1 JS 依赖经 clean `npm ci` 安装；Electron 42+ 改为首次 CLI 调用时下载 binary，本轮首次 43.4.1 下载成功，后续 clean install 从官方校验缓存恢复相同 executable（SHA-256 `E885FFC2A09DAB4C14DE706E3662A5929D1E65EA4EA347C56FD0964640EB923B`）。显式清空所有 npm/Electron 缓存后的复跑仍为 Runtime-TBD。
+- 开发基线已迁移为 Node 24.20.0/npm 11.19.0，并由 `.nvmrc`、`package.json#packageManager/engines` 和 lockfile 根包共同约束。2026-08-30 已在该精确基线完成 clean `npm ci`、254 项 Node/Electron 测试、Forge package/make 与 packaged smoke；Squirrel/NuGet make 需要正常文件系统权限，在受限沙箱压缩 Electron DLL 会产生误导性的 closed-stream 错误。
 
 这些发布级缺口及未确认的模型再分发权利在当前内部开发/测试中是非阻塞后续工作；若它们使本地技术实验无法运行或使结论失效，才需要提前处理。
 
@@ -349,9 +349,9 @@ Settings/Prompt Renderer
 | TD-10 | **R-02 已部分缓解**：ASR command 已校验精确字段、session、sequence、16 kHz 与有限样本；其他 IPC payload 仍缺少同等级校验 | settings、文本、filename 等大 payload 或类型错误仍可能影响 Main | ASR IPC 测试与其余 handler 源码确认 | 后续按当前具体风险逐 channel 限定类型/长度，不建设通用 schema 框架 |
 | TD-11 | **T-05 已缓解**：ASR/粘贴文本使用受控 DOM token，LLM 报告使用严格允许列表，错误使用纯文本 | 主应用不再从不可信文本创建标签或事件属性 | `src/safe-rendering.js`、安全渲染测试、Electron smoke、`src/app.js` 无 `innerHTML` | 后续若词库改为外部数据，继续按不可信输入处理 |
 | TD-12 | LLM fetch 控制风险已由 T-06 缓解；仍无自动重试 | 请求已有超时、取消、Main/Renderer 双层迟到抑制、结构验证和脱敏错误；瞬时失败仍需用户重试 | 25 项 fake-fetch 与 3 项 Renderer 竞态测试、源码确认 | 保留错误契约回归测试；是否重试需单独产品策略，不在请求层盲目加入 |
-| TD-13 | **R-09 已关闭**：UI 高亮与 lexicon 使用唯一共享规则源 | 内置 filler/hedge/vague 分类一致；customWords 进入有界本地 filler 统计 | shared rule 与 lexicon 聚焦测试 | 新规则只修改 canonical shared 文件；候选 tiered lexicon 仍独立设计 |
+| TD-13 | **R-09/本轮数据收口已关闭**：UI 高亮与 lexicon 使用唯一共享规则源 | 内置 filler/hedge/vague 分类一致；emotion JSON 只承载运行时情绪词；customWords 进入有界本地 filler 统计 | shared rule、数据契约与 lexicon 聚焦测试 | 新表达规则只修改 canonical shared 文件 |
 | TD-14 | README 与实现漂移风险 | 用户预期错误 | Phase 0 已修正触发字数、联网边界和平台口径 | 后续行为变更同步 README 与架构文档 |
-| TD-15 | 未启用候选词库容易被误认为运行时数据 | 维护者可能误删或直接接入不兼容 schema | `tiered-lexicon.json` 无 import，Phase 0 决定保留 | 明确标记未启用；在 T-01/T-02 后以独立任务设计 schema、合并规则和测试 |
+| TD-15 | **本轮已关闭**：未启用候选词库曾容易被误认为运行时数据 | 分层候选词库已从活跃数据树与发布载荷移除 | package 配置测试与仓库引用检查 | 只有出现明确产品需求和行为测试时才以新设计重新引入 |
 | TD-16 | **OPS-02 已关闭版本口径分裂** | 应用/制品由 `package.json#version` 唯一驱动，模型独立版本化；历史产品代际名称不再冒充 SemVer | package/lock 1.0.1、CHANGELOG、开发文档 release checklist | 仅在实际安装里程碑更新版本；公开发布再增加 tag/签名/checksums |
 | TD-17 | 生产依赖审计为 0；Forge 7.5/Squirrel 的仅开发传递依赖有 19 high/1 critical 告警 | 不进入应用运行依赖，但打包工具仍处理源码和制品；为避开 Forge 新版 `@electron/rebuild` 的 Git 依赖，本轮保留已验证的 registry-only 组合 | 2026-08-29 `npm audit --omit=dev --json` 为 0；完整 audit 为 20；未使用 `audit fix --force` 或通配 Git/script 放行 | OPS-03 以 registry-only 新组合受控升级；每次重跑干净 make 与 packaged native smoke |
 

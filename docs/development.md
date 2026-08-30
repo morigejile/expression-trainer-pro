@@ -1,7 +1,7 @@
 # 开发与验证
 
-> 当前验证基线：Windows 11 25H2 build 26200 x64、Node.js 22.23.x、npm 12.0.x、Electron 43.4.1、sherpa-onnx-node 1.13.3
-> 更新日期：2026-08-29
+> 当前开发基线：Windows 11 25H2 build 26200 x64、Node.js 24.20.0、npm 11.19.0、Electron 43.4.1、sherpa-onnx-node 1.13.3
+> 更新日期：2026-08-30
 > 当前用途：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞跟进，除非它们使当前技术实验无法运行或结论失效。
 
 ## 环境与安装
@@ -13,6 +13,8 @@ node --version
 npm --version
 npm ci
 ```
+
+项目跟随 Node.js 的最新 **Active LTS**，并固定该 Node 发行版官方捆绑的 npm；npm 没有独立 LTS 轨道，因此不单独追逐 npm 最新 major。每次 Node LTS 基线升级都先更新三处 canonical 版本，再执行干净 `npm ci`、完整 Node/Electron 测试、Forge package/make、packaged native-load smoke；未通过前不提升基线。Node Current 只有进入 Active LTS 后才纳入升级。
 
 项目使用 `.npmrc` 的 `strict-allow-scripts=true`，并在 `package.json#allowScripts` 只精确允许 Electron 43.4.1 下载和 Squirrel 5.4.4 的 7-Zip 架构选择脚本。后者随 Squirrel maker 移除时一并删除；依赖或 install-script 策略变化时重新验证干净安装，不增加通配白名单。
 
@@ -58,16 +60,6 @@ git commit -m "<English subject>" -m "中文：<简短说明>"
 2. 按本文件的验证触发规则运行 focused tests；里程碑收尾才运行完整测试与对应制品 smoke；
 3. 确认安装制品版本与 `package.json` 一致，且 userData/模型策略没有未记录变化；
 4. 使用英文提交主题和简短中文正文。公开发布时再增加 tag、签名、checksums 和 release notes；内部测试不伪装完成这些外部步骤。
-
-若本机未把项目基线 Node 加入 `PATH`，当前开发机可直接使用：
-
-```powershell
-$expressionTrainerRuntime = 'C:\Users\mr\AppData\Local\hermes\node'
-& "$expressionTrainerRuntime\node.exe" --version
-& "$expressionTrainerRuntime\npm.cmd" test
-```
-
-该绝对路径只是当前开发机工具位置，不是可移植的项目配置。
 
 ## ASR 模型
 
