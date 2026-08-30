@@ -8,6 +8,7 @@ const REQUIRED_FILE_ROLES = {
   paraformer: ['tokens', 'encoder', 'decoder'],
   'zipformer-ctc': ['tokens', 'model'],
   'fire-red-asr-ctc': ['tokens', 'model'],
+  'qwen3-asr': ['conv-frontend', 'encoder', 'decoder', 'tokenizer-config', 'tokenizer-merges', 'tokenizer-vocab'],
   sensevoice: ['tokens', 'model']
 };
 
@@ -61,6 +62,31 @@ function fileFor(candidate, role) {
 }
 
 function buildConfig(candidate) {
+  if (candidate.family === 'qwen3-asr' && candidate.mode === 'utterance') {
+    return {
+      kind: 'offline',
+      native: {
+        featConfig: { sampleRate: candidate.sampleRateHz, featureDim: 80 },
+        modelConfig: {
+          tokens: '',
+          numThreads: candidate.numThreads,
+          provider: candidate.provider,
+          debug: false,
+          qwen3Asr: {
+            convFrontend: fileFor(candidate, 'conv-frontend'),
+            encoder: fileFor(candidate, 'encoder'),
+            decoder: fileFor(candidate, 'decoder'),
+            tokenizer: path.dirname(fileFor(candidate, 'tokenizer-config')),
+            maxTotalLen: 512,
+            maxNewTokens: 128,
+            temperature: 0.000001,
+            topP: 0.8,
+            seed: 42
+          }
+        }
+      }
+    };
+  }
   const base = {
     tokens: fileFor(candidate, 'tokens'),
     numThreads: candidate.numThreads,

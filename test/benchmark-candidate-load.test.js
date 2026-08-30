@@ -57,6 +57,43 @@ test('FireRedASR2 CTC uses the offline single-model config', (t) => {
   assert.equal(config.modelConfig.tokens, path.join(modelRoot, 'fire-red', 'tokens.txt'));
 });
 
+test('Qwen3-ASR uses the fixed offline generation config and verified tokenizer directory', (t) => {
+  const { buildSherpaConfig } = require('../benchmark/models/load-candidate');
+  const candidate = {
+    id: 'qwen3-asr-0-6b-int8-2026-03-25',
+    family: 'qwen3-asr',
+    mode: 'utterance',
+    sampleRateHz: 16000,
+    numThreads: 2,
+    provider: 'cpu',
+    files: [
+      { relativePath: 'qwen3/conv_frontend.onnx', role: 'conv-frontend' },
+      { relativePath: 'qwen3/encoder.int8.onnx', role: 'encoder' },
+      { relativePath: 'qwen3/decoder.int8.onnx', role: 'decoder' },
+      { relativePath: 'qwen3/tokenizer/tokenizer_config.json', role: 'tokenizer-config' },
+      { relativePath: 'qwen3/tokenizer/merges.txt', role: 'tokenizer-merges' },
+      { relativePath: 'qwen3/tokenizer/vocab.json', role: 'tokenizer-vocab' }
+    ]
+  };
+
+  const modelRoot = fixtureModelRoot(t);
+  const config = buildSherpaConfig(candidate, modelRoot);
+
+  assert.equal(config.recognizerKind, 'offline');
+  assert.deepEqual(config.modelConfig.qwen3Asr, {
+    convFrontend: path.join(modelRoot, 'qwen3', 'conv_frontend.onnx'),
+    encoder: path.join(modelRoot, 'qwen3', 'encoder.int8.onnx'),
+    decoder: path.join(modelRoot, 'qwen3', 'decoder.int8.onnx'),
+    tokenizer: path.join(modelRoot, 'qwen3', 'tokenizer'),
+    maxTotalLen: 512,
+    maxNewTokens: 128,
+    temperature: 0.000001,
+    topP: 0.8,
+    seed: 42
+  });
+  assert.equal(config.modelConfig.tokens, '');
+});
+
 test('initialization selects the online or offline factory from the candidate mode', (t) => {
   const { initializeCandidate } = require('../benchmark/models/load-candidate');
   const calls = [];
