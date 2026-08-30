@@ -372,6 +372,11 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     });
   });
   await waitForPage(promptEditorWindow, 'prompt-editor.html');
+  assert.equal(
+    promptEditorWindow.webContents.listenerCount('will-prevent-unload') > 0,
+    true,
+    'dirty system-close attempts must have a native confirmation handler'
+  );
   const promptEditorState = await promptEditorWindow.webContents.executeJavaScript(`(() => {
     const back = document.getElementById('btn-back').getBoundingClientRect();
     const heading = document.querySelector('h1').getBoundingClientRect();

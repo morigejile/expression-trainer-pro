@@ -39,6 +39,45 @@ function createPage() {
   return page;
 }
 
+function createDeferred() {
+  let resolve;
+  let reject;
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
+  return { promise, resolve, reject };
+}
+
+test('settings actions stay disabled until loading completes', async (t) => {
+  const settings = createDeferred();
+  global.window = { api: { getSettings: async () => settings.promise } };
+  t.after(() => { delete global.window; });
+  const page = createPage();
+  page.settings = undefined;
+  page.onProviderChange = () => {};
+
+  const loading = page.loadSettings();
+
+  assert.equal(page.btnSave.disabled, true);
+  assert.equal(page.btnTestConnection.disabled, true);
+  settings.resolve({ provider: 'deepseek', providers: {} });
+  await loading;
+  assert.equal(page.btnSave.disabled, false);
+  assert.equal(page.btnTestConnection.disabled, false);
+});
+
+test('settings load failure keeps actions disabled and explains the failure', async (t) => {
+  global.window = { api: { getSettings: async () => { throw new Error('ipc unavailable'); } } };
+  t.after(() => { delete global.window; });
+  const page = createPage();
+  page.settings = undefined;
+
+  await page.loadSettings();
+
+  assert.equal(page.btnSave.disabled, true);
+  assert.equal(page.btnTestConnection.disabled, true);
+  assert.equal(page.connectionError.textContent, '设置加载失败，请关闭后重试');
+  assert.equal(page.connectionError.classList.contains('show'), true);
+});
+
 test('saving persists the draft without performing a connection test', async (t) => {
   const calls = [];
   global.window = {

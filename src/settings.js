@@ -53,8 +53,9 @@ class SettingsPage {
     this.groupCustom = document.getElementById('group-custom');
     this.groupCustomModel = document.getElementById('group-custom-model');
 
+    this.setActionsEnabled(false);
     this.bindEvents();
-    this.loadSettings();
+    this.loadPromise = this.loadSettings();
   }
 
   bindEvents() {
@@ -64,12 +65,23 @@ class SettingsPage {
   }
 
   async loadSettings() {
-    this.settings = await window.api.getSettings();
+    this.setActionsEnabled(false);
+    try {
+      this.settings = await window.api.getSettings();
+      this.providerSelect.value = this.settings.provider || 'deepseek';
+      // 先填充模型列表再加载字段值
+      this.onProviderChange();
+      this.setActionsEnabled(true);
+    } catch {
+      this.settings = undefined;
+      this.connectionError.textContent = '设置加载失败，请关闭后重试';
+      this.connectionError.classList.add('show');
+    }
+  }
 
-    this.providerSelect.value = this.settings.provider || 'deepseek';
-
-    // 先填充模型列表再加载字段值
-    this.onProviderChange();
+  setActionsEnabled(enabled) {
+    this.btnSave.disabled = !enabled;
+    this.btnTestConnection.disabled = !enabled;
   }
 
   /** 加载指定 provider 的配置到表单字段 */
@@ -159,12 +171,18 @@ class SettingsPage {
   }
 
   async save() {
+    if (this.loadPromise) await this.loadPromise;
     this.clearMessages();
-    const settings = this.buildDraftSettings();
+    if (!this.settings) {
+      this.connectionError.textContent = '设置尚未加载，暂时无法保存';
+      this.connectionError.classList.add('show');
+      return;
+    }
     this.btnSave.textContent = '保存中...';
     this.btnSave.disabled = true;
     this.btnSave.classList.add('loading');
     try {
+      const settings = this.buildDraftSettings();
       await window.api.saveSettings(settings);
       this.settings = settings;
       this.saveSuccess.textContent = '✓ 已保存';
@@ -180,12 +198,18 @@ class SettingsPage {
   }
 
   async testConnection() {
+    if (this.loadPromise) await this.loadPromise;
     this.clearMessages();
-    const settings = this.buildDraftSettings();
+    if (!this.settings) {
+      this.connectionError.textContent = '设置尚未加载，暂时无法测试连接';
+      this.connectionError.classList.add('show');
+      return;
+    }
     this.btnTestConnection.textContent = '测试中...';
     this.btnTestConnection.disabled = true;
     this.btnTestConnection.classList.add('loading');
     try {
+      const settings = this.buildDraftSettings();
       const result = await window.api.testLLMConnection(settings);
       if (result.success) {
         this.connectionError.textContent = '✓ 连接成功';

@@ -73,6 +73,8 @@ class ExpressionTrainer {
     this.lastFeedbackText = '';
     this.lastReport = '';
     this.reportRequestPending = false;
+    this.pasteAnalysisPending = false;
+    this.pasteAnalysisGeneration = 0;
     this.llmGeneration = 0;
     this.asrEventState = createAsrEventState();
     this.asrStartAttempt = null;
@@ -165,6 +167,10 @@ class ExpressionTrainer {
       this.showUserMessage('录制正在启动，请稍候');
       return;
     }
+    if (this.pasteAnalysisPending) {
+      this.showUserMessage('逐字稿正在分析，请稍候');
+      return;
+    }
     if (!this.isRecording
         && this.fullText.trim()
         && !window.confirm('开始新录制将替换当前内容，是否继续？')) {
@@ -192,7 +198,14 @@ class ExpressionTrainer {
       this.cancelActiveAsrSession(replacedSessionId, () => false);
     }
     this.advanceLLMGeneration();
-    await window.api.cancelLLMRequests();
+    try {
+      await window.api.cancelLLMRequests();
+    } catch {
+      if (this.asrStartAttempt === startAttempt) {
+        this.showError('录制准备失败：无法取消上一轮 AI 请求，请重试');
+      }
+      return;
+    }
     if (this.asrStartAttempt !== startAttempt) return;
 
     const sessionId = globalThis.crypto.randomUUID();
@@ -852,6 +865,12 @@ class ExpressionTrainer {
     this.btnStopLabel.textContent = pending ? '正在结束并整理最后一句…' : '结束';
   }
 
+  setPasteAnalysisPending(pending) {
+    this.pasteAnalysisPending = pending;
+    this.btnAnalyzePaste.disabled = pending;
+    this.btnAnalyzePaste.textContent = pending ? '分析中...' : '开始分析';
+  }
+
   showUserMessage(message, { openSettings = false } = {}) {
     this.userMessageText.textContent = message;
     this.userMessageAction.classList.toggle('hidden', !openSettings);
@@ -944,6 +963,8 @@ class ExpressionTrainer {
       return;
     }
     const sessionId = this.asrEventState.activeSessionId;
+    this.pasteAnalysisGeneration = (this.pasteAnalysisGeneration ?? 0) + 1;
+    this.setPasteAnalysisPending(false);
     this.asrStartAttempt = null;
     this.asrGeneration = (this.asrGeneration ?? 0) + 1;
     this.audioFeedTracker?.queue.cancel();
@@ -981,6 +1002,10 @@ class ExpressionTrainer {
   // ===== 粘贴逐字稿分析 =====
 
   openPasteModal() {
+    if (this.pasteAnalysisPending) {
+      this.showUserMessage('逐字稿正在分析，请稍候');
+      return;
+    }
     if (this.isRecording) {
       this.showUserMessage('请先结束当前录制，再导入逐字稿');
       return;
@@ -989,6 +1014,10 @@ class ExpressionTrainer {
   }
 
   async analyzePastedText() {
+    if (this.pasteAnalysisPending) {
+      this.showUserMessage('逐字稿正在分析，请稍候');
+      return;
+    }
     const text = this.pasteTextarea.value.trim();
     if (!text) {
       this.showUserMessage('请先粘贴需要分析的逐字稿');
@@ -1004,50 +1033,66 @@ class ExpressionTrainer {
       return;
     }
 
-    this.advanceLLMGeneration();
-    await window.api.cancelLLMRequests();
+    const generation = (this.pasteAnalysisGeneration ?? 0) + 1;
+    this.pasteAnalysisGeneration = generation;
+    this.setPasteAnalysisPending(true);
+    const ownsAnalysis = () => this.pasteAnalysisGeneration === generation;
 
-    // 关闭粘贴弹窗
-    this.closeModal(this.pasteModal);
-    this.pasteTextarea.value = '';
-
-    // 把文本显示到字幕区（高亮标记）
-    this.subtitleContainer.replaceChildren();
-    this.fullText = text;
-    this.lastFeedbackText = '';
-    this.resetStats();
-
-    // 按句号/问号/感叹号/换行分句
-    const sentences = text.split(/(?<=[。！？\n])/g).filter(s => s.trim());
-    this.sentences = sentences;
-
-    for (const sentence of sentences) {
-      const line = document.createElement('div');
-      line.className = 'subtitle-line';
-      renderHighlightedText(line, sentence.trim());
-      this.subtitleContainer.appendChild(line);
-
-      // 词库分析
-      const analysis = await window.api.analyzeText(sentence);
-      if (analysis) {
-        this.stats.fillers += analysis.fillers.length;
-        this.stats.hedges += analysis.hedges.length;
-        this.stats.vagueWords += analysis.vagueWords.length;
-        this.stats.totalWords += analysis.totalWords;
+    try {
+      this.advanceLLMGeneration();
+      try {
+        await window.api.cancelLLMRequests();
+      } catch {
+        if (ownsAnalysis()) this.showUserMessage('无法开始逐字稿分析，请重试');
+        return;
       }
+      if (!ownsAnalysis()) return;
+
+      // 关闭粘贴弹窗
+      this.closeModal(this.pasteModal);
+      this.pasteTextarea.value = '';
+
+      // 把文本显示到字幕区（高亮标记）
+      this.subtitleContainer.replaceChildren();
+      this.fullText = text;
+      this.lastFeedbackText = '';
+      this.resetStats();
+
+      // 按句号/问号/感叹号/换行分句
+      const sentences = text.split(/(?<=[。！？\n])/g).filter(s => s.trim());
+      this.sentences = sentences;
+
+      for (const sentence of sentences) {
+        const line = document.createElement('div');
+        line.className = 'subtitle-line';
+        renderHighlightedText(line, sentence.trim());
+        this.subtitleContainer.appendChild(line);
+
+        // 词库分析
+        const analysis = await window.api.analyzeText(sentence);
+        if (!ownsAnalysis()) return;
+        if (analysis) {
+          this.stats.fillers += analysis.fillers.length;
+          this.stats.hedges += analysis.hedges.length;
+          this.stats.vagueWords += analysis.vagueWords.length;
+          this.stats.totalWords += analysis.totalWords;
+        }
+      }
+
+      this.stats.duration = 0; // 粘贴模式没有时长
+      this.updateStatsDisplay();
+
+      // 显示操作按钮
+      this.btnReport.classList.remove('hidden');
+      this.btnCopyText.classList.remove('hidden');
+      this.btnSaveText.classList.remove('hidden');
+      this.btnClear.classList.remove('hidden');
+
+      // 请求AI语境化反馈
+      this.requestRealtimeFeedback();
+    } finally {
+      if (ownsAnalysis()) this.setPasteAnalysisPending(false);
     }
-
-    this.stats.duration = 0; // 粘贴模式没有时长
-    this.updateStatsDisplay();
-
-    // 显示操作按钮
-    this.btnReport.classList.remove('hidden');
-    this.btnCopyText.classList.remove('hidden');
-    this.btnSaveText.classList.remove('hidden');
-    this.btnClear.classList.remove('hidden');
-
-    // 请求AI语境化反馈
-    this.requestRealtimeFeedback();
   }
 }
 

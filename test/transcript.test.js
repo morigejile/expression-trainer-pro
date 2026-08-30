@@ -415,6 +415,75 @@ test('blank pasted text shows validation without starting analysis', async (t) =
   assert.deepEqual(messages, ['请先粘贴需要分析的逐字稿']);
 });
 
+test('pasted analysis rejects reentry while the first draft is pending', async (t) => {
+  const analysis = createDeferred();
+  const messages = [];
+  let analysisCalls = 0;
+  const testDocument = {
+    createTextNode: text => ({ textContent: text }),
+    createElement() {
+      const element = createElement();
+      element.ownerDocument = testDocument;
+      return element;
+    }
+  };
+  global.document = testDocument;
+  global.window = {
+    api: {
+      cancelLLMRequests: async () => ({ success: true }),
+      analyzeText: async () => {
+        analysisCalls += 1;
+        return analysis.promise;
+      }
+    }
+  };
+  t.after(() => {
+    analysis.resolve({ fillers: [], hedges: [], vagueWords: [], totalWords: 2 });
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.fullText = '';
+  trainer.pasteTextarea.value = '第一份。';
+  trainer.closeModal = () => {};
+  trainer.showUserMessage = message => messages.push(message);
+  trainer.requestRealtimeFeedback = () => {};
+
+  const first = trainer.analyzePastedText();
+  await new Promise(resolve => setImmediate(resolve));
+  trainer.pasteTextarea.value = '第二份。';
+  await trainer.analyzePastedText();
+
+  assert.equal(analysisCalls, 1);
+  assert.equal(trainer.fullText, '第一份。');
+  assert.deepEqual(messages, ['逐字稿正在分析，请稍候']);
+  analysis.resolve({ fillers: [], hedges: [], vagueWords: [], totalWords: 4 });
+  await first;
+});
+
+test('recording start reports LLM cancellation failure and restores its control', async (t) => {
+  const errors = [];
+  global.window = {
+    api: {
+      cancelLLMRequests: async () => { throw new Error('ipc unavailable'); },
+      startASR: async () => assert.fail('ASR must not start after preparation fails')
+    }
+  };
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.fullText = '';
+  trainer.showUserMessage = () => {};
+  trainer.showError = message => errors.push(message);
+
+  await trainer.startRecording();
+
+  assert.deepEqual(errors, ['录制准备失败：无法取消上一轮 AI 请求，请重试']);
+  assert.equal(trainer.btnStart.disabled, false);
+  assert.equal(trainer.asrStartAttempt, null);
+});
+
 test('copy failure is visible to the user', async (t) => {
   const originalNavigator = global.navigator;
   Object.defineProperty(global, 'navigator', {
