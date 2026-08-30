@@ -1,8 +1,8 @@
 # Expression Trainer TODO / Roadmap
 
 > 状态：Active execution baseline
-> 更新日期：2026-08-29
-> 当前进度：Phase 0-2、D-01～D-04、R-01～R-09、PKG-01～PKG-04、OPS-02/OPS-05 与 C-01/C-02 最小集成已完成；两个具名候选 archive 已在 Git 外完成官方 size/hash 缓存，下一主线为其后续运行时证据与其余 Phase 6 维护节点
+> 更新日期：2026-08-30
+> 当前进度：Phase 0-2、D-01～D-04、R-01～R-09、PKG-01～PKG-04、OPS-02/OPS-05 与 C-01/C-02 最小集成已完成；文档、运行时数据和发布载荷已完成首轮收口，Node 24.20.0 Active LTS/npm 11.19.0 已完成 clean install、完整测试、Forge make 与 packaged smoke；下一主线为其余 Phase 6 维护节点和公开发布跟进
 > 当前模式：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞后续工作；只有它们使当前技术实验无法运行或结论失效时，才阻塞当前路径。
 
 ## 1. 目标与排序原则
@@ -56,7 +56,7 @@ flowchart LR
 
 | 阶段 | 已完成范围 | Canonical 证据 |
 |---|---|---|
-| Phase 0 — B-01～B-06 | 文档/源码事实、Node 22.23.x/npm 12.0.x、lockfile 安装和开发说明 | [开发与验证](development.md)、[当前架构](architecture/current.md) |
+| Phase 0 — B-01～B-06 | 文档/源码事实、lockfile 安装和开发说明；工具链原基线 Node 22.23.x/npm 12.0.x 已由 OPS-03 迁移声明替代 | [开发与验证](development.md)、[当前架构](architecture/current.md) |
 | Phase 1 — T-01～T-08 | 核心测试、设置迁移、stop final、安全渲染、LLM 控制、Electron smoke、Electron 43 升级 | `test/`、[当前架构](architecture/current.md) |
 | Phase 2 — BM-01/BM-02/BM-04～BM-06 | 100 条冻结 FLEURS 数据、可复跑 harness、三候选同机比较 | [数据集来源](../benchmark/datasets/SOURCES.md)、[Harness](benchmark/harness.md)、[比较结果](benchmark/bm02-comparison-2026-08-27.md) |
 | Phase 3 — D-01/D-02 | 冻结比较规则；ADR-0005 接受继续使用 Paraformer 默认 | [ADR-0005](architecture/adr/0005-select-default-asr-model-by-benchmark.md) |
@@ -75,7 +75,7 @@ flowchart LR
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
 | D-03 | P0 | 接受 ASR 执行边界 ADR（Completed） | 有界 spike 比较 worker thread 与 Electron utility process 的 native load、1,000×320-frame 传输、退出恢复和路径边界；选择单个 utility process | R-02,R-04；BM-07 spike | ADR-0006 Accepted；R-05 使用 10-block 有界队列，R-06 实现 utility process 隔离；真实模型/Forge 验证保留在对应节点 |
-| D-04 | P1 | 复审目标架构（Completed） | 已用 utility process、D-03 有界传输证据、R-07～R-09 当前实现和 Windows 11 25H2+ x64 Tier 1 目标复审 `target.md`/NFR；打包、最低硬件性能和 Experimental 平台仍明确为未实现 | D-03,PKG-01 | 当前/目标边界与支持矩阵一致；可运行事实和 PKG/OPS 计划分离 |
+| D-04 | P1 | 复审目标架构（Completed） | utility process、R-07～R-09、Windows x64 打包与诊断边界均已实现；有效内容已合并进 `current.md`，短期 Target Architecture 已从活跃文档树移除 | D-03,PKG-01 | 当前事实、ADR 与 Roadmap 分工明确，不保留已实现的第二份架构真相源 |
 
 ## 5. Phase 4 — 渐进重构 Audio / ASR / Model Manager
 
@@ -119,7 +119,7 @@ Paraformer 继续是产品默认。上述候选仅用于内部技术验证和 be
 |---|---|---|---|---|---|
 | OPS-01 | P1 | CI 门禁 | `npm ci → npm test → Forge package`；大模型测试分层，普通 PR 使用 Fake/small smoke | T-07,PKG-02 | 主分支每次变更有自动结果 |
 | OPS-02 | P1 | 版本/变更规范（Completed） | `package.json#version` 作为应用/制品唯一版本源；CHANGELOG 记录内部版本、默认模型和 ADR；最小 release checklist 合并进开发文档，不新增发布框架 | PKG-03 | 已记录 1.0.0/1.0.1 基线与提交、模型、ADR；源码 V2 注释不再制造第二版本口径 |
-| OPS-03 | P1 | 受控依赖升级 | Electron/Sherpa/Forge 按具体安全或兼容风险批次升级 | OPS-01 | 每次验证 native load、模型 smoke 和 Tier 1 制品 |
+| OPS-03 | P1 | 受控运行时与依赖升级（Ongoing） | 当前基线固定 Node 24.20.0 Active LTS + 官方捆绑 npm 11.19.0，精确基线验证已通过；npm 不独立追逐 major。后续只在 Node 新 major 进入 Active LTS 后升级，并与 Electron/Sherpa/Forge 的具体安全或兼容风险分批处理 | OPS-01 | 三处 canonical 版本一致；每次升级完成 clean `npm ci`、完整测试、Forge make、packaged native/model smoke，只保留能发现实质回归的验证 |
 | OPS-04 | P1 | 模型生命周期 | registry 标记 current/deprecated/removed，定义兼容期和回退 | R-07,OPS-01 | 模型替换有数据、决策和弃用记录 |
 | OPS-05 | P1 | 诊断基线（Completed） | 单一固定 JSON schema 由 Main 组合 app/OS/arch、active 模型、Renderer 三项采样率、controller 初始化耗时和受控错误类别；只在用户点击时写文件，不建日志框架/历史库/上传 | R-09 | 主窗口可导出；白名单测试证明不含设置、密钥、路径、stack、音频、逐字稿或 LLM 内容 |
 | OPS-06 | P2 | 自动更新评估 | 至少两个稳定手工发布后再评估 updater、托管、签名和回滚成本 | PKG-05,OPS-02 | 新 ADR 说明是否采用，不默认引入 |
@@ -160,6 +160,6 @@ Paraformer 继续是产品默认。上述候选仅用于内部技术验证和 be
 
 - 任务状态改变时更新本文件；逐步命令、worktree 路径和一次性验收日志不写入 Roadmap。
 - 依赖未满足不得把下游标为完成；spike 结论必须回写对应 ADR。
-- 每完成一个里程碑，更新 [current.md](architecture/current.md)；目标实现后把有效内容从 [target.md](architecture/target.md) 合并进当前架构。
+- 每完成一个里程碑，更新 [current.md](architecture/current.md)；只有跨多个里程碑且无法由 Roadmap/ADR 清晰表达的 To-Be 设计才建立临时 Target Architecture，落地后立即合并并移除。
 - 新依赖、新平台或新云服务若改变约束，先更新 requirements，并在需要时创建或 supersede ADR。
 - Owner、Issue/PR 只在确有协作或跟踪价值时记录，不作为每项任务的固定流程。

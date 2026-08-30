@@ -7,7 +7,6 @@
 - [需求基线](docs/requirements/requirements.md)
 - [架构入口](docs/architecture/README.md)
 - [当前架构（As-Is）](docs/architecture/current.md)
-- [目标架构（To-Be）](docs/architecture/target.md)
 - [架构决策记录（ADR）](docs/architecture/adr/README.md)
 - [开发路线图](docs/roadmap.md)
 - [开发与可复现安装](docs/development.md)
@@ -30,8 +29,8 @@
 
 ```powershell
 cd expression-trainer-pro
-node --version  # 期望 22.23.x
-npm --version   # 期望 12.0.x
+node --version  # 期望 24.20.x
+npm --version   # 期望 11.19.x
 npm ci
 ```
 
@@ -79,30 +78,27 @@ npm start
 ## 技术架构
 
 ```
-┌─────────────────────────────────────────┐
-│ Electron 主进程                          │
-│  ├── Sherpa-ONNX (离线语音识别)          │
-│  ├── 词库匹配 (emotion-lexicon.json)     │
-│  └── AI反馈 (多后端 HTTP API)            │
-├─────────────────────────────────────────┤
-│ 渲染进程 (Chromium)                      │
-│  ├── 全屏字幕显示                        │
-│  ├── 实时统计面板                        │
-│  └── 分析报告弹窗                        │
-└─────────────────────────────────────────┘
+Renderer / Web Audio / UI
+        │ 受控 Preload API
+        ▼
+Electron Main（窗口、设置、分析、LLM 路由、ASR 控制器）
+        │ session-aware IPC
+        ▼
+ASR Utility Process（Model Manager + Sherpa Provider）
+        │
+        └── userData/models 中的版本化 Paraformer
 ```
+
+Main 不加载 Sherpa native addon，也不执行同步识别；音频采集在 Renderer 的独立 `AudioCapture`/AudioWorklet 中完成，ASR 推理在 utility process 中隔离。完整职责、数据流和已知技术债见[当前架构](docs/architecture/current.md)。
 
 ## 词库说明
 
-`data/emotion-lexicon.json` 基于大连理工情感词库7大类结构，包含：
+运行时数据由两个明确的真相源组成：
 
-- **130+ 情绪词**：分类（喜怒哀惧恶惊）+ 强度（1-9）
-- **笼统词→精准词映射**：25组高频替代建议
-- **填充词表**：24个常见口头禅
-- **犹豫词表**：19个弱化表达
-- **程度词梯度**：弱→中→强→极 四级
-- **画面化描述**：10组「抽象→具象」转换
-- **犹豫→直接转换**：8组对照示例
+- `data/emotion-lexicon.json`：146 个情绪词，包含分类、强度和极性；
+- `shared/expression-rules.js`：16 个填充词、14 个犹豫词和 20 组笼统词替代映射，Renderer 高亮与 Main 分析共同使用。
+
+未接入运行时的数据不放在活跃 `data/` 目录，避免被误认为产品能力或进入发布包。
 
 ## 开发
 
@@ -123,23 +119,27 @@ npm test
 │   ├── app.js           # 前端逻辑
 │   └── settings.js      # 设置逻辑
 ├── lib/
-│   ├── asr.js           # 语音识别
+│   ├── asr.js           # Paraformer adapter
 │   ├── asr-provider.js  # ASR provider 契约
+│   ├── asr-process-controller.js # Main 到 utility process 的控制边界
+│   ├── asr-utility-process.js    # 独立 ASR 执行入口
+│   ├── model-manager.js # 模型下载、校验、激活与回退
 │   ├── lexicon.js       # 词库匹配
 │   ├── ai-feedback.js   # AI反馈
 │   └── prompts.js       # Prompt模板
-├── data/
-│   ├── emotion-lexicon.json
-│   └── tiered-lexicon.json # 候选分层词库，当前未启用
-└── models/              # 版本化产品模型 registry（权重位于 userData）
+├── shared/              # Renderer/Main 共用的确定性规则
+├── data/                # 运行时情绪词数据
+├── models/registry.json # 产品模型清单（权重位于 userData）
+├── smoke/               # 发布包内使用的最小 Electron smoke 驱动
+├── test/                # 不进入发布包的自动测试
+├── benchmark/           # 不进入发布包的独立模型评测工具
+└── docs/                # 需求、当前架构、ADR、路线图与开发说明
 ```
-
-`tiered-lexicon.json` 作为候选数据资产保留；其 schema 与当前分析器不同，必须在独立测试任务中设计合并规则后才能启用。
 
 ## 系统要求
 
 - 已验证开发基线：Windows 11 25H2 build 26200 x64
-- Node.js 22.23.x、npm 12.0.x
+- Node.js 24.20.x（Active LTS）、npm 11.19.x（该 Node LTS 官方捆绑版本）
 - 麦克风权限
 - （可选）网络连接（用于AI反馈，词库分析可离线）
 

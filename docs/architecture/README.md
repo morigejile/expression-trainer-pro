@@ -2,8 +2,8 @@
 
 > 方法：arc42-lite + C4（Context/Container）+ ADR  
 > 状态：Current Documentation Index
-> 基线日期：2026-08-29
-> 源码基线：当前开发分支，已包含 Phase 4 / R-01～R-09
+> 基线日期：2026-08-30
+> 源码基线：`main`，已完成 R-01～R-09 与 PKG-01～PKG-04
 
 ## 1. 如何阅读
 
@@ -11,12 +11,11 @@
 |---|---|---|
 | [需求基线](../requirements/requirements.md) | 系统需要做什么？ | Existing 与 Planned 持续维护 |
 | [当前架构](current.md) | 现在实际如何实现？ | 必须与可运行代码一致 |
-| [目标架构](target.md) | 本轮迁移准备变成什么？ | 仅在迁移期间存在 |
 | [ADR](adr/README.md) | 为什么做出关键决策？ | 永久保留，变更时 Supersede |
 | [Roadmap](../roadmap.md) | 按什么顺序落地？ | 随执行状态更新 |
 | [支持矩阵](../support-matrix.md) | 首发平台和验证边界是什么？ | 随制品证据提升等级 |
 
-迁移完成后，应把已实现的目标内容合并进 `current.md`，再归档或删除失去意义的 `target.md`；ADR 不删除。
+上一轮目标架构已经实现并合并进 `current.md`，短期 `target.md` 已从活跃文档树移除。新的结构性变更先进入 Roadmap；只有需要跨多个里程碑维持独立 To-Be 视图时才重新建立目标架构文档。ADR 不删除。
 
 ## 2. 架构目标
 
@@ -44,7 +43,7 @@ flowchart LR
   User[训练用户]
   App[Expression Trainer\nElectron 桌面应用]
   LLM[外部 LLM 服务\n可选/需网络]
-  Models[模型分发源\nPlanned]
+  Models[模型分发源\nExternal]
   Maintainer[项目维护者]
 
   User -->|讲话、操作、查看反馈| App
@@ -62,7 +61,7 @@ flowchart LR
 - **事实先于结论**：候选 benchmark 结果与产品默认决策分别记录；当前 ADR-0005 保留 Paraformer 默认。
 - **渐进迁移**：先包住现有行为，再替换内部实现；每一步都应保持可运行和可回退。
 - **用户零开发依赖**：开发者可使用 Node/npm/Forge，最终用户不安装 Node、Python 或编译工具链。
-- **当前即事实**：代码变化应同步更新 `current.md`；未来意图只写入 `target.md` 或 Proposed ADR。
+- **当前即事实**：代码变化应同步更新 `current.md`；未来工作写入 Roadmap，重大方向变化用 Proposed ADR。
 
 ## 6. 当前状态摘要
 
@@ -76,16 +75,16 @@ Renderer/Web Audio → 10-block 有界队列 → Preload/IPC → Main Router
                                           sherpa-onnx-node/Paraformer
 ```
 
-停止尾部文本、LLM 请求控制、安全渲染、ASR session/Provider、AudioCapture、AudioWorklet、10-block 有界音频发送、utility-process 推理隔离、版本化模型自动准备和原子配置持久化已完成；真实 Electron smoke 覆盖执行单元退出报告与下一 session 重建。剩余技术债主要是逐块 invoke/structured-clone 复制、真实模型与设备性能证据、可导出诊断以及打包交付未闭环。详情见 [current.md](current.md)。
+停止尾部文本、LLM 请求控制、安全渲染、ASR session/Provider、AudioCapture、AudioWorklet、10-block 有界音频发送、utility-process 推理隔离、版本化模型自动准备、原子配置持久化、诊断导出和 Windows x64 内部安装/升级闭环已完成。剩余工作集中在 CI、签名、真实设备和扩展平台证据。详情见 [current.md](current.md) 与 [Roadmap](../roadmap.md)。
 
-## 7. 目标状态摘要
+## 7. 已落地的运行边界
 
-目标保留 Electron 和原生 Web UI，同时形成：
+当前已经形成：
 
 ```text
 Renderer UI + Chromium graph/AudioWorklet collector
                 ↓ 有界音频流
-Preload 最小桥接 → Main（窗口/设置/生命周期/模型协调）
+Preload 最小桥接 → Main（窗口/设置/生命周期/分析/LLM/ASR 控制）
                               ↓
                     独立 ASR 执行单元
                               ↓
@@ -94,7 +93,7 @@ Preload 最小桥接 → Main（窗口/设置/生命周期/模型协调）
                    可版本化 Model Manager
 ```
 
-详细模块、数据流、错误处理和迁移约束见 [target.md](target.md)。
+该图是当前事实，不再维护第二份 Target Architecture。后续收敛项以 Roadmap 为计划源，落地后同步更新 [current.md](current.md)。
 
 ## 8. 决策状态快照
 

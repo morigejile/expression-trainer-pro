@@ -13,13 +13,29 @@ const DEVELOPMENT_ONLY_ROOTS = new Set([
   'dist',
   'docs',
   'out',
+  'scripts',
   'test'
 ]);
 
+const NON_RUNTIME_FILES = new Set([
+  '.gitattributes',
+  '.gitignore',
+  '.npmrc',
+  '.nvmrc',
+  'CHANGELOG.md',
+  'README.md',
+  'data/tiered-lexicon.json',
+  'forge.config.js',
+  'models/.gitkeep',
+  'package-lock.json'
+]);
+
 function ignoreDevelopmentOnly(filePath) {
-  const parts = filePath.replaceAll('\\', '/').split('/').filter(Boolean);
+  const normalizedPath = filePath.replaceAll('\\', '/').replace(/^\/+/, '');
+  const parts = normalizedPath.split('/').filter(Boolean);
   const root = parts[0];
   if (DEVELOPMENT_ONLY_ROOTS.has(root)) return true;
+  if (NON_RUNTIME_FILES.has(normalizedPath)) return true;
   return root === 'node_modules' && ['.bin', 'electron', 'electron-nightly'].includes(parts[1]);
 }
 
