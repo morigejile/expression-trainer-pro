@@ -20,6 +20,15 @@
       margin: 0 auto;
     }
 
+    .editor-header {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 8px;
+    }
+
+    .editor-header h1 { margin-bottom: 0; }
+
     h1 {
       font-size: 20px;
       font-weight: 600;
@@ -152,9 +161,7 @@
     }
 
     .btn-back {
-      position: fixed;
-      top: 16px;
-      left: 16px;
+      position: static;
       padding: 6px 14px;
       background: rgba(255,255,255,0.06);
       border: 1px solid #333;
@@ -231,9 +238,11 @@
   </style>
 </head>
 <body>
-  <button class="btn-back" id="btn-back">← 返回</button>
   <div class="editor-container">
-    <h1>🎯 训练规则定制</h1>
+    <div class="editor-header">
+      <button class="btn-back" id="btn-back">← 返回</button>
+      <h1>🎯 训练规则定制</h1>
+    </div>
     <p class="subtitle">底层词库和基础反馈规则始终生效。你可以在上面叠加个人化的训练目标和规则。</p>
 
     <!-- 底层：锁定预览 -->
@@ -314,6 +323,26 @@
   </div>
 
   <script>
+    let savedSnapshot = '';
+    let allowClose = false;
+
+    function readDraft() {
+      return {
+        goals: document.getElementById('goals').value.trim(),
+        customRules: document.getElementById('custom-rules').value.trim(),
+        styleRef: document.getElementById('style-ref').value.trim(),
+        customWords: document.getElementById('custom-words').value.trim()
+      };
+    }
+
+    function markSaved(data = readDraft()) {
+      savedSnapshot = JSON.stringify(data);
+    }
+
+    function hasUnsavedChanges() {
+      return savedSnapshot !== JSON.stringify(readDraft());
+    }
+
     function toggleExample(id) {
       const el = document.getElementById(id);
       el.classList.toggle('show');
@@ -327,16 +356,13 @@
         document.getElementById('style-ref').value = data.styleRef || '';
         document.getElementById('custom-words').value = data.customWords || '';
       }
+      markSaved();
     }
 
     document.getElementById('btn-save').addEventListener('click', async () => {
-      const data = {
-        goals: document.getElementById('goals').value.trim(),
-        customRules: document.getElementById('custom-rules').value.trim(),
-        styleRef: document.getElementById('style-ref').value.trim(),
-        customWords: document.getElementById('custom-words').value.trim()
-      };
+      const data = readDraft();
       await window.api.saveCustomPrompt(data);
+      markSaved(data);
       const msg = document.getElementById('save-success');
       msg.classList.add('show');
       setTimeout(() => msg.classList.remove('show'), 2000);
@@ -349,6 +375,7 @@
         document.getElementById('style-ref').value = '';
         document.getElementById('custom-words').value = '';
         await window.api.saveCustomPrompt({ goals: '', customRules: '', styleRef: '', customWords: '' });
+        markSaved();
         const msg = document.getElementById('save-success');
         msg.textContent = '✓ 已恢复默认';
         msg.classList.add('show');
@@ -357,11 +384,19 @@
     });
 
     document.getElementById('btn-back').addEventListener('click', () => {
+      if (hasUnsavedChanges() && !confirm('有未保存的规则修改，确定要离开吗？')) return;
+      allowClose = true;
       if (window.api && window.api.closeWindow) {
         window.api.closeWindow();
       } else {
         window.close();
       }
+    });
+
+    window.addEventListener('beforeunload', event => {
+      if (allowClose || !hasUnsavedChanges()) return;
+      event.preventDefault();
+      event.returnValue = '';
     });
 
     loadCustomPrompt();
