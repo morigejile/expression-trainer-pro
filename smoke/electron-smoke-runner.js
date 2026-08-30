@@ -154,6 +154,64 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.equal(apiContract.title, '宇宙无敌表达训练系统');
   assert.deepEqual(apiContract.missing, []);
 
+  assert.deepEqual(mainWindow.getMinimumSize(), [960, 640]);
+  const desktopUsability = await mainWindow.webContents.executeJavaScript(`(() => {
+    const buttonIds = ['btn-prompt-editor', 'btn-diagnostics', 'btn-settings'];
+    const controls = buttonIds.map(id => {
+      const button = document.getElementById(id);
+      return {
+        id,
+        label: button.getAttribute('aria-label'),
+        text: button.querySelector('.btn-icon-label')?.textContent.trim()
+      };
+    });
+    const densityLabel = document.getElementById('stat-density-label');
+    return {
+      controls,
+      densityDescription: densityLabel?.getAttribute('title') || '',
+      reducedMotionRule: Array.from(document.styleSheets)
+        .flatMap(sheet => Array.from(sheet.cssRules))
+        .some(rule => rule.conditionText?.includes('prefers-reduced-motion'))
+    };
+  })()`);
+  assert.deepEqual(desktopUsability.controls, [
+    { id: 'btn-prompt-editor', label: '训练规则', text: '规则' },
+    { id: 'btn-diagnostics', label: '导出诊断信息', text: '诊断' },
+    { id: 'btn-settings', label: '打开设置', text: '设置' }
+  ]);
+  assert.match(desktopUsability.densityDescription, /有效词数.*总词数/);
+  assert.equal(desktopUsability.reducedMotionRule, true);
+
+  const modalKeyboardState = await mainWindow.webContents.executeJavaScript(`(() => {
+    const opener = document.getElementById('btn-paste');
+    const modal = document.getElementById('paste-modal');
+    const textarea = document.getElementById('paste-textarea');
+    opener.focus();
+    opener.click();
+    textarea.value = '尚未分析的草稿';
+    textarea.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+    const closedAfterEscape = modal.classList.contains('hidden');
+    const focusAfterEscape = document.activeElement?.id;
+    opener.click();
+    return {
+      role: modal.getAttribute('role'),
+      ariaModal: modal.getAttribute('aria-modal'),
+      closedAfterEscape,
+      focusAfterEscape,
+      retainedDraft: textarea.value
+    };
+  })()`);
+  assert.deepEqual(modalKeyboardState, {
+    role: 'dialog',
+    ariaModal: 'true',
+    closedAfterEscape: true,
+    focusAfterEscape: 'btn-paste',
+    retainedDraft: '尚未分析的草稿'
+  });
+  await mainWindow.webContents.executeJavaScript(
+    `document.getElementById('btn-close-paste').click()`
+  );
+
   const graphWindow = new BrowserWindow({
     show: false,
     webPreferences: { contextIsolation: true, nodeIntegration: false }
@@ -304,6 +362,31 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     hasGetSettings: true
   });
   settingsWindow.close();
+
+  await mainWindow.webContents.executeJavaScript(
+    `document.getElementById('btn-prompt-editor').click()`
+  );
+  const promptEditorWindow = await waitUntil('prompt editor window creation', () => {
+    return BrowserWindow.getAllWindows().find(window => {
+      return !window.isDestroyed() && window.webContents.getURL().endsWith('/prompt-editor.html');
+    });
+  });
+  await waitForPage(promptEditorWindow, 'prompt-editor.html');
+  const promptEditorState = await promptEditorWindow.webContents.executeJavaScript(`(() => {
+    const back = document.getElementById('btn-back').getBoundingClientRect();
+    const heading = document.querySelector('h1').getBoundingClientRect();
+    document.getElementById('goals').value = '尚未保存的目标';
+    window.confirm = () => false;
+    document.getElementById('btn-back').click();
+    return {
+      overlaps: !(back.right <= heading.left || back.left >= heading.right
+        || back.bottom <= heading.top || back.top >= heading.bottom)
+    };
+  })()`);
+  assert.equal(promptEditorState.overlaps, false);
+  await delay(50);
+  assert.equal(promptEditorWindow.isDestroyed(), false, 'declined dirty navigation must keep the editor open');
+  promptEditorWindow.destroy();
 
   await mainWindow.webContents.executeJavaScript(`(() => {
     document.getElementById('btn-paste').click();

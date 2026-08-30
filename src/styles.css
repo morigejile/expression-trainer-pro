@@ -97,6 +97,30 @@ button, input, select, .subtitle-scroll, .feedback-content, .modal-body {
   color: #fff;
 }
 
+.user-message {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 8px 16px 0;
+  padding: 8px 12px;
+  border: 1px solid #5a3447;
+  border-radius: 8px;
+  background: #1b1116;
+  color: #f0c9dc;
+  font-size: 12px;
+  -webkit-app-region: no-drag;
+}
+.btn-message-action {
+  flex: 0 0 auto;
+  padding: 4px 9px;
+  border: 1px solid #E5007E;
+  border-radius: 6px;
+  background: transparent;
+  color: #ff70bd;
+  cursor: pointer;
+}
+
 .modal-header-actions {
   display: flex;
   align-items: center;
@@ -110,7 +134,7 @@ button, input, select, .subtitle-scroll, .feedback-content, .modal-body {
   align-items: center;
   padding: 8px 0;
 }
-.stat-label { font-size: 13px; color: #666; }
+.stat-label { font-size: 13px; color: #aaa; }
 .stat-value { font-size: 18px; font-weight: 600; font-family: "SF Mono", monospace; }
 .stat-red { color: #ff6b6b; }
 .stat-orange { color: #ffa94d; }
@@ -125,6 +149,7 @@ button, input, select, .subtitle-scroll, .feedback-content, .modal-body {
   line-height: 1.6;
   color: #ccc;
 }
+.feedback-empty { color: #888; font-size: 12px; line-height: 1.6; }
 .feedback-item {
   padding: 8px 0;
   border-bottom: 1px solid #1a1a1a;
@@ -154,12 +179,26 @@ button, input, select, .subtitle-scroll, .feedback-content, .modal-body {
   padding-top: 36px;
   flex-shrink: 0;
 }
-.app-title { font-size: 13px; color: #555; letter-spacing: 1px; }
+.app-title { font-size: 13px; color: #999; letter-spacing: 1px; white-space: nowrap; }
 .topbar-right { display: flex; align-items: center; gap: 12px; }
-.timer { font-size: 16px; font-family: "SF Mono", monospace; color: #555; }
+.timer { font-size: 16px; font-family: "SF Mono", monospace; color: #999; }
 .timer.active { color: #E5007E; animation: pulse 1.5s ease-in-out infinite; }
 @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
-.btn-icon { background:none; border:none; font-size:18px; cursor:pointer; padding:4px; }
+.btn-icon {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 32px;
+  padding: 4px 6px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: #bbb;
+  font-size: 15px;
+  cursor: pointer;
+}
+.btn-icon:hover { color: #fff; border-color: #444; background: #151515; }
+.btn-icon-label { font-size: 11px; }
 
 /* 字幕滚动区——关键！ */
 .subtitle-scroll {
@@ -189,8 +228,8 @@ button, input, select, .subtitle-scroll, .feedback-content, .modal-body {
   color: #fff;
   word-break: break-word;
 }
-.subtitle-line.old { color: #666; font-size: 22px; }
-.subtitle-line.hint { color: #444; font-size: 20px; }
+.subtitle-line.old { color: #888; font-size: 22px; }
+.subtitle-line.hint { color: #888; font-size: 20px; }
 .subtitle-line.interim-line { color: #aaa; }
 
 /* 高亮 */
@@ -209,10 +248,11 @@ button, input, select, .subtitle-scroll, .feedback-content, .modal-body {
 }
 .btn-main {
   display: flex; align-items: center; gap: 4px;
-  padding: 6px 14px; border: none; border-radius: 20px;
+  min-height: 38px; padding: 8px 16px; border: none; border-radius: 20px;
   font-size: 12px; font-weight: 500; cursor: pointer;
   transition: all 0.2s;
 }
+.btn-main:disabled { opacity: 0.65; cursor: wait; transform: none; }
 .btn-icon-inner { font-size: 13px; }
 .btn-label { font-size: 12px; }
 
@@ -232,6 +272,14 @@ button, input, select, .subtitle-scroll, .feedback-content, .modal-body {
 .btn-save-text:hover { background: #333; border-color: #69db7c; }
 .btn-clear { background: #222; color: #888; border: 1px solid #333; }
 .btn-clear:hover { background: #333; color: #ff6b6b; border-color: #ff6b6b; }
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid #ff70bd;
+  outline-offset: 2px;
+}
 
 /* ===== 少女icon ===== */
 .girl-icon {
@@ -295,3 +343,11 @@ button, input, select, .subtitle-scroll, .feedback-content, .modal-body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

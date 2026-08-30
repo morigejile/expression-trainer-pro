@@ -28,8 +28,8 @@
         <span id="stat-hedges" class="stat-value stat-yellow">0</span>
       </div>
       <div class="stat-row">
-        <span class="stat-label">表达密度</span>
-        <span id="stat-density" class="stat-value stat-green">--</span>
+        <span id="stat-density-label" class="stat-label" title="有效词数（排除填充词和犹豫词）占总词数的比例">表达密度</span>
+        <span id="stat-density" class="stat-value stat-green" aria-describedby="stat-density-label">--</span>
       </div>
     </aside>
 
@@ -40,9 +40,9 @@
         <span class="app-title">宇宙无敌表达训练系统</span>
         <div class="topbar-right">
           <span id="timer" class="timer">00:00</span>
-          <button id="btn-prompt-editor" class="btn-icon" title="训练规则">🎯</button>
-          <button id="btn-diagnostics" class="btn-icon" title="导出诊断信息">🩺</button>
-          <button id="btn-settings" class="btn-icon" title="设置">⚙️</button>
+          <button id="btn-prompt-editor" class="btn-icon" title="训练规则" aria-label="训练规则"><span aria-hidden="true">🎯</span><span class="btn-icon-label">规则</span></button>
+          <button id="btn-diagnostics" class="btn-icon" title="导出诊断信息" aria-label="导出诊断信息"><span aria-hidden="true">🩺</span><span class="btn-icon-label">诊断</span></button>
+          <button id="btn-settings" class="btn-icon" title="设置" aria-label="打开设置"><span aria-hidden="true">⚙️</span><span class="btn-icon-label">设置</span></button>
         </div>
       </div>
 
@@ -56,6 +56,11 @@
           <button id="btn-save-text" class="btn-sm hidden" title="保存原文">💾 保存</button>
           <button id="btn-clear" class="btn-sm hidden" title="清空">🗑️ 清空</button>
         </div>
+      </div>
+
+      <div id="user-message" class="user-message hidden" role="status" aria-live="polite">
+        <span id="user-message-text"></span>
+        <button id="user-message-action" class="btn-message-action hidden">检查设置</button>
       </div>
 
       <!-- 字幕滚动区 -->
@@ -94,7 +99,7 @@
     <aside class="panel-right">
       <div class="panel-title">💡 实时反馈</div>
       <div id="feedback-content" class="feedback-content">
-        <!-- 实时反馈内容 -->
+        <p class="feedback-empty">录音后，本地提示和可选 AI 反馈会显示在这里</p>
       </div>
     </aside>
   </div>
@@ -114,11 +119,11 @@
   </div>
 
   <!-- 粘贴逐字稿弹窗 -->
-  <div id="paste-modal" class="modal hidden">
+  <div id="paste-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="paste-modal-title">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>📋 粘贴逐字稿</h2>
-        <button id="btn-close-paste" class="btn-close">×</button>
+        <h2 id="paste-modal-title">📋 粘贴逐字稿</h2>
+        <button id="btn-close-paste" class="btn-close" aria-label="关闭粘贴逐字稿">×</button>
       </div>
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
         <p style="color:#888;font-size:13px;">把逐字稿粘贴进来，我帮你分析</p>
@@ -129,13 +134,13 @@
   </div>
 
   <!-- 报告弹窗 -->
-  <div id="report-modal" class="modal hidden">
+  <div id="report-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
     <div class="modal-content">
       <div class="modal-header">
-        <h2>📋 表达分析报告</h2>
+        <h2 id="report-modal-title">📋 表达分析报告</h2>
         <div class="modal-header-actions">
           <button id="btn-copy-report" class="btn-sm">📋 复制全文</button>
-          <button id="btn-close-report" class="btn-close">×</button>
+          <button id="btn-close-report" class="btn-close" aria-label="关闭表达分析报告">×</button>
         </div>
       </div>
       <div id="report-body" class="modal-body">
