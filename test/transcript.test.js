@@ -63,6 +63,8 @@ function createTrainer() {
   trainer.lastFeedbackText = '';
   trainer.lastReport = '';
   trainer.reportRequestPending = false;
+  trainer.pasteAnalysisPending = false;
+  trainer.pasteAnalysisGeneration = 0;
   trainer.llmGeneration = 0;
   trainer.asrEventState = createAsrEventState();
   trainer.asrStartAttempt = null;
@@ -462,6 +464,28 @@ test('pasted analysis rejects reentry while the first draft is pending', async (
   await first;
 });
 
+test('report generation is blocked while pasted statistics are incomplete', async (t) => {
+  let reportCalls = 0;
+  const messages = [];
+  global.window = {
+    api: {
+      getFinalReport: async () => {
+        reportCalls += 1;
+        return { success: true, report: 'must not run' };
+      }
+    }
+  };
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  trainer.pasteAnalysisPending = true;
+  trainer.showUserMessage = message => messages.push(message);
+
+  await trainer.generateReport();
+
+  assert.equal(reportCalls, 0);
+  assert.deepEqual(messages, ['逐字稿统计尚未完成，请稍候']);
+});
+
 test('recording start reports LLM cancellation failure and restores its control', async (t) => {
   const errors = [];
   global.window = {
@@ -480,6 +504,7 @@ test('recording start reports LLM cancellation failure and restores its control'
   await trainer.startRecording();
 
   assert.deepEqual(errors, ['录制准备失败：无法取消上一轮 AI 请求，请重试']);
+  assert.equal(trainer.userMessage.classList.contains('hidden'), true);
   assert.equal(trainer.btnStart.disabled, false);
   assert.equal(trainer.asrStartAttempt, null);
 });

@@ -202,6 +202,7 @@ class ExpressionTrainer {
       await window.api.cancelLLMRequests();
     } catch {
       if (this.asrStartAttempt === startAttempt) {
+        this.hideUserMessage();
         this.showError('录制准备失败：无法取消上一轮 AI 请求，请重试');
       }
       return;
@@ -725,6 +726,10 @@ class ExpressionTrainer {
   // ===== 报告 =====
 
   async generateReport() {
+    if (this.pasteAnalysisPending) {
+      this.showUserMessage('逐字稿统计尚未完成，请稍候');
+      return;
+    }
     if (this.reportRequestPending) {
       this.showUserMessage('报告正在生成，请稍候');
       return;
@@ -769,7 +774,7 @@ class ExpressionTrainer {
       }
     } finally {
       this.reportRequestPending = false;
-      this.btnReport.disabled = false;
+      this.btnReport.disabled = this.pasteAnalysisPending;
     }
   }
 
@@ -869,6 +874,7 @@ class ExpressionTrainer {
     this.pasteAnalysisPending = pending;
     this.btnAnalyzePaste.disabled = pending;
     this.btnAnalyzePaste.textContent = pending ? '分析中...' : '开始分析';
+    this.btnReport.disabled = pending || this.reportRequestPending;
   }
 
   showUserMessage(message, { openSettings = false } = {}) {
