@@ -80,7 +80,17 @@ function withFixture(run) {
       candidate({ id: 'zipformer-small-ctc-zh-int8-2025-04-01', family: 'zipformer-ctc', mode: 'streaming', version: '2025-04-01', files: makeFiles('zipformer', ['model', 'tokens', 'bpe-vocab']) }),
       candidate({ id: 'zipformer-large-ctc-zh-int8-2025-06-30', family: 'zipformer-ctc', mode: 'streaming', version: '2025-06-30', files: makeFiles('zipformer-large', ['model', 'tokens']) }),
       candidate({ id: 'fire-red-asr2-ctc-zh-en-int8-2026-02-25', family: 'fire-red-asr-ctc', mode: 'utterance', version: '2026-02-25', files: makeFiles('fire-red-asr2', ['model', 'tokens']) }),
-      candidate({ id: 'sensevoice-small-int8-2024-07-17', family: 'sensevoice', mode: 'utterance', version: '2024-07-17', files: makeFiles('sensevoice', ['model', 'tokens']) })
+      candidate({ id: 'sensevoice-small-int8-2024-07-17', family: 'sensevoice', mode: 'utterance', version: '2024-07-17', files: makeFiles('sensevoice', ['model', 'tokens']) }),
+      candidate({
+        id: 'qwen3-asr-0-6b-int8-2026-03-25',
+        family: 'qwen3-asr',
+        mode: 'utterance',
+        version: '2026-03-25',
+        files: [
+          ...makeFiles('qwen3', ['conv-frontend', 'encoder', 'decoder']),
+          ...makeFiles('qwen3/tokenizer', ['tokenizer-config', 'tokenizer-merges', 'tokenizer-vocab'])
+        ]
+      })
     ]
   }));
   return Promise.resolve(run({ datasetRoot, modelRoot, registryPath })).finally(() => fs.rmSync(root, { recursive: true, force: true }));
@@ -193,6 +203,35 @@ test('FireRedASR2 CTC decodes one utterance once and emits only final text', asy
     assert.deepEqual(partials, []);
     assert.deepEqual(finals, ['离线终稿']);
     assert.match(sherpa.state.offlineConfig.modelConfig.fireRedAsrCtc.model, /model\.bin$/);
+    assert.equal(sherpa.state.streamFreed, 1);
+  });
+});
+
+test('Qwen3-ASR decodes one utterance with fixed generation settings and no partial text', async () => {
+  const { createSherpaAdapter } = require('../benchmark/adapters/sherpa');
+  await withFixture(async ({ datasetRoot, modelRoot, registryPath }) => {
+    const sherpa = fakeSherpa();
+    const adapter = createSherpaAdapter({ candidateId: 'qwen3-asr-0-6b-int8-2026-03-25', datasetRoot, modelRoot, registryPath, sherpa: sherpa.binding });
+    const partials = [];
+    const finals = [];
+    await adapter.init();
+    await adapter.transcribe(sample, { onPartial: ({ text }) => partials.push(text), onFinal: ({ text }) => finals.push(text) }, {});
+    await adapter.dispose();
+
+    assert.deepEqual(partials, []);
+    assert.deepEqual(finals, ['离线终稿']);
+    assert.deepEqual(sherpa.state.offlineConfig.modelConfig.qwen3Asr, {
+      convFrontend: path.join(modelRoot, 'qwen3', 'conv-frontend.bin'),
+      encoder: path.join(modelRoot, 'qwen3', 'encoder.bin'),
+      decoder: path.join(modelRoot, 'qwen3', 'decoder.bin'),
+      tokenizer: path.join(modelRoot, 'qwen3', 'tokenizer'),
+      maxTotalLen: 512,
+      maxNewTokens: 128,
+      temperature: 0.000001,
+      topP: 0.8,
+      seed: 42
+    });
+    assert.equal(sherpa.state.offlineConfig.modelConfig.tokens, '');
     assert.equal(sherpa.state.streamFreed, 1);
   });
 });
