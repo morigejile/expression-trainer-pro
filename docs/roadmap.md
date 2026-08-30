@@ -117,7 +117,7 @@ Paraformer 继续是产品默认。上述候选仅用于内部技术验证和 be
 
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
-| OPS-01 | P1 | CI 门禁 | `npm ci → npm test → Forge package`；大模型测试分层，普通 PR 使用 Fake/small smoke | T-07,PKG-02 | 主分支每次变更有自动结果 |
+| OPS-01 | P1 | 最小 CI/内测取包自动化（Deferred） | 内测快速迭代继续使用 focused tests 和本地 Forge make；只在跨机获取安装器成为反复痛点时，增加手工触发的 Windows `npm ci → npm test → Forge make → packaged smoke`，上传短期 workflow artifact。不创建 tag/Release，不引入 Forge Publisher、签名或自动更新；进入公开发布前再评估 PR/main 门禁，跨机取包需求消失时移除临时 workflow | T-07,PKG-02；触发条件：跨机取包成为实际痛点 | 需要远程取包时可手工生成、验证并下载短期内测制品；公开发布仍由 PKG-05 独立验收 |
 | OPS-02 | P1 | 版本/变更规范（Completed） | `package.json#version` 作为应用/制品唯一版本源；CHANGELOG 记录内部版本、默认模型和 ADR；最小 release checklist 合并进开发文档，不新增发布框架 | PKG-03 | 已记录 1.0.0/1.0.1 基线与提交、模型、ADR；源码 V2 注释不再制造第二版本口径 |
 | OPS-03 | P1 | 受控运行时与依赖升级（Ongoing） | 当前基线固定 Node 24.20.0 Active LTS + 官方捆绑 npm 11.19.0，精确基线验证已通过；npm 不独立追逐 major。后续只在 Node 新 major 进入 Active LTS 后升级，并与 Electron/Sherpa/Forge 的具体安全或兼容风险分批处理 | OPS-01 | 三处 canonical 版本一致；每次升级完成 clean `npm ci`、完整测试、Forge make、packaged native/model smoke，只保留能发现实质回归的验证 |
 | OPS-04 | P1 | 模型生命周期 | registry 标记 current/deprecated/removed，定义兼容期和回退 | R-07,OPS-01 | 模型替换有数据、决策和弃用记录 |

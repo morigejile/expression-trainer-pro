@@ -38,6 +38,14 @@ npm run smoke:package
 
 内部快速迭代默认只运行与改动直接相关的 focused tests。完整 `npm test` 只在 Roadmap 里程碑收尾运行；`benchmark:dry-run` 只在 Benchmark、model registry/candidate、adapter 或 manifest/schema 变化时运行；`npm audit` 只在依赖变化时运行；`npm ci`、package/make 和 packaged smoke 只在依赖、打包、native、安装相关改动或里程碑验收时运行。
 
+### 内测快速交付口径
+
+- 日常迭代只运行与改动直接相关的 focused tests，不为未交付的本地构建虚增应用版本。
+- 需要本地安装器时执行 `npm run make`，然后执行 `npm run smoke:package`；`make` 已包含目录打包，无需预先单独运行 `package`。
+- 只有安装器实际交付给内测用户时，才同步 `package.json`/lockfile 版本、更新 CHANGELOG，并运行完整测试、Forge make 和 packaged smoke。
+- `smoke:first-install` 和 `smoke:upgrade` 只在依赖、Forge/Squirrel、native bundle、Model Manager、首次安装或升级/卸载边界变化时运行，不进入每次内测构建。
+- 当跨机获取最新安装器成为反复痛点时，再实施 Roadmap `OPS-01`：仅增加手工触发的 Windows 构建、packaged smoke 和短期 workflow artifact，不创建 tag/GitHub Release，不引入 Forge Publisher、签名或自动更新。若跨机取包需求消失，则移除该临时 workflow。
+
 ## 提交说明约定
 
 每个项目提交使用简洁的英文主题，并在提交正文中附上简短的中文说明。推荐命令格式：
