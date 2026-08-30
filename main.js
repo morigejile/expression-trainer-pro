@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, Menu, utilityProcess } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu, shell, utilityProcess } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -11,6 +11,7 @@ const {
 } = require('./lib/custom-prompt-config');
 const {formatSafeError} = require('./lib/safe-log');
 const {createDiagnosticSnapshot} = require('./lib/diagnostics');
+const {isAllowedSupportUrl} = require('./shared/support-links');
 const { loadLexicon, analyzeText } = require('./lib/lexicon');
 const {
   createDefaultSettings,
@@ -485,6 +486,18 @@ ipcMain.handle('export-diagnostics', async (event, audioRates) => {
   if (result.canceled || !result.filePath) return {success: false};
   fs.writeFileSync(result.filePath, `${JSON.stringify(snapshot, null, 2)}\n`, 'utf8');
   return {success: true, path: result.filePath};
+});
+
+ipcMain.handle('open-support-link', async (event, rawUrl) => {
+  if (!isAllowedSupportUrl(rawUrl)) {
+    return {success: false, error: '不支持的反馈目标'};
+  }
+  try {
+    await shell.openExternal(rawUrl);
+    return {success: true};
+  } catch {
+    return {success: false, error: '无法打开问题和建议文档'};
+  }
 });
 
 // AI反馈（传入customPrompt）

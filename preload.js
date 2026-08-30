@@ -33,4 +33,5 @@ contextBridge.exposeInMainWorld('api', {
   // 文件保存
   saveFile: (content, filename) => ipcRenderer.invoke('save-file', content, filename),
   exportDiagnostics: (audioRates) => ipcRenderer.invoke('export-diagnostics', audioRates),
+  openSupportLink: (url) => ipcRenderer.invoke('open-support-link', url),
 });

@@ -22,9 +22,8 @@ function createPage() {
   page.ollamaUrlInput = { value: 'http://localhost:11434' };
   page.customBaseUrlInput = { value: '' };
   page.customModelInput = { value: '' };
-  page.btnSave = { textContent: '保存设置', disabled: false, classList: createClassList() };
-  page.btnTestConnection = { textContent: '测试连接', disabled: false, classList: createClassList() };
-  page.saveSuccess = { textContent: '✓ 已保存', classList: createClassList() };
+  page.btnSave = { textContent: '保存并测试', classList: createClassList() };
+  page.saveSuccess = { classList: createClassList() };
   page.connectionError = { textContent: '', classList: createClassList() };
   page.settings = {
     schemaVersion: 1,
@@ -39,51 +38,19 @@ function createPage() {
   return page;
 }
 
-function createDeferred() {
-  let resolve;
-  let reject;
-  const promise = new Promise((res, rej) => { resolve = res; reject = rej; });
-  return { promise, resolve, reject };
-}
-
-test('settings actions stay disabled until loading completes', async (t) => {
-  const settings = createDeferred();
-  global.window = { api: { getSettings: async () => settings.promise } };
-  t.after(() => { delete global.window; });
-  const page = createPage();
-  page.settings = undefined;
-  page.onProviderChange = () => {};
-
-  const loading = page.loadSettings();
-
-  assert.equal(page.btnSave.disabled, true);
-  assert.equal(page.btnTestConnection.disabled, true);
-  settings.resolve({ provider: 'deepseek', providers: {} });
-  await loading;
-  assert.equal(page.btnSave.disabled, false);
-  assert.equal(page.btnTestConnection.disabled, false);
-});
-
-test('settings load failure keeps actions disabled and explains the failure', async (t) => {
-  global.window = { api: { getSettings: async () => { throw new Error('ipc unavailable'); } } };
-  t.after(() => { delete global.window; });
-  const page = createPage();
-  page.settings = undefined;
-
-  await page.loadSettings();
-
-  assert.equal(page.btnSave.disabled, true);
-  assert.equal(page.btnTestConnection.disabled, true);
-  assert.equal(page.connectionError.textContent, '设置加载失败，请关闭后重试');
-  assert.equal(page.connectionError.classList.contains('show'), true);
-});
-
-test('saving persists the draft without performing a connection test', async (t) => {
+test('failed connection shows the specific reason and does not save', async (t) => {
   const calls = [];
   global.window = {
     api: {
-      saveSettings: async settings => { calls.push(['save', settings]); return { success: true }; },
-      testLLMConnection: async () => assert.fail('save must not test connectivity')
+      testLLMConnection: async () => {
+        calls.push('test');
+        return {
+          success: false,
+          error: 'API Key 无效或无权限',
+          errorCode: 'unauthorized'
+        };
+      },
+      saveSettings: async () => { calls.push('save'); }
     }
   };
   t.after(() => { delete global.window; });
@@ -91,55 +58,42 @@ test('saving persists the draft without performing a connection test', async (t)
 
   await page.save();
 
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0][0], 'save');
-  assert.equal(calls[0][1].providers.deepseek.apiKey, 'test-key');
+  assert.deepEqual(calls, ['test']);
+  assert.equal(page.connectionError.textContent, 'API Key 无效或无权限');
+  assert.equal(page.connectionError.classList.contains('show'), true);
+  assert.equal(page.btnSave.classList.contains('loading'), false);
+  assert.equal(page.btnSave.textContent, '保存并测试');
+});
+
+test('successful connection saves only after the test passes', async (t) => {
+  const calls = [];
+  const originalSetTimeout = global.setTimeout;
+  global.setTimeout = (callback) => { callback(); return 0; };
+  global.window = {
+    api: {
+      testLLMConnection: async () => { calls.push('test'); return { success: true }; },
+      saveSettings: async () => { calls.push('save'); return { success: true }; }
+    },
+    close() {}
+  };
+  t.after(() => {
+    global.setTimeout = originalSetTimeout;
+    delete global.window;
+  });
+  const page = createPage();
+
+  await page.save();
+
+  assert.deepEqual(calls, ['test', 'save']);
   assert.equal(page.saveSuccess.classList.contains('show'), true);
-  assert.equal(page.btnSave.disabled, false);
+  assert.equal(page.btnSave.textContent, '保存并测试');
 });
 
-test('testing connection checks the draft without saving it', async (t) => {
-  const calls = [];
+test('connection test rejection restores the button and displays a safe failure', async (t) => {
   global.window = {
     api: {
-      testLLMConnection: async settings => { calls.push(['test', settings]); return { success: true }; },
-      saveSettings: async () => assert.fail('connection test must not save')
-    }
-  };
-  t.after(() => { delete global.window; });
-  const page = createPage();
-
-  await page.testConnection();
-
-  assert.equal(calls.length, 1);
-  assert.equal(calls[0][0], 'test');
-  assert.equal(calls[0][1].providers.deepseek.apiKey, 'test-key');
-  assert.equal(page.connectionError.textContent, '✓ 连接成功');
-  assert.equal(page.connectionError.classList.contains('success'), true);
-  assert.equal(page.btnTestConnection.disabled, false);
-});
-
-test('connection failure reports its specific reason without claiming save failed', async (t) => {
-  global.window = {
-    api: {
-      testLLMConnection: async () => ({ success: false, error: 'API Key 无效或无权限' }),
-      saveSettings: async () => assert.fail('failed connection test must not save')
-    }
-  };
-  t.after(() => { delete global.window; });
-  const page = createPage();
-
-  await page.testConnection();
-
-  assert.equal(page.connectionError.textContent, '连接失败：API Key 无效或无权限');
-  assert.equal(page.connectionError.classList.contains('show'), true);
-  assert.equal(page.btnTestConnection.textContent, '测试连接');
-});
-
-test('save rejection restores its button and shows a save-specific error', async (t) => {
-  global.window = {
-    api: {
-      saveSettings: async () => { throw new Error('ipc unavailable'); }
+      testLLMConnection: async () => { throw new Error('ipc unavailable'); },
+      saveSettings: async () => assert.fail('must not save')
     }
   };
   t.after(() => { delete global.window; });
@@ -147,7 +101,23 @@ test('save rejection restores its button and shows a save-specific error', async
 
   await page.save();
 
-  assert.equal(page.connectionError.textContent, '保存失败，请重试');
-  assert.equal(page.btnSave.textContent, '保存设置');
-  assert.equal(page.btnSave.disabled, false);
+  assert.equal(page.connectionError.textContent, '连接测试失败，请重试');
+  assert.equal(page.btnSave.classList.contains('loading'), false);
+  assert.equal(page.btnSave.textContent, '保存并测试');
+});
+
+test('save rejection is distinguished from a connection failure', async (t) => {
+  global.window = {
+    api: {
+      testLLMConnection: async () => ({ success: true }),
+      saveSettings: async () => { throw new Error('disk unavailable'); }
+    }
+  };
+  t.after(() => { delete global.window; });
+  const page = createPage();
+
+  await page.save();
+
+  assert.equal(page.connectionError.textContent, '设置保存失败，请重试');
+  assert.equal(page.btnSave.classList.contains('loading'), false);
 });

@@ -144,15 +144,80 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       'openPromptEditor', 'getCustomPrompt', 'saveCustomPrompt', 'closeWindow',
       'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText',
       'getRealtimeFeedback', 'getFinalReport', 'testLLMConnection',
-      'cancelLLMRequests', 'saveFile', 'exportDiagnostics'
+      'cancelLLMRequests', 'saveFile', 'exportDiagnostics', 'openSupportLink'
     ];
     return {
       title: document.title,
-      missing: expected.filter(name => typeof window.api?.[name] !== 'function')
+      missing: expected.filter(name => typeof window.api?.[name] !== 'function'),
+      missingUi: [
+        'user-message', 'user-message-text', 'user-message-action',
+        'training-status', 'feedback-status'
+      ].filter(id => !document.getElementById(id)),
+      initialUi: {
+        trainingStatus: document.getElementById('training-status')?.textContent.trim(),
+        feedbackStatus: document.getElementById('feedback-status')?.textContent.trim(),
+        vagueClass: document.getElementById('stat-vague')?.className,
+        fillerClass: document.getElementById('stat-fillers')?.className,
+        hedgeClass: document.getElementById('stat-hedges')?.className,
+        densityHelp: document.querySelector('.stat-label[title]')?.getAttribute('title')
+      }
     };
   })()`);
   assert.equal(apiContract.title, '宇宙无敌表达训练系统');
   assert.deepEqual(apiContract.missing, []);
+  assert.deepEqual(apiContract.missingUi, []);
+  assert.deepEqual(apiContract.initialUi, {
+    trainingStatus: '准备就绪',
+    feedbackStatus: '本地分析可用；AI 建议约每新增 30 字生成',
+    vagueClass: 'stat-value stat-yellow',
+    fillerClass: 'stat-value stat-red',
+    hedgeClass: 'stat-value stat-orange',
+    densityHelp: '有效词数（排除填充词和犹豫词）占总词数的比例'
+  });
+
+  const helpState = await mainWindow.webContents.executeJavaScript(`(() => {
+    const helpButton = document.getElementById('btn-help');
+    const helpModal = document.getElementById('help-modal');
+    helpButton.click();
+    const openState = {
+      buttonText: helpButton.textContent.trim(),
+      title: helpModal.querySelector('.modal-header h2').textContent.trim(),
+      open: !helpModal.classList.contains('hidden'),
+      feedbackHeading: document.getElementById('feedback-section-title').textContent.trim(),
+      documentButtonText: document.getElementById('btn-open-feedback-document').textContent.trim(),
+      hasDiagnostics: Boolean(document.getElementById('btn-help-diagnostics')),
+      hasBugForm: Boolean(document.getElementById('bug-description')),
+      hasSuggestionForm: Boolean(document.getElementById('suggestion-description'))
+    };
+    document.getElementById('btn-close-help').click();
+    return {...openState, closed: helpModal.classList.contains('hidden')};
+  })()`);
+  assert.deepEqual(helpState, {
+    buttonText: '帮助',
+    title: '帮助与反馈',
+    open: true,
+    feedbackHeading: '问题和建议',
+    documentButtonText: '打开问题和建议文档',
+    hasDiagnostics: true,
+    hasBugForm: false,
+    hasSuggestionForm: false,
+    closed: true
+  });
+
+  const blankPasteState = await mainWindow.webContents.executeJavaScript(`(() => {
+    document.getElementById('btn-paste').click();
+    document.getElementById('btn-analyze-paste').click();
+    const state = {
+      message: document.getElementById('user-message-text').textContent.trim(),
+      settingsActionHidden: document.getElementById('user-message-action').classList.contains('hidden')
+    };
+    document.getElementById('btn-close-paste').click();
+    return state;
+  })()`);
+  assert.deepEqual(blankPasteState, {
+    message: '请先粘贴需要分析的逐字稿',
+    settingsActionHidden: true
+  });
 
   assert.deepEqual(mainWindow.getMinimumSize(), [960, 640]);
   const desktopUsability = await mainWindow.webContents.executeJavaScript(`(() => {
