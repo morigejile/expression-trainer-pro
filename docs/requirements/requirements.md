@@ -55,6 +55,8 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | FR-E10 | 用户应能复制或保存原文与报告。 | 原文可复制/保存为 Markdown；报告可复制/保存为 Markdown；保存路径通过系统对话框选择。 |
 | FR-E11 | 当前 Paraformer 应通过轻量 ASR Provider 边界访问。 | Main 只依赖 initialize/start/feed/stop/cancel/dispose 契约；Fake Provider 可在不加载真实 Paraformer/Sherpa 模块时验证业务与 Electron smoke 路径。 |
 | FR-E12 | 默认中文模型选择应由项目数据 benchmark 和明确产品取舍支持。 | 三候选比较结果可复跑；ADR-0005 记录继续使用 Paraformer 的 streaming UX 与渐进迁移理由。 |
+| FR-E13 | 用户应能在应用内查看帮助并记录内部测试反馈。 | 主页面“帮助”弹窗提供快速使用说明和统一的“问题和建议”在线文档入口；诊断信息沿用脱敏 JSON 导出并由用户按需补充到在线文档。 |
+| FR-E14 | 用户配置或操作无法完成时应获得可恢复的具体提示。 | 设置页显示校验或连接失败原因；实时反馈和报告的配置错误可直接打开设置；空粘贴、重复请求和内容覆盖有明确保护。 |
 | FR-P01 | 音频采集与 ASR 推理应成为独立职责。 | AudioCapture 独立持有权限、track/context/worklet 与 chunk 元数据；Renderer 只编排训练/session，Provider 隔离 Sherpa 配置。 |
 | FR-P02 | 音频链路应使用 16 kHz AudioContext、Electron/Chromium graph 采样率适配与 AudioWorklet collector。 | 已记录请求/context/track rate，固定 Electron OfflineAudioContext/AudioBufferSource fixture 覆盖 16/44.1/48 kHz 确定性缓冲；worklet 下混并汇集 320 帧 mono Float32 chunk，正常停止 flush 非空 tail，ScriptProcessor 已移除。真实 MediaStream 麦克风仍为非阻塞 follow-up。 |
 | FR-P03 | ASR Provider 应提供 session 和规范事件语义。 | `startASR/feedAudio/stopASR/cancelASR` 使用 `sessionId` 和 sequence，返回 `ready/partial/final/error/stopped` 事件的安全 envelope；旧 session、迟到/倒序事件不污染当前训练，stop/cancel/dispose 可重复处理。 |

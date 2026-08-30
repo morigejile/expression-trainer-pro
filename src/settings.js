@@ -45,6 +45,7 @@ class SettingsPage {
     this.customModelInput = document.getElementById('custom-model');
     this.btnSave = document.getElementById('btn-save');
     this.saveSuccess = document.getElementById('save-success');
+    this.connectionError = document.getElementById('connection-error');
 
     this.groupApikey = document.getElementById('group-apikey');
     this.groupOllama = document.getElementById('group-ollama');
@@ -119,14 +120,15 @@ class SettingsPage {
 
   async save() {
     const provider = this.providerSelect.value;
+    const idleButtonLabel = this.btnSave.textContent;
 
     // 隐藏上次的错误提示
-    const errorEl = document.getElementById('connection-error');
+    const errorEl = this.connectionError;
     errorEl.classList.remove('show');
     errorEl.textContent = '';
 
-    // 先获取完整 settings（包含所有 provider 的独立配置）
-    const settings = await window.api.getSettings();
+    // 在已加载的配置副本上更新，连接测试失败时不覆盖上一份可用配置。
+    const settings = structuredClone(this.settings);
 
     // 只更新当前 provider 的配置
     settings.provider = provider;
@@ -153,34 +155,42 @@ class SettingsPage {
       };
     }
 
-    await window.api.saveSettings(settings);
-
-    // 更新缓存，让下次切换 provider 时能看到最新值
-    this.settings = settings;
-
-    // 测试连通性
     this.btnSave.textContent = '⏳ 测试连接中...';
     this.btnSave.classList.add('loading');
-    const result = await window.api.testLLMConnection(settings);
+    try {
+      const result = await window.api.testLLMConnection(settings);
+      if (!result.success) {
+        errorEl.textContent = result.error || '连接测试失败，请重试';
+        errorEl.classList.add('show');
+        return;
+      }
 
-    if (result.success) {
-      // 连接成功 → 显示保存成功并关闭
-      this.btnSave.textContent = '保存设置';
-      this.btnSave.classList.remove('loading');
+      try {
+        await window.api.saveSettings(settings);
+      } catch {
+        errorEl.textContent = '设置保存失败，请重试';
+        errorEl.classList.add('show');
+        return;
+      }
+      this.settings = settings;
       this.saveSuccess.classList.add('show');
       setTimeout(() => {
         window.close();
       }, 800);
-    } else {
-      // 连接失败 → 显示红色错误提示，不关闭
-      this.btnSave.textContent = '保存设置';
-      this.btnSave.classList.remove('loading');
-      errorEl.textContent = `⚠️ 大模型测试连接失败，请核对后重试!`;
+    } catch {
+      errorEl.textContent = '连接测试失败，请重试';
       errorEl.classList.add('show');
+    } finally {
+      this.btnSave.textContent = idleButtonLabel;
+      this.btnSave.classList.remove('loading');
     }
   }
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  new SettingsPage();
-});
+if (typeof module !== 'undefined' && module.exports) {
+  module.exports = { SettingsPage };
+} else {
+  document.addEventListener('DOMContentLoaded', () => {
+    new SettingsPage();
+  });
+}

@@ -17,18 +17,18 @@
       <div class="panel-title">📊 表达分析</div>
       <div class="stat-row">
         <span class="stat-label">笼统词</span>
-        <span id="stat-vague" class="stat-value stat-red">0</span>
+        <span id="stat-vague" class="stat-value stat-yellow">0</span>
       </div>
       <div class="stat-row">
         <span class="stat-label">填充词</span>
-        <span id="stat-fillers" class="stat-value stat-orange">0</span>
+        <span id="stat-fillers" class="stat-value stat-red">0</span>
       </div>
       <div class="stat-row">
         <span class="stat-label">犹豫词</span>
-        <span id="stat-hedges" class="stat-value stat-yellow">0</span>
+        <span id="stat-hedges" class="stat-value stat-orange">0</span>
       </div>
       <div class="stat-row">
-        <span class="stat-label">表达密度</span>
+        <span class="stat-label" title="去除填充词和犹豫词后的有效词占比">表达密度 <span class="stat-help" aria-hidden="true">?</span></span>
         <span id="stat-density" class="stat-value stat-green">--</span>
       </div>
     </aside>
@@ -40,10 +40,16 @@
         <span class="app-title">宇宙无敌表达训练系统</span>
         <div class="topbar-right">
           <span id="timer" class="timer">00:00</span>
-          <button id="btn-prompt-editor" class="btn-icon" title="训练规则">🎯</button>
-          <button id="btn-diagnostics" class="btn-icon" title="导出诊断信息">🩺</button>
-          <button id="btn-settings" class="btn-icon" title="设置">⚙️</button>
+          <button id="btn-help" class="btn-help" title="帮助与反馈">帮助</button>
+          <button id="btn-prompt-editor" class="btn-icon" title="训练规则" aria-label="打开训练规则">🎯</button>
+          <button id="btn-diagnostics" class="btn-icon" title="导出诊断信息" aria-label="导出诊断信息">🩺</button>
+          <button id="btn-settings" class="btn-icon" title="设置" aria-label="打开设置">⚙️</button>
         </div>
+      </div>
+
+      <div id="user-message" class="user-message hidden" role="status" aria-live="polite">
+        <span id="user-message-text"></span>
+        <button id="user-message-action" class="btn-message-action hidden">打开设置</button>
       </div>
 
       <!-- 字幕区顶部工具栏 -->
@@ -64,6 +70,8 @@
           <div class="subtitle-line hint">点击下方按钮开始说话</div>
         </div>
       </div>
+
+      <div id="training-status" class="operation-status" role="status" aria-live="polite">准备就绪</div>
 
       <!-- 底部按钮（只保留核心操作） -->
       <div class="action-bar">
@@ -93,6 +101,7 @@
     <!-- 右栏：实时反馈 -->
     <aside class="panel-right">
       <div class="panel-title">💡 实时反馈</div>
+      <div id="feedback-status" class="feedback-status" role="status" aria-live="polite">本地分析可用；AI 建议约每新增 30 字生成</div>
       <div id="feedback-content" class="feedback-content">
         <!-- 实时反馈内容 -->
       </div>
@@ -118,7 +127,7 @@
     <div class="modal-content">
       <div class="modal-header">
         <h2>📋 粘贴逐字稿</h2>
-        <button id="btn-close-paste" class="btn-close">×</button>
+        <button id="btn-close-paste" class="btn-close" aria-label="关闭粘贴逐字稿">×</button>
       </div>
       <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
         <p style="color:#888;font-size:13px;">把逐字稿粘贴进来，我帮你分析</p>
@@ -135,7 +144,7 @@
         <h2>📋 表达分析报告</h2>
         <div class="modal-header-actions">
           <button id="btn-copy-report" class="btn-sm">📋 复制全文</button>
-          <button id="btn-close-report" class="btn-close">×</button>
+          <button id="btn-close-report" class="btn-close" aria-label="关闭训练报告">×</button>
         </div>
       </div>
       <div id="report-body" class="modal-body">
@@ -143,7 +152,48 @@
     </div>
   </div>
 
+  <!-- 帮助与反馈弹窗 -->
+  <div id="help-modal" class="modal hidden">
+    <div class="modal-content help-modal-content">
+      <div class="modal-header">
+        <h2>帮助与反馈</h2>
+        <button id="btn-close-help" class="btn-close" aria-label="关闭帮助">×</button>
+      </div>
+      <div class="modal-body help-body">
+        <section class="help-section">
+          <h2>快速开始</h2>
+          <ol>
+            <li>点击“开始录制”，允许应用使用麦克风。</li>
+            <li>讲话时查看中间字幕、左侧统计和右侧实时反馈。</li>
+            <li>结束后点击“生成报告”，查看完整表达分析。</li>
+            <li>已有文字时，可用“粘贴逐字稿”直接分析。</li>
+          </ol>
+          <h3>字幕颜色</h3>
+          <div class="help-color-grid">
+            <span><b class="help-red">红色</b>：填充词</span>
+            <span><b class="help-orange">橙色</b>：犹豫词</span>
+            <span><b class="help-yellow">黄色</b>：笼统词</span>
+            <span><b class="help-green">绿色</b>：有力表达</span>
+          </div>
+          <p class="help-note">🎯 可编辑训练目标与自定义规则；⚙️ 可配置 AI 服务。本应用当前处于内部开发测试阶段。</p>
+        </section>
+
+        <section class="help-section">
+          <h2 id="feedback-section-title">问题和建议</h2>
+          <p>问题与建议统一记录在腾讯在线文档中，便于内部测试阶段集中跟踪和处理。</p>
+          <p class="help-privacy-notice">如需提供错误线索，可先导出脱敏诊断 JSON，再将文件信息补充到在线文档。诊断信息不包含逐字稿、音频、密钥、绝对路径或完整错误堆栈。</p>
+          <p id="feedback-link-error" class="help-form-message" role="alert"></p>
+          <div class="help-actions">
+            <button id="btn-help-diagnostics" class="btn-support btn-support-secondary">导出诊断信息</button>
+            <button id="btn-open-feedback-document" class="btn-support">打开问题和建议文档</button>
+          </div>
+        </section>
+      </div>
+    </div>
+  </div>
+
   <script src="../shared/expression-rules.js"></script>
+  <script src="../shared/support-links.js"></script>
   <script src="safe-rendering.js"></script>
   <script src="asr-event-state.js"></script>
   <script src="audio-capture.js"></script>

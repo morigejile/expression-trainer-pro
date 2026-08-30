@@ -12,23 +12,46 @@ function createClassList() {
   return {
     add: (...names) => names.forEach(name => classes.add(name)),
     remove: (...names) => names.forEach(name => classes.delete(name)),
+    toggle(name, force) {
+      if (force === true) classes.add(name);
+      else if (force === false) classes.delete(name);
+      else if (classes.has(name)) classes.delete(name);
+      else classes.add(name);
+    },
     contains: (name) => classes.has(name)
   };
 }
 
-function createElement() {
+function createElement(tagName = 'div') {
   return {
+    tagName: tagName.toUpperCase(),
     classList: createClassList(),
     style: {},
     textContent: '',
     children: [],
+    get firstChild() {
+      return this.children[0] ?? null;
+    },
     appendChild(node) {
       this.children.push(node);
       return node;
     },
+    insertBefore(node, reference) {
+      const index = this.children.indexOf(reference);
+      if (index === -1) this.children.push(node);
+      else this.children.splice(index, 0, node);
+      return node;
+    },
+    removeChild(node) {
+      const index = this.children.indexOf(node);
+      if (index !== -1) this.children.splice(index, 1);
+      return node;
+    },
     replaceChildren(...nodes) {
       this.children = [...nodes];
-    }
+    },
+    focus() {},
+    addEventListener() {}
   };
 }
 
@@ -60,6 +83,7 @@ function createTrainer() {
   trainer.btnPause = createElement();
   trainer.btnResume = createElement();
   trainer.btnStart = createElement();
+  trainer.btnPaste = createElement();
   trainer.btnReport = createElement();
   trainer.btnCopyText = createElement();
   trainer.btnSaveText = createElement();
@@ -73,6 +97,13 @@ function createTrainer() {
   trainer.statDensity = createElement();
   trainer.reportBody = createElement();
   trainer.reportModal = createElement();
+  trainer.pasteModal = createElement();
+  trainer.pasteTextarea = { value: '', focus() {} };
+  trainer.userMessage = createElement();
+  trainer.userMessageText = createElement();
+  trainer.userMessageAction = createElement();
+  trainer.trainingStatus = createElement();
+  trainer.feedbackStatus = createElement();
   return trainer;
 }
 
@@ -250,6 +281,314 @@ test('stop final text reaches transcript, analysis, and the next report', async 
   assert.equal(trainer.stats.totalWords, 8);
   assert.equal(reportPayload.fullText, '已经确认尾部文本');
   assert.equal(reportPayload.stats.totalWords, 8);
+});
+
+test('realtime configuration failures show their reason with a settings action', async (t) => {
+  const messages = [];
+  global.window = {
+    api: {
+      getRealtimeFeedback: async () => ({
+        success: false,
+        error: '请先配置 API Key',
+        errorCode: 'missing-api-key'
+      })
+    }
+  };
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  trainer.fullText = '这是一段足够长的实时反馈测试文本';
+  trainer.showUserMessage = (message, options) => messages.push({ message, options });
+
+  await trainer.requestRealtimeFeedback();
+
+  assert.deepEqual(messages, [{
+    message: '实时反馈失败：请先配置 API Key',
+    options: { openSettings: true }
+  }]);
+});
+
+test('starting recognition immediately exposes preparation state and locks conflicting actions', async (t) => {
+  const cancellation = createDeferred();
+  global.document = { createElement };
+  global.window = {
+    api: {
+      cancelLLMRequests: () => cancellation.promise,
+      startASR: async () => ({ ok: false, error: { message: 'test stop' } })
+    }
+  };
+  let start;
+  t.after(async () => {
+    cancellation.resolve({ success: true });
+    await start?.catch(() => {});
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.fullText = '';
+
+  start = trainer.startRecording();
+
+  assert.equal(trainer.trainingStatus.textContent, '正在准备语音识别，首次运行可能需要数分钟');
+  assert.equal(trainer.btnStart.disabled, true);
+  assert.equal(trainer.btnPaste.disabled, true);
+
+  cancellation.resolve({ success: true });
+  await start;
+});
+
+test('stopping recording immediately exposes finalization state and locks recording controls', async (t) => {
+  const captureStop = createDeferred();
+  global.document = { createElement };
+  global.window = {
+    api: {
+      stopASR: async ({ sessionId }) => stopEnvelope(sessionId, ''),
+      cancelLLMRequests: async () => ({ success: true }),
+      analyzeText: async () => ({ totalWords: 0, fillers: [], hedges: [], vagueWords: [] })
+    }
+  };
+  t.after(() => {
+    captureStop.resolve();
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  activateAsrSession(trainer);
+  trainer.audioCapture = {
+    setEnabled() {},
+    stop: () => captureStop.promise
+  };
+
+  const stopping = trainer.stopRecording();
+
+  assert.equal(trainer.trainingStatus.textContent, '正在结束并整理尾部文字…');
+  assert.equal(trainer.btnStop.disabled, true);
+  assert.equal(trainer.btnPause.disabled, true);
+
+  captureStop.resolve();
+  await stopping;
+  assert.equal(trainer.trainingStatus.textContent, '本次训练已结束');
+});
+
+test('successful recording, pause, and resume expose the current operation state', async (t) => {
+  const { trainer } = await startAudioCaptureHarness(t);
+
+  assert.equal(trainer.trainingStatus.textContent, '正在录音');
+  assert.equal(trainer.btnPaste.disabled, true);
+
+  trainer.pauseRecording();
+  assert.equal(trainer.trainingStatus.textContent, '录音已暂停');
+
+  trainer.resumeRecording();
+  assert.equal(trainer.trainingStatus.textContent, '正在录音');
+});
+
+test('clearing an idle result restores ready and local-analysis states', (t) => {
+  global.document = { createElement };
+  global.window = {
+    confirm: () => true,
+    api: { cancelLLMRequests: () => ({ success: true }) }
+  };
+  t.after(() => {
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.trainingStatus.textContent = '本次训练已结束';
+  trainer.feedbackStatus.textContent = '本地分析正常，AI 建议已更新';
+
+  trainer.clearAll();
+
+  assert.equal(trainer.trainingStatus.textContent, '准备就绪');
+  assert.equal(trainer.feedbackStatus.textContent, '本地分析可用；AI 建议约每新增 30 字生成');
+  assert.equal(trainer.btnPaste.disabled, false);
+});
+
+test('realtime AI work exposes pending and updated status without hiding local analysis', async (t) => {
+  const feedback = createDeferred();
+  global.document = { createElement };
+  global.window = {
+    api: { getRealtimeFeedback: () => feedback.promise }
+  };
+  t.after(() => {
+    feedback.resolve({ success: false, errorCode: 'cancelled' });
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.fullText = '这是一段足够长的实时反馈测试文本';
+
+  const pending = trainer.requestRealtimeFeedback();
+  assert.equal(trainer.feedbackStatus.textContent, '本地分析正常，AI 建议生成中…');
+
+  feedback.resolve({ success: true, feedback: '表达清楚' });
+  await pending;
+
+  assert.equal(trainer.feedbackStatus.textContent, '本地分析正常，AI 建议已更新');
+});
+
+test('feedback items follow the transcript reading direction from oldest to newest', () => {
+  global.document = { createElement };
+  const trainer = createTrainer();
+
+  try {
+    trainer.addFeedbackItem('第一条');
+    trainer.addFeedbackItem('第二条');
+
+    assert.deepEqual(
+      trainer.feedbackContent.children.map(item => item.textContent),
+      ['第一条', '第二条']
+    );
+  } finally {
+    delete global.document;
+  }
+});
+
+test('report configuration failures show their reason with a settings action', async (t) => {
+  const messages = [];
+  global.document = { createElement };
+  global.window = {
+    api: {
+      getFinalReport: async () => ({
+        success: false,
+        error: 'API Key 无效或无权限',
+        errorCode: 'unauthorized'
+      })
+    }
+  };
+  t.after(() => {
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.showUserMessage = (message, options) => messages.push({ message, options });
+
+  await trainer.generateReport();
+
+  assert.deepEqual(messages, [{
+    message: '生成报告失败：API Key 无效或无权限',
+    options: { openSettings: true }
+  }]);
+  assert.equal(trainer.btnReport.disabled, false);
+  assert.deepEqual(
+    trainer.reportBody.children.map(node => [node.tagName, node.textContent]),
+    [
+      ['P', '生成报告失败：API Key 无效或无权限'],
+      ['BUTTON', '重试生成']
+    ]
+  );
+});
+
+test('a second report request is rejected while the first is pending', async (t) => {
+  const report = createDeferred();
+  const messages = [];
+  let calls = 0;
+  global.document = { createElement };
+  global.window = {
+    api: {
+      getFinalReport: async () => {
+        calls += 1;
+        return report.promise;
+      }
+    }
+  };
+  t.after(() => {
+    report.resolve({ success: false, error: 'test cleanup', errorCode: 'generic' });
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.showUserMessage = message => messages.push(message);
+  trainer.renderReport = () => {};
+
+  const first = trainer.generateReport();
+  await new Promise(resolve => setImmediate(resolve));
+  await trainer.generateReport();
+
+  assert.equal(calls, 1);
+  assert.deepEqual(messages, ['报告正在生成，请稍候']);
+  report.resolve({ success: true, report: '完成' });
+  await first;
+});
+
+test('opening paste analysis during recording is blocked with an explanation', () => {
+  const messages = [];
+  const trainer = createTrainer();
+  trainer.pasteModal.classList.add('hidden');
+  trainer.showUserMessage = message => messages.push(message);
+
+  trainer.openPasteModal();
+
+  assert.equal(trainer.pasteModal.classList.contains('hidden'), true);
+  assert.deepEqual(messages, ['请先结束当前录制，再导入逐字稿']);
+});
+
+test('blank pasted text is explained without starting analysis', async (t) => {
+  const messages = [];
+  global.window = {
+    api: {
+      cancelLLMRequests: async () => assert.fail('blank text must not start analysis')
+    }
+  };
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.fullText = '';
+  trainer.pasteTextarea.value = '  \n  ';
+  trainer.showUserMessage = message => messages.push(message);
+
+  await trainer.analyzePastedText();
+
+  assert.deepEqual(messages, ['请先粘贴需要分析的逐字稿']);
+});
+
+test('declining replacement keeps existing content when a new recording is requested', async (t) => {
+  global.window = {
+    confirm: () => false,
+    api: {
+      cancelLLMRequests: async () => assert.fail('declined replacement must not start')
+    }
+  };
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+
+  await trainer.startRecording();
+
+  assert.equal(trainer.fullText, '已经确认');
+  assert.equal(trainer.asrStartAttempt, null);
+});
+
+test('declining replacement keeps existing content when pasted text is analyzed', async (t) => {
+  global.window = {
+    confirm: () => false,
+    api: {
+      cancelLLMRequests: async () => assert.fail('declined replacement must not analyze')
+    }
+  };
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.pasteTextarea.value = '新逐字稿';
+
+  await trainer.analyzePastedText();
+
+  assert.equal(trainer.fullText, '已经确认');
+});
+
+test('declining clear keeps existing idle content', (t) => {
+  global.window = {
+    confirm: () => false,
+    api: { cancelLLMRequests: () => ({ success: true }) }
+  };
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+
+  trainer.clearAll();
+
+  assert.equal(trainer.fullText, '已经确认');
 });
 
 test('clear suppresses feedback that completed after cancellation', async (t) => {
@@ -618,18 +957,15 @@ test('clear during initial cancellation await prevents the stale start from clai
   assert.deepEqual(trainer.asrEventState, createAsrEventState());
 });
 
-test('only the latest of two overlapping starts may pass the initial await', async (t) => {
+test('a repeated start is rejected while the first start is pending', async (t) => {
   const firstCancellation = createDeferred();
-  const secondCancellation = createDeferred();
-  const gates = [firstCancellation, secondCancellation];
   const startCommands = [];
   let cancellationCalls = 0;
   global.window = {
     api: {
       cancelLLMRequests() {
-        const gate = gates[cancellationCalls];
         cancellationCalls += 1;
-        return gate.promise;
+        return firstCancellation.promise;
       },
       async startASR(command) {
         startCommands.push(command);
@@ -639,20 +975,21 @@ test('only the latest of two overlapping starts may pass the initial await', asy
   };
   t.after(() => {
     firstCancellation.resolve({ success: true });
-    secondCancellation.resolve({ success: true });
     delete global.window;
   });
   const trainer = createTrainer();
   trainer.showError = () => {};
+  const messages = [];
+  trainer.showUserMessage = message => messages.push(message);
 
   const firstStart = trainer.startRecording();
   const secondStart = trainer.startRecording();
   firstCancellation.resolve({ success: true });
-  await new Promise(resolve => setImmediate(resolve));
-  secondCancellation.resolve({ success: true });
   await Promise.all([firstStart, secondStart]);
 
+  assert.equal(cancellationCalls, 1);
   assert.equal(startCommands.length, 1);
+  assert.deepEqual(messages, ['录制正在启动，请稍候']);
   assert.deepEqual(trainer.asrEventState, createAsrEventState());
 });
 
@@ -693,13 +1030,13 @@ test('audio capture setup failure releases the local capture and leaves no owner
   assert.deepEqual(trainer.lastAudioCaptureRates, rateError.audioRates);
 });
 
-test('microphone rejection from a replaced start does not display a stale error', async (t) => {
+test('a repeated start cannot replace a start that is waiting for microphone access', async (t) => {
   const firstMicrophone = createDeferred();
   const microphoneRequested = createDeferred();
-  const secondCancellation = createDeferred();
   let cancelLlmCalls = 0;
   let startCalls = 0;
   const shownErrors = [];
+  const messages = [];
   const audio = createAudioCaptureFactoryFake({
     start() {
       microphoneRequested.resolve();
@@ -710,31 +1047,26 @@ test('microphone rejection from a replaced start does not display a stale error'
     api: {
       cancelLLMRequests() {
         cancelLlmCalls += 1;
-        return cancelLlmCalls === 1
-          ? Promise.resolve({ success: true })
-          : secondCancellation.promise;
+        return Promise.resolve({ success: true });
       },
       async startASR(command) {
         startCalls += 1;
-        if (startCalls === 1) {
-          return {
-            ok: true,
-            events: [{ type: 'ready', sessionId: command.sessionId, sequence: 0 }]
-          };
-        }
-        return { ok: false, error: { code: 'second-stopped', message: 'second stopped' } };
+        return {
+          ok: true,
+          events: [{ type: 'ready', sessionId: command.sessionId, sequence: 0 }]
+        };
       },
       cancelASR: async () => ({ ok: true, events: [] })
     }
   };
   t.after(() => {
     firstMicrophone.reject(new Error('old permission failure'));
-    secondCancellation.resolve({ success: true });
     delete global.window;
   });
   const trainer = createTrainer();
   trainer.audioCaptureFactory = audio.factory;
   trainer.showError = message => shownErrors.push(message);
+  trainer.showUserMessage = message => messages.push(message);
 
   const firstStart = trainer.startRecording();
   await microphoneRequested.promise;
@@ -742,8 +1074,10 @@ test('microphone rejection from a replaced start does not display a stale error'
   firstMicrophone.reject(new Error('old permission failure'));
   await firstStart;
 
-  assert.equal(shownErrors.some(message => message.includes('old permission failure')), false);
-  secondCancellation.resolve({ success: true });
+  assert.equal(cancelLlmCalls, 1);
+  assert.equal(startCalls, 1);
+  assert.equal(shownErrors.some(message => message.includes('old permission failure')), true);
+  assert.deepEqual(messages, ['录制正在启动，请稍候']);
   await secondStart;
 });
 
