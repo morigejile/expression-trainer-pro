@@ -1037,6 +1037,7 @@ test('audio capture setup failure releases the local capture and leaves no owner
   assert.equal(audio.calls.stop.length, 1);
   assert.equal(trainer.audioCapture, null);
   assert.deepEqual(trainer.lastAudioCaptureRates, rateError.audioRates);
+  assert.equal(trainer.userMessage.classList.contains('hidden'), true);
 });
 
 test('clear during stop-final analysis prevents stale analysis side effects', async (t) => {

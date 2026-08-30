@@ -220,6 +220,7 @@ class ExpressionTrainer {
     } catch (error) {
       if (ownsSession()) {
         this.asrEventState = invalidateAsrSession(this.asrEventState);
+        this.hideUserMessage();
         this.showError(`语音识别启动失败: ${error.message}`);
         this.asrStartAttempt = null;
       }
@@ -236,6 +237,7 @@ class ExpressionTrainer {
         this.asrEventState = invalidateAsrSession(this.asrEventState);
       }
       if (this.asrStartAttempt === startAttempt) {
+        if (!startResponse?.ok) this.hideUserMessage();
         this.asrStartAttempt = null;
       } else if (startResponse?.ok) {
         await this.cancelActiveAsrSession(sessionId, () => false);
@@ -280,6 +282,7 @@ class ExpressionTrainer {
         () => failureOwned && this.asrStartAttempt === startAttempt
       );
       if (failureOwned && this.asrStartAttempt === startAttempt) {
+        this.hideUserMessage();
         this.showError(`麦克风访问失败: ${err.message}`);
         this.asrStartAttempt = null;
       }
