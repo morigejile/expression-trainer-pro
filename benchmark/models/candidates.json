@@ -62,7 +62,7 @@
       "displayName": "Zipformer Large CTC Chinese INT8",
       "family": "zipformer-ctc",
       "mode": "streaming",
-      "status": "pending",
+      "status": "verified",
       "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30.tar.bz2",
       "upstreamVersion": "2025-06-30",
       "license": {
@@ -73,24 +73,23 @@
       "evidence": {
         "source": { "status": "verified", "checkedAt": "2026-08-29T00:00:00.000Z" },
         "license": { "status": "pending", "checkedAt": "2026-08-29T00:00:00.000Z" },
-        "files": { "status": "pending", "reason": "Official archive has not been downloaded or hashed in this worktree.", "verifiedAt": "2026-08-29T00:00:00.000Z" },
-        "nativeLoad": { "status": "pending", "reason": "Sherpa native initialization awaits external model files.", "recordedAt": "2026-08-29T00:00:00.000Z" }
+        "files": { "status": "verified", "reason": "The official archive matched its published SHA-256; extracted runtime files were SHA-256 verified locally.", "verifiedAt": "2026-08-30T00:00:00.000Z" },
+        "nativeLoad": { "status": "passed", "reason": "Sherpa-ONNX 1.13.3 native OnlineRecognizer initialization completed on Windows x64.", "recordedAt": "2026-08-30T00:00:00.000Z" }
       },
       "sampleRateHz": 16000,
       "numThreads": 2,
       "provider": "cpu",
-      "files": [],
-      "pending": {
-        "reason": "Internal candidate contract is ready; external artifact evidence and benchmark execution remain.",
-        "missing": ["archive-download", "runtime-file-hashes", "native-load", "benchmark"]
-      }
+      "files": [
+        { "relativePath": "sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30/model.int8.onnx", "sha256": "24ffdc19ba9aaed5a6a9beaede1e087745217d82425cf4041bca0c696661801e", "bytes": 162290887, "role": "model" },
+        { "relativePath": "sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30/tokens.txt", "sha256": "6193c7ea1c96d0d9a1e9652789b40d13a8a913b434a5451e93158f5a09fd6652", "bytes": 20628, "role": "tokens" }
+      ]
     },
     {
       "id": "fire-red-asr2-ctc-zh-en-int8-2026-02-25",
       "displayName": "FireRedASR2 CTC Chinese-English INT8",
       "family": "fire-red-asr-ctc",
       "mode": "utterance",
-      "status": "pending",
+      "status": "verified",
       "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25.tar.bz2",
       "upstreamVersion": "2026-02-25",
       "license": {
@@ -101,17 +100,16 @@
       "evidence": {
         "source": { "status": "verified", "checkedAt": "2026-08-29T00:00:00.000Z" },
         "license": { "status": "pending", "checkedAt": "2026-08-29T00:00:00.000Z" },
-        "files": { "status": "pending", "reason": "Official archive has not been downloaded or hashed in this worktree.", "verifiedAt": "2026-08-29T00:00:00.000Z" },
-        "nativeLoad": { "status": "pending", "reason": "Sherpa native OfflineRecognizer initialization awaits external model files.", "recordedAt": "2026-08-29T00:00:00.000Z" }
+        "files": { "status": "verified", "reason": "The official archive matched its published SHA-256; the missing tokens file was retrieved from the exact conversion source used by the official Sherpa packaging workflow, and both runtime files were SHA-256 verified locally.", "verifiedAt": "2026-08-30T00:00:00.000Z" },
+        "nativeLoad": { "status": "passed", "reason": "Sherpa-ONNX 1.13.3 native OfflineRecognizer initialization completed on Windows x64.", "recordedAt": "2026-08-30T00:00:00.000Z" }
       },
       "sampleRateHz": 16000,
       "numThreads": 2,
       "provider": "cpu",
-      "files": [],
-      "pending": {
-        "reason": "Utterance-only adapter contract is ready; external artifact evidence, benchmark execution, and interaction assessment remain.",
-        "missing": ["archive-download", "runtime-file-hashes", "native-load", "benchmark", "utterance-ux"]
-      }
+      "files": [
+        { "relativePath": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25/model.int8.onnx", "sha256": "ca3dbabd82170110cc0b343c2890866d449984bc9cd92b9a18371ff80a81bb99", "bytes": 775861420, "role": "model" },
+        { "relativePath": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25/tokens.txt", "sha256": "1bc613de2112d257e61a349c3e72d1b1a9cf19c33d3ca954197ad2171e5ea07b", "bytes": 79172, "role": "tokens" }
+      ]
     },
     {
       "id": "sensevoice-small-int8-2024-07-17",

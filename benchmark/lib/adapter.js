@@ -5,6 +5,8 @@ const { normalizeCandidateConfig } = require('./candidate-config');
 const SHERPA_CANDIDATES = [
   'paraformer-bilingual-zh-en-control',
   'zipformer-small-ctc-zh-int8-2025-04-01',
+  'zipformer-large-ctc-zh-int8-2025-06-30',
+  'fire-red-asr2-ctc-zh-en-int8-2026-02-25',
   'sensevoice-small-int8-2024-07-17'
 ];
 const ADAPTER_FACTORIES = { fake: createFakeAdapter };
