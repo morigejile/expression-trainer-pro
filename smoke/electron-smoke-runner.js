@@ -155,6 +155,8 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
         'training-status', 'feedback-status'
       ].filter(id => !document.getElementById(id)),
       initialUi: {
+        theme: document.documentElement.dataset.theme,
+        layout: document.documentElement.dataset.layout,
         trainingStatus: document.getElementById('training-status')?.textContent.trim(),
         feedbackStatus: document.getElementById('feedback-status')?.textContent.trim(),
         vagueClass: document.getElementById('stat-vague')?.className,
@@ -168,6 +170,8 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.deepEqual(apiContract.missing, []);
   assert.deepEqual(apiContract.missingUi, []);
   assert.deepEqual(apiContract.initialUi, {
+    theme: 'graphite',
+    layout: 'coach-rail',
     trainingStatus: '准备就绪',
     feedbackStatus: '本地分析可用；AI 建议约每新增 30 字生成',
     vagueClass: 'stat-value stat-yellow',
@@ -441,14 +445,58 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       return {
         title: document.title,
         provider: provider.value,
-        hasGetLlmProviderSettings: typeof window.api?.getLlmProviderSettings === 'function'
+        hasGetLlmProviderSettings: typeof window.api?.getLlmProviderSettings === 'function',
+        theme: document.documentElement.dataset.theme,
+        layout: document.documentElement.dataset.layout
       };
     })()`);
   });
   assert.deepEqual(settingsState, {
     title: '设置',
     provider: 'deepseek',
-    hasGetLlmProviderSettings: true
+    hasGetLlmProviderSettings: true,
+    theme: 'graphite',
+    layout: 'coach-rail'
+  });
+
+  await mainWindow.webContents.executeJavaScript(`(() => {
+    window.__appearanceSmoke = {
+      transcript: document.getElementById('subtitle-container'),
+      feedback: document.getElementById('feedback-content')
+    };
+  })()`);
+  const settingsAppearanceSave = await settingsWindow.webContents.executeJavaScript(
+    `window.api.saveAppearance({theme: 'paper', layout: 'focus-hud'})`
+  );
+  assert.deepEqual(settingsAppearanceSave, {
+    success: true,
+    appearance: {schemaVersion: 1, theme: 'paper', layout: 'focus-hud'}
+  });
+  const synchronizedSettingsAppearance = await waitUntil('settings appearance synchronization', async () => {
+    const [mainState, settingsState] = await Promise.all([
+      mainWindow.webContents.executeJavaScript(`(() => ({
+        theme: document.documentElement.dataset.theme,
+        layout: document.documentElement.dataset.layout,
+        transcriptPreserved: window.__appearanceSmoke.transcript === document.getElementById('subtitle-container'),
+        feedbackPreserved: window.__appearanceSmoke.feedback === document.getElementById('feedback-content')
+      }))()`),
+      settingsWindow.webContents.executeJavaScript(`(() => ({
+        theme: document.documentElement.dataset.theme,
+        layout: document.documentElement.dataset.layout
+      }))()`)
+    ]);
+    return mainState.theme === 'paper' && settingsState.theme === 'paper'
+      ? {mainState, settingsState}
+      : null;
+  });
+  assert.deepEqual(synchronizedSettingsAppearance, {
+    mainState: {
+      theme: 'paper',
+      layout: 'focus-hud',
+      transcriptPreserved: true,
+      feedbackPreserved: true
+    },
+    settingsState: {theme: 'paper', layout: 'focus-hud'}
   });
   settingsWindow.close();
 
@@ -474,12 +522,35 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     document.getElementById('btn-back').click();
     return {
       overlaps: !(back.right <= heading.left || back.left >= heading.right
-        || back.bottom <= heading.top || back.top >= heading.bottom)
+        || back.bottom <= heading.top || back.top >= heading.bottom),
+      theme: document.documentElement.dataset.theme,
+      layout: document.documentElement.dataset.layout
     };
   })()`);
-  assert.equal(promptEditorState.overlaps, false);
+  assert.deepEqual(promptEditorState, {
+    overlaps: false,
+    theme: 'paper',
+    layout: 'focus-hud'
+  });
   await delay(50);
   assert.equal(promptEditorWindow.isDestroyed(), false, 'declined dirty navigation must keep the editor open');
+  const promptAppearanceSave = await promptEditorWindow.webContents.executeJavaScript(
+    `window.api.saveAppearance({theme: 'midnight', layout: 'coach-rail'})`
+  );
+  assert.deepEqual(promptAppearanceSave, {
+    success: true,
+    appearance: {schemaVersion: 1, theme: 'midnight', layout: 'coach-rail'}
+  });
+  await waitUntil('prompt appearance synchronization', async () => {
+    const [mainTheme, promptTheme] = await Promise.all([
+      mainWindow.webContents.executeJavaScript('document.documentElement.dataset.theme'),
+      promptEditorWindow.webContents.executeJavaScript('document.documentElement.dataset.theme')
+    ]);
+    return mainTheme === 'midnight' && promptTheme === 'midnight';
+  });
+  await promptEditorWindow.webContents.executeJavaScript(
+    `window.api.saveAppearance({theme: 'graphite', layout: 'coach-rail'})`
+  );
   promptEditorWindow.destroy();
 
   await mainWindow.webContents.executeJavaScript(`(() => {

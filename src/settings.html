@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="graphite" data-layout="coach-rail">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="styles.css">
   <style>
     body {
-      background: #1a1a1a;
+      background: var(--color-page);
       padding: 40px 32px 32px;
       display: block;
       overflow-y: auto;
@@ -22,7 +22,7 @@
       font-size: 20px;
       font-weight: 600;
       margin-bottom: 24px;
-      color: #fff;
+      color: var(--color-text);
     }
 
     .form-group {
@@ -32,7 +32,7 @@
     .form-group label {
       display: block;
       font-size: 13px;
-      color: #888;
+      color: var(--color-text-muted);
       margin-bottom: 6px;
       text-transform: uppercase;
       letter-spacing: 0.5px;
@@ -42,10 +42,10 @@
     .form-group input {
       width: 100%;
       padding: 10px 14px;
-      background: #2a2a2a;
-      border: 1px solid #444;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
       border-radius: 8px;
-      color: #fff;
+      color: var(--color-text);
       font-size: 14px;
       outline: none;
       transition: border-color 0.2s;
@@ -53,16 +53,16 @@
 
     .form-group select:focus,
     .form-group input:focus {
-      border-color: #4dabf7;
+      border-color: var(--color-focus);
     }
 
     .form-group input::placeholder {
-      color: #666;
+      color: var(--color-text-subtle);
     }
 
     .form-group .hint {
       font-size: 12px;
-      color: #666;
+      color: var(--color-text-subtle);
       margin-top: 4px;
     }
 
@@ -77,8 +77,8 @@
     .btn-save {
       width: 100%;
       padding: 12px;
-      background: #4dabf7;
-      color: #000;
+      background: var(--color-accent);
+      color: var(--color-accent-contrast);
       border: none;
       border-radius: 8px;
       font-size: 15px;
@@ -89,7 +89,7 @@
     }
 
     .btn-save:hover {
-      background: #339af0;
+      filter: brightness(1.08);
     }
 
     .message-container {
@@ -103,7 +103,7 @@
       left: 0;
       right: 0;
       text-align: center;
-      color: #69db7c;
+      color: var(--color-success);
       font-size: 13px;
       opacity: 0;
       transition: opacity 0.3s;
@@ -118,7 +118,7 @@
       left: 0;
       right: 0;
       text-align: center;
-      color: #ff6b6b;
+      color: var(--color-error);
       font-size: 13px;
       opacity: 0;
       transition: opacity 0.3s;
@@ -130,13 +130,13 @@
     }
 
     .connection-error.success {
-      color: #69db7c;
+      color: var(--color-success);
       opacity: 1;
     }
 
     .model-presets {
       font-size: 12px;
-      color: #666;
+      color: var(--color-text-subtle);
       margin-top: 4px;
     }
 
@@ -159,15 +159,15 @@
       width: 42%;
       padding: 12px;
       background: transparent;
-      color: #aaa;
-      border: 1px solid #555;
+      color: var(--color-text-muted);
+      border: 1px solid var(--color-border);
       border-radius: 8px;
       font-size: 14px;
       font-weight: 600;
       cursor: pointer;
     }
 
-    .btn-test-connection:hover { color: #fff; border-color: #4dabf7; }
+    .btn-test-connection:hover { color: var(--color-text); border-color: var(--color-focus); }
     .btn-test-connection.loading { opacity: 0.6; pointer-events: none; }
   </style>
 </head>
@@ -225,6 +225,8 @@
     </div>
   </div>
 
+  <script src="appearance.js"></script>
+  <script>window.Appearance.initializeAppearance();</script>
   <script src="settings.js"></script>
 </body>
 </html>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="graphite" data-layout="coach-rail">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="styles.css">
   <style>
     body {
-      background: #1a1a1a;
+      background: var(--color-page);
       padding: 32px;
       display: block;
       overflow-y: auto;
@@ -33,12 +33,12 @@
       font-size: 20px;
       font-weight: 600;
       margin-bottom: 8px;
-      color: #fff;
+      color: var(--color-text);
     }
 
     .subtitle {
       font-size: 13px;
-      color: #666;
+      color: var(--color-text-subtle);
       margin-bottom: 28px;
       line-height: 1.6;
     }
@@ -57,7 +57,7 @@
     .section-title {
       font-size: 14px;
       font-weight: 500;
-      color: #ccc;
+      color: var(--color-text-muted);
     }
 
     .section-badge {
@@ -69,29 +69,29 @@
     }
 
     .badge-locked {
-      background: rgba(255,255,255,0.06);
-      color: #666;
+      background: var(--color-surface);
+      color: var(--color-text-subtle);
     }
 
     .badge-editable {
-      background: rgba(229,0,126,0.1);
-      color: #E5007E;
+      background: color-mix(in srgb, var(--color-accent) 12%, transparent);
+      color: var(--color-accent);
     }
 
     .section-desc {
       font-size: 12px;
-      color: #555;
+      color: var(--color-text-subtle);
       margin-bottom: 10px;
       line-height: 1.5;
     }
 
     .locked-preview {
-      background: #111;
-      border: 1px solid #2a2a2a;
+      background: var(--color-panel);
+      border: 1px solid var(--color-border);
       border-radius: 8px;
       padding: 14px 16px;
       font-size: 12px;
-      color: #555;
+      color: var(--color-text-subtle);
       line-height: 1.6;
       max-height: 120px;
       overflow-y: auto;
@@ -105,17 +105,17 @@
       top: 8px;
       right: 12px;
       font-size: 10px;
-      color: #444;
+      color: var(--color-text-subtle);
     }
 
     textarea {
       width: 100%;
       min-height: 120px;
       padding: 14px 16px;
-      background: #222;
-      border: 1px solid #444;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
       border-radius: 8px;
-      color: #eee;
+      color: var(--color-text);
       font-size: 13px;
       font-family: -apple-system, 'SF Pro Text', sans-serif;
       line-height: 1.7;
@@ -125,16 +125,16 @@
     }
 
     textarea:focus {
-      border-color: #E5007E;
+      border-color: var(--color-focus);
     }
 
     textarea::placeholder {
-      color: #555;
+      color: var(--color-text-subtle);
     }
 
     .example-toggle {
       font-size: 11px;
-      color: #E5007E;
+      color: var(--color-accent);
       cursor: pointer;
       margin-top: 6px;
       display: inline-block;
@@ -146,13 +146,13 @@
 
     .example-content {
       display: none;
-      background: #1a1a1a;
-      border: 1px dashed #333;
+      background: var(--color-panel);
+      border: 1px dashed var(--color-border);
       border-radius: 6px;
       padding: 12px 14px;
       margin-top: 8px;
       font-size: 11px;
-      color: #888;
+      color: var(--color-text-muted);
       line-height: 1.7;
     }
 
@@ -163,10 +163,10 @@
     .btn-back {
       position: static;
       padding: 6px 14px;
-      background: rgba(255,255,255,0.06);
-      border: 1px solid #333;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
       border-radius: 6px;
-      color: #aaa;
+      color: var(--color-text-muted);
       font-size: 13px;
       cursor: pointer;
       -webkit-app-region: no-drag;
@@ -174,8 +174,8 @@
     }
 
     .btn-back:hover {
-      border-color: #666;
-      color: #fff;
+      border-color: var(--color-focus);
+      color: var(--color-text);
     }
 
     .btn-row {
@@ -187,8 +187,8 @@
     .btn-save {
       flex: 1;
       padding: 12px;
-      background: #E5007E;
-      color: #fff;
+      background: var(--color-accent);
+      color: var(--color-accent-contrast);
       border: none;
       border-radius: 8px;
       font-size: 14px;
@@ -198,14 +198,14 @@
     }
 
     .btn-save:hover {
-      background: #c70069;
+      filter: brightness(1.08);
     }
 
     .btn-reset {
       padding: 12px 20px;
       background: transparent;
-      color: #666;
-      border: 1px solid #333;
+      color: var(--color-text-muted);
+      border: 1px solid var(--color-border);
       border-radius: 8px;
       font-size: 13px;
       cursor: pointer;
@@ -213,13 +213,13 @@
     }
 
     .btn-reset:hover {
-      border-color: #666;
-      color: #aaa;
+      border-color: var(--color-focus);
+      color: var(--color-text);
     }
 
     .save-success {
       text-align: center;
-      color: #69db7c;
+      color: var(--color-success);
       font-size: 13px;
       margin-top: 12px;
       opacity: 0;
@@ -232,7 +232,7 @@
 
     .divider {
       border: none;
-      border-top: 1px solid #2a2a2a;
+      border-top: 1px solid var(--color-border);
       margin: 28px 0;
     }
   </style>
@@ -322,6 +322,8 @@
     <div class="save-success" id="save-success">✓ 已保存，下次训练生效</div>
   </div>
 
+  <script src="appearance.js"></script>
+  <script>window.Appearance.initializeAppearance();</script>
   <script>
     let savedSnapshot = '';
     let allowClose = false;
