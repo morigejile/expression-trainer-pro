@@ -53,13 +53,13 @@ refactor: consume the validated ASR catalog in model manager
 
 ## Task 3: Add the production Zipformer CTC provider
 
-- [ ] Add failing `test/zipformer-ctc-asr-provider.test.js` cases for required `model`/`tokens` roles, the `zipformer2Ctc` native configuration, 16 kHz streaming partial/final behavior, endpoint reset, stop tail, cancel, dispose, and missing-file failure.
-- [ ] Run the new focused test and confirm it fails because the provider does not exist.
-- [ ] Extract only the proven common online-recognizer lifecycle from `lib/asr.js` when that avoids duplication; preserve every existing Paraformer config and behavior assertion.
-- [ ] Add `lib/zipformer-ctc-asr-provider.js` with the fixed `zipformer2Ctc` greedy-search/endpoint configuration used by the accepted Sherpa runtime contract.
-- [ ] Do not import benchmark code or expose model architecture branching to Main/Renderer.
-- [ ] Run Paraformer, Zipformer CTC, ASR session, and provider contract tests.
-- [ ] Commit with an English subject and a Chinese body.
+- [x] Add failing `test/zipformer-ctc-asr-provider.test.js` cases for required `model`/`tokens` roles, the `zipformer2Ctc` native configuration, 16 kHz streaming partial/final behavior, endpoint reset, stop tail, cancel, dispose, and missing-file failure.
+- [x] Run the new focused test and confirm it fails because the provider does not exist.
+- [x] Extract only the proven common online-recognizer lifecycle from `lib/asr.js` when that avoids duplication; preserve every existing Paraformer config and behavior assertion. (No extraction was needed; keeping Paraformer untouched reduced regression risk.)
+- [x] Add `lib/zipformer-ctc-asr-provider.js` with the fixed `zipformer2Ctc` greedy-search/endpoint configuration used by the accepted Sherpa runtime contract.
+- [x] Do not import benchmark code or expose model architecture branching to Main/Renderer.
+- [x] Run Paraformer, Zipformer CTC, ASR session, and provider contract tests.
+- [x] Commit with an English subject and a Chinese body.
 
 Expected commit:
 
