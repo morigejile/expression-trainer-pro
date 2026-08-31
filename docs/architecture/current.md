@@ -178,6 +178,8 @@ Main 负责 Electron 控制面、词库分析、小型 userData JSON 原子文�
 - 支持粘贴逐字稿、生成报告、复制/保存原文和报告、清空当前内存状态。
 - LLM 报告只渲染标题、加粗、行内代码、引用、普通行和换行等严格允许列表；LLM/HTTP 错误作为纯文本显示。
 - `src/appearance.js` 只更新根节点 `data-theme`/`data-layout`；四套主题共用语义 CSS token，初始化读取失败时保留 Graphite/coach-rail HTML 默认值，广播不会移动或重建训练 DOM。
+- 主页面的 stage、coach、insights 区域共用一套语义 DOM。`coach-rail` 将实时反馈和紧凑洞察稳定放在右栏；`focus-hud` 使用有安全留白的内嵌反馈面板，在 1280 以下收敛为固定右栏。反馈宽度限制为 300～460 逻辑像素，字幕字号用 `clamp()` 伸缩，整体内容在超宽屏封顶居中。
+- 操作图标是随 HTML 内联、继承 `currentColor` 的单色 SVG；可见标题缩短为“表达训练”，完整产品名仍是窗口标题。DJ 装饰、字幕循环发光和计时器循环呼吸已移除，录音态改用静态状态点并保留 `prefers-reduced-motion` 与键盘焦点。
 
 R-02 已建立 ASR session/event 状态，R-03/R-04 已把采集生命周期和 Web Audio 节点移出 `ExpressionTrainer`，但尚未形成覆盖权限、录音、分析等全部阶段的显式训练状态机。替换 session、启动/麦克风/worklet/feed 失败和清空会立即使旧 session 失效；正常 stop 使用单飞操作完成 tail flush、feed drain、ASR stop/final 和 UI 收尾。T-06 的 LLM pending 请求协调和 Renderer 代际过滤继续独立生效。
 
@@ -261,7 +263,7 @@ providers.custom     { apiKey, baseUrl, model, customModel }
 
 旧版扁平字段、缺失 provider 字段和旧文件名 `settings.json` 在读取时迁移为 schema version 1；canonical 文件优先，迁移后不删除 legacy 文件，也不按时间戳合并。损坏 JSON 使用默认配置运行并保留原文件，未知 provider 配置块不会在规范化时被删除。canonical 或 legacy future schema 可读取已知子集，显式保存则返回稳定错误且不写文件。LLM provider 与 custom-prompt 都使用同盘原子写，发布失败保留旧文件并清理临时文件。API Key 仍为明文；当前内部阶段不为此增加 native keychain 依赖，发布前再按平台成本评估。`custom-prompt.json` 保存 versioned goals、customRules、styleRef、customWords。训练文本、统计和报告仅在 Renderer 内存中，除非用户手动复制/保存。
 
-`appearance.json` 已实现 schema version 1，只保存 `theme` 与 `layout`；合法值固定为 Graphite/Midnight/Paper/Mist 和 coach-rail/focus-hud。缺失或损坏文件使用默认值且不覆盖原文件，future schema 可读取已知值但拒绝显式保存。设置页外观区域即时保存并独立于 LLM 保存/连接测试。多模型选择仍为 Planned，后续使用独立 `asr-selection.json`，不重新并入 LLM provider 或 Appearance 配置。
+`appearance.json` 已实现 schema version 1，只保存 `theme` 与 `layout`；合法值固定为 Graphite/Midnight/Paper/Mist 和 coach-rail/focus-hud。缺失或损坏文件使用默认值且不覆盖原文件，future schema 可读取已知值但拒绝显式保存。设置页外观区域即时保存并独立于 LLM 保存/连接测试。两种布局已由同一 DOM 和 CSS Grid areas 实现，切换不接触 Renderer 训练状态。多模型选择仍为 Planned，后续使用独立 `asr-selection.json`，不重新并入 LLM provider 或 Appearance 配置。
 
 ### 5.8 Benchmark dataset boundary (BM-01)
 

@@ -1,5 +1,9 @@
 # UI-02 Dual Layout and Visual Refresh Implementation Plan
 
+> **Status:** Completed on 2026-08-31.
+>
+> **Completion evidence:** Fresh `node --test` reported 323 tests, 321 pass, 0 fail, and the two existing Windows file-symlink skips. Electron smoke verified both layouts at 960×640, 1366×768, and 1760×1000 while preserving node identity, scroll, controls, timer, and training status. In-app visual checks covered Graphite coach-rail at minimum size, Graphite focus-hud at standard size, and Paper focus-hud at wide size; no screenshot baseline or approval system was added.
+
 > **For Codex:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
 **Goal:** Deliver the coach-rail and focus-hud responsive layouts with a shared DOM, unified inline SVG controls, and representative visual acceptance without changing training behavior.
@@ -72,13 +76,13 @@ style: simplify training visuals and motion
 
 ## Task 4: Representative acceptance and documentation
 
-- [ ] Run the full automated test suite and record exact pass/fail/skip counts.
-- [ ] Perform representative visual checks for Graphite coach-rail, Graphite focus-hud, and one light-theme focus-hud at minimum, standard, and wide logical sizes where the available host permits.
-- [ ] Confirm subtitle first, feedback second, insights third; no overlap, clipped core control, DJ decoration, emoji control, or continuous animation remains.
-- [ ] Update `docs/requirements/requirements.md`, `docs/roadmap.md`, `docs/architecture/current.md`, and `docs/development.md` to mark UI-02 implemented and record only material verification evidence.
-- [ ] Mark this plan completed with the final evidence and remaining host limitations, if any.
-- [ ] Run the full suite again after documentation and inspect `git diff --check` plus `git status --short`.
-- [ ] Commit with an English subject and a Chinese body.
+- [x] Run the full automated test suite and record exact pass/fail/skip counts.
+- [x] Perform representative visual checks for Graphite coach-rail, Graphite focus-hud, and one light-theme focus-hud at minimum, standard, and wide logical sizes where the available host permits.
+- [x] Confirm subtitle first, feedback second, insights third; no overlap, clipped core control, DJ decoration, emoji control, or continuous animation remains.
+- [x] Update `docs/requirements/requirements.md`, `docs/roadmap.md`, `docs/architecture/current.md`, and `docs/development.md` to mark UI-02 implemented and record only material verification evidence.
+- [x] Mark this plan completed with the final evidence and remaining host limitations, if any.
+- [x] Run the full suite again after documentation and inspect `git diff --check` plus `git status --short`.
+- [x] Commit with an English subject and a Chinese body.
 
 Expected commit:
 

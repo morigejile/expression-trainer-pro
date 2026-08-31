@@ -81,6 +81,8 @@ Appearance schema version 1 只保存四主题和两个布局标识；缺失、�
 
 UI-01 收尾在 Node 24 系列运行完整 `node --test`：323 项中 321 pass、0 fail、2 skip；两项 skip 是当前 Windows host 不允许创建 file symlink，directory junction 边界测试仍通过。本轮未改依赖、benchmark/model schema、native 或安装边界，因此不重复运行 audit、benchmark dry-run、Forge make 或 packaged smoke。
 
+UI-02 继续使用 Electron smoke 作为布局行为验收：两布局在 960×640、1366×768、1760×1000 逻辑内容尺寸下验证字幕/反馈不相交、反馈宽度有界、洞察层级较低，并验证节点、滚动、控件、计时和训练状态在切换中保持。代表性视觉检查覆盖 Graphite coach-rail、Graphite focus-hud 与 Paper focus-hud；不维护截图基线。收尾完整 `node --test` 仍为 323 项中 321 pass、0 fail、2 个既有 Windows file-symlink skip。
+
 ## ASR 模型
 
 模型权重不进入 Git。当前已实现的产品运行时仍由 utility process 根据 `models/registry.json` 自动下载并校验 Paraformer，安装到 Electron `userData/models/paraformer-bilingual-zh-en/2024-03-10/`；native 初始化成功后才更新 active pointer。ADR-0009 已选择 Zipformer Large 作为后续产品化的技术默认，但模型切换和交付尚未接入这条运行时路径。archive/runtime 的固定大小、hash 与再分发状态见 registry 和 ADR-0004/0009。

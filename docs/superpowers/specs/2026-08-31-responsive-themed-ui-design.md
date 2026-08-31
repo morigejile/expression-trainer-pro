@@ -1,7 +1,7 @@
 # Expression Trainer 响应式主题与双布局设计
 
 日期：2026-08-31
-状态：已确认方向；收敛评审已纳入；Planned
+状态：Implemented（UI-01/UI-02）；2026-08-31
 
 ## 1. 目标
 
