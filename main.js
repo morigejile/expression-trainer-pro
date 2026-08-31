@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, Menu, shell, utilityProcess } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu, screen, shell, utilityProcess } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -20,6 +20,8 @@ const {
   loadLlmProviderSettings,
   saveLlmProviderSettings
 } = require('./lib/llm-provider-store');
+const {loadAppearance, saveAppearance} = require('./lib/appearance-store');
+const {calculateInitialWindowSize} = require('./lib/window-bounds');
 const { createAsrIpcRouter } = require('./lib/asr-ipc');
 const { createAsrProcessController } = require('./lib/asr-process-controller');
 const {runManagedModelSmoke} = require('./lib/managed-model-smoke');
@@ -149,9 +151,10 @@ function saveCustomPrompt(data) {
 }
 
 function createMainWindow() {
+  const initialSize = calculateInitialWindowSize(screen.getPrimaryDisplay().workAreaSize);
   mainWindow = new BrowserWindow({
-    width: 1200,
-    height: 800,
+    width: initialSize.width,
+    height: initialSize.height,
     minWidth: 960,
     minHeight: 640,
     backgroundColor: '#000000',
@@ -164,6 +167,7 @@ function createMainWindow() {
     }
   });
 
+  mainWindow.center();
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
   mainWindow.setFullScreenable(true);
 
@@ -172,6 +176,14 @@ function createMainWindow() {
   });
 
   return mainWindow;
+}
+
+function broadcastAppearance(appearance) {
+  for (const window of [mainWindow, settingsWindow, promptEditorWindow]) {
+    if (window && !window.isDestroyed()) {
+      window.webContents.send('appearance-changed', appearance);
+    }
+  }
 }
 
 function createPromptEditorWindow() {
@@ -331,6 +343,25 @@ app.on('window-all-closed', () => {
 });
 
 // IPC Handlers
+
+ipcMain.handle('get-appearance', () => {
+  return loadAppearance(app.getPath('userData'));
+});
+
+ipcMain.handle('save-appearance', (event, appearance) => {
+  try {
+    const normalized = saveAppearance(app.getPath('userData'), appearance);
+    broadcastAppearance(normalized);
+    return {success: true, appearance: normalized};
+  } catch (error) {
+    return {
+      success: false,
+      error: error.code === 'unsupported-schema-version'
+        ? '当前版本无法保存更高版本的外观配置'
+        : '外观保存失败，请重试'
+    };
+  }
+});
 
 // LLM Provider 设置
 ipcMain.handle('get-llm-provider-settings', () => {

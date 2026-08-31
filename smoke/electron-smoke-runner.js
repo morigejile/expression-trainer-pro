@@ -141,6 +141,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   const apiContract = await mainWindow.webContents.executeJavaScript(`(() => {
     const expected = [
       'getLlmProviderSettings', 'saveLlmProviderSettings', 'openSettings',
+      'getAppearance', 'saveAppearance', 'onAppearanceChanged',
       'openPromptEditor', 'getCustomPrompt', 'saveCustomPrompt', 'closeWindow',
       'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText',
       'getRealtimeFeedback', 'getFinalReport', 'testLLMConnection',
@@ -173,6 +174,29 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     fillerClass: 'stat-value stat-red',
     hedgeClass: 'stat-value stat-orange',
     densityHelp: '有效词数（排除填充词和犹豫词）占总词数的比例'
+  });
+
+  const appearanceIpcState = await mainWindow.webContents.executeJavaScript(`(async () => {
+    const received = [];
+    const unsubscribe = window.api.onAppearanceChanged(appearance => received.push(appearance));
+    const initial = await window.api.getAppearance();
+    const saved = await window.api.saveAppearance({theme: 'paper', layout: 'focus-hud'});
+    await new Promise(resolve => setTimeout(resolve, 25));
+    unsubscribe();
+    const restored = await window.api.saveAppearance({theme: 'graphite', layout: 'coach-rail'});
+    return {initial, saved, received, restored};
+  })()`);
+  assert.deepEqual(appearanceIpcState, {
+    initial: {schemaVersion: 1, theme: 'graphite', layout: 'coach-rail'},
+    saved: {
+      success: true,
+      appearance: {schemaVersion: 1, theme: 'paper', layout: 'focus-hud'}
+    },
+    received: [{schemaVersion: 1, theme: 'paper', layout: 'focus-hud'}],
+    restored: {
+      success: true,
+      appearance: {schemaVersion: 1, theme: 'graphite', layout: 'coach-rail'}
+    }
   });
 
   const helpState = await mainWindow.webContents.executeJavaScript(`(() => {

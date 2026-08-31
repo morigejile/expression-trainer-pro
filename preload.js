@@ -6,6 +6,15 @@ contextBridge.exposeInMainWorld('api', {
   saveLlmProviderSettings: (settings) => ipcRenderer.invoke('save-llm-provider-settings', settings),
   openSettings: () => ipcRenderer.invoke('open-settings'),
 
+  // 外观设置
+  getAppearance: () => ipcRenderer.invoke('get-appearance'),
+  saveAppearance: (appearance) => ipcRenderer.invoke('save-appearance', appearance),
+  onAppearanceChanged: (listener) => {
+    const wrapped = (_event, appearance) => listener(appearance);
+    ipcRenderer.on('appearance-changed', wrapped);
+    return () => ipcRenderer.removeListener('appearance-changed', wrapped);
+  },
+
   // Prompt编辑器
   openPromptEditor: () => ipcRenderer.invoke('open-prompt-editor'),
   getCustomPrompt: () => ipcRenderer.invoke('get-custom-prompt'),
