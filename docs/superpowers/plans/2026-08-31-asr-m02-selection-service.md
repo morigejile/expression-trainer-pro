@@ -84,11 +84,11 @@ feat: restore the selected ASR model at startup
 
 ## Task 5: Verify ASR-M02 and update current truth
 
-- [ ] Run the complete automated suite and record exact pass/fail/skip counts.
-- [ ] Confirm no ASR model-management IPC/UI, install task process, utterance path, dependency, model, corpus, or benchmark runtime import was added.
-- [ ] Update requirements, roadmap, current architecture, development notes, multi-ASR design status, and this plan for ASR-M02 only; leave ASR-M03+ planned and redistribution gated.
-- [ ] Run the full suite again after documentation, then inspect `git diff --check` and `git status --short`.
-- [ ] Commit with an English subject and a Chinese body.
+- [x] Run the complete automated suite and record exact pass/fail/skip counts: 336 tests, 334 pass, 0 fail, 2 existing Windows file-symlink skips.
+- [x] Confirm no ASR model-management IPC/UI, install task process, utterance path, dependency, model, corpus, or benchmark runtime import was added.
+- [x] Update requirements, roadmap, current architecture, development notes, multi-ASR design status, and this plan for ASR-M02 only; leave ASR-M03+ planned and redistribution gated.
+- [x] Run the full suite again after documentation, then inspect `git diff --check` and `git status --short`.
+- [x] Commit with an English subject and a Chinese body.
 
 Expected commit:
 

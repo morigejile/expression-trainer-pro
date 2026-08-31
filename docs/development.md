@@ -77,13 +77,13 @@ git commit -m "<English subject>" -m "中文：<简短说明>"
 
 新文件不存在时从 legacy `settings.json` 单向迁移，不删除旧文件，也不做跨版本双向同步；新文件存在后以新文件为准。canonical 或 legacy 来源的 schema 高于当前支持版本时，读取可识别字段但拒绝所有显式保存。测试覆盖旧文件迁移、原子发布失败、新文件优先、future schema 拒绝保存，以及设置页“保存”和“测试连接”保持独立。
 
-Appearance 和 ASR selection 分别使用 Planned 的 `appearance.json` 与 `asr-selection.json`，不得合并进 LLM provider 配置快照。
+ASR selection 已独立使用 `asr-selection.json`；Appearance 保持自己的数据边界。两者都不得合并进 LLM provider 配置快照。
 
-ASR-M01 收尾在 Node 24.20.0 运行完整 `node --test`：312 项中 310 pass、0 fail、2 skip；两项 skip 是当前 Windows host 不允许创建 file symlink，directory junction 边界测试仍通过。
+ASR-M02 收尾在 Node 24.20.0 运行完整 `node --test`：336 项中 334 pass、0 fail、2 skip；两项 skip 是当前 Windows host 不允许创建 file symlink，directory junction 边界测试仍通过。
 
 ## ASR 模型
 
-模型权重不进入 Git。`models/registry.json` 已演进为唯一 schema-v2 产品 Catalog，仅包含 Paraformer、Zipformer Small 和 Zipformer Large 三款 streaming 模型；固定 archive/runtime 大小、SHA-256、role、最低应用版本与 `redistribution: not-approved`。`lib/asr-provider-factory.js` 只以代码内冻结映射创建 Paraformer 或 Zipformer CTC Provider，Catalog 不提供模块路径或运行能力。当前 utility 启动仍显式固定 Paraformer，并在 native 初始化成功后才更新 active pointer；选择与切换从 ASR-M02 继续。
+模型权重不进入 Git。唯一 schema-v2 产品 Catalog 仅包含 Paraformer、Zipformer Small 和 Zipformer Large；Factory 只以代码内冻结映射创建对应 Provider。正常启动按严格 `--asr-model=<modelId>`、`asr-selection.json`、Zipformer Large 默认的顺序解析；命令行覆盖只影响本次运行。稳定文件问题可在默认模型成功后恢复持久选择，瞬时失败保留原选择。切换服务保证先销毁旧 controller 再创建目标，失败时新建原 controller 回退；ASR-M03 才提供模型管理 IPC/UI。
 
 内部开发阶段 `.tar.bz2` 解包调用系统 `tar`。PKG-03 已证明 packaged utility 可从零下载并校验真实约 1 GB Paraformer、调用系统 `tar`、完成 native 初始化和强制离线二次启动，且模型仍位于安装目录外。真实麦克风、接近资格线硬件、macOS/Linux 和正式发布制品仍需对应环境证据。
 
@@ -102,7 +102,7 @@ ASR-M01 收尾在 Node 24.20.0 运行完整 `node --test`：312 项中 310 pass�
 
 BM-01 已完成的数据采集、人工 review 和 freeze 工具已归档到 Git 历史，不再作为当前维护入口。若引入新语料，必须先明确重开该工作并重新评估所需工具，不能把现有冻结结果当作通用数据治理平台。
 
-BM-04 已完成七候选验证，ADR-0009 据此选择 Zipformer Large 作为技术默认。ASR-M01 已把三款 streaming 模型接入产品 Catalog/Factory，但当前启动仍固定 Paraformer；候选验证和技术接入均不代表模型切换已经实现，也不代表公开发布具备再分发授权。
+BM-04 已完成七候选验证，ADR-0009 据此选择 Zipformer Large 作为技术默认。ASR-M01/M02 已接入三款 streaming Catalog/Factory 与启动选择/单 controller 服务；Renderer 尚无切换或安装入口，公开发布也仍不具备模型再分发授权。
 
 ## 发布边界
 

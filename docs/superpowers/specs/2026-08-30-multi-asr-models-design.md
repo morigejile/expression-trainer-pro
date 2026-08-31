@@ -1,7 +1,7 @@
 # 多 ASR 模型产品化设计
 
 - Date: 2026-08-30
-- Status: Approved; ASR-M01 implemented; ASR-M02+ planned
+- Status: Approved; ASR-M01/M02 implemented; ASR-M03+ planned
 - Scope: Paraformer、Zipformer Small、Zipformer Large、SenseVoiceSmall、FireRedASR2 CTC INT8
 
 ## 1. 目标

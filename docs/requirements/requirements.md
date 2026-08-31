@@ -45,7 +45,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 |---|---|---|
 | FR-E01 | 应用应提供 Electron 桌面界面和训练操作入口。 | `npm start` 应打开主窗口；主窗口最小保持 960×640，核心图标操作同时提供文字和可访问名称；运行验收仍需在有模型/麦克风环境执行。 |
 | FR-E02 | 用户应能开始、暂停、继续和结束一次录音训练。 | 开始准备、结束收尾期间显示明确忙碌状态并阻止重复提交；开始后采集麦克风；暂停期间不送入 ASR；继续后恢复；结束时释放 processor、AudioContext 和 MediaStream tracks。 |
-| FR-E03 | 应用应使用本地 `sherpa-onnx-node` 与 streaming Paraformer 中英双语 INT8 模型识别。 | utility process 从 `userData/models/<id>/<version>/` 按 registry role 加载 encoder、decoder、tokens 的绝对路径；首次缺失时自动安装，native 初始化成功后才激活。 |
+| FR-E03 | 应用应使用本地 `sherpa-onnx-node` 与受信任 streaming 模型识别。 | utility process 从 `userData/models/<id>/<version>/` 按 Catalog role 加载 Paraformer 或 Zipformer CTC 的绝对路径；无持久选择时采用 Zipformer Large 技术默认，native 初始化成功后才激活并保存选择。 |
 | FR-E04 | 应用应展示 partial 和 endpoint/final 识别文本。 | partial 更新临时字幕；endpoint 结果进入完整文本、统计和高亮；停止时尚未 endpoint 的 `finalText` 已由 Renderer 去重合并并有自动化测试。 |
 | FR-E05 | 应用应分析填充词、犹豫词、笼统词、情绪词和表达密度。 | 返回计数、位置、精准替代和建议，并在左右面板更新统计/反馈；界面说明表达密度的计算含义。 |
 | FR-E06 | 用户应能粘贴逐字稿并复用本地分析和 LLM 反馈。 | 粘贴文本按句展示和分析，无需麦克风或 ASR 模型；录音中禁止替换，已有内容时替换需用户确认。 |
@@ -60,7 +60,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | FR-P01 | 音频采集与 ASR 推理应成为独立职责。 | AudioCapture 独立持有权限、track/context/worklet 与 chunk 元数据；Renderer 只编排训练/session，Provider 隔离 Sherpa 配置。 |
 | FR-P02 | 音频链路应使用 16 kHz AudioContext、Electron/Chromium graph 采样率适配与 AudioWorklet collector。 | 已记录请求/context/track rate，固定 Electron OfflineAudioContext/AudioBufferSource fixture 覆盖 16/44.1/48 kHz 确定性缓冲；worklet 下混并汇集 320 帧 mono Float32 chunk，正常停止 flush 非空 tail，ScriptProcessor 已移除。真实 MediaStream 麦克风仍为非阻塞 follow-up。 |
 | FR-P03 | ASR Provider 应提供 session 和规范事件语义。 | `startASR/feedAudio/stopASR/cancelASR` 使用 `sessionId` 和 sequence，返回 `ready/partial/final/error/stopped` 事件的安全 envelope；旧 session、迟到/倒序事件不污染当前训练，stop/cancel/dispose 可重复处理。 |
-| FR-P04 | ASR 初始化和推理应移出 Electron Main。 | Main 只持有 Router 与 `AsrProcessController`；utility process 加载 Provider/Sherpa，退出使当前命令安全失败，下一次 start 可重建；退出 dispose 最多等待 5 秒。真实模型负载与 Forge 制品路径仍按后续验收验证。 |
+| FR-P04 | ASR 初始化和推理应移出 Electron Main。 | Main 只持有 Router、AsrModelService 与当前 `AsrProcessController`；utility process 加载 Provider/Sherpa，退出使当前命令安全失败，下一次 start 可重建；退出 dispose 最多等待 5 秒。真实模型负载与 Forge 制品路径仍按后续验收验证。 |
 
 ### 4.2 Partial / Planned
 
@@ -73,7 +73,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | FR-P10 | Existing | 本地训练在 LLM 不可用时仍应工作。 | 离线、无 API Key 或 LLM 请求失败时，录音、本地 ASR 和基础词库分析仍可完成。 |
 | FR-P11 | Existing | LLM Provider 配置应具有独立且可识别的持久化与接口命名。 | `8b93f88` 已实现 `settings.json` 到 `llm-provider-settings.json` 的单向迁移；配置模块、Preload API 和 IPC 使用 LLM provider 语义名称；canonical 或 legacy 来源遇到高于当前支持版本的 schema 时拒绝显式保存；不与 Appearance 或 ASR 选择共享完整快照。 |
 | FR-P12 | Planned | 用户应能选择四个内置主题和 coach-rail/focus-hud 两种响应式布局。 | 外观使用独立 `appearance.json`；主题与布局可即时切换、跨窗口同步和重启恢复；训练中切换不重建 DOM，不改变 session、内容、pending 请求或滚动位置；最小窗口下字幕和反馈不被遮挡。 |
-| FR-P13 | Partial | 用户应能安装、选择和切换受信任 Catalog 中的 streaming ASR 模型。 | ASR-M01 已完成仅含 Paraformer、Zipformer Small 和 Zipformer Large 的唯一产品 Catalog、固定来源/文件校验及闭合 ProviderFactory；当前启动仍固定 Paraformer。SelectionStore、AsrModelService、controller 切换、模型管理 IPC/UI 属于 ASR-M02/M03。 |
+| FR-P13 | Partial | 用户应能安装、选择和切换受信任 Catalog 中的 streaming ASR 模型。 | ASR-M01/M02 已完成三模型 Catalog/Factory、独立 `asr-selection.json`、启动恢复、严格 `--asr-model=<modelId>` 覆盖和单 controller 切换/失败回退；切换服务尚未暴露给 Renderer。模型管理 IPC、取消/重试和设置页属于 ASR-M03。 |
 | FR-P14 | Planned | 产品可在 streaming 轨道稳定后支持明确列出的 utterance ASR 模型。 | 第二批只含 SenseVoiceSmall 和 FireRedASR2；停止后解码、无 partial、5 分钟有界 PCM、cancel、失败和 session 隔离通过；不得阻塞第一批 streaming 交付或为其他候选预建适配器。 |
 
 ## 5. 非功能需求（NFR）
@@ -146,5 +146,5 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 - 当前实现：[Current Architecture](../architecture/current.md)
 - 决策记录：[ADR Index](../architecture/adr/README.md)
 - 交付顺序：[Roadmap](../roadmap.md)
-- 部分实现的多模型设计（ASR-M01 已完成）：[Multi-ASR Productization](../superpowers/specs/2026-08-30-multi-asr-models-design.md)
+- 部分实现的多模型设计（ASR-M01/M02 已完成）：[Multi-ASR Productization](../superpowers/specs/2026-08-30-multi-asr-models-design.md)
 - Planned 外观设计：[Responsive Themed UI](../superpowers/specs/2026-08-31-responsive-themed-ui-design.md)
