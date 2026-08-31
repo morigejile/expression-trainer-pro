@@ -174,19 +174,19 @@
 - Consumes: an internal Forge/Squirrel artifact created by `npm run make:internal-model` and a fresh test `userData` directory.
 - Produces: `smoke:bundled-default` evidence for archive presence/hash, first offline import/native initialization, active pointer under `userData/models`, second offline startup, and cleanup.
 
-- [ ] **Step 1: Write failing packaged-smoke contract tests**
+- [x] **Step 1: Write failing packaged-smoke contract tests**
 
   Assert the smoke script follows `package.json#version`, selects the Catalog default rather than a literal Paraformer ID, forces offline network behavior on both launches, checks the active pointer and installed runtime files under `userData/models`, and never treats the installation-directory archive as the runtime model directory.
 
-- [ ] **Step 2: Implement the packaged smoke script**
+- [x] **Step 2: Implement the packaged smoke script**
 
-  Install the Squirrel artifact into a clean Windows user path, verify the fixed archive exists below `resources/asr-models`, run a dedicated bundled-default managed smoke twice with network disabled, assert the active Zipformer Large pointer and runtime files, uninstall, and delete only the exact temporary test paths.
+  Verify the packaged app contains the fixed archive below `resources/asr-models`, run a dedicated bundled-default managed smoke twice with network disabled and a fresh isolated `userData`, assert the active Zipformer Large pointer and runtime files, then delete only that exact temporary test path. The generated Squirrel installer was not executed because this host already has `%LOCALAPPDATA%\ExpressionTrainer`; protecting that installation leaves installer/upgrade qualification in full ASR-M04.
 
-- [ ] **Step 3: Run automated verification**
+- [x] **Step 3: Run automated verification**
 
   Run focused tests, then the complete suite. Run `git diff --check` and confirm no archive/model binary is tracked.
 
-- [ ] **Step 4: Run the real internal artifact qualification when the external archive is available**
+- [x] **Step 4: Run the real internal artifact qualification when the external archive is available**
 
   ```powershell
   $env:EXPRESSION_TRAINER_INTERNAL_MODEL_ARCHIVE='C:\model-cache\sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30.tar.bz2'
@@ -194,13 +194,13 @@
   npm run smoke:bundled-default
   ```
 
-  Record exact install/import/second-start timings. If the archive is unavailable, leave this task explicitly as unverified rather than fabricating release evidence; all deterministic build/import tests must still pass.
+  Verified the Catalog archive at 127,965,713 bytes and SHA-256 `f2ab7a5deb02717801f6a5b26c751b42f8a2db891b07f5b095e6da7442081448`. Internal Forge/Squirrel make completed; the packaged app's first offline import/native initialization took 16.903 seconds and its second offline startup took 2.324 seconds.
 
-- [ ] **Step 5: Update canonical documentation without claiming public completion**
+- [x] **Step 5: Update canonical documentation without claiming public completion**
 
   Mark only `ASR-M04a Internal Qualification` complete when the real artifact smoke passes. Keep ASR-M03 independent, ASR-M04 public delivery externally gated, Zipformer Large `redistribution: not-approved`, and signing/public release unfinished.
 
-- [ ] **Step 6: Commit qualification evidence**
+- [x] **Step 6: Commit qualification evidence**
 
   ```text
   docs: record internal bundled-default qualification

@@ -25,7 +25,11 @@ const { createAsrProcessController } = require('./lib/asr-process-controller');
 const {createAsrSelectionStore} = require('./lib/asr-selection-store');
 const {createModelManager} = require('./lib/model-manager');
 const {resolveBundledModelArchive} = require('./lib/bundled-model-source');
-const {createAsrUtilityArgs, createMainAsrProvider} = require('./lib/asr-main-composition');
+const {
+  createAsrUtilityArgs,
+  createBundledDefaultSmokeOptions,
+  createMainAsrProvider
+} = require('./lib/asr-main-composition');
 const {runManagedModelSmoke} = require('./lib/managed-model-smoke');
 const modelRegistry = require('./models/registry.json');
 const bundledModelArchive = resolveBundledModelArchive({
@@ -39,8 +43,9 @@ if (isSquirrelStartup) app.quit();
 const isSmokeTest = process.argv.includes('--smoke-test');
 const isNativeAddonSmokeTest = process.argv.includes('--native-addon-smoke-test');
 const isManagedModelSmokeTest = process.argv.includes('--managed-model-smoke-test');
+const isBundledDefaultSmokeTest = process.argv.includes('--bundled-default-smoke-test');
 const isOfflineModelSmoke = process.env.EXPRESSION_TRAINER_MODEL_SMOKE_OFFLINE === '1';
-if (isNativeAddonSmokeTest || isManagedModelSmokeTest) app.disableHardwareAcceleration();
+if (isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTest) app.disableHardwareAcceleration();
 const smokeTest = isSmokeTest ? require('./smoke/electron-smoke-runner') : null;
 const {
   createRequestCoordinator,
@@ -55,7 +60,7 @@ const {
 if (smokeTest) {
   smokeTest.configureApp(app);
 }
-if (isNativeAddonSmokeTest || isManagedModelSmokeTest) {
+if (isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTest) {
   const userDataPath = process.env.EXPRESSION_TRAINER_SMOKE_USER_DATA;
   if (!userDataPath || !path.isAbsolute(userDataPath)) {
     throw new Error('Smoke mode requires an absolute EXPRESSION_TRAINER_SMOKE_USER_DATA path');
@@ -89,7 +94,12 @@ function processControllerFor({modelId, installedOnly = false, fake = false, off
 
 const asrProvider = isSmokeTest
   ? processControllerFor({fake: true})
-  : isManagedModelSmokeTest
+  : isBundledDefaultSmokeTest
+    ? processControllerFor(createBundledDefaultSmokeOptions({
+        catalog: modelRegistry,
+        bundledArchive: bundledModelArchive
+      }))
+    : isManagedModelSmokeTest
     ? processControllerFor({
         modelId: 'paraformer-bilingual-zh-en',
         offline: isOfflineModelSmoke
@@ -300,15 +310,19 @@ app.whenReady().then(async () => {
     }
     return;
   }
-  if (isManagedModelSmokeTest) {
+  if (isManagedModelSmokeTest || isBundledDefaultSmokeTest) {
     try {
       await runManagedModelSmoke(asrProvider);
-      console.log(isOfflineModelSmoke
-        ? 'MANAGED_MODEL_SMOKE_OFFLINE_OK'
-        : 'MANAGED_MODEL_SMOKE_ONLINE_OK');
+      console.log(isBundledDefaultSmokeTest
+        ? 'BUNDLED_DEFAULT_SMOKE_OK'
+        : isOfflineModelSmoke
+          ? 'MANAGED_MODEL_SMOKE_OFFLINE_OK'
+          : 'MANAGED_MODEL_SMOKE_ONLINE_OK');
       app.exit(0);
     } catch (error) {
-      console.error('[managed-model-smoke] FAILED');
+      console.error(isBundledDefaultSmokeTest
+        ? '[bundled-default-smoke] FAILED'
+        : '[managed-model-smoke] FAILED');
       console.error(formatSafeError(error));
       app.exit(1);
     }

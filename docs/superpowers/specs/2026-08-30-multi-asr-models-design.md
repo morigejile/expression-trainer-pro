@@ -1,7 +1,7 @@
 # 多 ASR 模型产品化设计
 
 - Date: 2026-08-30
-- Status: Approved; ASR-M01/M02 implemented; ASR-M03+ planned
+- Status: Approved; ASR-M01/M02 and ASR-M04a internal qualification implemented; ASR-M03 and public ASR-M04 planned
 - Scope: Paraformer、Zipformer Small、Zipformer Large、SenseVoiceSmall、FireRedASR2 CTC INT8
 
 ## 1. 目标
@@ -397,6 +397,8 @@ UI、IPC 和诊断不得暴露完整本地路径、stack、原始 native 错误�
 第二批另外要求两款 utterance 资格验证、FireRed 多来源安装、5 分钟缓冲/cancel/失败路径和停止后等待 UX 通过。
 
 在 Zipformer Large 再分发许可获批前，公开带模型制品构建必须失败。内部工程包可以通过显式 internal 构建模式包含模型，但必须标记为不可公开发布，且不能通过公开制品检查。这里不新增审批服务；版本控制中的 Catalog 状态和现有 release checklist 即为门槛。
+
+ASR-M04a 已实现并验证这条内部路径：普通构建保持无模型，显式 internal 构建只接受 Catalog 默认归档；打包应用在隔离 `userData` 和禁网条件下完成首次校验、导入、native 初始化与激活，并在第二次启动复用已安装模型。该证据不满足上面的公开发布门槛，也不改变 `redistribution: not-approved`。
 
 ## 15. 交付顺序
 

@@ -1,6 +1,6 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09、PKG-01～PKG-04、CONV-01～CONV-03 与 ASR-M01/M02 Completed；ADR-0009 采用 Zipformer Large 技术默认
+> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09、PKG-01～PKG-04、CONV-01～CONV-03、ASR-M01/M02 与 ASR-M04a Completed；ADR-0009 采用 Zipformer Large 技术默认
 > 基线日期：2026-08-31
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
 > 描述对象：截至 Phase 4 / R-09；保留 Electron 43 与 T-04～T-08 行为基线
@@ -109,9 +109,11 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 
 R-08 已由 Main 向 utility process 传入 `userData` 与 app version；ASR-M01 Factory 只接受 `sherpa.online-paraformer` 与 `sherpa.online-ctc`，能力来自代码。ASR-M02 在 Main 组合 SelectionStore、ModelManager 与 provider-shaped ModelService：严格启动覆盖优先，其次恢复持久选择，否则采用 Zipformer Large；非默认选择和命令行覆盖只允许已安装模型。稳定缺失/损坏可在默认模型成功后原子恢复选择，native/资源/进程等瞬时失败不改写。切换先验证、后 dispose 旧 controller，再创建目标；失败时创建全新的原 controller，双失败进入 unavailable，任意时刻最多一个模型 utility process。
 
+ASR-M04a 增加一个显式内部构建入口。它从 Git 外的绝对归档路径读取 Catalog 默认模型，先校验精确字节数和 SHA-256，再只把 `asr-models/<modelId>/<version>/<archive>` 加入 Forge `extraResource`；普通 `package`/`make` 仍不携带模型。Main 仅从 `process.resourcesPath` 派生受信任包内归档位置，utility process 让 ModelManager 复用既有 staging、双重校验、白名单解压、原子发布、native 初始化后激活的事务。运行时始终使用 `userData/models`，不会直接从只读应用资源加载模型。
+
 ### 3.3 PKG-02 Windows x64 packaging（Completed）
 
-`forge.config.js` 是唯一打包配置：只构建 Windows x64 Squirrel，排除 docs/test/benchmark 等开发树，并使用 ASAR；整个 `sherpa-onnx-win-x64` 目录保持 unpack，确保 `.node` 与四个相邻 DLL 的加载关系不被破坏。模型不进入应用资源，继续位于 `userData/models`。
+`forge.config.js` 是唯一打包配置：只构建 Windows x64 Squirrel，排除 docs/test/benchmark 等开发树，并使用 ASAR；整个 `sherpa-onnx-win-x64` 目录保持 unpack，确保 `.node` 与四个相邻 DLL 的加载关系不被破坏。普通构建不把模型放入应用资源；显式 internal 构建只携带待导入归档，实际运行模型继续位于 `userData/models`。
 
 干净 `npm ci → npm run make` 已生成 `ExpressionTrainerSetup.exe`、版本化 full nupkg 与 `RELEASES`；当前制品版本为 1.0.1。`smoke:package` 在未安装目录制品上验证 Fake 产品流程、utility process 中的 Sherpa native load、native 文件集合和不创建模型目录。PKG-03 进一步证明静默安装、真实约 1 GB Paraformer 下载/系统 `tar`/初始化及离线二次启动。
 
@@ -335,12 +337,13 @@ Settings/Prompt Renderer
 - `package.json` 有开发、测试、benchmark、Forge package/make 与 packaged smoke scripts；没有 publish script。
 - Electron Forge 7.5/Squirrel 已固定为 Windows x64 最小打包配置；没有 GitHub Actions。
 - `smoke/` 随安装包进入 ASAR，只在显式 smoke 参数和隔离 `userData` 下执行；`test/`、`benchmark/`、`scripts/` 与 `docs/` 不进入制品。普通启动不得进入 Fake ASR/LLM 路径。
-- `models/` 跟踪版本化产品 registry；模型权重由首次 ASR 初始化自动下载、校验并安装到 `userData/models`。
+- `models/` 跟踪版本化产品 registry；普通制品的模型权重由首次 ASR 初始化自动下载、校验并安装到 `userData/models`。显式 internal 构建可携带固定默认归档，但首次启动仍将其校验、导入并从 `userData/models` 运行。
 - 已有 canonical 支持矩阵、Windows x64 首发选择、未签名内部安装制品，以及真实首次安装/模型和 1.0.0→1.0.1 升级/卸载数据保留闭环；仍无签名、公证或自动更新。
 - 主窗口可按需导出固定 JSON 诊断；Main 组合系统/active 模型/controller 状态，Renderer 只提供经过严格字段校验的采样率，不后台记录或上传用户内容。
 - 原有 `package-lock.json` 清理已由负责人确认纳入 Phase 0；陈旧 `node-microphone` 条目已删除，lockfile 与 `package.json` 一致。
 - 开发基线已迁移为 Node 24.20.0/npm 11.19.0，并由 `.nvmrc`、`package.json#packageManager/engines` 和 lockfile 根包共同约束。2026-08-30 已在该精确基线完成 clean `npm ci`、254 项 Node/Electron 测试、Forge package/make 与 packaged smoke；Squirrel/NuGet make 需要正常文件系统权限，在受限沙箱压缩 Electron DLL 会产生误导性的 closed-stream 错误。
 - CONV-02/CONV-03 完成后，2026-08-31 使用规范 Node 24.20.0/npm 11.19.0 全量运行 297 项测试，295 pass、0 fail、2 skip；两项 skip 均因当前 Windows host 不允许创建 file symlink，directory junction 安全测试通过。
+- ASR-M04a 在 2026-08-31 完成 352 项测试（350 pass、0 fail、2 个同源 Windows symlink skip），并以 Catalog 固定的 127,965,713 字节 Zipformer Large 归档生成 281,500,160 字节 Squirrel Setup。打包应用在全新隔离 `userData` 且网络禁用时首次导入、native 初始化和激活耗时 16.903 秒，二次离线启动耗时 2.324 秒。为避免覆盖本机已有 ExpressionTrainer 安装，本轮没有执行生成的 Setup；公开安装、升级、签名和模型许可仍归完整 ASR-M04。
 
 这些发布级缺口及未确认的模型再分发权利在当前内部开发/测试中是非阻塞后续工作；若它们使本地技术实验无法运行或使结论失效，才需要提前处理。
 

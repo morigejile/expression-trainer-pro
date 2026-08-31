@@ -81,6 +81,8 @@ ASR selection 已独立使用 `asr-selection.json`；Appearance 保持自己的�
 
 ASR-M02 收尾在 Node 24.20.0 运行完整 `node --test`：336 项中 334 pass、0 fail、2 skip；两项 skip 是当前 Windows host 不允许创建 file symlink，directory junction 边界测试仍通过。
 
+ASR-M04a 收尾运行 352 项测试：350 pass、0 fail、2 个同源 Windows symlink skip。真实内部 Squirrel make 和打包应用离线 smoke 已通过；首次导入并 native 初始化为 16.903 秒，二次离线启动为 2.324 秒。
+
 ## ASR 模型
 
 模型权重不进入 Git。唯一 schema-v2 产品 Catalog 仅包含 Paraformer、Zipformer Small 和 Zipformer Large；Factory 只以代码内冻结映射创建对应 Provider。正常启动按严格 `--asr-model=<modelId>`、`asr-selection.json`、Zipformer Large 默认的顺序解析；命令行覆盖只影响本次运行。稳定文件问题可在默认模型成功后恢复持久选择，瞬时失败保留原选择。切换服务保证先销毁旧 controller 再创建目标，失败时新建原 controller 回退；ASR-M03 才提供模型管理 IPC/UI。
@@ -89,7 +91,15 @@ ASR-M02 收尾在 Node 24.20.0 运行完整 `node --test`：336 项中 334 pass�
 
 耗时模型资产统一留在 Git 外的本机缓存中。只有首次安装/下载链路 smoke 从空目录验证完整下载，其余模型开发与测试可以复用已校验缓存；缓存本身不构成 native-load、benchmark 或发布许可证据。候选 URL、大小和 hash 的 canonical 来源是 registry，历史准备过程见证据索引和 Git 历史，本文件不维护本机路径、下载代理或一次性速度记录。
 
-许可批准前可以保留显式 internal 模型制品模式，用于验证包内默认模型的离线导入和真实包装路径。该模式必须标为不可公开发布，不能绕过 product registry 的 `redistribution` 状态或公开 release checklist；如果不再需要验证包内默认模型，应删除该模式。
+许可批准前保留显式 internal 模型制品模式，用于验证包内默认模型的离线导入和真实包装路径。模型归档必须在 Git 外，并与 Catalog 的默认 model/version、字节数和 SHA-256 完全一致：
+
+```powershell
+$env:EXPRESSION_TRAINER_INTERNAL_MODEL_ARCHIVE='C:\model-cache\sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30.tar.bz2'
+npm run make:internal-model
+npm run smoke:bundled-default
+```
+
+普通 `npm run package` / `npm run make` 仍不携带模型。internal 模式不可公开发布，不能绕过 product registry 的 `redistribution` 状态或公开 release checklist；完整公开路径取代这项内部验证或不再需要验证包内默认模型时，应删除该模式。
 
 ## Benchmark 边界
 
@@ -102,7 +112,7 @@ ASR-M02 收尾在 Node 24.20.0 运行完整 `node --test`：336 项中 334 pass�
 
 BM-01 已完成的数据采集、人工 review 和 freeze 工具已归档到 Git 历史，不再作为当前维护入口。若引入新语料，必须先明确重开该工作并重新评估所需工具，不能把现有冻结结果当作通用数据治理平台。
 
-BM-04 已完成七候选验证，ADR-0009 据此选择 Zipformer Large 作为技术默认。ASR-M01/M02 已接入三款 streaming Catalog/Factory 与启动选择/单 controller 服务；Renderer 尚无切换或安装入口，公开发布也仍不具备模型再分发授权。
+BM-04 已完成七候选验证，ADR-0009 据此选择 Zipformer Large 作为技术默认。ASR-M01/M02 已接入三款 streaming Catalog/Factory 与启动选择/单 controller 服务，ASR-M04a 已完成内部包内默认离线资格；Renderer 尚无切换或安装入口，公开发布也仍不具备模型再分发授权。
 
 ## 发布边界
 

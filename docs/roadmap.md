@@ -2,7 +2,7 @@
 
 > 状态：Active execution baseline
 > 更新日期：2026-08-31
-> 当前进度：Phase 0-5 的内部基线、R-01～R-09、PKG-01～PKG-04、OPS-02/OPS-05、七候选 benchmark、CONV-01～CONV-03 与 ASR-M01/M02 已完成。ASR 后续主线从 ASR-M03 继续；ASR-M04 仍受许可和公开制品条件约束。
+> 当前进度：Phase 0-5 的内部基线、R-01～R-09、PKG-01～PKG-04、OPS-02/OPS-05、七候选 benchmark、CONV-01～CONV-03、ASR-M01/M02 与 ASR-M04a 内部资格验证已完成。ASR-M03 可独立继续；完整 ASR-M04 仍受许可和公开制品条件约束。
 > 当前模式：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞后续工作；只有它们使当前技术实验无法运行或结论失效时，才阻塞当前路径。
 
 ## 1. 目标与排序原则
@@ -15,7 +15,8 @@
 → CONV-02/CONV-03 基线代码风险
 → UI-01/UI-02 与 ASR-M01/M02 分轨推进；ASR-M01/M02 已完成
 → ASR-M03 继续安装任务、模型管理 IPC 与设置链路
-→ ASR-M04 受许可与公开制品条件约束
+→ ASR-M04a 已独立完成内部包内默认资格验证
+→ 完整 ASR-M04 继续受许可、公开制品和升级验收约束
 → ASR-U01/ASR-U02 在 streaming 稳定后再确认
 ```
 
@@ -93,6 +94,7 @@ CONV-02 与 CONV-03 使用独立实施计划和提交，不与 Appearance、多�
 | ASR-M01 | P1 | Completed | schema-v2 唯一产品 Catalog、受信任 ProviderFactory 与三款 streaming provider；启动选择当时延后至 ASR-M02 | CONV-02,CONV-03,ADR-0009 | 312 项全量测试中 310 pass、0 fail、2 个既有 Windows symlink skip；无 benchmark runtime import、无新依赖或空转 Registry service |
 | ASR-M02 | P1 | Completed | 独立 AsrSelectionStore、AsrModelService、启动恢复、严格命令行覆盖和单 controller 切换 | ASR-M01 | 336 项全量测试中 334 pass、0 fail、2 个既有 Windows symlink skip；稳定损坏恢复默认，瞬时失败保留选择，切换失败新建原 controller 回退 |
 | ASR-M03 | P1 | Planned | 独立安装任务、模型管理 IPC 和设置页模型区域 | ASR-M02 | 下载可取消重试；Renderer 不提交路径、URL 或 providerType；安装不影响当前识别 |
+| ASR-M04a | P1 | Completed/Internal Only | 显式内部构建携带 Catalog 默认 Zipformer Large，并复用 ModelManager 完成包内离线导入与真实 native 初始化 | ASR-M02 | 352 项中 350 pass、0 fail、2 个 Windows symlink skip；内部 Squirrel make 成功；打包应用首次离线启动 16.903 秒、二次 2.324 秒；归档不进入 Git |
 | ASR-M04 | P1 | Planned/External Gate | Zipformer Large 包内默认、升级保留和真实模型资格验证 | ASR-M03,redistribution approved | 离线首次导入、native 初始化、二次启动和升级保留通过；公开制品满足签名与许可要求 |
 
 ### 4.4 Utterance ASR
@@ -125,7 +127,7 @@ Utterance 不进入当前 streaming 关键路径；开始 ASR-U01 前必须重�
 | R-08 | P1 | 激活版本化默认模型（Completed） | utility process 从 `userData/models` 解析或安装 registry 默认 Paraformer；使用 role→绝对路径配置，native 初始化成功后才原子激活；当前版本损坏或加载失败时只探测并切换一次上一版本 | R-06,R-07,D-02 | 聚焦测试覆盖首次安装、single-flight、取消、role config、激活时序、损坏 active 与失败回退；PKG-03 已完成 packaged 真实模型初始化与离线二次启动 |
 | R-09 | P1 | 收敛设置/规则/日志（Completed） | settings 与 custom-prompt 使用同盘临时文件 + fsync + rename 原子写；旧 schema 自动迁移，future schema 自动加载不写回；字幕与本地分析共用唯一规则源，customWords 作为有界 filler 生效；现有错误日志维持脱敏边界，不引入 keychain/native 依赖 | T-03,R-07 | R-09 聚焦测试覆盖读取和原子发布、规则同源、自定义 filler 与错误脱敏；当时未覆盖的 LLM provider 显式保存防降级已由 CONV-03 完成；OPS-05 已补固定白名单诊断导出 |
 
-R-01～R-09、D-03/D-04、PKG-01～PKG-04、BM-04 与 ASR-M01/M02 已完成当前最小边界。产品会恢复独立持久选择，无选择时采用 Zipformer Large 技术默认；服务已具备单 controller 切换和失败回退，但 Renderer 入口与安装管理从 ASR-M03 继续。公开分发仍取决于许可与产品链路验收。
+R-01～R-09、D-03/D-04、PKG-01～PKG-04、BM-04、ASR-M01/M02 与 ASR-M04a 已完成当前最小边界。产品会恢复独立持久选择，无选择时采用 Zipformer Large 技术默认；内部包已验证从应用资源离线导入至 `userData/models`，服务也具备单 controller 切换和失败回退。Renderer 入口与安装管理从 ASR-M03 继续，公开分发仍取决于许可与产品链路验收。
 
 ### 6.1 内部 benchmark 候选（不改变当前 Paraformer 运行时）
 
@@ -134,7 +136,7 @@ R-01～R-09、D-03/D-04、PKG-01～PKG-04、BM-04 与 ASR-M01/M02 已完成当�
 | C-01 | P1 | 验证 Zipformer Large CTC INT8 候选（Completed） | registry、runtime hash、native-load 与 BM-04 benchmark 均已完成；继续使用现有 `zipformer-ctc` streaming adapter | Phase 0～2、R-01 | 候选证据可复核；公开再分发仍未获批 |
 | C-02 | P1 | 验证 FireRedASR2 CTC INT8 utterance 候选（Completed） | registry、runtime hash、native-load 与 BM-04 benchmark 均已完成；16 kHz utterance 仅输出 final | R-02,R-04 | cancel/new-session 隔离与候选证据可复核；公开再分发仍未获批 |
 
-ADR-0009 已采用 Zipformer Large 作为技术默认；ASR-M02 已接入启动恢复，旧 Paraformer 安装继续保留。设置页切换入口、安装任务、打包和再分发授权尚未完成。
+ADR-0009 已采用 Zipformer Large 作为技术默认；ASR-M02 已接入启动恢复，旧 Paraformer 安装继续保留。ASR-M04a 已完成显式内部包的离线导入和真实初始化；设置页切换入口、安装任务、公开升级验收和再分发授权尚未完成。
 
 ## 7. Phase 5 — Electron Forge 打包与发布
 
@@ -169,7 +171,7 @@ ADR-0009 已采用 Zipformer Large 作为技术默认；ASR-M02 已接入启动�
 | M4 可安装发布 | In Progress | PKG-01～PKG-06（PKG-01～PKG-04 Completed；PKG-05/PKG-06 为外部发布跟进） | Windows x64 内部安装/升级闭环已完成；公开发布仍需签名与对应平台证据 |
 | M5 可长期维护 | In Progress | OPS-01～OPS-06（OPS-02/OPS-05 Completed） | 版本与脱敏诊断基线已完成；CI、依赖和模型生命周期待按实际风险推进 |
 | M6 合并后收敛 | Completed | CONV-01～CONV-03 | 文档真相源一致；benchmark writer 竞态与 LLM provider 配置边界已关闭；Node 24.20.0 全量测试通过 |
-| M7 新需求产品化 | In Progress | UI-01～UI-02、ASR-M01～ASR-M04（ASR-M01/M02 Completed） | 三款 streaming Catalog/Factory 与选择/单 controller 服务已完成；安装设置入口、响应式外观及公开默认模型条件继续分轨交付 |
+| M7 新需求产品化 | In Progress | UI-01～UI-02、ASR-M01～ASR-M04（ASR-M01/M02、ASR-M04a Completed） | 三款 streaming Catalog/Factory、选择/单 controller 服务与内部包内默认资格已完成；安装设置入口、响应式外观及公开默认模型条件继续分轨交付 |
 
 ## 10. 明确不做
 

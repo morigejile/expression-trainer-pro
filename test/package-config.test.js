@@ -88,6 +88,12 @@ test('first-install smoke remains an explicit non-default command', () => {
   assert.doesNotMatch(manifest.scripts.test, /first-install/);
 });
 
+test('bundled-default qualification remains an explicit non-default command', () => {
+  const manifest = require('../package.json');
+  assert.equal(manifest.scripts['smoke:bundled-default'], 'node scripts/verify-bundled-default.js');
+  assert.doesNotMatch(manifest.scripts.test, /bundled-default/);
+});
+
 test('first-install smoke follows the current package version', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'scripts', 'verify-first-install.js'), 'utf8');
   assert.match(source, /require\('\.\.\/package\.json'\)\.version/);
