@@ -1,21 +1,21 @@
 # Expression Trainer TODO / Roadmap
 
 > 状态：Active execution baseline
-> 更新日期：2026-08-30
-> 当前进度：Phase 0-2、D-01～D-04、R-01～R-09、PKG-01～PKG-04、OPS-02/OPS-05 与 C-01/C-02 最小集成已完成；文档、运行时数据和发布载荷已完成首轮收口，Node 24.20.0 Active LTS/npm 11.19.0 已完成 clean install、完整测试、Forge make 与 packaged smoke；下一主线为其余 Phase 6 维护节点和公开发布跟进
+> 更新日期：2026-08-31
+> 当前进度：Phase 0-5 的内部基线、R-01～R-09、PKG-01～PKG-04、OPS-02/OPS-05 与七候选 benchmark 已完成；近期合并新增了响应式外观和多 ASR 模型产品化需求。当前主线是 CONV-01 文档收敛，随后独立完成 CONV-02 benchmark writer 竞态和 CONV-03 LLM provider 配置迁移，再开始 UI/ASR 产品轨道。
 > 当前模式：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞后续工作；只有它们使当前技术实验无法运行或结论失效时，才阻塞当前路径。
 
 ## 1. 目标与排序原则
 
-路线图保持以下主线，不因阶段记录清理而改变：
+已完成历史主线保持不变；近期合并后的执行主线调整为：
 
 ```text
-事实/构建基线
-→ 最小测试与真实 benchmark
-→ 接受关键 ADR
-→ 渐进重构 Audio / ASR / Model Manager
-→ Electron Forge 安装发布
-→ CI、版本和长期维护
+已完成 Paraformer/安装/benchmark 基线
+→ CONV-01 文档与职责收敛
+→ CONV-02/CONV-03 基线代码风险
+→ UI-01/UI-02 与 ASR-M01～M03 可独立推进
+→ ASR-M04 受许可与公开制品条件约束
+→ ASR-U01/ASR-U02 在 streaming 稳定后再确认
 ```
 
 排序规则：
@@ -31,23 +31,19 @@
 
 ```mermaid
 flowchart LR
-  B[Phase 0 构建基线] --> T[Phase 1 测试/高风险缺陷]
-  T --> BM[Phase 2 数据集与七候选 benchmark]
-  BM --> D2[Phase 3 默认模型决策]
-  D2 --> R1[R-01 最小 Provider]
-  R1 --> ZF[Zipformer Large 候选准备]
-  R1 --> R2[R-02 session/event]
-  R2 --> R3[R-03 AudioCapture]
-  R3 --> R4[R-04 AudioWorklet/Chromium 图适配]
-  R4 --> FR[FireRedASR2 utterance spike]
-  R4 --> D3[D-03 执行边界决策]
-  D3 --> R5[R-05 有界音频传输]
-  R5 --> R6[R-06 ASR 移出 Main]
-  D2 --> R7[R-07 Model Manager]
-  R6 --> R8[R-08 激活版本化默认模型]
-  R7 --> R8
-  R8 --> PKG[Phase 5 Tier 1 发布]
-  PKG --> OPS[Phase 6 长期维护]
+  BASE[已完成当前基线] --> C1[CONV-01 文档收敛]
+  C1 --> C2[CONV-02 benchmark writer]
+  C1 --> C3[CONV-03 LLM provider 配置迁移]
+  C2 --> UI1[UI-01 Appearance]
+  C3 --> UI1
+  C2 --> M1[ASR-M01 Catalog/Factory]
+  C3 --> M1
+  UI1 --> UI2[UI-02 双布局]
+  M1 --> M2[ASR-M02 Selection/Service]
+  M2 --> M3[ASR-M03 安装与设置页]
+  M3 --> M4[ASR-M04 包内默认与资格验证]
+  M3 --> U1[ASR-U01 SenseVoice]
+  U1 --> U2[ASR-U02 FireRedASR2]
 ```
 
 ## 3. 已完成基线
@@ -60,7 +56,7 @@ flowchart LR
 | Phase 1 — T-01～T-08 | 核心测试、设置迁移、stop final、安全渲染、LLM 控制、Electron smoke、Electron 43 升级 | `test/`、[当前架构](architecture/current.md) |
 | Phase 2 — BM-01～BM-04 | 100 条冻结 FLEURS 数据、可复跑 harness、七候选同机比较 | [数据集来源](../benchmark/datasets/SOURCES.md)、[Harness](benchmark/harness.md)、[BM-04 结果](benchmark/bm04-seven-model-comparison-2026-08-30.md) |
 | Phase 3 — D-01/D-02 | 冻结比较规则；ADR-0009 采用 Zipformer Large 技术默认 | [ADR-0009](architecture/adr/0009-productize-multiple-asr-models.md) |
-| Phase 4 — R-01～R-09 | session/event、安全 IPC、AudioCapture/AudioWorklet、有界传输与 utility process 已建立；版本化 Paraformer 安全激活/回退；settings/custom rules 原子持久化、future-schema 防降级、共享规则与当前日志脱敏边界完成 | [当前架构](architecture/current.md) |
+| Phase 4 — R-01～R-09 | session/event、安全 IPC、AudioCapture/AudioWorklet、有界传输与 utility process 已建立；版本化 Paraformer 安全激活/回退；settings/custom rules 原子持久化、共享规则与当前日志脱敏边界完成。future schema 的自动加载不写回，但显式保存边界留给 CONV-03 | [当前架构](architecture/current.md) |
 | Phase 5 — PKG-01～PKG-04 | Windows 11 25H2+ x64 Tier 1 目标；Forge/Squirrel package/make、完整 Sherpa Windows native bundle ASAR unpack、packaged Fake/native-load smoke；静默安装、真实 Paraformer 首次准备、强制离线二次启动、1.0.0→1.0.1 升级及卸载数据保留 | [支持矩阵](support-matrix.md)、[ADR-0007](architecture/adr/0007-package-with-electron-forge.md) |
 
 补充边界：
@@ -70,14 +66,51 @@ flowchart LR
 - BM-07 已以 D-03 最小执行边界 spike 完成：只比较 native load、有界小块传输、退出恢复与进程隔离，不扩张为通用性能框架。
 - 仅重开 Zipformer Large CTC INT8 候选准备与 FireRedASR2 CTC INT8 utterance spike；不进行通用的新模型扩张。新语料和新的 review 流程仍不在当前关键路径。
 
-## 4. Phase 3 未完成决策
+## 4. 当前执行轨道
+
+### 4.1 Baseline Convergence
+
+| ID | P | 状态 | 任务 | 依赖 | 完成标准 |
+|---|---|---|---|---|---|
+| CONV-01 | P0 | In Progress | 收敛 requirements、current architecture、ADR/spec、Roadmap、开发与验证文档 | 当前 main 基线 | 当前事实、未来设计和历史证据各有唯一来源；文档类型不扩张；本轮文档经一致性检查 |
+| CONV-02 | P0 | Planned | 修复 benchmark result writer 并行失败后的 staging 清理竞态 | CONV-01 | 原始写入错误不再被 Windows `ENOTEMPTY` 覆盖；聚焦故障注入和规范 Node 24.20.0 全量测试通过 |
+| CONV-03 | P1 | Planned | 显式命名和迁移 LLM provider 配置 | CONV-01 | `settings.json` 单向迁移为 `llm-provider-settings.json`；模块、Preload API 和 IPC 命名明确；future schema 显式保存被拒绝；迁移失败有聚焦测试 |
+
+CONV-02 与 CONV-03 使用独立实施计划和提交，不与 Appearance、多模型或彼此混合。
+
+### 4.2 Appearance
+
+| ID | P | 状态 | 任务 | 依赖 | 完成标准 |
+|---|---|---|---|---|---|
+| UI-01 | P1 | Planned | 独立 AppearanceStore、四主题、窗口同步和响应式初始尺寸 | CONV-02,CONV-03 | `appearance.json` 可恢复、原子持久化和跨窗口同步；不读写 LLM provider 配置；读取失败时页面仍可见 |
+| UI-02 | P1 | Planned | coach-rail/focus-hud 双布局、统一图标和代表性视觉验收 | UI-01 | 训练中切换不改变 session、内容、pending 请求或滚动；最小尺寸不遮挡字幕；不增加视觉审批系统 |
+
+### 4.3 Streaming ASR Productization
+
+| ID | P | 状态 | 任务 | 依赖 | 完成标准 |
+|---|---|---|---|---|---|
+| ASR-M01 | P1 | Planned | 演进产品 Catalog schema，以内含受信任映射的 ProviderFactory 接入三款 streaming provider | CONV-02,CONV-03,ADR-0009 | 当前 Paraformer 回归不变；三款模型由同一工厂创建；不建立独立空转 Registry service |
+| ASR-M02 | P1 | Planned | AsrSelectionStore、AsrModelService、启动恢复和 controller 切换 | ASR-M01 | 无活动 session 时可切换；稳定文件损坏可恢复默认，瞬时 native/资源失败不永久改写选择 |
+| ASR-M03 | P1 | Planned | 独立安装任务、模型管理 IPC 和设置页模型区域 | ASR-M02 | 下载可取消重试；Renderer 不提交路径、URL 或 providerType；安装不影响当前识别 |
+| ASR-M04 | P1 | Planned/External Gate | Zipformer Large 包内默认、升级保留和真实模型资格验证 | ASR-M03,redistribution approved | 离线首次导入、native 初始化、二次启动和升级保留通过；公开制品满足签名与许可要求 |
+
+### 4.4 Utterance ASR
+
+| ID | P | 状态 | 任务 | 依赖 | 完成标准 |
+|---|---|---|---|---|---|
+| ASR-U01 | P2 | Deferred | SenseVoiceSmall utterance、5 分钟缓冲和停止后解码 | ASR-M03,streaming 轨道稳定 | 无 partial；上限、cancel、失败和 session 隔离通过 |
+| ASR-U02 | P2 | Deferred | FireRedASR2 多来源安装和 utterance UX | ASR-U01 | 固定多来源校验、真实模型和人工等待体验通过 |
+
+Utterance 不进入当前 streaming 关键路径；开始 ASR-U01 前必须重新确认产品优先级。
+
+## 5. 历史 Phase 3 决策
 
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
 | D-03 | P0 | 接受 ASR 执行边界 ADR（Completed） | 有界 spike 比较 worker thread 与 Electron utility process 的 native load、1,000×320-frame 传输、退出恢复和路径边界；选择单个 utility process | R-02,R-04；BM-07 spike | ADR-0006 Accepted；R-05 使用 10-block 有界队列，R-06 实现 utility process 隔离；真实模型/Forge 验证保留在对应节点 |
 | D-04 | P1 | 复审目标架构（Completed） | utility process、R-07～R-09、Windows x64 打包与诊断边界均已实现；有效内容已合并进 `current.md`，短期 Target Architecture 已从活跃文档树移除 | D-03,PKG-01 | 当前事实、ADR 与 Roadmap 分工明确，不保留已实现的第二份架构真相源 |
 
-## 5. Phase 4 — 渐进重构 Audio / ASR / Model Manager
+## 6. 历史 Phase 4 — 渐进重构 Audio / ASR / Model Manager
 
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
@@ -89,11 +122,11 @@ flowchart LR
 | R-06 | P0 | ASR 移出 Main（Completed） | 单个 utility process 持有 Provider/Sherpa；Main Controller 关联请求、检测退出、下一 start 重建并以 5 秒上限完成 quit dispose | R-02,R-05,D-03 | Controller 测试与真实 Electron Fake smoke 覆盖强制退出、安全失败、重建和有界关闭；真实模型负载留作非阻塞环境验证 |
 | R-07 | P1 | 实现轻量 Model Manager（Completed） | 独立产品 registry 固定 Paraformer 版本与 archive/runtime hash；HTTPS 下载有流式字节上限和严格 Range 有限续传，系统 `tar` 只提取白名单文件；同盘 staging、不可变版本目录、active pointer 与显式 rollback 均位于 `userData/models` | D-02,R-01 | 聚焦测试覆盖中断/续传、错误 hash、解压失败、空间不足、成功升级和上一版本回退；PKG-03 已完成真实 1 GB archive/system tar 闭环 |
 | R-08 | P1 | 激活版本化默认模型（Completed） | utility process 从 `userData/models` 解析或安装 registry 默认 Paraformer；使用 role→绝对路径配置，native 初始化成功后才原子激活；当前版本损坏或加载失败时只探测并切换一次上一版本 | R-06,R-07,D-02 | 聚焦测试覆盖首次安装、single-flight、取消、role config、激活时序、损坏 active 与失败回退；PKG-03 已完成 packaged 真实模型初始化与离线二次启动 |
-| R-09 | P1 | 收敛设置/规则/日志（Completed） | settings 与 custom-prompt 使用同盘临时文件 + fsync + rename 原子写；旧 schema 自动迁移，未来 schema 只兼容读取而不降级覆盖；字幕与本地分析共用唯一规则源，customWords 作为有界 filler 生效；现有错误日志维持脱敏边界，不引入 keychain/native 依赖 | T-03,R-07 | 聚焦测试覆盖旧/当前/未来 schema、发布失败保留旧文件、规则同源、自定义 filler 与错误脱敏；OPS-05 已补固定白名单诊断导出，API Key 明文仍留给发布前权衡 |
+| R-09 | P1 | 收敛设置/规则/日志（Completed） | settings 与 custom-prompt 使用同盘临时文件 + fsync + rename 原子写；旧 schema 自动迁移，future schema 自动加载不写回；字幕与本地分析共用唯一规则源，customWords 作为有界 filler 生效；现有错误日志维持脱敏边界，不引入 keychain/native 依赖 | T-03,R-07 | 聚焦测试覆盖旧/当前/future schema 的读取和原子发布、规则同源、自定义 filler 与错误脱敏；显式保存防降级留给 CONV-03；OPS-05 已补固定白名单诊断导出 |
 
 R-01～R-09、D-03/D-04、PKG-01～PKG-04 与 BM-04 已完成当前最小边界。七候选均已验证；ADR-0009 已采用 Zipformer Large 技术默认，公开分发仍取决于许可与产品链路验收。
 
-### 5.1 内部 benchmark 候选（不改变当前 Paraformer 运行时）
+### 6.1 内部 benchmark 候选（不改变当前 Paraformer 运行时）
 
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
@@ -102,7 +135,7 @@ R-01～R-09、D-03/D-04、PKG-01～PKG-04 与 BM-04 已完成当前最小边界�
 
 ADR-0009 已采用 Zipformer Large 作为后续产品化的技术默认；当前已实现的产品运行时仍使用 Paraformer，切换、打包和再分发授权尚未完成。
 
-## 6. Phase 5 — Electron Forge 打包与发布
+## 7. Phase 5 — Electron Forge 打包与发布
 
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
@@ -113,7 +146,7 @@ ADR-0009 已采用 Zipformer Large 作为后续产品化的技术默认；当前
 | PKG-05 | P1 | 签名与发布 | 按平台启用代码签名/公证、checksums 和 release notes；无凭据时明确阻塞 | PKG-03 | 用户可验证来源和制品完整性 |
 | PKG-06 | P1 | 扩展支持矩阵 | 在对应 OS 构建并执行 install/smoke，逐个平台提升支持等级 | PKG-03 | 每个声称支持的平台都有 CI 或人工证据 |
 
-## 7. Phase 6 — 长期维护
+## 8. Phase 6 — 长期维护
 
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
@@ -124,7 +157,7 @@ ADR-0009 已采用 Zipformer Large 作为后续产品化的技术默认；当前
 | OPS-05 | P1 | 诊断基线（Completed） | 单一固定 JSON schema 由 Main 组合 app/OS/arch、active 模型、Renderer 三项采样率、controller 初始化耗时和受控错误类别；只在用户点击时写文件，不建日志框架/历史库/上传 | R-09 | 主窗口可导出；白名单测试证明不含设置、密钥、路径、stack、音频、逐字稿或 LLM 内容 |
 | OPS-06 | P2 | 自动更新评估 | 至少两个稳定手工发布后再评估 updater、托管、签名和回滚成本 | PKG-05,OPS-02 | 新 ADR 说明是否采用，不默认引入 |
 
-## 8. 里程碑
+## 9. 里程碑
 
 | 里程碑 | 状态 | 包含 | 可交付结果 |
 |---|---|---|---|
@@ -134,17 +167,19 @@ ADR-0009 已采用 Zipformer Large 作为后续产品化的技术默认；当前
 | M3 架构收敛 | Completed | R-01～R-09、D-03/D-04 | Audio/ASR/模型分离，Main 不推理，模型升级可回退 |
 | M4 可安装发布 | In Progress | PKG-01～PKG-06（PKG-01～PKG-04 Completed；PKG-05/PKG-06 为外部发布跟进） | Windows x64 内部安装/升级闭环已完成；公开发布仍需签名与对应平台证据 |
 | M5 可长期维护 | In Progress | OPS-01～OPS-06（OPS-02/OPS-05 Completed） | 版本与脱敏诊断基线已完成；CI、依赖和模型生命周期待按实际风险推进 |
+| M6 合并后收敛 | In Progress | CONV-01～CONV-03 | 文档真相源一致，已知基线竞态与 LLM provider 配置边界关闭 |
+| M7 新需求产品化 | Planned | UI-01～UI-02、ASR-M01～ASR-M04 | 响应式外观与三款 streaming 模型分轨交付；公开默认模型受许可约束 |
 
-## 9. 明确不做
+## 10. 明确不做
 
 - 不把重构变成 React/Vite/TypeScript UI 重写。
 - 不默认引入 Python/FunASR/PyTorch/CUDA、Tauri 或 WASM。
-- 除 Zipformer Large CTC INT8 和 FireRedASR2 CTC INT8 这两个已重开候选外，不新增模型；不新增语料或公开 benchmark，也不进行通用模型扩张。
+- 当前产品化只使用已完成证据的 Paraformer、Zipformer Small、Zipformer Large、SenseVoiceSmall 和 FireRedASR2；不新增模型、语料或公开 benchmark，也不进行通用模型扩张。
 - 不建设插件系统、模型市场、数据库、云端账户或通用评测平台。
 - 不把内部模型选择升级为复杂审批、不可抵赖审计链或针对本地恶意管理员的防御系统。
 - 不为覆盖率数字增加无法发现实质回归的测试。
 
-## 10. 人工与外部跟进（当前非阻塞）
+## 11. 人工与外部跟进（当前非阻塞）
 
 以下事项需要外部证据或人工判断；在内部开发/测试中仅当它们使当前技术实验无法运行或结论失效时才升级为阻塞项：
 
@@ -156,7 +191,7 @@ ADR-0009 已采用 Zipformer Large 作为后续产品化的技术默认；当前
 - 确认 FireRedASR2 的 utterance/VAD 交互是否适合最终用户；
 - 确认公开隐私告知、LLM 披露和发布支持口径。
 
-## 11. Roadmap 维护规则
+## 12. Roadmap 维护规则
 
 - 任务状态改变时更新本文件；逐步命令、worktree 路径和一次性验收日志不写入 Roadmap。
 - 依赖未满足不得把下游标为完成；spike 结论必须回写对应 ADR。

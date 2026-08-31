@@ -1,6 +1,12 @@
 # Frontend Interaction UX Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status:** Historical / Completed
+>
+> **Implemented by:** `9d7c718` through `9271a28`, integrated into `main` by `2513fc1`
+>
+> **Maintenance:** The checkboxes below preserve the original execution plan. Current behavior lives in requirements/current architecture; they are not active Roadmap state.
+
+> **Historical instruction (inactive):** This plan originally used checkbox steps and an agentic execution skill. Do not resume it as current work.
 
 **Goal:** Make the existing recording, pasted-transcript, settings, modal, and rule-editing flows understandable, recoverable, and safe from accidental data loss.
 

@@ -1,6 +1,12 @@
 # BM-04 Seven-Model Benchmark Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status:** Historical / Completed
+>
+> **Implemented by:** `915b5ff` (harness/candidates), `6e5ebf0` (report), integrated into `main` by `2513fc1`
+>
+> **Maintenance:** The checkboxes below preserve the original execution plan. Current progress and rerun triggers live in the Roadmap and benchmark harness contract.
+
+> **Historical instruction (inactive):** This plan originally used checkbox steps and an agentic execution skill. Do not resume it as current work.
 
 **Goal:** Extend the existing benchmark-only harness with Qwen3-ASR 0.6B INT8 and SenseVoice 2025 INT8, then run and document a reproducible seven-model comparison.
 

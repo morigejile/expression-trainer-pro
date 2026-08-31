@@ -231,7 +231,7 @@ CONV-02 和 CONV-03 是文档收敛审阅后的首批代码任务，不与 Appea
 
 | ID | 优先级 | 任务 | 依赖 | 完成标准 |
 |---|---|---|---|---|
-| UI-01 | P1 | AppearanceStore、主题 token、窗口同步和响应式初始尺寸 | CONV-01 | 四主题可持久化和跨窗口同步；不覆盖 LLM settings；读取失败安全回退 |
+| UI-01 | P1 | AppearanceStore、主题 token、窗口同步和响应式初始尺寸 | CONV-02、CONV-03 | 四主题可持久化和跨窗口同步；不覆盖 LLM provider 配置；读取失败安全回退 |
 | UI-02 | P1 | coach-rail/focus-hud 双布局、统一图标和代表性视觉验收 | UI-01 | 训练中切换不改变 session、内容、请求或滚动；最小尺寸不遮挡字幕 |
 
 UI-01 不依赖 ASR Productization，可以在 Baseline Convergence 代码任务完成后独立推进。
@@ -240,7 +240,7 @@ UI-01 不依赖 ASR Productization，可以在 Baseline Convergence 代码任务
 
 | ID | 优先级 | 任务 | 依赖 | 完成标准 |
 |---|---|---|---|---|
-| ASR-M01 | P1 | 产品 registry schema 演进、内含受信任映射的 ProviderFactory 和三款 streaming provider | CONV-01、ADR-0009 | 当前 Paraformer 回归不变；三款模型均可由同一显式工厂创建；不产生独立空转 Registry service |
+| ASR-M01 | P1 | 产品 registry schema 演进、内含受信任映射的 ProviderFactory 和三款 streaming provider | CONV-02、CONV-03、ADR-0009 | 当前 Paraformer 回归不变；三款模型均可由同一显式工厂创建；不产生独立空转 Registry service |
 | ASR-M02 | P1 | SelectionStore、AsrModelService、启动恢复与 controller 切换 | ASR-M01 | 无活动 session 时可切换；稳定损坏与瞬时失败采用不同持久化语义 |
 | ASR-M03 | P1 | 独立安装任务、设置页模型区域和模型管理 IPC | ASR-M02 | 下载可取消重试；路径、URL 和 providerType 不由 Renderer 提交；不影响当前识别 |
 | ASR-M04 | P1 | Zipformer Large 包内默认、升级保留与真实模型资格验证 | ASR-M03、redistribution approved | 离线首次导入、native 初始化、二次启动和升级保留通过 |

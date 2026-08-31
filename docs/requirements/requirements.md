@@ -1,7 +1,7 @@
 # Expression Trainer 需求基线
 
 > 状态：Existing / Partial / Planned
-> 基线日期：2026-08-30
+> 基线日期：2026-08-31
 > 适用范围：内部开发/测试中的当前实现（Existing/Partial）与下一阶段工程化目标（Planned）
 > 源码基线：`main`，已包含 R-01～R-09 与 PKG-01～PKG-04
 
@@ -50,7 +50,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | FR-E05 | 应用应分析填充词、犹豫词、笼统词、情绪词和表达密度。 | 返回计数、位置、精准替代和建议，并在左右面板更新统计/反馈；界面说明表达密度的计算含义。 |
 | FR-E06 | 用户应能粘贴逐字稿并复用本地分析和 LLM 反馈。 | 粘贴文本按句展示和分析，无需麦克风或 ASR 模型；录音中禁止替换，已有内容时替换需用户确认。 |
 | FR-E07 | 用户配置 LLM 后，应用应生成实时反馈和最终报告。 | 当前实现支持 OpenAI、DeepSeek、Ollama 与自定义 OpenAI-compatible endpoint；每新增约 30 个字符触发实时反馈，用户可手动生成最终报告。 |
-| FR-E08 | 应用应保存各 LLM Provider 配置并兼容旧版扁平配置。 | “保存设置”只持久化，“测试连接”只验证当前表单草稿，两者具有独立忙碌和结果状态；配置原子写入 Electron `userData/settings.json`，按 provider 保存；旧字段在读取时迁移，未来 schema 不被旧版本自动降级覆盖。API Key 当前为明文，属于发布前安全权衡。 |
+| FR-E08 | 应用应保存各 LLM Provider 配置并兼容旧版扁平配置。 | “保存设置”只持久化，“测试连接”只验证当前表单草稿，两者具有独立忙碌和结果状态；当前配置原子写入 Electron `userData/settings.json`，按 provider 保存；旧字段在读取时迁移。未来 schema 的自动加载不会触发写回，但当前版本显式保存仍可能覆盖未来字段。API Key 当前为明文，属于发布前安全权衡。 |
 | FR-E09 | 用户应能编辑训练目标、自定义规则、风格参考和额外口癖词。 | versioned 内容原子写入 `userData/custom-prompt.json`；实时/报告 prompt 读取，额外口癖词也作为最多 64 个有界 filler 参与本地统计；存在未保存修改时离开编辑器需确认。 |
 | FR-E10 | 用户应能复制或保存原文与报告。 | 原文可复制/保存为 Markdown；报告可复制/保存为 Markdown；保存路径通过系统对话框选择；取消或失败时给出可见反馈。 |
 | FR-E11 | 当前 Paraformer 应通过轻量 ASR Provider 边界访问。 | Main 只依赖 initialize/start/feed/stop/cancel/dispose 契约；Fake Provider 可在不加载真实 Paraformer/Sherpa 模块时验证业务与 Electron smoke 路径。 |
@@ -71,6 +71,10 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | FR-P08 | Existing | 应用应能生成普通用户可安装的桌面制品。 | Electron Forge/Squirrel 已生成 Windows x64 Setup/nupkg/RELEASES；PKG-03/PKG-04 证明安装、启动、真实模型、升级与卸载路径不要求终端用户安装 Node.js、Python、CMake 或编译器。公开发布仍需签名与目标环境证据。 |
 | FR-P09 | Existing | 设置、用户数据、模型、缓存和日志应与程序文件分离。 | 设置与版本化模型位于 Electron `userData`；PKG-04 已验证应用升级、手工旧安装器降级、恢复当前版本及卸载均不静默删除这些数据。日志与模型资产缓存仍按各自开发/运行目录管理。 |
 | FR-P10 | Existing | 本地训练在 LLM 不可用时仍应工作。 | 离线、无 API Key 或 LLM 请求失败时，录音、本地 ASR 和基础词库分析仍可完成。 |
+| FR-P11 | Planned | LLM Provider 配置应具有独立且可识别的持久化与接口命名。 | `settings.json` 单向迁移为 `llm-provider-settings.json`；配置模块、Preload API 和 IPC 使用 LLM provider 语义名称；新文件遇到高于当前支持版本的 schema 时拒绝显式保存，不降级覆盖；不与 Appearance 或 ASR 选择共享完整快照。 |
+| FR-P12 | Planned | 用户应能选择四个内置主题和 coach-rail/focus-hud 两种响应式布局。 | 外观使用独立 `appearance.json`；主题与布局可即时切换、跨窗口同步和重启恢复；训练中切换不重建 DOM，不改变 session、内容、pending 请求或滚动位置；最小窗口下字幕和反馈不被遮挡。 |
+| FR-P13 | Planned | 用户应能安装、选择和切换受信任 Catalog 中的 streaming ASR 模型。 | 第一批仅含 Paraformer、Zipformer Small 和 Zipformer Large；产品 registry 是唯一 Catalog 数据源；下载、hash、解包与版本生命周期由 ModelManager 管理；无活动 session 时由 AsrModelService 切换单一 controller；稳定损坏与瞬时初始化失败采用不同持久化语义。 |
+| FR-P14 | Planned | 产品可在 streaming 轨道稳定后支持明确列出的 utterance ASR 模型。 | 第二批只含 SenseVoiceSmall 和 FireRedASR2；停止后解码、无 partial、5 分钟有界 PCM、cancel、失败和 session 隔离通过；不得阻塞第一批 streaming 交付或为其他候选预建适配器。 |
 
 ## 5. 非功能需求（NFR）
 
@@ -86,7 +90,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | NFR-08 | Existing | 权限隔离 | Renderer 不获得不受限的 Node.js 权限；当前 BrowserWindow 使用 `contextIsolation: true`、`nodeIntegration: false`，Preload 只暴露显式能力。后续新增 IPC 时继续维持该边界。 |
 | NFR-09 | Partial | 可测试性 | 词库/共享规则、设置与自定义规则迁移/原子写、Provider、ASR session/IPC/Renderer 过滤、AudioCapture/collector、有界队列、process controller、Model Manager 和 Electron 16/44.1/48 kHz graph fixture 已有测试；packaged 真实模型 smoke 已补齐，真实麦克风仍待环境验证。 |
 | NFR-10 | Partial | 可移植性 | 首个 Tier 1 目标选定 Windows 11 25H2+ x64；Windows ARM64、macOS、Linux 保持 Experimental，只有对应 package/smoke/native-model 证据才能升级支持等级。 |
-| NFR-11 | Existing | 可升级性 | 设置/自定义规则已有 schemaVersion、旧配置迁移、未来 schema 防降级覆盖与原子写；模型具备不可变版本目录、原子 active pointer 和上一版本回退。PKG-04 已验证 1.0.0→1.0.1 安装制品升级与卸载保留 userData；旧完整 Setup 仍可降级二进制，重装当前 Setup 可恢复。自动更新服务不属于首个基线。 |
+| NFR-11 | Partial | 可升级性 | 设置/自定义规则已有 schemaVersion、旧配置迁移与原子写；自动加载 future schema 不写回，但显式保存仍可能降级未知字段，待 FR-P11 收敛。模型具备不可变版本目录、原子 active pointer 和上一版本回退。PKG-04 已验证 1.0.0→1.0.1 安装制品升级与卸载保留 userData；旧完整 Setup 仍可降级二进制，重装当前 Setup 可恢复。自动更新服务不属于首个基线。 |
 | NFR-12 | Existing | 可观测性 | 用户可主动导出 app/OS/arch、active 模型、请求/context/track sample rate、ASR 初始化耗时和受控错误类别；固定白名单不含设置、密钥、路径、stack、音频、逐字稿或 LLM 内容，且不后台持久化或上传。 |
 | NFR-13 | Existing | 桌面可用性 | 对话框提供 dialog 语义、Esc 关闭、焦点约束与焦点回归；键盘焦点可见，支持系统减少动态效果偏好；Electron smoke 覆盖关键交互。 |
 
@@ -142,3 +146,5 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 - 当前实现：[Current Architecture](../architecture/current.md)
 - 决策记录：[ADR Index](../architecture/adr/README.md)
 - 交付顺序：[Roadmap](../roadmap.md)
+- Planned 多模型设计：[Multi-ASR Productization](../superpowers/specs/2026-08-30-multi-asr-models-design.md)
+- Planned 外观设计：[Responsive Themed UI](../superpowers/specs/2026-08-31-responsive-themed-ui-design.md)

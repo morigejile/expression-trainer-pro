@@ -1,48 +1,34 @@
-# ASR candidate preparation inventory
+# ASR candidate evidence index
 
-Queried and downloaded: 2026-08-25 (UTC+08:00); named candidate archive cache refreshed 2026-08-29 and BM-04 candidates added 2026-08-30. This is preparation evidence only: it does not contain benchmark measurements, a ranking, a default-model decision, or a production ASR change.
+- Status: Historical index
+- Preparation window: 2026-08-25 to 2026-08-30
 
-## Official sources and complete archives
+本页保留旧链接的稳定入口，不再维护一份与 registry、结果报告和 ADR 重复的模型清单。
 
-| Candidate | Intended mode | Official Sherpa documentation | Official release asset | Release metadata and archive evidence |
-| --- | --- | --- | --- | --- |
-| Current Paraformer bilingual Chinese/English | streaming | https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-paraformer/paraformer-models.html | https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-paraformer-bilingual-zh-en.tar.bz2 | `asr-models`; asset created 2024-03-10T02:24:45Z; GitHub size 1,047,319,737 bytes; upstream digest not published; local SHA-256 `5462a1fce42693deae572af1e8c4687124b12aa85fe61ff4d3168bb5280e205f` |
-| Zipformer small CTC Chinese INT8 2025-04-01 | streaming | https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-ctc/zipformer-ctc-models.html | https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01.tar.bz2 | `asr-models`; asset created 2025-04-01T12:13:54Z; expected 21,264,113 bytes; upstream digest not published; local archive SHA-256 `b3b309f7ce4a737195fcc6963ea19b0653a7d3401580af5ae0d3e284cbb71f0b` |
-| SenseVoiceSmall INT8 2024-07-17 | utterance/VAD | https://k2-fsa.github.io/sherpa/onnx/sense-voice/pretrained.html | https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2 | `asr-models`; asset created 2025-09-01T08:32:52Z; GitHub size 163,002,883 bytes; official and local SHA-256 `7d1efa2138a65b0b488df37f8b89e3d91a60676e416f515b952358d83dfd347e` |
-| Zipformer Large CTC Chinese INT8 2025-06-30 | streaming | https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-ctc/zipformer-ctc-models.html | https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30.tar.bz2 | GitHub release API size 127,965,713 bytes and digest `f2ab7a5deb02717801f6a5b26c751b42f8a2db891b07f5b095e6da7442081448`; external cache matches both; runtime files, native initialization and 100-sample benchmark passed on 2026-08-30 |
-| FireRedASR2 CTC Chinese-English INT8 2026-02-25 | utterance | https://k2-fsa.github.io/sherpa/onnx/FireRedAsr/pretrained.html | https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25.tar.bz2 | GitHub release API size 520,516,278 bytes and digest `1da8b737ecc5e29f36759a4460c754863e7c919a4ba325aea187331fbfc83274`; archive omitted `tokens.txt`, so the exact token file from the official packaging workflow's conversion source was fetched and hash-pinned; native initialization and 100-sample benchmark passed on 2026-08-30 |
-| Qwen3-ASR 0.6B INT8 2026-03-25 | utterance/VAD | https://k2-fsa.github.io/sherpa/onnx/qwen3-asr/pretrained.html | https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25.tar.bz2 | GitHub release API size 878,702,423 bytes and digest `393f8a14e2f5fb96746aaab342997a40641001fbd5bf9592a080a8329178ee96`; BITS cache matches both; six runtime files total 987,015,347 bytes; Sherpa-ONNX 1.13.3 native initialization passed on 2026-08-30 |
-| SenseVoiceSmall Cantonese-tuned INT8 2025-09-09 | utterance/VAD | https://k2-fsa.github.io/sherpa/onnx/sense-voice/pretrained.html | https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09.tar.bz2 | GitHub release API size 165,783,878 bytes and digest `7305f7905bfcf77fa0b39388a313f3da35c68d971661a65475b56fb2162c8e63`; BITS cache matches both; two runtime files total 237,431,441 bytes; Sherpa-ONNX 1.13.3 native initialization passed on 2026-08-30 |
+## Canonical sources
 
-The official GitHub release API at `https://api.github.com/repos/k2-fsa/sherpa-onnx/releases/tags/asr-models` reported `immutable: false` and `updated_at: 2026-08-24T19:23:12Z`. Archive names alone are therefore not provenance: registry entries use locally calculated hashes of complete extracted runtime files.
+| 信息 | 唯一来源 |
+|---|---|
+| Benchmark 候选 ID、provider、运行文件、大小、hash、来源和 redistribution 状态 | [`benchmark/models/candidates.json`](../../benchmark/models/candidates.json) |
+| 当前产品模型版本、下载资源、运行文件角色和 active/default 规则 | [`models/registry.json`](../../models/registry.json) |
+| 评测执行合同、超时、结果格式和复评触发条件 | [Harness](harness.md) |
+| 冻结语料及来源合同 | [`benchmark/datasets/README.md`](../../benchmark/datasets/README.md) 与 [`benchmark/datasets/SOURCES.md`](../../benchmark/datasets/SOURCES.md) |
+| 产品默认模型决策 | [ADR-0009](../architecture/adr/0009-productize-multiple-asr-models.md) |
 
-Before extraction, both accepted archives were fully listed and rejected if any entry was absolute or contained `..`. Both had zero unsafe entries. Two earlier Paraformer curl attempts remain externally preserved as partials and were never accepted; the complete BITS archive above is the only Paraformer evidence source.
+Registry 是机器可校验的数据源。本页不复制 URL、字节数、SHA-256、runtime file 列表或本机缓存路径；这些字段变化时只更新对应 registry 和必要验证证据。
 
-## License and redistribution boundary
+## Immutable result reports
 
-- Sherpa-ONNX code: Apache-2.0, at https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE.
-- Paraformer: Sherpa identifies the ModelScope conversion source at https://www.modelscope.cn/models/damo/speech_paraformer_asr_nat-zh-cn-16k-common-vocab8404-online/summary. The complete conversion archive has no embedded `LICENSE` entry. No model or training-data redistribution grant was established in this run.
-- Zipformer: the official Sherpa page identifies the upstream checkpoint. Its model license has not yet been independently retrieved in this run.
-- SenseVoice: Sherpa identifies the `iic/SenseVoiceSmall` conversion source. Its 71-byte embedded `LICENSE` only says `Ref to https://github.com/modelscope/FunASR?tab=readme-ov-file#license`; the official FunASR README says model licenses vary. This is not a model or data redistribution grant.
-- Qwen3-ASR: the original Qwen3-ASR repository is Apache-2.0, while the Sherpa archive identifies a third-party ONNX conversion and contains no model license. Product-installer redistribution of this converted INT8 artifact remains unapproved.
-- SenseVoice 2025: Sherpa identifies `ASLP-lab/WSYue-ASR/sensevoice_small_yue`, a 21.8k-hour Cantonese fine-tune that explicitly does not support punctuation. Its fine-tuned-weight and conversion redistribution terms remain unapproved.
+| 阶段 | 报告 | 用途 |
+|---|---|---|
+| BM-02 | [三候选比较](bm02-comparison-2026-08-27.md) | 初始同机基线 |
+| BM-03 | [五候选比较](bm03-five-model-comparison-2026-08-30.md) | streaming/utterance 扩展比较 |
+| BM-04 | [七候选范围](bm04-seven-model-scope-2026-08-30.md)、[七候选结果](bm04-seven-model-comparison-2026-08-30.md) | 最终候选比较与产品建议 |
 
-Every registry entry keeps `redistribution: not-approved`. No model artifact, archive, audio sample, external-log path, or absolute local model path is committed to this repository.
+报告是当次运行的不可变证据，不回填为“当前模型状态”。新的正式复评创建新报告，不改写旧测量值。
 
-## Runtime-file and native-load evidence
+## Evidence boundary
 
-Paraformer: the read-only registry verifier accepted 237,202,501 runtime bytes: `encoder.int8.onnx` 165,462,184 bytes / `81a70226a8934e6ed92aa1d4fc486b428b5398e2f2619ed4897b7294cab90e9a`; `decoder.int8.onnx` 71,664,561 bytes / `f3cca9f77bb9d93c8fcbfb63ae617b6b1ee96818df3aa3b151c40658fe38594f`; and `tokens.txt` 75,756 bytes / `59aba8873a2ed1e122c25fee421e25f283b63290efbde85c1f01a853d83cb6e6`. On Windows x64 / Node 22.23.0 / modules ABI 127 / `sherpa-onnx-node` 1.13.3, the structured dry-run initialized an `OnlineRecognizer` in 1,516.1384 ms (direct initialization: 1,029.4998 ms).
+准备阶段验证过完整 archive、路径安全、runtime file hash 和 Sherpa-ONNX native 初始化；原始 archive、日志、模型和绝对路径均保留在 Git 外。技术验证不等于公开再分发获批，所有公开制品仍以 product registry 的 redistribution 状态和 release checklist 为准。
 
-SenseVoice: the read-only registry verifier accepted 239,549,735 runtime bytes: `model.int8.onnx` 239,233,841 bytes / `c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51`; and `tokens.txt` 315,894 bytes / `f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc`. The embedded `LICENSE` is 71 bytes / `221c6df10b0931a5629adad671ea48fb7747e034c414b6d2bfa275bc3dd4ea17`. On the same environment, the structured dry-run initialized an utterance-mode `OfflineRecognizer` in 1,647.8367 ms (direct initialization: 1,216.086 ms).
-
-Zipformer remains hash-verified outside Git: `model.int8.onnx` is 26,342,340 bytes / `68c9c943840f7d9cf3e8a4970ba50f404feb5277f611fa82b7e72267786fa84a`; `tokens.txt` is 13,366 bytes / `6fed8c6c248516f38e7faa19404b57413e8ce259f1cbc1fa4aebc86eac32fdfd`; and `bbpe.model` is 255,180 bytes / `503204e0690eff065e30d0e01898c9ab06d0e6dc376a741eb6846198f95b2f82`. Its verified total is 26,610,886 bytes and the Windows x64 native online recognizer initialized in 1,922.078 ms using the same Node/modules/Sherpa versions.
-
-Zipformer Large is a distinct verified benchmark candidate. Its archive matches the official digest; runtime files total 162,311,515 bytes. Sherpa-ONNX 1.13.3 native online initialization and the BM-03/BM-04 100-sample runs passed on Windows x64. ADR-0009 selects it as the technical default for subsequent productization, but the current Paraformer runtime has not switched and Zipformer Large is not yet a packaged or redistribution-approved artifact.
-
-FireRedASR2 CTC is a distinct verified benchmark candidate. The official archive matches its digest but omits `tokens.txt`; Sherpa's own packaging workflow downloads that file from `csukuangfj/FireRedASR2-AED-onnx`, so BM-03 fetched the same conversion artifact and hash-pinned it separately. Runtime files total 775,940,592 bytes. Sherpa-ONNX 1.13.3 native offline initialization and the BM-03 100-sample run passed on Windows x64. VAD/product interaction, packaging and redistribution approval remain unresolved.
-
-Qwen3-ASR 0.6B INT8 is a distinct utterance candidate. Its official archive matched the published size and digest. Runtime evidence covers `conv_frontend.onnx` 44,148,281 bytes / `d22dc4423e0940e49884e903d2ea2f7e5567c14fc1aed97e4e26d6b8f208ef9e`; `encoder.int8.onnx` 182,491,662 bytes / `60748d3e6744a57c9c91e1b17424a6c2990567e8adceb0783940c03ed98fa9d9`; `decoder.int8.onnx` 755,914,231 bytes / `4f6885be5959ae26af3089d38ee7972c5fafbeeb1cf8d5e76eab6d8b61ca5771`; and the three tokenizer files recorded in the registry, for 987,015,347 runtime bytes total. The official package has no `tokens.txt`; Sherpa-ONNX 1.13.3 initialized with an empty `tokens` value in 2,976.9029 ms on Windows x64.
-
-SenseVoiceSmall 2025-09-09 is the Cantonese-tuned utterance candidate, not a general replacement for the 2024 checkpoint. Its official archive matched the published size and digest. `model.int8.onnx` is 237,115,547 bytes / `12ca1a2ae7ecf3e0019ef2822307ee0b5cadc9196569e379b4c4026f8205276d`; `tokens.txt` is 315,894 bytes / `f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc`; runtime total is 237,431,441 bytes. Sherpa-ONNX 1.13.3 initialized it in 1,052.9058 ms on Windows x64.
-
-All archive, extraction, verifier, and native-init logs remain in the external artifact root. This inventory remains preparation and provenance evidence rather than the ranking source. BM-04 subsequently ran all seven candidates on the frozen 100-sample corpus; measured CER, latency, RTF, CPU, RAM, result IDs, and product recommendations are recorded in `bm04-seven-model-comparison-2026-08-30.md`. ADR-0009 changes the accepted technical default, while production ASR, packaging, dependencies, and the currently implemented Paraformer runtime remain unchanged.
+当前产品运行时仍使用 Paraformer。ADR-0009 选择 Zipformer Large 作为 Planned 产品化的技术默认，并不表示多模型切换、包内默认模型或公开分发已经实现。
