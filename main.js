@@ -26,6 +26,7 @@ const { createAsrIpcRouter } = require('./lib/asr-ipc');
 const { createAsrProcessController } = require('./lib/asr-process-controller');
 const {createAsrSelectionStore} = require('./lib/asr-selection-store');
 const {createModelManager} = require('./lib/model-manager');
+const {migrateLegacyModelRoot, resolveProductionModelRoot} = require('./lib/model-storage');
 const {resolveBundledModelArchive} = require('./lib/bundled-model-source');
 const {
   createAsrUtilityArgs,
@@ -78,6 +79,12 @@ if (isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTe
   app.setPath('userData', userDataPath);
 }
 
+const usesIsolatedModelRoot = isSmokeTest || isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTest;
+const modelRoot = usesIsolatedModelRoot
+  ? path.join(app.getPath('userData'), 'models')
+  : resolveProductionModelRoot(app.getPath('appData'));
+if (!usesIsolatedModelRoot) migrateLegacyModelRoot({userDataPath: app.getPath('userData'), modelRoot});
+
 function forkAsrUtility(args) {
   return utilityProcess.fork(
     path.join(__dirname, 'lib', 'asr-utility-process.js'),
@@ -93,6 +100,7 @@ function processControllerFor({modelId, installedOnly = false, fake = false, off
       ? ['--fake-asr']
       : createAsrUtilityArgs({
           userDataPath: app.getPath('userData'),
+          modelRoot,
           appVersion: app.getVersion(),
           modelId,
           installedOnly,
@@ -123,6 +131,7 @@ const asrProvider = isSmokeTest
         }),
         modelManager: createModelManager({
           userDataPath: app.getPath('userData'),
+          modelRoot,
           appVersion: app.getVersion(),
           registry: modelRegistry
         }),
@@ -135,6 +144,7 @@ const asrProvider = isSmokeTest
 const asrIpc = createAsrIpcRouter({provider: asrProvider});
 const managementModelManager = createModelManager({
   userDataPath: app.getPath('userData'),
+  modelRoot,
   appVersion: app.getVersion(),
   registry: modelRegistry
 });
@@ -187,6 +197,7 @@ const modelInstallController = isSmokeTest ? createSmokeModelInstallTask() : cre
     path.join(__dirname, 'lib', 'model-install-utility-process.js'),
     createAsrUtilityArgs({
       userDataPath: app.getPath('userData'),
+      modelRoot,
       appVersion: app.getVersion(),
       modelId
     }),
@@ -637,9 +648,11 @@ ipcMain.handle('save-file', async (event, content, filename) => {
 ipcMain.handle('export-diagnostics', async (event, audioRates) => {
   const {dialog} = require('electron');
   const controller = asrProvider.snapshot();
+  const diagnosticModelId = controller.effectiveModelId || controller.selectedModelId || modelRegistry.defaultModelId;
   const snapshot = createDiagnosticSnapshot({
     appVersion: app.getVersion(),
-    userDataPath: app.getPath('userData'),
+    modelRoot,
+    modelId: diagnosticModelId,
     platform: process.platform,
     arch: process.arch,
     osRelease: os.release(),
