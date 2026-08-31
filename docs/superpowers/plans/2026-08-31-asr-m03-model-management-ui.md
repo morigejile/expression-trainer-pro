@@ -83,10 +83,10 @@ feat: manage ASR models from settings
 
 ## Task 5: Verify ASR-M03 and update current truth
 
-- [ ] Run the complete automated suite and record exact pass/fail/skip counts.
-- [ ] Confirm no bundled archive, release-approval machinery, utterance path, dependency, model, corpus, benchmark runtime import, or generic task framework was added.
-- [ ] Update requirements, roadmap, current architecture, development notes, multi-ASR design status, and this plan for ASR-M03 only; leave ASR-M04 externally gated.
-- [ ] Run the full suite again after documentation, inspect `git diff --check` and `git status --short`, and commit with an English subject plus Chinese body.
+- [x] Run the complete automated suite and record exact pass/fail/skip counts: 354 tests, 352 pass, 0 fail, 2 existing Windows file-symlink skips.
+- [x] Confirm no bundled archive, release-approval machinery, utterance path, dependency, model, corpus, benchmark runtime import, or generic task framework was added.
+- [x] Update requirements, roadmap, current architecture, development notes, multi-ASR design status, and this plan for ASR-M03 only; leave ASR-M04 externally gated.
+- [x] Run the full suite again after documentation, inspect `git diff --check` and `git status --short`, and commit with an English subject plus Chinese body.
 
 Expected commit:
 

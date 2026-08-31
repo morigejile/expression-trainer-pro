@@ -79,11 +79,13 @@ git commit -m "<English subject>" -m "中文：<简短说明>"
 
 ASR selection 已独立使用 `asr-selection.json`；Appearance 保持自己的数据边界。两者都不得合并进 LLM provider 配置快照。
 
-ASR-M02 收尾在 Node 24.20.0 运行完整 `node --test`：336 项中 334 pass、0 fail、2 skip；两项 skip 是当前 Windows host 不允许创建 file symlink，directory junction 边界测试仍通过。
+ASR-M03 收尾在 Node 24.20.0 运行完整 `node --test`：354 项中 352 pass、0 fail、2 skip；两项 skip 是当前 Windows host 不允许创建 file symlink，directory junction 边界测试仍通过。
 
 ## ASR 模型
 
-模型权重不进入 Git。唯一 schema-v2 产品 Catalog 仅包含 Paraformer、Zipformer Small 和 Zipformer Large；Factory 只以代码内冻结映射创建对应 Provider。正常启动按严格 `--asr-model=<modelId>`、`asr-selection.json`、Zipformer Large 默认的顺序解析；命令行覆盖只影响本次运行。稳定文件问题可在默认模型成功后恢复持久选择，瞬时失败保留原选择。切换服务保证先销毁旧 controller 再创建目标，失败时新建原 controller 回退；ASR-M03 才提供模型管理 IPC/UI。
+模型权重不进入 Git。唯一 schema-v2 产品 Catalog 仅包含 Paraformer、Zipformer Small 和 Zipformer Large；Factory 只以代码内冻结映射创建对应 Provider。正常启动按严格 `--asr-model=<modelId>`、`asr-selection.json`、Zipformer Large 默认的顺序解析；命令行覆盖只影响本次运行。稳定文件问题可在默认模型成功后恢复持久选择，瞬时失败保留原选择。切换服务保证先销毁旧 controller 再创建目标，失败时新建原 controller 回退。
+
+设置页的“语音识别模型”区域直接调用 `getAsrModelState`、`installAsrModel`、`cancelAsrModelInstall`、`switchAsrModel` 并订阅专用状态事件；这些操作不经过 LLM 保存/测试。Renderer 只接收 Catalog 展示字段和规范状态，只提交受信任模型 ID。安装由独立短生命周期 utility process 执行，同时只允许一个任务；取消、失败和进度不会终止当前识别 controller，下载完成也不会自动切换。
 
 内部开发阶段 `.tar.bz2` 解包调用系统 `tar`。PKG-03 已证明 packaged utility 可从零下载并校验真实约 1 GB Paraformer、调用系统 `tar`、完成 native 初始化和强制离线二次启动，且模型仍位于安装目录外。真实麦克风、接近资格线硬件、macOS/Linux 和正式发布制品仍需对应环境证据。
 
@@ -102,7 +104,7 @@ ASR-M02 收尾在 Node 24.20.0 运行完整 `node --test`：336 项中 334 pass�
 
 BM-01 已完成的数据采集、人工 review 和 freeze 工具已归档到 Git 历史，不再作为当前维护入口。若引入新语料，必须先明确重开该工作并重新评估所需工具，不能把现有冻结结果当作通用数据治理平台。
 
-BM-04 已完成七候选验证，ADR-0009 据此选择 Zipformer Large 作为技术默认。ASR-M01/M02 已接入三款 streaming Catalog/Factory 与启动选择/单 controller 服务；Renderer 尚无切换或安装入口，公开发布也仍不具备模型再分发授权。
+BM-04 已完成七候选验证，ADR-0009 据此选择 Zipformer Large 作为技术默认。ASR-M01～M03 已接入三款 streaming Catalog/Factory、启动选择/单 controller 服务及设置页安装/切换入口；公开发布仍不具备模型再分发授权，包内默认和发布资格验证属于 ASR-M04。
 
 ## 发布边界
 

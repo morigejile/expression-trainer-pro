@@ -1,6 +1,6 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09、PKG-01～PKG-04、CONV-01～CONV-03 与 ASR-M01/M02 Completed；ADR-0009 采用 Zipformer Large 技术默认
+> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09、PKG-01～PKG-04、CONV-01～CONV-03 与 ASR-M01～M03 Completed；ADR-0009 采用 Zipformer Large 技术默认
 > 基线日期：2026-08-31
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
 > 描述对象：截至 Phase 4 / R-09；保留 Electron 43 与 T-04～T-08 行为基线
@@ -103,11 +103,13 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 
 当前 registry 的七个候选均为 `verified`，具备固定 runtime-file hash、native-load 与 BM-04 benchmark 证据；其中 FireRedASR2 CTC、Qwen3-ASR 和两个 SenseVoice 版本按 utterance 契约只输出 final。模型证据保存在 Git 外，所有候选继续保持 `redistribution: not-approved`；技术验证不等于公开打包获批。
 
-### 3.2 Model Manager 与 ASR-M01/M02 多模型运行边界（Completed）
+### 3.2 Model Manager 与 ASR-M01～M03 多模型运行边界（Completed）
 
 产品层以 `models/registry.json` 作为唯一 schema-v2 Catalog，不依赖 `benchmark/`。它仅固定 Paraformer、Zipformer Small 与 Zipformer Large 三款 streaming 模型的 HTTPS archive、最终运行文件、大小、SHA-256、最低应用版本及许可状态；加载器执行精确字段和路径校验并深冻结结果。ModelManager 使用该 Catalog，模型安装位于 `userData/models`，保留跨 utility 安装锁、同盘 `.staging`、流式大小上限、双重校验、白名单解压、不可变 `model/version` 目录、active pointer 和显式上一版本 rollback。
 
 R-08 已由 Main 向 utility process 传入 `userData` 与 app version；ASR-M01 Factory 只接受 `sherpa.online-paraformer` 与 `sherpa.online-ctc`，能力来自代码。ASR-M02 在 Main 组合 SelectionStore、ModelManager 与 provider-shaped ModelService：严格启动覆盖优先，其次恢复持久选择，否则采用 Zipformer Large；非默认选择和命令行覆盖只允许已安装模型。稳定缺失/损坏可在默认模型成功后原子恢复选择，native/资源/进程等瞬时失败不改写。切换先验证、后 dispose 旧 controller，再创建目标；失败时创建全新的原 controller，双失败进入 unavailable，任意时刻最多一个模型 utility process。
+
+ASR-M03 增加单任务、短生命周期的安装 utility，与当前识别 controller 独立运行并提供有界进度、取消和失败重试。Main 的模型管理 router 只接受四个精确命令和 Catalog 模型 ID，设置窗口只获得脱敏快照与专用状态事件；路径、URL、hash、provider type 和任意监听器均不进入 Renderer。设置页使用原生控件即时执行下载、取消、重试、重新安装或切换，不经过 LLM 保存/测试流程；录音或命令行覆盖期间不提供冲突切换动作。
 
 ### 3.3 PKG-02 Windows x64 packaging（Completed）
 
@@ -260,7 +262,7 @@ providers.custom     { apiKey, baseUrl, model, customModel }
 
 旧版扁平字段、缺失 provider 字段和旧文件名 `settings.json` 在读取时迁移为 schema version 1；canonical 文件优先，迁移后不删除 legacy 文件，也不按时间戳合并。损坏 JSON 使用默认配置运行并保留原文件，未知 provider 配置块不会在规范化时被删除。canonical 或 legacy future schema 可读取已知子集，显式保存则返回稳定错误且不写文件。LLM provider 与 custom-prompt 都使用同盘原子写，发布失败保留旧文件并清理临时文件。API Key 仍为明文；当前内部阶段不为此增加 native keychain 依赖，发布前再按平台成本评估。`custom-prompt.json` 保存 versioned goals、customRules、styleRef、customWords。训练文本、统计和报告仅在 Renderer 内存中，除非用户手动复制/保存。
 
-ASR 选择已独立使用 schema-v1 `asr-selection.json`，只保存 `selectedModelId`，缺失/损坏先内存恢复且在默认模型成功后才原子写入；未来 schema 可读取已知选择但拒绝降级保存。Appearance 仍使用其独立规划的数据边界，两者都不并入 LLM provider 配置。模型管理 IPC/UI 尚未实现，因此当前服务切换能力还没有 Renderer 入口。
+ASR 选择已独立使用 schema-v1 `asr-selection.json`，只保存 `selectedModelId`，缺失/损坏先内存恢复且在默认模型成功后才原子写入；未来 schema 可读取已知选择但拒绝降级保存。Appearance 仍使用其独立规划的数据边界，两者都不并入 LLM provider 配置。模型管理状态不持久化到 LLM 配置；设置窗口通过专用 IPC 查询并订阅脱敏快照，模型操作立即生效。
 
 ### 5.8 Benchmark dataset boundary (BM-01)
 
