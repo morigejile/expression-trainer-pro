@@ -393,6 +393,17 @@ button, input, select, .subtitle-scroll, .feedback-content, .modal-body {
   padding: 5px 9px;
 }
 .btn-message-action:hover { background: var(--color-surface-raised); }
+.user-message-actions { align-items: center; display: flex; flex-shrink: 0; gap: 8px; }
+.btn-message-close {
+  background: transparent;
+  border: 0;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 20px;
+  line-height: 1;
+  padding: 3px 5px;
+}
+.btn-message-close:hover { color: var(--color-text); }
 .operation-status, .feedback-status {
   color: var(--color-text-muted);
   font-size: 12px;

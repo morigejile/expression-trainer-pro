@@ -26,6 +26,7 @@ const { createAsrIpcRouter } = require('./lib/asr-ipc');
 const { createAsrProcessController } = require('./lib/asr-process-controller');
 const {createAsrSelectionStore} = require('./lib/asr-selection-store');
 const {createModelManager} = require('./lib/model-manager');
+const {migrateLegacyModelRoot, resolveProductionModelRoot} = require('./lib/model-storage');
 const {resolveBundledModelArchive} = require('./lib/bundled-model-source');
 const {
   createAsrUtilityArgs,
@@ -78,6 +79,12 @@ if (isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTe
   app.setPath('userData', userDataPath);
 }
 
+const usesIsolatedModelRoot = isSmokeTest || isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTest;
+const modelRoot = usesIsolatedModelRoot
+  ? path.join(app.getPath('userData'), 'models')
+  : resolveProductionModelRoot(app.getPath('appData'));
+if (!usesIsolatedModelRoot) migrateLegacyModelRoot({userDataPath: app.getPath('userData'), modelRoot});
+
 function forkAsrUtility(args) {
   return utilityProcess.fork(
     path.join(__dirname, 'lib', 'asr-utility-process.js'),
@@ -93,6 +100,7 @@ function processControllerFor({modelId, installedOnly = false, fake = false, off
       ? ['--fake-asr']
       : createAsrUtilityArgs({
           userDataPath: app.getPath('userData'),
+          modelRoot,
           appVersion: app.getVersion(),
           modelId,
           installedOnly,
@@ -123,6 +131,7 @@ const asrProvider = isSmokeTest
         }),
         modelManager: createModelManager({
           userDataPath: app.getPath('userData'),
+          modelRoot,
           appVersion: app.getVersion(),
           registry: modelRegistry
         }),
@@ -135,6 +144,7 @@ const asrProvider = isSmokeTest
 const asrIpc = createAsrIpcRouter({provider: asrProvider});
 const managementModelManager = createModelManager({
   userDataPath: app.getPath('userData'),
+  modelRoot,
   appVersion: app.getVersion(),
   registry: modelRegistry
 });
@@ -187,6 +197,7 @@ const modelInstallController = isSmokeTest ? createSmokeModelInstallTask() : cre
     path.join(__dirname, 'lib', 'model-install-utility-process.js'),
     createAsrUtilityArgs({
       userDataPath: app.getPath('userData'),
+      modelRoot,
       appVersion: app.getVersion(),
       modelId
     }),
@@ -433,35 +444,36 @@ app.whenReady().then(async () => {
     }
     return;
   }
-  // macOS 需要显式创建应用菜单，否则菜单栏显示默认的 "Electron"
-  // Windows/Linux 上此菜单同样适用，macOS 专属角色（hide/hideOthers）会自动生效
-  const appMenuTemplate = [
-    {
-      label: app.name,
-      submenu: [
-        { role: 'about' },
-        { type: 'separator' },
-        { role: 'hide' },
-        { role: 'hideOthers' },
-        { role: 'unhide' },
-        { type: 'separator' },
-        { role: 'quit' }
-      ]
-    },
-    {
-      label: 'Edit',
-      submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
-        { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'selectAll' }
-      ]
-    }
-  ];
-  Menu.setApplicationMenu(Menu.buildFromTemplate(appMenuTemplate));
+  if (process.platform === 'darwin') {
+    Menu.setApplicationMenu(Menu.buildFromTemplate([
+      {
+        label: app.name,
+        submenu: [
+          { role: 'about' },
+          { type: 'separator' },
+          { role: 'hide' },
+          { role: 'hideOthers' },
+          { role: 'unhide' },
+          { type: 'separator' },
+          { role: 'quit' }
+        ]
+      },
+      {
+        label: 'Edit',
+        submenu: [
+          { role: 'undo' },
+          { role: 'redo' },
+          { type: 'separator' },
+          { role: 'cut' },
+          { role: 'copy' },
+          { role: 'paste' },
+          { role: 'selectAll' }
+        ]
+      }
+    ]));
+  } else {
+    Menu.setApplicationMenu(null);
+  }
 
   // 加载词库
   loadLexicon();
@@ -523,6 +535,9 @@ ipcMain.handle('get-llm-provider-settings', () => {
 ipcMain.handle('save-llm-provider-settings', (event, settings) => {
   try {
     saveLlmProviderSettings(app.getPath('userData'), settings);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('llm-provider-settings-changed');
+    }
     return { success: true };
   } catch (error) {
     if (error.code === 'unsupported-schema-version') {
@@ -637,9 +652,11 @@ ipcMain.handle('save-file', async (event, content, filename) => {
 ipcMain.handle('export-diagnostics', async (event, audioRates) => {
   const {dialog} = require('electron');
   const controller = asrProvider.snapshot();
+  const diagnosticModelId = controller.effectiveModelId || controller.selectedModelId || modelRegistry.defaultModelId;
   const snapshot = createDiagnosticSnapshot({
     appVersion: app.getVersion(),
-    userDataPath: app.getPath('userData'),
+    modelRoot,
+    modelId: diagnosticModelId,
     platform: process.platform,
     arch: process.arch,
     osRelease: os.release(),

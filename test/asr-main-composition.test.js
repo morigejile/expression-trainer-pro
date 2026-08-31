@@ -37,12 +37,14 @@ test('utility arguments propagate only selected model identity and installed-onl
   const {createAsrUtilityArgs} = require('../lib/asr-main-composition');
   assert.deepEqual(createAsrUtilityArgs({
     userDataPath: 'C:\\Users\\test\\data',
+    modelRoot: 'C:\\Users\\test\\AppData\\Roaming\\expression-trainer-pro-models',
     appVersion: '1.0.1',
     modelId: SMALL,
     installedOnly: true,
     offline: true
   }), [
     '--user-data-path', 'C:\\Users\\test\\data',
+    '--model-root', 'C:\\Users\\test\\AppData\\Roaming\\expression-trainer-pro-models',
     '--app-version', '1.0.1',
     '--model-id', SMALL,
     '--installed-only',
@@ -55,12 +57,14 @@ test('utility arguments carry one application-owned bundled default archive trip
   const archivePath = 'C:\\Program Files\\ExpressionTrainer\\resources\\asr-models\\large.tar.bz2';
   assert.deepEqual(createAsrUtilityArgs({
     userDataPath: 'C:\\Users\\test\\data',
+    modelRoot: 'C:\\Users\\test\\AppData\\Roaming\\expression-trainer-pro-models',
     appVersion: '1.0.1',
     modelId: LARGE,
     bundledArchive: {modelId: LARGE, version: '2025-06-30', archivePath},
     offline: true
   }), [
     '--user-data-path', 'C:\\Users\\test\\data',
+    '--model-root', 'C:\\Users\\test\\AppData\\Roaming\\expression-trainer-pro-models',
     '--app-version', '1.0.1',
     '--model-id', LARGE,
     '--bundled-model-id', LARGE,

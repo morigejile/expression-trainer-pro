@@ -126,6 +126,20 @@ test('read-only active lookup does not create managed model roots', async (t) =>
   assert.equal(fs.existsSync(modelsRoot), false);
 });
 
+test('an explicit model root keeps native model files outside Unicode userData', async (t) => {
+  const {createModelManager} = require('../lib/model-manager');
+  const data = fixture(t);
+  const unicodeUserDataPath = path.join(data.userDataPath, '宇宙无敌表达训练');
+  const modelRoot = path.join(data.userDataPath, 'expression-trainer-pro-models');
+  fs.mkdirSync(unicodeUserDataPath);
+  const manager = createModelManager({...data, userDataPath: unicodeUserDataPath, modelRoot, appVersion: '1.0.0'});
+
+  const installed = await manager.install(data.model.id, {activate: true});
+
+  assert.equal(installed.modelPath, path.join(modelRoot, data.model.id, data.model.version));
+  assert.equal(fs.existsSync(path.join(unicodeUserDataPath, 'models')), false);
+});
+
 test('install verifies staged bytes, atomically publishes a version, and activates it', async (t) => {
   const {createModelManager} = require('../lib/model-manager');
   const data = fixture(t);

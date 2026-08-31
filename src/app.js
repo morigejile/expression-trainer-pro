@@ -72,6 +72,7 @@ class ExpressionTrainer {
     this.pasteAnalysisPending = false;
     this.pasteAnalysisGeneration = 0;
     this.llmGeneration = 0;
+    this.userMessageRequiresSettings = false;
     this.activeModal = null;
     this.modalOpener = null;
     this.asrEventState = createAsrEventState();
@@ -112,6 +113,7 @@ class ExpressionTrainer {
     this.userMessage = document.getElementById('user-message');
     this.userMessageText = document.getElementById('user-message-text');
     this.userMessageAction = document.getElementById('user-message-action');
+    this.userMessageClose = document.getElementById('user-message-close');
     this.trainingStatus = document.getElementById('training-status');
     this.feedbackStatus = document.getElementById('feedback-status');
     this.helpModal = document.getElementById('help-modal');
@@ -134,6 +136,8 @@ class ExpressionTrainer {
     this.btnReport.addEventListener('click', () => this.generateReport());
     this.btnSettings.addEventListener('click', () => window.api.openSettings());
     this.userMessageAction.addEventListener('click', () => window.api.openSettings());
+    this.userMessageClose.addEventListener('click', () => this.hideUserMessage());
+    window.api.onLlmProviderSettingsChanged?.(() => this.handleLlmProviderSettingsChanged());
     this.btnHelp.addEventListener('click', () => this.openHelpModal());
     this.btnDiagnostics.addEventListener('click', () => this.exportDiagnostics());
     this.btnCloseHelp.addEventListener('click', () => this.closeModal(this.helpModal));
@@ -904,8 +908,21 @@ class ExpressionTrainer {
 
   showUserMessage(message, { openSettings = false } = {}) {
     this.userMessageText.textContent = message;
+    this.userMessageRequiresSettings = openSettings;
     this.userMessageAction.classList.toggle('hidden', !openSettings);
     this.userMessage.classList.remove('hidden');
+  }
+
+  hideUserMessage() {
+    this.userMessageRequiresSettings = false;
+    this.userMessageAction.classList.add('hidden');
+    this.userMessage.classList.add('hidden');
+  }
+
+  handleLlmProviderSettingsChanged() {
+    if (!this.userMessageRequiresSettings) return;
+    this.hideUserMessage();
+    this.feedbackStatus.textContent = '本地分析可用；AI 建议将在后续表达中生成';
   }
 
   setPasteAnalysisPending(pending) {

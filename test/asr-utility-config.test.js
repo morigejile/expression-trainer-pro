@@ -10,6 +10,7 @@ test('managed utility accepts one exact trusted model ID and installed-only mode
   const result = resolveManagedAsrOptions([
     'electron', 'asr-utility-process.js',
     '--user-data-path', 'C:\\Users\\test\\data',
+    '--model-root', 'C:\\Users\\test\\AppData\\Roaming\\expression-trainer-pro-models',
     '--app-version', '1.0.1',
     '--model-id', modelId,
     '--installed-only'
@@ -19,12 +20,13 @@ test('managed utility accepts one exact trusted model ID and installed-only mode
   assert.equal(result.catalogEntry.modelId, modelId);
   assert.equal(result.installedOnly, true);
   assert.equal(result.userDataPath, 'C:\\Users\\test\\data');
+  assert.equal(result.modelRoot, 'C:\\Users\\test\\AppData\\Roaming\\expression-trainer-pro-models');
   assert.equal(result.appVersion, '1.0.1');
 });
 
 test('managed utility rejects missing, unknown, duplicate, and inline model arguments', () => {
   const {resolveManagedAsrOptions} = require('../lib/asr-utility-config');
-  const base = ['electron', 'asr-utility-process.js', '--user-data-path', 'C:\\data', '--app-version', '1.0.1'];
+  const base = ['electron', 'asr-utility-process.js', '--user-data-path', 'C:\\data', '--model-root', 'C:\\models', '--app-version', '1.0.1'];
   for (const extra of [
     [],
     ['--model-id', 'unknown'],
@@ -43,6 +45,7 @@ test('managed utility accepts one complete bundled Catalog-default triplet', () 
   const result = resolveManagedAsrOptions([
     'electron', 'asr-utility-process.js',
     '--user-data-path', 'C:\\Users\\test\\data',
+    '--model-root', 'C:\\Users\\test\\AppData\\Roaming\\expression-trainer-pro-models',
     '--app-version', '1.0.1',
     '--model-id', modelId,
     '--bundled-model-id', modelId,
@@ -60,6 +63,7 @@ test('managed utility rejects partial, duplicate, relative, and non-default bund
   const base = [
     'electron', 'asr-utility-process.js',
     '--user-data-path', 'C:\\data',
+    '--model-root', 'C:\\models',
     '--app-version', '1.0.1',
     '--model-id', modelId
   ];
