@@ -16,7 +16,7 @@ BM-03 又在同一冻结的 100 条普通话样本、Sherpa-ONNX 1.13.3、CPU、
 
 1. 支持 Paraformer、Zipformer Small、Zipformer Large、SenseVoiceSmall 和 FireRedASR2 CTC INT8。
 2. Zipformer Large 成为技术默认模型，supersede ADR-0005 的 Paraformer 默认决策。
-3. 默认模型随公开安装包交付，首次使用时通过 Model Manager 的完整校验和原子 staging 导入 `userData/models`；后续完全从用户目录离线运行。
+3. 默认模型随公开安装包交付，首次使用时通过 Model Manager 的完整校验和原子 staging 导入 `appData/expression-trainer-pro-models`；后续完全从用户目录离线运行。Windows 使用 `%APPDATA%\expression-trainer-pro-models`，避免 native Sherpa 读取本地化 `userData` 路径失败。
 4. 公开带模型制品只有在 Zipformer Large `redistribution: approved` 后才能生成；内部工程包不是公开分发制品。
 5. 第一批先交付三款 streaming 模型，第二批再交付两款 utterance 模型。Utterance 不伪造 partial，并使用 5 分钟有界 PCM 缓冲。
 6. Provider 使用代码内“显式适配器注册表 + 能力描述”。首期只实现所需 Sherpa-ONNX 适配器，不建设插件、动态代码、市场或通用配置 DSL。
