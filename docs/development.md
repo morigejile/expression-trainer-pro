@@ -73,11 +73,13 @@ git commit -m "<English subject>" -m "中文：<简短说明>"
 
 ## 配置文件边界
 
-当前产品代码仍把 LLM provider 配置保存到 `userData/settings.json`，并使用 `lib/settings-config.js`、`getSettings`/`saveSettings` 和 `get-settings`/`save-settings`。CONV-03 是 Planned 迁移：目标命名为 `llm-provider-settings.json`、`lib/llm-provider-config.js`、`getLlmProviderSettings`/`saveLlmProviderSettings` 和对应显式 IPC。实现前不得把目标名称写成当前事实。
+当前产品把 LLM provider 配置保存到 `userData/llm-provider-settings.json`，并使用 `lib/llm-provider-config.js`、`lib/llm-provider-store.js`、`getLlmProviderSettings`/`saveLlmProviderSettings` 和 `get-llm-provider-settings`/`save-llm-provider-settings`。通用的 `src/settings.*` 名称只表示设置页面，后续 Appearance 和模型管理仍可在该页面提供独立区域。
 
-迁移只从旧文件到新文件执行一次，不删除旧文件，也不做跨版本双向同步；新文件存在后以新文件为准。新文件 schema 高于当前支持版本时，读取可识别字段但拒绝所有显式保存。该任务必须聚焦验证旧文件迁移、原子发布失败、新文件优先、future schema 拒绝保存，以及设置页“保存”和“测试连接”仍保持独立。
+新文件不存在时从 legacy `settings.json` 单向迁移，不删除旧文件，也不做跨版本双向同步；新文件存在后以新文件为准。canonical 或 legacy 来源的 schema 高于当前支持版本时，读取可识别字段但拒绝所有显式保存。测试覆盖旧文件迁移、原子发布失败、新文件优先、future schema 拒绝保存，以及设置页“保存”和“测试连接”保持独立。
 
 Appearance 和 ASR selection 分别使用 Planned 的 `appearance.json` 与 `asr-selection.json`，不得合并进 LLM provider 配置快照。
+
+CONV-02/CONV-03 收尾已在 Node 24.20.0/npm 11.19.0 运行完整 `npm test`：297 项中 295 pass、0 fail、2 skip；两项 skip 是当前 Windows host 不允许创建 file symlink，directory junction 边界测试仍通过。
 
 ## ASR 模型
 

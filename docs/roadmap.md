@@ -2,7 +2,7 @@
 
 > 状态：Active execution baseline
 > 更新日期：2026-08-31
-> 当前进度：Phase 0-5 的内部基线、R-01～R-09、PKG-01～PKG-04、OPS-02/OPS-05、七候选 benchmark 与 CONV-01 文档收敛已完成。下一主线是独立完成 CONV-02 benchmark writer 竞态和 CONV-03 LLM provider 配置迁移，再开始 UI/ASR 产品轨道。
+> 当前进度：Phase 0-5 的内部基线、R-01～R-09、PKG-01～PKG-04、OPS-02/OPS-05、七候选 benchmark 与 CONV-01～CONV-03 已完成。下一主线是 UI-01/UI-02 与 ASR-M01～ASR-M03；两条轨道使用独立分支，ASR-M04 继续受许可和公开制品条件约束。
 > 当前模式：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞后续工作；只有它们使当前技术实验无法运行或结论失效时，才阻塞当前路径。
 
 ## 1. 目标与排序原则
@@ -56,7 +56,7 @@ flowchart LR
 | Phase 1 — T-01～T-08 | 核心测试、设置迁移、stop final、安全渲染、LLM 控制、Electron smoke、Electron 43 升级 | `test/`、[当前架构](architecture/current.md) |
 | Phase 2 — BM-01～BM-04 | 100 条冻结 FLEURS 数据、可复跑 harness、七候选同机比较 | [数据集来源](../benchmark/datasets/SOURCES.md)、[Harness](benchmark/harness.md)、[BM-04 结果](benchmark/bm04-seven-model-comparison-2026-08-30.md) |
 | Phase 3 — D-01/D-02 | 冻结比较规则；ADR-0009 采用 Zipformer Large 技术默认 | [ADR-0009](architecture/adr/0009-productize-multiple-asr-models.md) |
-| Phase 4 — R-01～R-09 | session/event、安全 IPC、AudioCapture/AudioWorklet、有界传输与 utility process 已建立；版本化 Paraformer 安全激活/回退；settings/custom rules 原子持久化、共享规则与当前日志脱敏边界完成。future schema 的自动加载不写回，但显式保存边界留给 CONV-03 | [当前架构](architecture/current.md) |
+| Phase 4 — R-01～R-09 | session/event、安全 IPC、AudioCapture/AudioWorklet、有界传输与 utility process 已建立；版本化 Paraformer 安全激活/回退；settings/custom rules 原子持久化、共享规则与当前日志脱敏边界完成。R-09 当时未关闭的 LLM provider 显式保存边界已由 CONV-03 补齐 | [当前架构](architecture/current.md) |
 | Phase 5 — PKG-01～PKG-04 | Windows 11 25H2+ x64 Tier 1 目标；Forge/Squirrel package/make、完整 Sherpa Windows native bundle ASAR unpack、packaged Fake/native-load smoke；静默安装、真实 Paraformer 首次准备、强制离线二次启动、1.0.0→1.0.1 升级及卸载数据保留 | [支持矩阵](support-matrix.md)、[ADR-0007](architecture/adr/0007-package-with-electron-forge.md) |
 
 补充边界：
@@ -73,8 +73,8 @@ flowchart LR
 | ID | P | 状态 | 任务 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
 | CONV-01 | P0 | Completed | 收敛 requirements、current architecture、ADR/spec、Roadmap、开发与验证文档 | 当前 main 基线 | `bb8abb7` 已使当前事实、未来设计和历史证据各有唯一来源；文档类型未扩张；13 个文档通过链接、代码块和差异检查 |
-| CONV-02 | P0 | Planned | 修复 benchmark result writer 并行失败后的 staging 清理竞态 | CONV-01 | 原始写入错误不再被 Windows `ENOTEMPTY` 覆盖；聚焦故障注入和规范 Node 24.20.0 全量测试通过 |
-| CONV-03 | P1 | Planned | 显式命名和迁移 LLM provider 配置 | CONV-01 | `settings.json` 单向迁移为 `llm-provider-settings.json`；模块、Preload API 和 IPC 命名明确；future schema 显式保存被拒绝；迁移失败有聚焦测试 |
+| CONV-02 | P0 | Completed | 修复 benchmark result writer 并行失败后的 staging 清理竞态 | CONV-01 | `2c01017` 等待全部写入 settled 后再清理并保留原始错误；聚焦故障注入和 Node 24.20.0 全量测试通过 |
+| CONV-03 | P1 | Completed | 显式命名和迁移 LLM provider 配置 | CONV-01 | `8b93f88` 完成单向迁移、显式模块/Preload/IPC 命名、future schema 保存拒绝和迁移失败测试 |
 
 CONV-02 与 CONV-03 使用独立实施计划和提交，不与 Appearance、多模型或彼此混合。
 
@@ -122,7 +122,7 @@ Utterance 不进入当前 streaming 关键路径；开始 ASR-U01 前必须重�
 | R-06 | P0 | ASR 移出 Main（Completed） | 单个 utility process 持有 Provider/Sherpa；Main Controller 关联请求、检测退出、下一 start 重建并以 5 秒上限完成 quit dispose | R-02,R-05,D-03 | Controller 测试与真实 Electron Fake smoke 覆盖强制退出、安全失败、重建和有界关闭；真实模型负载留作非阻塞环境验证 |
 | R-07 | P1 | 实现轻量 Model Manager（Completed） | 独立产品 registry 固定 Paraformer 版本与 archive/runtime hash；HTTPS 下载有流式字节上限和严格 Range 有限续传，系统 `tar` 只提取白名单文件；同盘 staging、不可变版本目录、active pointer 与显式 rollback 均位于 `userData/models` | D-02,R-01 | 聚焦测试覆盖中断/续传、错误 hash、解压失败、空间不足、成功升级和上一版本回退；PKG-03 已完成真实 1 GB archive/system tar 闭环 |
 | R-08 | P1 | 激活版本化默认模型（Completed） | utility process 从 `userData/models` 解析或安装 registry 默认 Paraformer；使用 role→绝对路径配置，native 初始化成功后才原子激活；当前版本损坏或加载失败时只探测并切换一次上一版本 | R-06,R-07,D-02 | 聚焦测试覆盖首次安装、single-flight、取消、role config、激活时序、损坏 active 与失败回退；PKG-03 已完成 packaged 真实模型初始化与离线二次启动 |
-| R-09 | P1 | 收敛设置/规则/日志（Completed） | settings 与 custom-prompt 使用同盘临时文件 + fsync + rename 原子写；旧 schema 自动迁移，future schema 自动加载不写回；字幕与本地分析共用唯一规则源，customWords 作为有界 filler 生效；现有错误日志维持脱敏边界，不引入 keychain/native 依赖 | T-03,R-07 | 聚焦测试覆盖旧/当前/future schema 的读取和原子发布、规则同源、自定义 filler 与错误脱敏；显式保存防降级留给 CONV-03；OPS-05 已补固定白名单诊断导出 |
+| R-09 | P1 | 收敛设置/规则/日志（Completed） | settings 与 custom-prompt 使用同盘临时文件 + fsync + rename 原子写；旧 schema 自动迁移，future schema 自动加载不写回；字幕与本地分析共用唯一规则源，customWords 作为有界 filler 生效；现有错误日志维持脱敏边界，不引入 keychain/native 依赖 | T-03,R-07 | R-09 聚焦测试覆盖读取和原子发布、规则同源、自定义 filler 与错误脱敏；当时未覆盖的 LLM provider 显式保存防降级已由 CONV-03 完成；OPS-05 已补固定白名单诊断导出 |
 
 R-01～R-09、D-03/D-04、PKG-01～PKG-04 与 BM-04 已完成当前最小边界。七候选均已验证；ADR-0009 已采用 Zipformer Large 技术默认，公开分发仍取决于许可与产品链路验收。
 
@@ -167,7 +167,7 @@ ADR-0009 已采用 Zipformer Large 作为后续产品化的技术默认；当前
 | M3 架构收敛 | Completed | R-01～R-09、D-03/D-04 | Audio/ASR/模型分离，Main 不推理，模型升级可回退 |
 | M4 可安装发布 | In Progress | PKG-01～PKG-06（PKG-01～PKG-04 Completed；PKG-05/PKG-06 为外部发布跟进） | Windows x64 内部安装/升级闭环已完成；公开发布仍需签名与对应平台证据 |
 | M5 可长期维护 | In Progress | OPS-01～OPS-06（OPS-02/OPS-05 Completed） | 版本与脱敏诊断基线已完成；CI、依赖和模型生命周期待按实际风险推进 |
-| M6 合并后收敛 | In Progress | CONV-01～CONV-03 | 文档真相源一致，已知基线竞态与 LLM provider 配置边界关闭 |
+| M6 合并后收敛 | Completed | CONV-01～CONV-03 | 文档真相源一致；benchmark writer 竞态与 LLM provider 配置边界已关闭；Node 24.20.0 全量测试通过 |
 | M7 新需求产品化 | Planned | UI-01～UI-02、ASR-M01～ASR-M04 | 响应式外观与三款 streaming 模型分轨交付；公开默认模型受许可约束 |
 
 ## 10. 明确不做

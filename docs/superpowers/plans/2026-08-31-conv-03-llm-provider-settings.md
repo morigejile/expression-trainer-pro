@@ -1,6 +1,10 @@
 # CONV-03 LLM Provider Settings Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **Status:** Historical / Completed
+>
+> **Implemented by:** `8b93f88`
+>
+> **Historical instruction (inactive):** This plan has been executed. Do not resume it as current work.
 
 **Goal:** Give LLM provider configuration explicit file, module, API and IPC names while safely migrating the legacy file and rejecting future-schema downgrades.
 
@@ -30,17 +34,17 @@
 - Produces: `CURRENT_LLM_PROVIDER_SCHEMA_VERSION`, `DEFAULT_LLM_PROVIDER_CONFIGS`, `createDefaultLlmProviderSettings()`, `normalizeLlmProviderSettings(raw)`, `parseLlmProviderSettingsJson(json)`, `getSelectedLlmProviderSettings(settings)`.
 - `parseLlmProviderSettingsJson` additionally returns `isFutureSchema: boolean` while preserving `settings`, `shouldPersist`, and `error`.
 
-- [ ] **Step 1: Rename the test and write future-schema assertions**
+- [x] **Step 1: Rename the test and write future-schema assertions**
 
 Update imports and public names. Extend the future-schema test to assert `isFutureSchema === true`; current/legacy/invalid cases assert `false`.
 
-- [ ] **Step 2: Run the renamed test to verify it fails**
+- [x] **Step 2: Run the renamed test to verify it fails**
 
 Run: `node --test test/llm-provider-config.test.js`
 
 Expected: FAIL because the renamed module and exports do not exist.
 
-- [ ] **Step 3: Rename the module and implement explicit exports**
+- [x] **Step 3: Rename the module and implement explicit exports**
 
 Rename functions/constants consistently. In the parser compute:
 
@@ -51,7 +55,7 @@ const isFutureSchema = Number.isInteger(raw.schemaVersion)
 
 Return this flag without changing normalization behavior.
 
-- [ ] **Step 4: Run the pure config test**
+- [x] **Step 4: Run the pure config test**
 
 Run: `node --test test/llm-provider-config.test.js`
 
@@ -68,21 +72,21 @@ Expected: all tests pass.
 - `options` allows test-only injection of `fsImpl`, `atomicWrite`, and `logger`; production defaults use `node:fs`, `atomicWriteJsonSync`, and `console`.
 - Save throws an Error with `code === 'unsupported-schema-version'` when the canonical file contains a future schema.
 
-- [ ] **Step 1: Write store tests**
+- [x] **Step 1: Write store tests**
 
 Cover canonical priority, legacy-to-canonical atomic migration, legacy preservation, invalid legacy fallback without write, future legacy read without migration write, future canonical explicit-save rejection, and injected atomic-write failure leaving canonical absent.
 
-- [ ] **Step 2: Run store tests to verify they fail**
+- [x] **Step 2: Run store tests to verify they fail**
 
 Run: `node --test test/llm-provider-store.test.js`
 
 Expected: FAIL because the store module does not exist.
 
-- [ ] **Step 3: Implement the minimal store**
+- [x] **Step 3: Implement the minimal store**
 
 Resolve both filenames under the supplied `userDataPath`. Load canonical when it exists; otherwise parse legacy and atomically write normalized current data only when the legacy parse is valid and not future schema. On save, inspect an existing canonical file before normalizing the submitted settings; reject a future schema and otherwise atomically write the canonical file.
 
-- [ ] **Step 4: Run store and config tests**
+- [x] **Step 4: Run store and config tests**
 
 Run: `node --test test/llm-provider-config.test.js test/llm-provider-store.test.js`
 
@@ -102,21 +106,21 @@ Expected: all tests pass.
 - Main: LLM requests call `loadLlmProviderSettings(app.getPath('userData'))`; save handler catches `unsupported-schema-version` and returns `{success:false,error:'当前版本无法保存更高版本的 LLM Provider 配置'}` without writing.
 - The general settings page keeps `loadSettings()` as an internal UI lifecycle method but calls the explicit Preload methods.
 
-- [ ] **Step 1: Update Renderer and smoke tests first**
+- [x] **Step 1: Update Renderer and smoke tests first**
 
 Change mocked APIs and smoke capability assertions to `getLlmProviderSettings`/`saveLlmProviderSettings`. Add a settings-page case asserting a `{success:false,error}` save result is rendered and does not report success.
 
-- [ ] **Step 2: Run focused UI tests to verify they fail**
+- [x] **Step 2: Run focused UI tests to verify they fail**
 
 Run: `node --test test/settings-page.test.js`
 
 Expected: FAIL until production API names and save-result handling are updated.
 
-- [ ] **Step 3: Wire Main, Preload and settings page**
+- [x] **Step 3: Wire Main, Preload and settings page**
 
 Remove local generic file helpers from Main, import the config/store explicit names, rename IPC channels, and update both LLM request call sites. Update the settings page to await `saveLlmProviderSettings`, throw/display the returned error when `success` is false, and leave connection testing unchanged.
 
-- [ ] **Step 4: Run focused settings and Electron behavior tests**
+- [x] **Step 4: Run focused settings and Electron behavior tests**
 
 Run: `node --test test/llm-provider-config.test.js test/llm-provider-store.test.js test/settings-page.test.js test/ai-feedback.test.js test/electron-smoke.test.js`
 
@@ -131,19 +135,18 @@ Expected: all tests pass.
 - Modify: `docs/roadmap.md`
 - Modify: this plan
 
-- [ ] **Step 1: Run name and boundary checks**
+- [x] **Step 1: Run name and boundary checks**
 
 Run: `rg -n "settings-config|get-settings|save-settings|getSettings|saveSettings" main.js preload.js lib src test smoke`
 
 Expected: no LLM provider configuration references use the generic names; unrelated Web Audio `getSettings()` remains allowed.
 
-- [ ] **Step 2: Run the full canonical test suite**
+- [x] **Step 2: Run the full canonical test suite**
 
 Run under Node 24.20.0: `npm test`
 
 Expected: all tests pass after CONV-02 is present.
 
-- [ ] **Step 3: Update current facts and lifecycle metadata**
+- [x] **Step 3: Update current facts and lifecycle metadata**
 
 Move FR-P11 to Existing, mark CONV-03 Completed, update current architecture/development to canonical names and actual migration semantics, and mark this plan Historical / Completed with the implementation commit. Do not modify README or CHANGELOG because no user-visible release is produced.
-

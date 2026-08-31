@@ -38,7 +38,7 @@ node benchmark/run.js `
 
 正式运行拒绝 dirty worktree、未知 candidate、非正 repetitions、缺失必需路径，以及规范解析后位于 dataset root 内的 output root。dirty gate 与环境快照共用 harness 仓库根目录的 Git 溯源，不受调用进程 cwd 影响。即使 output root 尚不存在，也会先解析既有祖先；创建后及原子预留 run ID 前再次解析，因而 Windows junction/symlink 不能绕过该限制。每个非 dry-run 正式运行以 output root 内的 `.benchmark-formal.lock` 互斥；已有锁（包括 stale lock）一律拒绝，必须由操作人员先确认并显式清除。run ID 由 reservation sentinel 原子预留，成功后仅用一次同级目录 rename 发布完整结果。
 
-当前已知缺口：并行结果写入发生注入失败时，首个 rejected promise 会提前进入 staging 清理，而其他写入仍可能占用目录；Windows 上的 `ENOTEMPTY` 因此可能覆盖原始写入错误。Roadmap CONV-02 负责在等待全部写入 settled 后再清理，并保留原始错误。在 CONV-02 完成前，不把“失败必定清理 staging/reservation”作为已验证合同。
+CONV-02 已使并行 artifact 写入全部 settled 后才进入 staging 清理。任一写入失败时抛出输入顺序中的首个 artifact 错误，不让 Windows 清理错误覆盖它；失败不会发布最终 run 目录，内部 reservation 仍按既有 finally 语义释放。
 
 超时会 abort `transcribe` 的 `AbortSignal`、等待 adapter `cancel()` 完成并屏蔽迟到回调，才开始下一条 repetition。候选 `init` 失败会将每个预期 sample 标记为 `not-run`，而 init/dispose 失败另写入 `failures.jsonl`；因此 `summary.total` 与 tag 分母始终等于 sample × repetitions。环境快照从此仓库根目录解析 Git；Git 失败为 `status: "unknown"`、`commit/dirty: null`，不会伪报 clean。持久化的候选配置仅允许 `provider`、`sampleRateHz`、`threads`，secret-like key 只记录名称，模型路径必须为规范的、未越界的相对路径。
 

@@ -139,7 +139,7 @@ ModelManager 不保存用户当前选择哪个模型。
 userData/asr-selection.json
 ```
 
-首期只保存当前 schema 版本和 `selectedModelId`。文件使用现有同目录临时文件、fsync、rename 的原子 JSON 写入方式。它不进入 LLM provider 配置；CONV-03 落地后的配置文件名是 `llm-provider-settings.json`。这样设置页旧快照不会覆盖 ASR 选择。
+首期只保存当前 schema 版本和 `selectedModelId`。文件使用现有同目录临时文件、fsync、rename 的原子 JSON 写入方式。它不进入当前 `llm-provider-settings.json`。这样设置页旧快照不会覆盖 ASR 选择。
 
 ### 4.6 AsrModelService
 
