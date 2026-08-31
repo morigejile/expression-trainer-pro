@@ -25,7 +25,7 @@ BM-03 又在同一冻结的 100 条普通话样本、Sherpa-ONNX 1.13.3、CPU、
 9. 下载和安装由独立、任务期间存活的 utility process 执行，不扩张 AsrProvider session 契约。
 10. Benchmark 保持 ADR-0008 的隔离非发布边界；只有模型、运行配置或默认决策受到影响时才补跑。
 
-详细组件、数据流、UI、错误、测试和发布边界由 `docs/superpowers/specs/2026-08-30-multi-asr-models-design.md` 定义。
+已实现组件和数据流以[当前架构](../current.md)为准；剩余交付顺序和外部门禁分别由 [Roadmap](../../roadmap.md)与[支持矩阵](../../support-matrix.md)维护。
 
 ## Alternatives
 
@@ -78,7 +78,8 @@ BM-03 又在同一冻结的 100 条普通话样本、Sherpa-ONNX 1.13.3、CPU、
 
 ## References
 
-- [多 ASR 模型产品化设计](../../superpowers/specs/2026-08-30-multi-asr-models-design.md)
+- [当前架构](../current.md)
+- [Roadmap](../../roadmap.md)
 - [BM-03 五模型比较](../../benchmark/bm03-five-model-comparison-2026-08-30.md)
 - [ADR-0005](0005-select-default-asr-model-by-benchmark.md)
 - [ADR-0008](0008-keep-benchmark-as-isolated-non-shipping-tool.md)

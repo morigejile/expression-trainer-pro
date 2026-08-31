@@ -1,6 +1,6 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09、PKG-01～PKG-04、CONV-01～CONV-03、UI-01/UI-02、ASR-M01～M03 与 ASR-M04a Completed；ADR-0009 采用 Zipformer Large 技术默认
+> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，三款 streaming ASR、模型管理和内部包内默认资格已实现；公开模型分发仍受外部门禁约束
 > 基线日期：2026-08-31
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
 > 描述对象：当前集成分支的产品运行时、开发工具边界与已验证的内部安装基线
@@ -197,7 +197,7 @@ R-02 已建立 ASR session/event 状态，R-03/R-04 已把采集生命周期和 
 - 通过 LLM provider/custom-prompt config 模块规范化、迁移旧 schema；损坏 JSON 回退默认值且不覆盖原文件。LLM provider 的 canonical 或 legacy future schema 可读取已知字段，但显式保存返回 `unsupported-schema-version`；迁移不删除旧文件，也不做双向同步。
 - 在启动时同步加载词库。
 - 注册所有 IPC handlers。
-- 仅在显式 `--smoke-test` 参数下让 utility process 组合最小 Fake ASR，并在 Main 组合 Fake LLM、临时 `userData` 和自动驱动；正常启动向 utility process 传入 `userData`/app version 并组合 managed Paraformer Provider。
+- 仅在显式 `--smoke-test` 参数下让 utility process 组合最小 Fake ASR，并在 Main 组合 Fake LLM、临时 `userData` 和自动驱动；正常启动向 utility process 传入 `userData`、app version、受信任模型选择及可选包内默认归档，由 managed provider 和 Factory 创建 Catalog 对应的 streaming Provider。
 - `start-asr`、`feed-audio`、`stop-asr`、`cancel-asr` 通过 ASR Router 与 Controller 返回安全 envelope；Main 不加载 `lib/asr.js` 或 Sherpa。执行单元退出会拒绝 pending 命令，下一次 start 重新创建；应用退出最多等待 5 秒 dispose 后强杀。
 - `analyze-text` 在 Main 中执行本地分析。
 - `get-realtime-feedback`、`get-final-report` 和连接测试在 Main 中发起受超时约束的 fetch；同一 Renderer 的同类新请求会取消旧请求，显式取消可终止该 Renderer 的全部 LLM 请求。
@@ -205,15 +205,13 @@ R-02 已建立 ASR session/event 状态，R-03/R-04 已把采集生命周期和 
 
 设置和 Prompt 文件仍使用同步 API，但数据量很小，写入通过同目录临时文件、fsync 与 rename 防止中断留下半文件；只有实测 Main 卡顿时才改异步 store。
 
-### 5.4 ASR Provider / `lib/asr-provider.js`、`lib/asr-session.js`、`lib/asr.js`
+### 5.4 ASR Provider / session、managed provider 与 Factory
 
-R-08 后，Main 只持有同一 Provider 契约形状的 `AsrProcessController`；实际 session wrapper、managed provider、Paraformer adapter、Sherpa 对象和模型均位于 utility process。`lib/asr-session.js` 维护单一 active session：start 创建 session 并发出 `ready`，feed 验证连续 input sequence 并发出 `partial/final/error`，stop flush 后发出可选 `final` 和必有 `stopped`，cancel 不 flush 且发出 `stopped`。生产 `createParaformerAsrProvider()` 仍只支持一个并发识别流，其固定配置包括：
+Main 只持有 `AsrProcessController`；实际 session wrapper、managed provider、Sherpa adapter、模型安装和模型对象均位于 utility process。`lib/asr-session.js` 维护单一 active session：start 创建 session 并发出 `ready`，feed 验证连续 input sequence 并发出 `partial/final/error`，stop flush 后发出可选 `final` 和必有 `stopped`，cancel 不 flush 且发出 `stopped`。
 
-- 从 active/default 版本取得 encoder、decoder、tokens 的绝对 role 路径；
-- feat sample rate 16000、feature dim 80；
-- CPU、2 threads、greedy search、endpoint rules。
+`lib/asr-provider-factory.js` 只接受 Catalog 中代码支持的 provider type：Paraformer 由 `lib/asr.js` 创建，Zipformer Small/Large 由 `lib/zipformer-ctc-asr-provider.js` 创建。`lib/managed-asr-provider.js` 从选中模型的不可变 active 版本取得 role 文件，完成准备和 native 初始化后才把 Provider 交给 session wrapper；Factory 不接收 Renderer 提供的路径、URL、hash 或 provider type。
 
-adapter `feed()` 总以 `sampleRate:16000` 调用 `acceptWaveform`，同步循环 decode，并保持 `{text,isFinal}` / `null` 结果；adapter `stop()` flush 并返回最后的未确认文本。重复 `initialize()` 复用 recognizer，session start 创建新 stream。`lib/fake-asr-provider.js` 通过同一 session wrapper 用于普通测试与 Electron smoke；没有加入多模型注册、通用依赖注入或新依赖。
+三款 Provider 均只支持一个并发识别流，使用 16 kHz mono Float32 输入、CPU、2 threads 和 greedy search。Paraformer 从 encoder、decoder、tokens role 创建 recognizer；Zipformer 从 model、tokens 及可选 BPE role 创建 online CTC recognizer。adapter `feed()` 同步 decode 并返回 `{text,isFinal}` / `null`，`stop()` flush 最后的未确认文本。重复 `initialize()` 复用 recognizer，session start 创建新 stream。`lib/fake-asr-provider.js` 通过同一 session wrapper 用于普通测试与 Electron smoke；没有通用插件系统或依赖注入容器。
 
 T-04/R-02 后，`src/app.js` 会把当前 session 的 `final` 事件经 `mergeFinalText()` 去重后合并；非空尾部文本进入逐字稿、分析统计和后续报告，空文本或与 endpoint 相同的文本不会重复更新状态。`stopRecording()` 等待 stop envelope 中尾部 final 的本地分析完成，再开放报告操作；分析或取消失败显示安全错误，但 `finally` 仍复位录音状态和 UI。
 
@@ -337,7 +335,7 @@ Settings/Prompt Renderer
 - 已有 canonical 支持矩阵、Windows x64 首发选择、未签名内部安装制品，以及真实首次安装/模型和 1.0.0→1.0.1 升级/卸载数据保留闭环；仍无签名、公证或自动更新。
 - 主窗口可按需导出固定 JSON 诊断；Main 组合系统/active 模型/controller 状态，Renderer 只提供经过严格字段校验的采样率，不后台记录或上传用户内容。
 - 开发版本由 `.nvmrc`、`package.json#packageManager/engines` 和 lockfile 共同约束；当前精确基线的 clean install、完整测试、Forge make 与 packaged smoke 已通过。具体命令和环境限制维护在[开发与验证](../development.md)。
-- ASR-M04a 已在与 ASR-M03、UI-01/UI-02 组合后完成 404 项测试（402 pass、0 fail、2 个 Windows file-symlink skip）、普通 model-free Squirrel make/packaged smoke、显式 `ExpressionTrainerInternalOnly` Squirrel make、全新隔离 `userData` 的首次离线导入/native 初始化（17.398 秒）及二次离线启动（2.510 秒）。内部源归档必须位于项目树外，内部资源树只允许 Catalog 固定默认归档；普通打包全局排除已支持的模型权重/归档后缀并在验收时检查 ASAR 清单。模型归档不进入 Git；本轮使用 Codex host 的 Node 24.19.0/npm 12.0.2，正式 PR 前仍需在声明的 Node 24.20.0/npm 11.19.0 基线上复跑。公开安装、升级、签名和再分发许可仍归完整 ASR-M04。
+- ASR-M04a 已验证普通 model-free Squirrel 制品、显式 `ExpressionTrainerInternalOnly` 制品、全新隔离 `userData` 的首次离线导入/native 初始化和二次离线启动。内部源归档必须位于项目树外，内部资源树只允许 Catalog 固定默认归档；普通打包全局排除已支持的模型权重/归档后缀并在验收时检查 ASAR 清单。模型归档不进入 Git；公开安装、升级、签名和再分发许可仍归完整 ASR-M04。
 
 这些发布级缺口及未确认的模型再分发权利在当前内部开发/测试中是非阻塞后续工作；若它们使本地技术实验无法运行或使结论失效，才需要提前处理。
 

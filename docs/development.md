@@ -79,15 +79,9 @@ git commit -m "<English subject>" -m "中文：<简短说明>"
 
 Appearance schema version 1 只保存四主题和两个布局标识；缺失、损坏或未知值回退 Graphite/coach-rail，future schema 拒绝显式保存。ASR selection schema version 1 只保存 `selectedModelId`；稳定损坏在默认模型成功后恢复，瞬时初始化失败保留选择。两者均不得合并进 LLM provider 配置快照。
 
-ASR-M04a 独立收尾运行 352 项测试：350 pass、0 fail、2 个同源 Windows symlink skip。真实内部 Squirrel make 和打包应用离线 smoke 已通过；首次导入并 native 初始化为 16.903 秒，二次离线启动为 2.324 秒。
-
-ASR-M03、UI-01/UI-02 与 ASR-M04a 在最终集成分支合并后运行 404 项测试：402 pass、0 fail、2 个同源 Windows symlink skip；普通 model-free Squirrel make 与 packaged smoke 通过。普通打包全局排除已支持的模型权重/归档后缀，制品验收还会检查 ASAR 清单。内部 make 产出显式命名的 `ExpressionTrainerInternalOnlySetup.exe`，只接受项目树外的 Catalog 固定默认归档且拒绝额外资源；普通 packaged smoke 会拒绝该内部包。内部打包应用首次离线导入/native 初始化为 17.398 秒、二次离线启动为 2.510 秒。包内归档复制沿用 M03 的有界安装进度，不改变设置页和独立安装 utility 的边界。该轮 Codex host 仅提供 Node 24.19.0/npm 12.0.2，正式 PR 前仍需在项目声明的 Node 24.20.0/npm 11.19.0 基线上复跑完整测试和两类制品 smoke。
-
 ## ASR 模型
 
 模型权重不进入 Git。唯一 schema-v2 产品 Catalog 是 `models/registry.json`，固定 Paraformer、Zipformer Small 和 Zipformer Large 三款 streaming 模型；受信任 Factory 只创建代码支持的两类 Provider。启动按严格 `--asr-model=<modelId>`、持久选择、Catalog 默认值解析，设置页可下载、取消、重试、重新安装或在空闲时切换模型；安装使用独立短生命周期 utility，不影响当前识别 controller。archive/runtime 的固定大小、hash 与再分发状态见 registry 和 ADR-0004/0009。
-
-ASR-M03 收尾在 Node 24.20.0 运行完整 `node --test`：354 项中 352 pass、0 fail、2 skip；两项 skip 是当前 Windows host 不允许创建 file symlink，directory junction 边界测试仍通过。
 
 内部开发阶段 `.tar.bz2` 解包调用系统 `tar`。PKG-03 已证明 packaged utility 可从零下载并校验真实约 1 GB Paraformer、调用系统 `tar`、完成 native 初始化和强制离线二次启动，且模型仍位于安装目录外。真实麦克风、接近资格线硬件、macOS/Linux 和正式发布制品仍需对应环境证据。
 
