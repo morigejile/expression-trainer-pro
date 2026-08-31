@@ -45,7 +45,7 @@ R-05/R-06 使用单执行单元、单有界队列，不引入 worker pool 或通
 - [x] worker 的 1,000 个 ArrayBuffer 全部 detach；utility process 使用 structured-clone copy。该差异不改变当前选择。
 - [x] 两者强制以 73 退出后均被检测并成功重建；只有 utility process 提供 native 故障所需的进程边界。
 - [x] 测量期间 Main 定时器最大延迟分别约 2.2 ms 与 4.8 ms；队列峰值为 10。
-- [ ] 本 worktree 没有 Paraformer 模型文件，因此真实 start/feed/stop 模型循环、推理 CPU/RAM 和 native fatal crash 注入移到 R-06 集中验证。
+- [x] PKG-03 后续以 packaged utility 和真实 Paraformer 完成 initialize/start/feed/stop、模型准备与离线二次启动；native fatal crash 注入未单独执行，现有强制退出与下一 session 重建覆盖当前隔离决策，只有真实故障逃逸该边界时才重开。
 - [x] Forge packaged app 中的 entry、native addon、共享库和外部模型路径已由 PKG-02 packaged smoke 验证；签名和跨平台仍为非阻塞 TODO。
 
 原始结果保存在 `benchmark/results/asr-boundary/windows-x64-electron-43.4.1.json`。这些数字是一次本地机制 spike，不是产品性能承诺。

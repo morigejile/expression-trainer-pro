@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="zh-CN" data-theme="graphite" data-layout="coach-rail">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,11 +10,28 @@
   <!-- 洋红闪烁边框 -->
   <div class="glow-border"></div>
 
+  <svg class="icon-sprite" aria-hidden="true">
+    <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M4 19V9m6 10V5m6 14v-7m4 7H2"/></symbol>
+    <symbol id="icon-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="3"/><path d="M15 9l5-5m0 0v4m0-4h-4"/></symbol>
+    <symbol id="icon-diagnostics" viewBox="0 0 24 24"><path d="M4 12h3l2-5 4 10 2-5h5"/><path d="M5 4h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2Z"/></symbol>
+    <symbol id="icon-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 13.5v-3l-2-.7a7 7 0 0 0-.7-1.7l.9-1.9-2.1-2.1-1.9.9a7 7 0 0 0-1.7-.7L10.5 2h-3l-.7 2a7 7 0 0 0-1.7.7l-1.9-.9L1.1 6l.9 1.9a7 7 0 0 0-.7 1.7l-2 .9v3l2 .7a7 7 0 0 0 .7 1.7l-.9 1.9 2.1 2.1 1.9-.9a7 7 0 0 0 1.7.7l.7 2h3l.7-2a7 7 0 0 0 1.7-.7l1.9.9 2.1-2.1-.9-1.9a7 7 0 0 0 .7-1.7Z" transform="translate(1.5) scale(.88)"/></symbol>
+    <symbol id="icon-clipboard" viewBox="0 0 24 24"><rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 4V2h6v2m-6 5h6m-6 4h6m-6 4h4"/></symbol>
+    <symbol id="icon-save" viewBox="0 0 24 24"><path d="M4 3h13l3 3v15H4Z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/></symbol>
+    <symbol id="icon-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 3h6l1 4H8Zm-3 4 1 14h10l1-14M10 11v6m4-6v6"/></symbol>
+    <symbol id="icon-mic" viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="13" rx="4"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3m-4 0h8"/></symbol>
+    <symbol id="icon-pause" viewBox="0 0 24 24"><path d="M8 5v14m8-14v14"/></symbol>
+    <symbol id="icon-play" viewBox="0 0 24 24"><path d="m8 5 11 7-11 7Z"/></symbol>
+    <symbol id="icon-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/></symbol>
+    <symbol id="icon-report" viewBox="0 0 24 24"><path d="M5 3h11l3 3v15H5Z"/><path d="M14 3v5h5M9 12h6m-6 4h6"/></symbol>
+    <symbol id="icon-bulb" viewBox="0 0 24 24"><path d="M9 18h6m-5 3h4m3-8c1.2-1 2-2.6 2-4.5a7 7 0 1 0-14 0c0 1.9.8 3.5 2 4.5 1 .8 1.5 1.8 1.5 3h7c0-1.2.5-2.2 1.5-3Z"/></symbol>
+    <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
+  </svg>
+
   <!-- 主布局：三列 -->
   <div class="layout">
     <!-- 左栏：表达分析 -->
-    <aside class="panel-left">
-      <div class="panel-title">📊 表达分析</div>
+    <aside class="panel-left" data-region="insights" aria-labelledby="insights-title">
+      <div id="insights-title" class="panel-title"><svg class="icon" aria-hidden="true"><use href="#icon-chart"/></svg>表达分析</div>
       <div class="stat-row">
         <span class="stat-label">笼统词</span>
         <span id="stat-vague" class="stat-value stat-yellow">0</span>
@@ -34,16 +51,16 @@
     </aside>
 
     <!-- 中间：主内容区 -->
-    <main class="main-area">
+    <main class="main-area" data-region="stage">
       <!-- 顶部栏 -->
       <div class="topbar">
-        <span class="app-title">宇宙无敌表达训练系统</span>
+        <span class="app-title">表达训练</span>
         <div class="topbar-right">
           <span id="timer" class="timer">00:00</span>
           <button id="btn-help" class="btn-help" title="帮助与反馈">帮助</button>
-          <button id="btn-prompt-editor" class="btn-icon" title="训练规则" aria-label="训练规则"><span aria-hidden="true">🎯</span><span class="btn-icon-label">规则</span></button>
-          <button id="btn-diagnostics" class="btn-icon" title="导出诊断信息" aria-label="导出诊断信息"><span aria-hidden="true">🩺</span><span class="btn-icon-label">诊断</span></button>
-          <button id="btn-settings" class="btn-icon" title="设置" aria-label="打开设置"><span aria-hidden="true">⚙️</span><span class="btn-icon-label">设置</span></button>
+          <button id="btn-prompt-editor" class="btn-icon" title="训练规则" aria-label="训练规则"><svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg><span class="btn-icon-label">规则</span></button>
+          <button id="btn-diagnostics" class="btn-icon" title="导出诊断信息" aria-label="导出诊断信息"><svg class="icon" aria-hidden="true"><use href="#icon-diagnostics"/></svg><span class="btn-icon-label">诊断</span></button>
+          <button id="btn-settings" class="btn-icon" title="设置" aria-label="打开设置"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg><span class="btn-icon-label">设置</span></button>
         </div>
       </div>
 
@@ -55,12 +72,12 @@
       <!-- 字幕区顶部工具栏 -->
       <div class="subtitle-topbar">
         <button id="btn-paste" class="btn-sm btn-paste-top">
-          <span>📋</span> 粘贴逐字稿
+          <svg class="icon" aria-hidden="true"><use href="#icon-clipboard"/></svg>粘贴逐字稿
         </button>
         <div class="subtitle-topbar-right">
-          <button id="btn-copy-text" class="btn-sm hidden" title="复制原文">📋 复制</button>
-          <button id="btn-save-text" class="btn-sm hidden" title="保存原文">💾 保存</button>
-          <button id="btn-clear" class="btn-sm hidden" title="清空">🗑️ 清空</button>
+          <button id="btn-copy-text" class="btn-sm hidden" title="复制原文"><svg class="icon" aria-hidden="true"><use href="#icon-clipboard"/></svg>复制</button>
+          <button id="btn-save-text" class="btn-sm hidden" title="保存原文"><svg class="icon" aria-hidden="true"><use href="#icon-save"/></svg>保存</button>
+          <button id="btn-clear" class="btn-sm hidden" title="清空"><svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg>清空</button>
         </div>
       </div>
 
@@ -76,31 +93,31 @@
       <!-- 底部按钮（只保留核心操作） -->
       <div class="action-bar">
         <button id="btn-start" class="btn-main btn-start">
-          <span class="btn-icon-inner">🎤</span>
+          <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-mic"/></svg>
           <span class="btn-label">开始录制</span>
         </button>
         <button id="btn-pause" class="btn-main btn-pause hidden">
-          <span class="btn-icon-inner">⏸️</span>
+          <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-pause"/></svg>
           <span class="btn-label">暂停</span>
         </button>
         <button id="btn-resume" class="btn-main btn-resume hidden">
-          <span class="btn-icon-inner">▶️</span>
+          <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-play"/></svg>
           <span class="btn-label">继续</span>
         </button>
         <button id="btn-stop" class="btn-main btn-stop hidden">
-          <span class="btn-icon-inner">⏹️</span>
+          <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-stop"/></svg>
           <span class="btn-label">结束</span>
         </button>
         <button id="btn-report" class="btn-main btn-report hidden">
-          <span class="btn-icon-inner">📋</span>
+          <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-report"/></svg>
           <span class="btn-label">生成报告</span>
         </button>
       </div>
     </main>
 
     <!-- 右栏：实时反馈 -->
-    <aside class="panel-right">
-      <div class="panel-title">💡 实时反馈</div>
+    <aside class="panel-right" data-region="coach" aria-labelledby="coach-title">
+      <div id="coach-title" class="panel-title"><svg class="icon" aria-hidden="true"><use href="#icon-bulb"/></svg>实时反馈</div>
       <div id="feedback-status" class="feedback-status" role="status" aria-live="polite">本地分析可用；AI 建议约每新增 30 字生成</div>
       <div id="feedback-content" class="feedback-content">
         <!-- 实时反馈内容 -->
@@ -108,31 +125,17 @@
     </aside>
   </div>
 
-  <!-- 耳机DJ少女 icon -->
-  <div class="girl-icon">
-    <svg width="44" height="44" viewBox="0 0 70 70" fill="none">
-      <path d="M16 32 Q16 14 35 12 Q54 14 54 32" stroke="#E5007E" stroke-width="2.5" fill="none"/>
-      <rect x="12" y="30" width="7" height="12" rx="3" fill="#E5007E" opacity="0.6"/>
-      <rect x="51" y="30" width="7" height="12" rx="3" fill="#E5007E" opacity="0.6"/>
-      <circle cx="35" cy="38" r="14" stroke="#E5007E" stroke-width="2" fill="none"/>
-      <path d="M28 36 Q32 33 36 36" stroke="#E5007E" stroke-width="1.5" fill="none"/>
-      <path d="M38 36 Q41 34 44 37" stroke="#E5007E" stroke-width="1.5" fill="none"/>
-      <circle cx="32" cy="35.5" r="1.2" fill="#E5007E"/>
-      <path d="M31 43 Q35 46 39 43" stroke="#E5007E" stroke-width="1.5" fill="none" stroke-linecap="round"/>
-    </svg>
-  </div>
-
   <!-- 粘贴逐字稿弹窗 -->
   <div id="paste-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="paste-modal-title">
     <div class="modal-content">
       <div class="modal-header">
-        <h2 id="paste-modal-title">📋 粘贴逐字稿</h2>
+        <h2 id="paste-modal-title"><svg class="icon" aria-hidden="true"><use href="#icon-clipboard"/></svg>粘贴逐字稿</h2>
         <button id="btn-close-paste" class="btn-close" aria-label="关闭粘贴逐字稿">×</button>
       </div>
-      <div class="modal-body" style="display:flex;flex-direction:column;gap:12px;">
-        <p style="color:#888;font-size:13px;">把逐字稿粘贴进来，我帮你分析</p>
-        <textarea id="paste-textarea" placeholder="在这里粘贴文字..." style="flex:1;min-height:300px;background:#0a0a0a;border:1px solid #333;border-radius:8px;padding:16px;color:#fff;font-size:14px;line-height:1.8;resize:none;font-family:inherit;"></textarea>
-        <button id="btn-analyze-paste" style="background:#E5007E;color:#fff;border:none;border-radius:8px;padding:12px 20px;font-size:14px;cursor:pointer;align-self:flex-end;">🔍 开始分析</button>
+      <div class="modal-body paste-modal-body">
+        <p class="paste-intro">把逐字稿粘贴进来，我帮你分析</p>
+        <textarea id="paste-textarea" placeholder="在这里粘贴文字..."></textarea>
+        <button id="btn-analyze-paste"><svg class="icon" aria-hidden="true"><use href="#icon-search"/></svg>开始分析</button>
       </div>
     </div>
   </div>
@@ -141,9 +144,9 @@
   <div id="report-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
     <div class="modal-content">
       <div class="modal-header">
-        <h2 id="report-modal-title">📋 表达分析报告</h2>
+        <h2 id="report-modal-title"><svg class="icon" aria-hidden="true"><use href="#icon-report"/></svg>表达分析报告</h2>
         <div class="modal-header-actions">
-          <button id="btn-copy-report" class="btn-sm">📋 复制全文</button>
+          <button id="btn-copy-report" class="btn-sm"><svg class="icon" aria-hidden="true"><use href="#icon-clipboard"/></svg>复制全文</button>
           <button id="btn-close-report" class="btn-close" aria-label="关闭训练报告">×</button>
         </div>
       </div>
@@ -175,7 +178,7 @@
             <span><b class="help-yellow">黄色</b>：笼统词</span>
             <span><b class="help-green">绿色</b>：有力表达</span>
           </div>
-          <p class="help-note">🎯 可编辑训练目标与自定义规则；⚙️ 可配置 AI 服务。本应用当前处于内部开发测试阶段。</p>
+          <p class="help-note">“训练规则”可编辑训练目标与自定义规则；“设置”可配置 AI 服务。本应用当前处于内部开发测试阶段。</p>
         </section>
 
         <section class="help-section">
@@ -198,6 +201,8 @@
   <script src="asr-event-state.js"></script>
   <script src="audio-capture.js"></script>
   <script src="audio-feed-queue.js"></script>
+  <script src="appearance.js"></script>
+  <script>window.Appearance.initializeAppearance();</script>
   <script src="app.js"></script>
 </body>
 </html>

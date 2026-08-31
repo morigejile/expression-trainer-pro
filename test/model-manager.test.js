@@ -19,32 +19,37 @@ function fixture(t, overrides = {}) {
     'tokens.txt': Buffer.from('tokens-v1')
   };
   const model = {
-    id: 'paraformer-bilingual-zh-en',
+    modelId: 'paraformer-bilingual-zh-en',
     version: '2024-03-10',
-    engine: 'sherpa-onnx',
-    architecture: 'paraformer',
-    languages: ['zh', 'en'],
-    mode: 'streaming',
-    sampleRateHz: 16000,
+    displayName: 'Fixture Paraformer',
+    description: 'Streaming fixture model',
+    providerType: 'sherpa.online-paraformer',
     minAppVersion: '1.0.0',
-    archive: {
+    downloadBytes: archive.length,
+    sources: [{
+      type: 'archive',
       url: 'https://example.test/paraformer.tar.bz2',
       sha256: sha256(archive),
       bytes: archive.length,
       format: 'tar.bz2',
-      rootDirectory: 'archive-root'
-    },
+      rootDirectory: 'archive-root',
+      builtIn: false
+    }],
     files: Object.entries(runtimeFiles).map(([relativePath, bytes]) => ({
       relativePath,
       sha256: sha256(bytes),
       bytes: bytes.length,
       role: relativePath.split('.')[0]
     })),
-    license: {redistribution: 'not-approved'}
+    license: {
+      sourceUrl: 'https://example.test/license',
+      notice: 'Fixture only',
+      redistribution: 'not-approved'
+    }
   };
-  const registry = {schemaVersion: 1, defaultModelId: model.id, models: [model]};
+  const registry = {schemaVersion: 2, defaultModelId: model.modelId, models: [model]};
   const extractArchive = async ({destination}) => {
-    const root = path.join(destination, model.archive.rootDirectory);
+    const root = path.join(destination, model.sources[0].rootDirectory);
     fs.mkdirSync(root, {recursive: true});
     for (const [relativePath, bytes] of Object.entries(runtimeFiles)) {
       fs.writeFileSync(path.join(root, relativePath), bytes);
@@ -54,37 +59,52 @@ function fixture(t, overrides = {}) {
     status: 200,
     headers: {'content-length': String(archive.length)}
   });
-  return {archive, extractArchive, fetchImpl, model, registry, runtimeFiles, userDataPath, ...overrides};
+  return {
+    archive,
+    extractArchive,
+    fetchImpl,
+    model: {...model, id: model.modelId, archive: model.sources[0]},
+    registry,
+    runtimeFiles,
+    userDataPath,
+    ...overrides
+  };
 }
 
-test('model registry accepts one exact versioned HTTPS model and rejects unsafe input', (t) => {
-  const {validateModelRegistry} = require('../lib/model-manager');
+test('ModelManager accepts one validated fixed archive source', (t) => {
+  const {loadModelCatalog} = require('../lib/model-catalog');
   const {registry} = fixture(t);
-  assert.equal(validateModelRegistry(registry), registry);
+  assert.equal(loadModelCatalog(registry).models[0].sources[0].type, 'archive');
+});
 
-  const insecure = structuredClone(registry);
-  insecure.models[0].archive.url = 'http://example.test/model.tar.bz2';
-  assert.throws(() => validateModelRegistry(insecure), /HTTPS/);
-
-  const traversal = structuredClone(registry);
-  traversal.models[0].files[0].relativePath = '../encoder.onnx';
-  assert.throws(() => validateModelRegistry(traversal), /relative path/);
-
-  const duplicate = structuredClone(registry);
-  duplicate.models.push(structuredClone(duplicate.models[0]));
-  assert.throws(() => validateModelRegistry(duplicate), /duplicate/);
+test('ModelManager rejects source layouts outside the current single-archive streaming path', async (t) => {
+  const {createModelManager} = require('../lib/model-manager');
+  const data = fixture(t);
+  const fileRegistry = structuredClone(data.registry);
+  const runtimeFile = fileRegistry.models[0].files[0];
+  fileRegistry.models[0].downloadBytes = runtimeFile.bytes;
+  fileRegistry.models[0].sources = [{
+    type: 'file',
+    url: 'https://example.test/encoder.int8.onnx',
+    sha256: runtimeFile.sha256,
+    bytes: runtimeFile.bytes,
+    relativePath: runtimeFile.relativePath,
+    builtIn: false
+  }];
+  const manager = createModelManager({...data, registry: fileRegistry, appVersion: '1.0.0'});
+  await assert.rejects(manager.install(data.model.id), /unsupported source layout/);
 });
 
 test('committed product registry pins the accepted Paraformer artifact and runtime files', () => {
-  const {validateModelRegistry} = require('../lib/model-manager');
-  const registry = require('../models/registry.json');
-  validateModelRegistry(registry);
-  assert.equal(registry.defaultModelId, 'paraformer-bilingual-zh-en');
+  const {loadModelCatalog} = require('../lib/model-catalog');
+  const registry = loadModelCatalog(require('../models/registry.json'));
+  const paraformer = registry.models.find(model => model.modelId === 'paraformer-bilingual-zh-en');
+  assert.equal(registry.defaultModelId, 'zipformer-large-ctc-zh-int8-2025-06-30');
   assert.deepEqual(
-    registry.models[0].files.map(({role}) => role),
+    paraformer.files.map(({role}) => role),
     ['encoder', 'decoder', 'tokens']
   );
-  assert.equal(registry.models[0].license.redistribution, 'not-approved');
+  assert.equal(paraformer.license.redistribution, 'not-approved');
 });
 
 test('archive entry validation rejects absolute and traversal extraction targets', () => {
@@ -110,6 +130,23 @@ test('install verifies staged bytes, atomically publishes a version, and activat
   assert.equal(active.version, data.model.version);
   assert.equal(fs.readFileSync(path.join(active.modelPath, 'tokens.txt'), 'utf8'), 'tokens-v1');
   assert.deepEqual(fs.readdirSync(path.join(data.userDataPath, 'models', '.staging')), []);
+});
+
+test('install reports bounded monotonic download and verification phases', async (t) => {
+  const {createModelManager} = require('../lib/model-manager');
+  const data = fixture(t);
+  const progress = [];
+  const manager = createModelManager({...data, appVersion: '1.0.0'});
+  await manager.install(data.model.id, {onProgress(value) { progress.push(value); }});
+  assert.equal(progress[0].phase, 'downloading');
+  assert.equal(progress[0].receivedBytes, 0);
+  assert.ok(progress.some(value => value.phase === 'downloading' && value.receivedBytes === data.archive.length));
+  assert.ok(progress.some(value => value.phase === 'verifying'));
+  assert.ok(progress.some(value => value.phase === 'installing'));
+  for (const value of progress) {
+    assert.deepEqual(Object.keys(value).sort(), ['phase', 'receivedBytes', 'totalBytes']);
+    assert.ok(value.receivedBytes >= 0 && value.receivedBytes <= value.totalBytes);
+  }
 });
 
 test('an interrupted download leaves the active version and staging area unchanged', async (t) => {
@@ -172,7 +209,10 @@ test('rollback can recover the previous version when the active files are corrup
   await manager.install(data.model.id, {activate: true});
   fs.writeFileSync(path.join(data.userDataPath, 'models', data.model.id, '2024-03-11', 'encoder.int8.onnx'), 'corrupt');
 
-  await assert.rejects(manager.getActive(data.model.id), /Byte-size mismatch|SHA-256 mismatch/);
+  await assert.rejects(
+    manager.getActive(data.model.id),
+    error => error.code === 'asr-model-corrupt' && /Byte-size mismatch|SHA-256 mismatch/.test(error.message)
+  );
   assert.equal((await manager.rollback(data.model.id)).version, '2024-03-10');
   assert.equal((await manager.getActive(data.model.id)).version, '2024-03-10');
 });
@@ -272,7 +312,7 @@ test('a wrong archive hash or extraction failure never replaces the active versi
 
   const wrongHashRegistry = structuredClone(data.registry);
   wrongHashRegistry.models[0].version = '2024-03-11';
-  wrongHashRegistry.models[0].archive.sha256 = '0'.repeat(64);
+  wrongHashRegistry.models[0].sources[0].sha256 = '0'.repeat(64);
   await assert.rejects(
     createModelManager({...data, registry: wrongHashRegistry, appVersion: '1.0.0'}).install(data.model.id, {activate: true}),
     /SHA-256 mismatch/

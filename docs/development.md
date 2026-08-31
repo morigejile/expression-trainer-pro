@@ -73,17 +73,17 @@ git commit -m "<English subject>" -m "中文：<简短说明>"
 
 ## 配置文件边界
 
-当前产品把 LLM provider 配置保存到 `userData/llm-provider-settings.json`，并使用 `lib/llm-provider-config.js`、`lib/llm-provider-store.js`、`getLlmProviderSettings`/`saveLlmProviderSettings` 和 `get-llm-provider-settings`/`save-llm-provider-settings`。通用的 `src/settings.*` 名称只表示设置页面，后续 Appearance 和模型管理仍可在该页面提供独立区域。
+当前产品分别把 Appearance、ASR 选择和 LLM provider 配置保存到 `userData/appearance.json`、`userData/asr-selection.json` 与 `userData/llm-provider-settings.json`。三者使用独立 config/store、Preload API 和 IPC，只共用设置页面，不共用配置快照。
 
 新文件不存在时从 legacy `settings.json` 单向迁移，不删除旧文件，也不做跨版本双向同步；新文件存在后以新文件为准。canonical 或 legacy 来源的 schema 高于当前支持版本时，读取可识别字段但拒绝所有显式保存。测试覆盖旧文件迁移、原子发布失败、新文件优先、future schema 拒绝保存，以及设置页“保存”和“测试连接”保持独立。
 
-Appearance 和 ASR selection 分别使用 Planned 的 `appearance.json` 与 `asr-selection.json`，不得合并进 LLM provider 配置快照。
-
-CONV-02/CONV-03 收尾已在 Node 24.20.0/npm 11.19.0 运行完整 `npm test`：297 项中 295 pass、0 fail、2 skip；两项 skip 是当前 Windows host 不允许创建 file symlink，directory junction 边界测试仍通过。
+Appearance schema version 1 只保存四主题和两个布局标识；缺失、损坏或未知值回退 Graphite/coach-rail，future schema 拒绝显式保存。ASR selection schema version 1 只保存 `selectedModelId`；稳定损坏在默认模型成功后恢复，瞬时初始化失败保留选择。两者均不得合并进 LLM provider 配置快照。
 
 ## ASR 模型
 
-模型权重不进入 Git。当前已实现的产品运行时仍由 utility process 根据 `models/registry.json` 自动下载并校验 Paraformer，安装到 Electron `userData/models/paraformer-bilingual-zh-en/2024-03-10/`；native 初始化成功后才更新 active pointer。ADR-0009 已选择 Zipformer Large 作为后续产品化的技术默认，但模型切换和交付尚未接入这条运行时路径。archive/runtime 的固定大小、hash 与再分发状态见 registry 和 ADR-0004/0009。
+模型权重不进入 Git。唯一 schema-v2 产品 Catalog 是 `models/registry.json`，固定 Paraformer、Zipformer Small 和 Zipformer Large 三款 streaming 模型；受信任 Factory 只创建代码支持的两类 Provider。启动按严格 `--asr-model=<modelId>`、持久选择、Catalog 默认值解析，设置页可下载、取消、重试、重新安装或在空闲时切换模型；安装使用独立短生命周期 utility，不影响当前识别 controller。archive/runtime 的固定大小、hash 与再分发状态见 registry 和 ADR-0004/0009。
+
+ASR-M03 收尾在 Node 24.20.0 运行完整 `node --test`：354 项中 352 pass、0 fail、2 skip；两项 skip 是当前 Windows host 不允许创建 file symlink，directory junction 边界测试仍通过。
 
 内部开发阶段 `.tar.bz2` 解包调用系统 `tar`。PKG-03 已证明 packaged utility 可从零下载并校验真实约 1 GB Paraformer、调用系统 `tar`、完成 native 初始化和强制离线二次启动，且模型仍位于安装目录外。真实麦克风、接近资格线硬件、macOS/Linux 和正式发布制品仍需对应环境证据。
 
@@ -106,12 +106,8 @@ BM-04 已完成七候选验证，ADR-0009 据此选择 Zipformer Large 作为后
 
 ## 发布边界
 
-仓库已有 Windows x64 Electron Forge/Squirrel package/make 配置和 packaged smoke；PKG-03 已完成静默安装、真实模型首次准备及离线二次启动，PKG-04 已完成 1.0.0→1.0.1 升级、数据保留与卸载验证。手工运行旧完整 Setup 仍可降级应用二进制，重新运行当前 Setup 可恢复；userData 保持不变。当前产物仍是未签名内部测试制品，不代表公开支持；签名、模型再分发许可和其他平台属于后续发布工作，除非使当前技术实验无法运行或结论失效，否则不阻塞内部开发。
+仓库已有 Windows x64 Electron Forge/Squirrel package/make 配置和 packaged smoke。当前产物仍是未签名内部测试制品，不代表公开支持；已验证的安装、升级、卸载、平台和硬件范围统一维护在[支持矩阵](support-matrix.md)，未完成工作的优先级统一维护在 [Roadmap](roadmap.md)。
 
 ## 诊断导出
 
 主窗口的“🩺”按钮按用户操作导出固定 schema 的 JSON：应用版本、OS/platform/arch、active 模型 ID/版本、请求/context/track 采样率、最近 ASR 初始化耗时和受控错误类别。文件不包含设置、API Key、Authorization、绝对路径、stack、音频、逐字稿或 LLM 内容；不在后台持续写日志，也不自动上传。未开始录音或未安装模型时，对应字段明确为 `null`/`not-installed`。
-
-## 人工与外部跟进
-
-以下事项保留为非阻塞后续工作：模型/数据集再分发权利、16/44.1/48 kHz 真实麦克风验证、接近资格线的性能验证、代码签名/公证凭据、Experimental 平台 native addon 与制品行为、FireRedASR2 utterance/VAD 交互，以及公开隐私/LLM 披露。首个 Tier 1 目标与待验证硬件线见[支持矩阵](support-matrix.md)。

@@ -6,6 +6,15 @@ contextBridge.exposeInMainWorld('api', {
   saveLlmProviderSettings: (settings) => ipcRenderer.invoke('save-llm-provider-settings', settings),
   openSettings: () => ipcRenderer.invoke('open-settings'),
 
+  // 外观设置
+  getAppearance: () => ipcRenderer.invoke('get-appearance'),
+  saveAppearance: (appearance) => ipcRenderer.invoke('save-appearance', appearance),
+  onAppearanceChanged: (listener) => {
+    const wrapped = (_event, appearance) => listener(appearance);
+    ipcRenderer.on('appearance-changed', wrapped);
+    return () => ipcRenderer.removeListener('appearance-changed', wrapped);
+  },
+
   // Prompt编辑器
   openPromptEditor: () => ipcRenderer.invoke('open-prompt-editor'),
   getCustomPrompt: () => ipcRenderer.invoke('get-custom-prompt'),
@@ -20,6 +29,17 @@ contextBridge.exposeInMainWorld('api', {
   }),
   stopASR: (options) => ipcRenderer.invoke('stop-asr', options),
   cancelASR: (options) => ipcRenderer.invoke('cancel-asr', options),
+
+  // 受信任 ASR 模型管理
+  getAsrModelState: () => ipcRenderer.invoke('get-asr-model-state'),
+  installAsrModel: (modelId) => ipcRenderer.invoke('install-asr-model', {modelId}),
+  cancelAsrModelInstall: (modelId) => ipcRenderer.invoke('cancel-asr-model-install', {modelId}),
+  switchAsrModel: (modelId) => ipcRenderer.invoke('switch-asr-model', {modelId}),
+  onAsrModelStateChanged: (callback) => {
+    const listener = (event, state) => callback(state);
+    ipcRenderer.on('asr-model-state-changed', listener);
+    return () => ipcRenderer.removeListener('asr-model-state-changed', listener);
+  },
 
   // 词库分析
   analyzeText: (text) => ipcRenderer.invoke('analyze-text', text),

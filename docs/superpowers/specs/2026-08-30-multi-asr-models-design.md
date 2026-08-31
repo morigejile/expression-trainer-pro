@@ -1,7 +1,7 @@
 # 多 ASR 模型产品化设计
 
 - Date: 2026-08-30
-- Status: Approved; convergence review incorporated; Planned
+- Status: Approved; ASR-M01～M03 implemented; ASR-M04+ planned
 - Scope: Paraformer、Zipformer Small、Zipformer Large、SenseVoiceSmall、FireRedASR2 CTC INT8
 
 ## 1. 目标
@@ -10,7 +10,7 @@
 
 | modelId | 交互 | providerType | 交付批次 |
 |---|---|---|---|
-| `paraformer-bilingual-zh-en-control` | streaming | `sherpa.online-paraformer` | 第一批 |
+| `paraformer-bilingual-zh-en` | streaming | `sherpa.online-paraformer` | 第一批 |
 | `zipformer-small-ctc-zh-int8-2025-04-01` | streaming | `sherpa.online-ctc` | 第一批 |
 | `zipformer-large-ctc-zh-int8-2025-06-30` | streaming | `sherpa.online-ctc` | 第一批，默认 |
 | `sensevoice-small-int8-2024-07-17` | utterance | `sherpa.offline-sensevoice` | 第二批 |

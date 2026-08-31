@@ -9,7 +9,8 @@ const SMOKE_EXIT_SESSION_ID = '123e4567-e89b-42d3-a456-426614174002';
 const SMOKE_CANCEL_SESSION_ID = '123e4567-e89b-42d3-a456-426614174001';
 
 const calls = {
-  llmFeedback: 0
+  llmFeedback: 0,
+  llmConnection: 0
 };
 
 const fakeAsrProvider = createFakeAsrProvider({
@@ -91,6 +92,7 @@ const fakeLlm = {
   },
 
   async testConnection() {
+    calls.llmConnection += 1;
     return { success: true };
   }
 };
@@ -141,6 +143,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   const apiContract = await mainWindow.webContents.executeJavaScript(`(() => {
     const expected = [
       'getLlmProviderSettings', 'saveLlmProviderSettings', 'openSettings',
+      'getAppearance', 'saveAppearance', 'onAppearanceChanged',
       'openPromptEditor', 'getCustomPrompt', 'saveCustomPrompt', 'closeWindow',
       'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText',
       'getRealtimeFeedback', 'getFinalReport', 'testLLMConnection',
@@ -154,6 +157,8 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
         'training-status', 'feedback-status'
       ].filter(id => !document.getElementById(id)),
       initialUi: {
+        theme: document.documentElement.dataset.theme,
+        layout: document.documentElement.dataset.layout,
         trainingStatus: document.getElementById('training-status')?.textContent.trim(),
         feedbackStatus: document.getElementById('feedback-status')?.textContent.trim(),
         vagueClass: document.getElementById('stat-vague')?.className,
@@ -167,12 +172,37 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.deepEqual(apiContract.missing, []);
   assert.deepEqual(apiContract.missingUi, []);
   assert.deepEqual(apiContract.initialUi, {
+    theme: 'graphite',
+    layout: 'coach-rail',
     trainingStatus: '准备就绪',
     feedbackStatus: '本地分析可用；AI 建议约每新增 30 字生成',
     vagueClass: 'stat-value stat-yellow',
     fillerClass: 'stat-value stat-red',
     hedgeClass: 'stat-value stat-orange',
     densityHelp: '有效词数（排除填充词和犹豫词）占总词数的比例'
+  });
+
+  const appearanceIpcState = await mainWindow.webContents.executeJavaScript(`(async () => {
+    const received = [];
+    const unsubscribe = window.api.onAppearanceChanged(appearance => received.push(appearance));
+    const initial = await window.api.getAppearance();
+    const saved = await window.api.saveAppearance({theme: 'paper', layout: 'focus-hud'});
+    await new Promise(resolve => setTimeout(resolve, 25));
+    unsubscribe();
+    const restored = await window.api.saveAppearance({theme: 'graphite', layout: 'coach-rail'});
+    return {initial, saved, received, restored};
+  })()`);
+  assert.deepEqual(appearanceIpcState, {
+    initial: {schemaVersion: 1, theme: 'graphite', layout: 'coach-rail'},
+    saved: {
+      success: true,
+      appearance: {schemaVersion: 1, theme: 'paper', layout: 'focus-hud'}
+    },
+    received: [{schemaVersion: 1, theme: 'paper', layout: 'focus-hud'}],
+    restored: {
+      success: true,
+      appearance: {schemaVersion: 1, theme: 'graphite', layout: 'coach-rail'}
+    }
   });
 
   const helpState = await mainWindow.webContents.executeJavaScript(`(() => {
@@ -236,7 +266,15 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       densityDescription: densityLabel?.getAttribute('title') || '',
       reducedMotionRule: Array.from(document.styleSheets)
         .flatMap(sheet => Array.from(sheet.cssRules))
-        .some(rule => rule.conditionText?.includes('prefers-reduced-motion'))
+        .some(rule => rule.conditionText?.includes('prefers-reduced-motion')),
+      visibleTitle: document.querySelector('.app-title')?.textContent.trim(),
+      decorativeMascotPresent: Boolean(document.querySelector('.girl-icon')),
+      emojiControls: Array.from(document.querySelectorAll('button')).filter(button => {
+        return /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(button.textContent);
+      }).map(button => button.id),
+      unlabeledSvgControls: Array.from(document.querySelectorAll('button:has(svg)')).filter(button => {
+        return !(button.getAttribute('aria-label') || button.textContent.trim() || button.title);
+      }).map(button => button.id)
     };
   })()`);
   assert.deepEqual(desktopUsability.controls, [
@@ -246,6 +284,128 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   ]);
   assert.match(desktopUsability.densityDescription, /有效词数.*总词数/);
   assert.equal(desktopUsability.reducedMotionRule, true);
+  assert.equal(desktopUsability.visibleTitle, '表达训练');
+  assert.equal(desktopUsability.decorativeMascotPresent, false);
+  assert.deepEqual(desktopUsability.emojiControls, []);
+  assert.deepEqual(desktopUsability.unlabeledSvgControls, []);
+
+  const visualMotionState = await mainWindow.webContents.executeJavaScript(`(() => {
+    const subtitle = document.getElementById('subtitle-scroll');
+    const timer = document.getElementById('timer');
+    const settings = document.getElementById('btn-settings');
+    timer.classList.add('active');
+    settings.focus();
+    const state = {
+      subtitleAnimation: getComputedStyle(subtitle).animationName,
+      timerAnimation: getComputedStyle(timer).animationName,
+      focusOutlineStyle: getComputedStyle(settings).outlineStyle,
+      focusOutlineWidth: getComputedStyle(settings).outlineWidth
+    };
+    timer.classList.remove('active');
+    settings.blur();
+    return state;
+  })()`);
+  assert.equal(visualMotionState.subtitleAnimation, 'none');
+  assert.equal(visualMotionState.timerAnimation, 'none');
+  assert.notEqual(visualMotionState.focusOutlineStyle, 'none');
+  assert.notEqual(visualMotionState.focusOutlineWidth, '0px');
+
+  const originalContentSize = mainWindow.getContentSize();
+  await mainWindow.webContents.executeJavaScript(`(() => {
+    const transcript = document.getElementById('subtitle-scroll');
+    const feedback = document.getElementById('feedback-content');
+    const transcriptSpacer = document.createElement('div');
+    const feedbackSpacer = document.createElement('div');
+    transcriptSpacer.dataset.smokeSpacer = 'transcript';
+    feedbackSpacer.dataset.smokeSpacer = 'feedback';
+    transcriptSpacer.style.height = '1200px';
+    feedbackSpacer.style.height = '900px';
+    transcript.append(transcriptSpacer);
+    feedback.append(feedbackSpacer);
+    transcript.scrollTop = 57;
+    feedback.scrollTop = 31;
+    document.getElementById('timer').textContent = '12:34';
+    document.getElementById('training-status').textContent = '布局切换状态保真';
+    window.__layoutSmoke = {
+      transcript: document.getElementById('subtitle-container'),
+      feedback,
+      insights: document.querySelector('[data-region="insights"]'),
+      timer: document.getElementById('timer'),
+      trainingStatus: document.getElementById('training-status'),
+      transcriptScroll: transcript.scrollTop,
+      feedbackScroll: feedback.scrollTop,
+      controlState: ['btn-start', 'btn-pause', 'btn-resume', 'btn-stop', 'btn-report']
+        .map(id => document.getElementById(id).className).join('|')
+    };
+  })()`);
+  for (const viewport of [
+    {width: 960, height: 640},
+    {width: 1366, height: 768},
+    {width: 1760, height: 1000}
+  ]) {
+    mainWindow.setContentSize(viewport.width, viewport.height);
+    await delay(40);
+    for (const layout of ['coach-rail', 'focus-hud']) {
+      await mainWindow.webContents.executeJavaScript(
+        `window.api.saveAppearance({theme: 'graphite', layout: '${layout}'})`
+      );
+      await waitUntil(`${layout} layout at ${viewport.width}`, async () => {
+        const value = await mainWindow.webContents.executeJavaScript('document.documentElement.dataset.layout');
+        return value === layout;
+      });
+      const geometry = await mainWindow.webContents.executeJavaScript(`(() => {
+        const rect = selector => {
+          const value = document.querySelector(selector).getBoundingClientRect();
+          return {left: value.left, top: value.top, right: value.right, bottom: value.bottom, width: value.width, height: value.height};
+        };
+        const transcriptScroll = document.getElementById('subtitle-scroll');
+        const feedbackScroll = document.getElementById('feedback-content');
+        return {
+          viewport: {width: innerWidth, height: innerHeight},
+          stage: rect('[data-region="stage"]'),
+          transcript: rect('#subtitle-scroll'),
+          coach: rect('[data-region="coach"]'),
+          insights: rect('[data-region="insights"]'),
+          nodesPreserved: window.__layoutSmoke.transcript === document.getElementById('subtitle-container')
+            && window.__layoutSmoke.feedback === feedbackScroll
+            && window.__layoutSmoke.insights === document.querySelector('[data-region="insights"]')
+            && window.__layoutSmoke.timer === document.getElementById('timer')
+            && window.__layoutSmoke.trainingStatus === document.getElementById('training-status'),
+          scrollPreserved: transcriptScroll.scrollTop === window.__layoutSmoke.transcriptScroll
+            && feedbackScroll.scrollTop === window.__layoutSmoke.feedbackScroll,
+          controlsPreserved: ['btn-start', 'btn-pause', 'btn-resume', 'btn-stop', 'btn-report']
+            .map(id => document.getElementById(id).className).join('|') === window.__layoutSmoke.controlState,
+          timer: document.getElementById('timer').textContent,
+          trainingStatus: document.getElementById('training-status').textContent
+        };
+      })()`);
+      assert.equal(geometry.viewport.width, viewport.width);
+      assert.equal(geometry.viewport.height, viewport.height);
+      assert.equal(geometry.nodesPreserved, true);
+      assert.equal(geometry.scrollPreserved, true);
+      assert.equal(geometry.controlsPreserved, true);
+      assert.equal(geometry.timer, '12:34');
+      assert.equal(geometry.trainingStatus, '布局切换状态保真');
+      assert.ok(geometry.transcript.right <= geometry.coach.left + 1, `${layout} transcript must not intersect feedback`);
+      assert.ok(geometry.coach.width >= 300 && geometry.coach.width <= 460, `${layout} coach width must stay bounded`);
+      assert.ok(geometry.coach.top >= 0 && geometry.coach.bottom <= geometry.viewport.height, `${layout} coach must remain visible`);
+      assert.ok(geometry.insights.height < geometry.coach.height, `${layout} insights must remain subordinate to feedback`);
+      if (layout === 'coach-rail') {
+        assert.ok(geometry.insights.top >= geometry.coach.bottom - 1, 'coach-rail insights must sit below feedback');
+      } else if (viewport.width >= 1280) {
+        assert.ok(geometry.coach.top > 0 && geometry.coach.bottom < geometry.viewport.height, 'focus HUD must be inset');
+      }
+    }
+  }
+  await mainWindow.webContents.executeJavaScript(`(() => {
+    document.querySelectorAll('[data-smoke-spacer]').forEach(node => node.remove());
+    document.getElementById('timer').textContent = '00:00';
+    document.getElementById('training-status').textContent = '准备就绪';
+    delete window.__layoutSmoke;
+    return window.api.saveAppearance({theme: 'graphite', layout: 'coach-rail'});
+  })()`);
+  mainWindow.setContentSize(...originalContentSize);
+  await delay(40);
 
   const modalKeyboardState = await mainWindow.webContents.executeJavaScript(`(() => {
     const opener = document.getElementById('btn-paste');
@@ -413,19 +573,135 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     return settingsWindow.webContents.executeJavaScript(`(() => {
       const provider = document.getElementById('provider');
       const model = document.getElementById('model');
-      if (!provider || !model || model.options.length === 0) return null;
+      const cards = document.querySelectorAll('.asr-model-card');
+      if (!provider || !model || model.options.length === 0 || cards.length !== 3) return null;
       return {
         title: document.title,
         provider: provider.value,
-        hasGetLlmProviderSettings: typeof window.api?.getLlmProviderSettings === 'function'
+        hasGetLlmProviderSettings: typeof window.api?.getLlmProviderSettings === 'function',
+        theme: document.documentElement.dataset.theme,
+        layout: document.documentElement.dataset.layout,
+        themeControls: document.querySelectorAll('[name="appearance-theme"]').length,
+        layoutControls: document.querySelectorAll('[name="appearance-layout"]').length,
+        modelNames: Array.from(cards, card => card.querySelector('h3')?.textContent.trim()),
+        status: document.getElementById('asr-model-status')?.textContent.trim()
       };
     })()`);
   });
   assert.deepEqual(settingsState, {
     title: '设置',
     provider: 'deepseek',
-    hasGetLlmProviderSettings: true
+    hasGetLlmProviderSettings: true,
+    theme: 'graphite',
+    layout: 'coach-rail',
+    themeControls: 4,
+    layoutControls: 2,
+    modelNames: [
+      'Paraformer 中英双语',
+      'Zipformer Small CTC 中文 INT8',
+      'Zipformer Large CTC 中文 INT8'
+    ],
+    status: '当前使用：Paraformer 中英双语'
   });
+
+  await mainWindow.webContents.executeJavaScript(`(() => {
+    window.__appearanceSmoke = {
+      transcript: document.getElementById('subtitle-container'),
+      feedback: document.getElementById('feedback-content'),
+      insights: document.querySelector('[data-region="insights"]'),
+      trainingStatus: document.getElementById('training-status'),
+      timer: document.getElementById('timer'),
+      actions: document.querySelector('.action-bar')
+    };
+  })()`);
+  const connectionCallsBeforeAppearance = calls.llmConnection;
+  await settingsWindow.webContents.executeJavaScript(`(() => {
+    const control = document.querySelector('[name="appearance-theme"][value="paper"]');
+    control.checked = true;
+    control.dispatchEvent(new Event('change', {bubbles: true}));
+  })()`);
+  await waitUntil('paper theme selection', async () => {
+    const theme = await mainWindow.webContents.executeJavaScript('document.documentElement.dataset.theme');
+    return theme === 'paper';
+  });
+  await settingsWindow.webContents.executeJavaScript(`(() => {
+    const control = document.querySelector('[name="appearance-layout"][value="focus-hud"]');
+    control.checked = true;
+    control.dispatchEvent(new Event('change', {bubbles: true}));
+  })()`);
+  const synchronizedSettingsAppearance = await waitUntil('settings appearance synchronization', async () => {
+    const [mainState, settingsState] = await Promise.all([
+      mainWindow.webContents.executeJavaScript(`(() => ({
+        theme: document.documentElement.dataset.theme,
+        layout: document.documentElement.dataset.layout,
+        transcriptPreserved: window.__appearanceSmoke.transcript === document.getElementById('subtitle-container'),
+        feedbackPreserved: window.__appearanceSmoke.feedback === document.getElementById('feedback-content'),
+        insightsPreserved: window.__appearanceSmoke.insights === document.querySelector('[data-region="insights"]'),
+        trainingStatusPreserved: window.__appearanceSmoke.trainingStatus === document.getElementById('training-status'),
+        timerPreserved: window.__appearanceSmoke.timer === document.getElementById('timer'),
+        actionsPreserved: window.__appearanceSmoke.actions === document.querySelector('.action-bar')
+      }))()`),
+      settingsWindow.webContents.executeJavaScript(`(() => ({
+        theme: document.documentElement.dataset.theme,
+        layout: document.documentElement.dataset.layout,
+        error: document.getElementById('appearance-error').textContent,
+        scrollable: getComputedStyle(document.body).overflowY === 'auto'
+      }))()`)
+    ]);
+    return mainState.theme === 'paper' && settingsState.theme === 'paper'
+      ? {mainState, settingsState}
+      : null;
+  });
+  assert.deepEqual(synchronizedSettingsAppearance, {
+    mainState: {
+      theme: 'paper',
+      layout: 'focus-hud',
+      transcriptPreserved: true,
+      feedbackPreserved: true,
+      insightsPreserved: true,
+      trainingStatusPreserved: true,
+      timerPreserved: true,
+      actionsPreserved: true
+    },
+    settingsState: {theme: 'paper', layout: 'focus-hud', error: '', scrollable: true}
+  });
+  assert.equal(calls.llmConnection, connectionCallsBeforeAppearance);
+
+  const asrManagementState = await settingsWindow.webContents.executeJavaScript(`(async () => {
+    const small = 'zipformer-small-ctc-zh-int8-2025-04-01';
+    const install = await window.api.installAsrModel(small);
+    const cancel = await window.api.cancelAsrModelInstall(small);
+    return {install, cancel};
+  })()`);
+  assert.equal(asrManagementState.install.ok, true);
+  assert.equal(asrManagementState.install.state.installTask.status, 'running');
+  assert.equal(asrManagementState.cancel.ok, true);
+  assert.equal(asrManagementState.cancel.state.installTask.status, 'idle');
+
+  const switchSessionId = '123e4567-e89b-42d3-a456-426614174003';
+  const switchStart = await mainWindow.webContents.executeJavaScript(`window.api.startASR({
+    sessionId: '${switchSessionId}', sampleRateHz: 16000
+  })`);
+  assert.equal(switchStart.ok, true);
+  const rejectedSwitch = await settingsWindow.webContents.executeJavaScript(
+    `window.api.switchAsrModel('zipformer-small-ctc-zh-int8-2025-04-01')`
+  );
+  assert.deepEqual(rejectedSwitch, {
+    ok: false,
+    error: {
+      code: 'asr-switch-active-session',
+      message: 'End the active recording before switching ASR models'
+    }
+  });
+  const switchCancel = await mainWindow.webContents.executeJavaScript(
+    `window.api.cancelASR({sessionId: '${switchSessionId}'})`
+  );
+  assert.equal(switchCancel.ok, true);
+  const successfulSwitch = await settingsWindow.webContents.executeJavaScript(
+    `window.api.switchAsrModel('zipformer-small-ctc-zh-int8-2025-04-01')`
+  );
+  assert.equal(successfulSwitch.ok, true);
+  assert.equal(successfulSwitch.state.effectiveModelId, 'zipformer-small-ctc-zh-int8-2025-04-01');
   settingsWindow.close();
 
   await mainWindow.webContents.executeJavaScript(
@@ -450,12 +726,35 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     document.getElementById('btn-back').click();
     return {
       overlaps: !(back.right <= heading.left || back.left >= heading.right
-        || back.bottom <= heading.top || back.top >= heading.bottom)
+        || back.bottom <= heading.top || back.top >= heading.bottom),
+      theme: document.documentElement.dataset.theme,
+      layout: document.documentElement.dataset.layout
     };
   })()`);
-  assert.equal(promptEditorState.overlaps, false);
+  assert.deepEqual(promptEditorState, {
+    overlaps: false,
+    theme: 'paper',
+    layout: 'focus-hud'
+  });
   await delay(50);
   assert.equal(promptEditorWindow.isDestroyed(), false, 'declined dirty navigation must keep the editor open');
+  const promptAppearanceSave = await promptEditorWindow.webContents.executeJavaScript(
+    `window.api.saveAppearance({theme: 'midnight', layout: 'coach-rail'})`
+  );
+  assert.deepEqual(promptAppearanceSave, {
+    success: true,
+    appearance: {schemaVersion: 1, theme: 'midnight', layout: 'coach-rail'}
+  });
+  await waitUntil('prompt appearance synchronization', async () => {
+    const [mainTheme, promptTheme] = await Promise.all([
+      mainWindow.webContents.executeJavaScript('document.documentElement.dataset.theme'),
+      promptEditorWindow.webContents.executeJavaScript('document.documentElement.dataset.theme')
+    ]);
+    return mainTheme === 'midnight' && promptTheme === 'midnight';
+  });
+  await promptEditorWindow.webContents.executeJavaScript(
+    `window.api.saveAppearance({theme: 'graphite', layout: 'coach-rail'})`
+  );
   promptEditorWindow.destroy();
 
   await mainWindow.webContents.executeJavaScript(`(() => {

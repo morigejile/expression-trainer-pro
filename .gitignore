@@ -1,4 +1,6 @@
 node_modules/
+.pnpm-store/
+.superpowers/
 .worktrees/
 models/*.onnx
 models/sherpa-onnx-*/
