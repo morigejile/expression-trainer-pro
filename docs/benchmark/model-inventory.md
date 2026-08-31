@@ -23,7 +23,7 @@ Registry 是机器可校验的数据源。本页不复制 URL、字节数、SHA-
 |---|---|---|
 | BM-02 | [三候选比较](bm02-comparison-2026-08-27.md) | 初始同机基线 |
 | BM-03 | [五候选比较](bm03-five-model-comparison-2026-08-30.md) | streaming/utterance 扩展比较 |
-| BM-04 | [七候选范围](bm04-seven-model-scope-2026-08-30.md)、[七候选结果](bm04-seven-model-comparison-2026-08-30.md) | 最终候选比较与产品建议 |
+| BM-04 | [七候选结果](bm04-seven-model-comparison-2026-08-30.md) | 最终候选比较与产品建议 |
 
 报告是当次运行的不可变证据，不回填为“当前模型状态”。新的正式复评创建新报告，不改写旧测量值。
 

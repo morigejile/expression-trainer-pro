@@ -7,7 +7,7 @@
 
 ## 1. 证据边界
 
-本文件检查了当前源码、README、依赖清单和 Git 状态，并以 Node 测试、自动化 Electron smoke、packaged native-load、真实 Paraformer 首次安装及升级 smoke 建立证据。smoke 实际加载 Main、Preload、主页面和设置页，通过真实 utility-process IPC 验证 Fake ASR session/event、活动执行单元退出后的安全失败和下一 session 重建，并覆盖协调式 Fake LLM 与粘贴分析；隐藏 fixture 窗口还在真实 Electron 43 AudioWorklet/OfflineAudioContext 中验证 16/44.1/48 kHz 双声道时变输入适配到 16 kHz、320 帧分块和时序过渡。真实可配置麦克风、真实外部 LLM、接近资格线硬件及非 Windows x64 制品仍未形成证据。
+当前事实来自源码、依赖清单和 Git 状态，并由 Node 测试、Electron smoke、packaged native-load、真实 Paraformer 首次安装及升级 smoke 支持。已验证 Main/Preload/Renderer、utility-process IPC、执行单元退出与重建、Fake LLM、粘贴分析，以及 Electron AudioWorklet 对 16/44.1/48 kHz fixture 的适配。真实可配置麦克风、真实外部 LLM、接近资格线硬件及非 Windows x64 制品仍未形成证据。
 
 | 标记 | 含义 |
 |---|---|
@@ -70,7 +70,7 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 
 应用支持训练开始/暂停/继续/结束、partial/final 字幕、填充词/犹豫词/笼统词/表达密度统计、精准词建议、自定义训练规则、LLM 反馈、原文/报告复制和 Markdown 保存。
 
-它没有大型前端框架、独立后端、数据库或微服务。问题不是业务模块过多，而是音频、ASR、Electron Main、模型、安全和交付边界仍停留在原型工程阶段。
+它没有大型前端框架、独立后端、数据库或微服务。音频、ASR、模型、配置和交付边界已从原型职责中拆开；Renderer 的训练编排仍集中在 `ExpressionTrainer`。
 
 ## 3. 当前技术栈与版本
 
@@ -92,35 +92,19 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 
 开发工具基线固定为 Node 24.20.0/npm 11.19.0；npm 版本跟随 Node Active LTS 官方捆绑版本，与 Electron 内置 Node 24.18.1 明确区分。当前只验证 Windows 11 Home 25H2 build 26200 x64；PKG-01 已把 Windows 11 25H2+ x64 选为首个 Tier 1 目标。Windows ARM64、macOS 与 Linux 为 Experimental，仍没有 CI、打包配置或制品测试证明。
 
-### 3.1 BM-02 harness（Completed）
+### 3.1 Benchmark 与模型决策
 
-独立 benchmark CLI 用 manifest 输出每个 sample/repetition 的 JSONL、汇总 JSON/CSV、环境快照及 tag 分层统计；失败的 init、sample、timeout 和 dispose 事件也会被落盘。它不改动生产 Audio/IPC/Main，且没有新增依赖。BM-02、BM-03 与 BM-04 已依次完成三、五、七候选同机比较；ADR-0009 据此采用 Zipformer Large 技术默认。模型再分发许可仍是后续发布门禁。
+独立 benchmark CLI 从 manifest 生成逐样本结果、汇总和环境快照，不进入产品 Audio/IPC/Main。BM-02～BM-04 已完成七候选同机比较，ADR-0009 据此采用 Zipformer Large 技术默认。候选具有固定 runtime hash、native-load 和 benchmark 证据，但再分发状态仍为 `not-approved`。
 
-当前 registry 的七个候选均为 `verified`，具备固定 runtime-file hash、native-load 与 BM-04 benchmark 证据；其中 FireRedASR2 CTC、Qwen3-ASR 和两个 SenseVoice 版本按 utterance 契约只输出 final。模型证据保存在 Git 外，所有候选继续保持 `redistribution: not-approved`；技术验证不等于公开打包获批。
+### 3.2 Model Manager 与生产模型
 
-### 3.2 R-07/R-08 Model Manager 与生产接入（Completed）
+产品 registry 与 Model Manager 独立于 benchmark。模型安装到 `userData/models`，经过大小和 hash 校验、白名单解压、不可变版本发布与 native 初始化后才激活；中断、空间不足或校验失败不替换上一可用版本。当前版本失败时只探测并切换一次上一版本。
 
-产品层已有独立 `models/registry.json` 与 `lib/model-manager.js`，不依赖 `benchmark/`。registry 只固定 ADR-0005 接受的 Paraformer archive/runtime 文件 URL、大小和 SHA-256；模型安装位于 `userData/models`，使用跨 utility 安装锁、按年龄清理的同盘 `.staging`、流式下载大小上限、archive/runtime 双重校验、白名单解压、不可变 `model/version` 目录、active pointer 和显式上一版本 rollback。中断、错误 hash、解压失败或空间不足不会替换旧 active。
+### 3.3 Packaging、安装与升级
 
-R-08 已由 Main 向正常 utility process 传入 `userData` 与 app version；Fake smoke 分支仍先行且不加载 Sherpa/Model Manager。生产 provider 解析 active 版本，无 active 时安装但不立即激活；只有 role 路径通过 Paraformer native 初始化后才更新 active。当前版本损坏或 native 加载失败时，上一版本也先 native 探测，成功后才切换指针，且不循环回退。初始化可取消并使用独立 30 分钟预算；PKG-03 首次安装 smoke 使用与外层一致的 45 分钟预算。`.tar.bz2` 继续调用系统 `tar`，真实 1 GB archive、系统工具和 packaged native 初始化已在 PKG-03 闭环。
+`forge.config.js` 是唯一打包配置，当前只构建 Windows x64 Squirrel；native Sherpa bundle 保持 ASAR unpack，模型位于 `userData/models`。内部制品已验证安装、真实模型首次准备、强制离线二次启动、1.0.0→1.0.1 前向升级和卸载数据保留，终端用户无需开发工具。
 
-### 3.3 PKG-02 Windows x64 packaging（Completed）
-
-`forge.config.js` 是唯一打包配置：只构建 Windows x64 Squirrel，排除 docs/test/benchmark 等开发树，并使用 ASAR；整个 `sherpa-onnx-win-x64` 目录保持 unpack，确保 `.node` 与四个相邻 DLL 的加载关系不被破坏。模型不进入应用资源，继续位于 `userData/models`。
-
-干净 `npm ci → npm run make` 已生成 `ExpressionTrainerSetup.exe`、版本化 full nupkg 与 `RELEASES`；当前制品版本为 1.0.1。`smoke:package` 在未安装目录制品上验证 Fake 产品流程、utility process 中的 Sherpa native load、native 文件集合和不创建模型目录。PKG-03 进一步证明静默安装、真实约 1 GB Paraformer 下载/系统 `tar`/初始化及离线二次启动。
-
-### 3.4 PKG-03 first-install loop（Completed）
-
-独立 Windows 测试用户路径从零执行 Squirrel 静默安装，普通用户环境不依赖 Node、Python 或编译器。packaged utility 下载 registry 固定的 1,047,319,737-byte archive，完成 archive/runtime 校验、系统 `tar` 白名单解包、native 初始化及一轮 16 kHz silent session；随后注入禁止网络的 fetch，在相同模型目录完成离线二次启动。当前开发机实测安装 12.798 s、在线首次闭环 563.664 s、离线启动 3.672 s，最后卸载应用并删除精确测试模型目录。
-
-真实下载曾暴露 GitHub/CDN HTTP/2 中途错误；Model Manager 现按实际落盘字节在同次安装内有限续传，续传只接受严格匹配的 `206`、`Content-Range` 与总长度，最终 SHA-256 仍是发布前门禁。接近 4-core/8-GB 资格线的性能、真实麦克风和签名继续作为非阻塞环境待办，不由本次高配开发机结果外推。
-
-### 3.5 PKG-04 upgrade/uninstall lifecycle（Completed）
-
-PKG-04 保存 1.0.0 Setup 作为真实基线，先静默安装并在隔离 userData 写入 settings、custom prompt 和模型标记，再用 1.0.1 Setup 前向升级。安装后的 `RELEASES` 指向 1.0.1，packaged smoke 通过，三类用户数据逐字节不变；Squirrel 卸载移除应用但保留安装目录外的 userData，随后 smoke 只清理精确测试目录。
-
-实测手工运行旧 1.0.0 完整 Setup 会以成功退出码将应用二进制降级；旧安装器无法由 1.0.1 追溯加固。降级与卸载过程本身没有删除 userData。CONV-03 迁移后的 LLM provider canonical 文件与旧应用写入的 `settings.json` 隔离；旧应用仍可能显式保存并按旧 schema 覆盖 `custom-prompt.json` 等共享文件。重新运行当前 Setup 只能恢复应用版本，不能恢复已经被旧应用覆盖的共享数据。项目因此将受支持更新路径定义为向前安装，并把旧完整安装器降级列为已知边界，而不是为内部测试引入额外 updater 或安装器框架。
+受支持更新路径是向前安装。手工运行旧完整 Setup 可能降级应用二进制，并可能用旧 schema 覆盖共享用户文件；重新运行当前 Setup 只能恢复应用版本，不能恢复已被覆盖的数据。该已知边界保留在支持文档，不为内部阶段增加 updater 框架。
 
 ## 4. C4 Level 2：当前容器/运行边界
 
@@ -333,9 +317,7 @@ Settings/Prompt Renderer
 - `models/` 跟踪版本化产品 registry；模型权重由首次 ASR 初始化自动下载、校验并安装到 `userData/models`。
 - 已有 canonical 支持矩阵、Windows x64 首发选择、未签名内部安装制品，以及真实首次安装/模型和 1.0.0→1.0.1 升级/卸载数据保留闭环；仍无签名、公证或自动更新。
 - 主窗口可按需导出固定 JSON 诊断；Main 组合系统/active 模型/controller 状态，Renderer 只提供经过严格字段校验的采样率，不后台记录或上传用户内容。
-- 原有 `package-lock.json` 清理已由负责人确认纳入 Phase 0；陈旧 `node-microphone` 条目已删除，lockfile 与 `package.json` 一致。
-- 开发基线已迁移为 Node 24.20.0/npm 11.19.0，并由 `.nvmrc`、`package.json#packageManager/engines` 和 lockfile 根包共同约束。2026-08-30 已在该精确基线完成 clean `npm ci`、254 项 Node/Electron 测试、Forge package/make 与 packaged smoke；Squirrel/NuGet make 需要正常文件系统权限，在受限沙箱压缩 Electron DLL 会产生误导性的 closed-stream 错误。
-- CONV-02/CONV-03 完成后，2026-08-31 使用规范 Node 24.20.0/npm 11.19.0 全量运行 297 项测试，295 pass、0 fail、2 skip；两项 skip 均因当前 Windows host 不允许创建 file symlink，directory junction 安全测试通过。
+- 开发版本由 `.nvmrc`、`package.json#packageManager/engines` 和 lockfile 共同约束；当前精确基线的 clean install、完整测试、Forge make 与 packaged smoke 已通过。具体命令和环境限制维护在[开发与验证](../development.md)。
 
 这些发布级缺口及未确认的模型再分发权利在当前内部开发/测试中是非阻塞后续工作；若它们使本地技术实验无法运行或使结论失效，才需要提前处理。
 
