@@ -289,6 +289,103 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.deepEqual(desktopUsability.emojiControls, []);
   assert.deepEqual(desktopUsability.unlabeledSvgControls, []);
 
+  const originalContentSize = mainWindow.getContentSize();
+  await mainWindow.webContents.executeJavaScript(`(() => {
+    const transcript = document.getElementById('subtitle-scroll');
+    const feedback = document.getElementById('feedback-content');
+    const transcriptSpacer = document.createElement('div');
+    const feedbackSpacer = document.createElement('div');
+    transcriptSpacer.dataset.smokeSpacer = 'transcript';
+    feedbackSpacer.dataset.smokeSpacer = 'feedback';
+    transcriptSpacer.style.height = '1200px';
+    feedbackSpacer.style.height = '900px';
+    transcript.append(transcriptSpacer);
+    feedback.append(feedbackSpacer);
+    transcript.scrollTop = 57;
+    feedback.scrollTop = 31;
+    document.getElementById('timer').textContent = '12:34';
+    document.getElementById('training-status').textContent = '布局切换状态保真';
+    window.__layoutSmoke = {
+      transcript: document.getElementById('subtitle-container'),
+      feedback,
+      insights: document.querySelector('[data-region="insights"]'),
+      timer: document.getElementById('timer'),
+      trainingStatus: document.getElementById('training-status'),
+      transcriptScroll: transcript.scrollTop,
+      feedbackScroll: feedback.scrollTop,
+      controlState: ['btn-start', 'btn-pause', 'btn-resume', 'btn-stop', 'btn-report']
+        .map(id => document.getElementById(id).className).join('|')
+    };
+  })()`);
+  for (const viewport of [
+    {width: 960, height: 640},
+    {width: 1366, height: 768},
+    {width: 1760, height: 1000}
+  ]) {
+    mainWindow.setContentSize(viewport.width, viewport.height);
+    await delay(40);
+    for (const layout of ['coach-rail', 'focus-hud']) {
+      await mainWindow.webContents.executeJavaScript(
+        `window.api.saveAppearance({theme: 'graphite', layout: '${layout}'})`
+      );
+      await waitUntil(`${layout} layout at ${viewport.width}`, async () => {
+        const value = await mainWindow.webContents.executeJavaScript('document.documentElement.dataset.layout');
+        return value === layout;
+      });
+      const geometry = await mainWindow.webContents.executeJavaScript(`(() => {
+        const rect = selector => {
+          const value = document.querySelector(selector).getBoundingClientRect();
+          return {left: value.left, top: value.top, right: value.right, bottom: value.bottom, width: value.width, height: value.height};
+        };
+        const transcriptScroll = document.getElementById('subtitle-scroll');
+        const feedbackScroll = document.getElementById('feedback-content');
+        return {
+          viewport: {width: innerWidth, height: innerHeight},
+          stage: rect('[data-region="stage"]'),
+          transcript: rect('#subtitle-scroll'),
+          coach: rect('[data-region="coach"]'),
+          insights: rect('[data-region="insights"]'),
+          nodesPreserved: window.__layoutSmoke.transcript === document.getElementById('subtitle-container')
+            && window.__layoutSmoke.feedback === feedbackScroll
+            && window.__layoutSmoke.insights === document.querySelector('[data-region="insights"]')
+            && window.__layoutSmoke.timer === document.getElementById('timer')
+            && window.__layoutSmoke.trainingStatus === document.getElementById('training-status'),
+          scrollPreserved: transcriptScroll.scrollTop === window.__layoutSmoke.transcriptScroll
+            && feedbackScroll.scrollTop === window.__layoutSmoke.feedbackScroll,
+          controlsPreserved: ['btn-start', 'btn-pause', 'btn-resume', 'btn-stop', 'btn-report']
+            .map(id => document.getElementById(id).className).join('|') === window.__layoutSmoke.controlState,
+          timer: document.getElementById('timer').textContent,
+          trainingStatus: document.getElementById('training-status').textContent
+        };
+      })()`);
+      assert.equal(geometry.viewport.width, viewport.width);
+      assert.equal(geometry.viewport.height, viewport.height);
+      assert.equal(geometry.nodesPreserved, true);
+      assert.equal(geometry.scrollPreserved, true);
+      assert.equal(geometry.controlsPreserved, true);
+      assert.equal(geometry.timer, '12:34');
+      assert.equal(geometry.trainingStatus, '布局切换状态保真');
+      assert.ok(geometry.transcript.right <= geometry.coach.left + 1, `${layout} transcript must not intersect feedback`);
+      assert.ok(geometry.coach.width >= 300 && geometry.coach.width <= 460, `${layout} coach width must stay bounded`);
+      assert.ok(geometry.coach.top >= 0 && geometry.coach.bottom <= geometry.viewport.height, `${layout} coach must remain visible`);
+      assert.ok(geometry.insights.height < geometry.coach.height, `${layout} insights must remain subordinate to feedback`);
+      if (layout === 'coach-rail') {
+        assert.ok(geometry.insights.top >= geometry.coach.bottom - 1, 'coach-rail insights must sit below feedback');
+      } else if (viewport.width >= 1280) {
+        assert.ok(geometry.coach.top > 0 && geometry.coach.bottom < geometry.viewport.height, 'focus HUD must be inset');
+      }
+    }
+  }
+  await mainWindow.webContents.executeJavaScript(`(() => {
+    document.querySelectorAll('[data-smoke-spacer]').forEach(node => node.remove());
+    document.getElementById('timer').textContent = '00:00';
+    document.getElementById('training-status').textContent = '准备就绪';
+    delete window.__layoutSmoke;
+    return window.api.saveAppearance({theme: 'graphite', layout: 'coach-rail'});
+  })()`);
+  mainWindow.setContentSize(...originalContentSize);
+  await delay(40);
+
   const modalKeyboardState = await mainWindow.webContents.executeJavaScript(`(() => {
     const opener = document.getElementById('btn-paste');
     const modal = document.getElementById('paste-modal');

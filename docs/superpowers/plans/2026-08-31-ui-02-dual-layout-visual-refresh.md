@@ -33,16 +33,16 @@ feat: unify the training interface structure and icons
 
 ## Task 2: Implement coach-rail and focus-hud responsive geometry
 
-- [ ] Add failing Electron smoke geometry checks at 960x640, a standard width, and a wide width for both layouts.
-- [ ] Assert the transcript reading area never intersects the visible feedback region, feedback remains visible, and the insight region has lower visual prominence.
-- [ ] Assert switching layouts preserves transcript and feedback scroll positions plus active control/status values.
-- [ ] Run the smoke test and confirm the new geometry/state checks fail against the legacy three-column CSS.
-- [ ] Rewrite the main layout rules in `src/styles.css` using shared grid areas and layout-specific selectors rooted at `data-layout`.
-- [ ] Implement compact, standard, wide, and capped ultrawide behavior; use `clamp()` for subtitle size, spacing, and the 300-460px coach width.
-- [ ] Reserve a safe stage area for focus-hud and collapse it to a non-overlapping rail near the minimum width.
-- [ ] Keep transitions within 120-180ms and add/retain `prefers-reduced-motion` behavior.
-- [ ] Run focused smoke and renderer tests.
-- [ ] Commit with an English subject and a Chinese body.
+- [x] Add failing Electron smoke geometry checks at 960x640, a standard width, and a wide width for both layouts.
+- [x] Assert the transcript reading area never intersects the visible feedback region, feedback remains visible, and the insight region has lower visual prominence.
+- [x] Assert switching layouts preserves transcript and feedback scroll positions plus active control/status values.
+- [x] Run the smoke test and confirm the new geometry/state checks fail against the legacy three-column CSS.
+- [x] Rewrite the main layout rules in `src/styles.css` using shared grid areas and layout-specific selectors rooted at `data-layout`.
+- [x] Implement compact, standard, wide, and capped ultrawide behavior; use `clamp()` for subtitle size, spacing, and the 300-460px coach width.
+- [x] Reserve a safe stage area for focus-hud and collapse it to a non-overlapping rail near the minimum width.
+- [x] Keep transitions within 120-180ms and add/retain `prefers-reduced-motion` behavior.
+- [x] Run focused smoke and renderer tests.
+- [x] Commit with an English subject and a Chinese body.
 
 Expected commit:
 
