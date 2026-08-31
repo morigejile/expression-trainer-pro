@@ -73,15 +73,17 @@ git commit -m "<English subject>" -m "中文：<简短说明>"
 
 ## 配置文件边界
 
-当前产品把 Appearance 保存到 `userData/appearance.json`，把 LLM provider 配置保存到 `userData/llm-provider-settings.json`。两者使用独立 config/store、Preload API 和 IPC，只共用设置页面，不共用配置快照。
+当前产品分别把 Appearance、ASR 选择和 LLM provider 配置保存到 `userData/appearance.json`、`userData/asr-selection.json` 与 `userData/llm-provider-settings.json`。三者使用独立 config/store、Preload API 和 IPC，只共用设置页面，不共用配置快照。
 
 新文件不存在时从 legacy `settings.json` 单向迁移，不删除旧文件，也不做跨版本双向同步；新文件存在后以新文件为准。canonical 或 legacy 来源的 schema 高于当前支持版本时，读取可识别字段但拒绝所有显式保存。测试覆盖旧文件迁移、原子发布失败、新文件优先、future schema 拒绝保存，以及设置页“保存”和“测试连接”保持独立。
 
-Appearance schema version 1 只保存四主题和两个布局标识；缺失、损坏或未知值回退 Graphite/coach-rail，future schema 拒绝显式保存。ASR selection 仍使用 Planned 的独立 `asr-selection.json`；两者均不得合并进 LLM provider 配置快照。
+Appearance schema version 1 只保存四主题和两个布局标识；缺失、损坏或未知值回退 Graphite/coach-rail，future schema 拒绝显式保存。ASR selection schema version 1 只保存 `selectedModelId`；稳定损坏在默认模型成功后恢复，瞬时初始化失败保留选择。两者均不得合并进 LLM provider 配置快照。
 
 ## ASR 模型
 
-模型权重不进入 Git。当前已实现的产品运行时仍由 utility process 根据 `models/registry.json` 自动下载并校验 Paraformer，安装到 Electron `userData/models/paraformer-bilingual-zh-en/2024-03-10/`；native 初始化成功后才更新 active pointer。ADR-0009 已选择 Zipformer Large 作为后续产品化的技术默认，但模型切换和交付尚未接入这条运行时路径。archive/runtime 的固定大小、hash 与再分发状态见 registry 和 ADR-0004/0009。
+模型权重不进入 Git。唯一 schema-v2 产品 Catalog 是 `models/registry.json`，固定 Paraformer、Zipformer Small 和 Zipformer Large 三款 streaming 模型；受信任 Factory 只创建代码支持的两类 Provider。启动按严格 `--asr-model=<modelId>`、持久选择、Catalog 默认值解析，设置页可下载、取消、重试、重新安装或在空闲时切换模型；安装使用独立短生命周期 utility，不影响当前识别 controller。archive/runtime 的固定大小、hash 与再分发状态见 registry 和 ADR-0004/0009。
+
+ASR-M03 收尾在 Node 24.20.0 运行完整 `node --test`：354 项中 352 pass、0 fail、2 skip；两项 skip 是当前 Windows host 不允许创建 file symlink，directory junction 边界测试仍通过。
 
 内部开发阶段 `.tar.bz2` 解包调用系统 `tar`。PKG-03 已证明 packaged utility 可从零下载并校验真实约 1 GB Paraformer、调用系统 `tar`、完成 native 初始化和强制离线二次启动，且模型仍位于安装目录外。真实麦克风、接近资格线硬件、macOS/Linux 和正式发布制品仍需对应环境证据。
 

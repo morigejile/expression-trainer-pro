@@ -573,7 +573,8 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     return settingsWindow.webContents.executeJavaScript(`(() => {
       const provider = document.getElementById('provider');
       const model = document.getElementById('model');
-      if (!provider || !model || model.options.length === 0) return null;
+      const cards = document.querySelectorAll('.asr-model-card');
+      if (!provider || !model || model.options.length === 0 || cards.length !== 3) return null;
       return {
         title: document.title,
         provider: provider.value,
@@ -581,7 +582,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
         theme: document.documentElement.dataset.theme,
         layout: document.documentElement.dataset.layout,
         themeControls: document.querySelectorAll('[name="appearance-theme"]').length,
-        layoutControls: document.querySelectorAll('[name="appearance-layout"]').length
+        layoutControls: document.querySelectorAll('[name="appearance-layout"]').length,
+        modelNames: Array.from(cards, card => card.querySelector('h3')?.textContent.trim()),
+        status: document.getElementById('asr-model-status')?.textContent.trim()
       };
     })()`);
   });
@@ -592,7 +595,13 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     theme: 'graphite',
     layout: 'coach-rail',
     themeControls: 4,
-    layoutControls: 2
+    layoutControls: 2,
+    modelNames: [
+      'Paraformer 中英双语',
+      'Zipformer Small CTC 中文 INT8',
+      'Zipformer Large CTC 中文 INT8'
+    ],
+    status: '当前使用：Paraformer 中英双语'
   });
 
   await mainWindow.webContents.executeJavaScript(`(() => {
@@ -657,6 +666,42 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     settingsState: {theme: 'paper', layout: 'focus-hud', error: '', scrollable: true}
   });
   assert.equal(calls.llmConnection, connectionCallsBeforeAppearance);
+
+  const asrManagementState = await settingsWindow.webContents.executeJavaScript(`(async () => {
+    const small = 'zipformer-small-ctc-zh-int8-2025-04-01';
+    const install = await window.api.installAsrModel(small);
+    const cancel = await window.api.cancelAsrModelInstall(small);
+    return {install, cancel};
+  })()`);
+  assert.equal(asrManagementState.install.ok, true);
+  assert.equal(asrManagementState.install.state.installTask.status, 'running');
+  assert.equal(asrManagementState.cancel.ok, true);
+  assert.equal(asrManagementState.cancel.state.installTask.status, 'idle');
+
+  const switchSessionId = '123e4567-e89b-42d3-a456-426614174003';
+  const switchStart = await mainWindow.webContents.executeJavaScript(`window.api.startASR({
+    sessionId: '${switchSessionId}', sampleRateHz: 16000
+  })`);
+  assert.equal(switchStart.ok, true);
+  const rejectedSwitch = await settingsWindow.webContents.executeJavaScript(
+    `window.api.switchAsrModel('zipformer-small-ctc-zh-int8-2025-04-01')`
+  );
+  assert.deepEqual(rejectedSwitch, {
+    ok: false,
+    error: {
+      code: 'asr-switch-active-session',
+      message: 'End the active recording before switching ASR models'
+    }
+  });
+  const switchCancel = await mainWindow.webContents.executeJavaScript(
+    `window.api.cancelASR({sessionId: '${switchSessionId}'})`
+  );
+  assert.equal(switchCancel.ok, true);
+  const successfulSwitch = await settingsWindow.webContents.executeJavaScript(
+    `window.api.switchAsrModel('zipformer-small-ctc-zh-int8-2025-04-01')`
+  );
+  assert.equal(successfulSwitch.ok, true);
+  assert.equal(successfulSwitch.state.effectiveModelId, 'zipformer-small-ctc-zh-int8-2025-04-01');
   settingsWindow.close();
 
   await mainWindow.webContents.executeJavaScript(

@@ -1,6 +1,6 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09、PKG-01～PKG-04、CONV-01～CONV-03 与 UI-01/UI-02 Completed；ADR-0009 采用 Zipformer Large 技术默认
+> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09、PKG-01～PKG-04、CONV-01～CONV-03、UI-01/UI-02 与 ASR-M01～M03 Completed；ADR-0009 采用 Zipformer Large 技术默认
 > 基线日期：2026-08-31
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
 > 描述对象：当前集成分支的产品运行时、开发工具边界与已验证的内部安装基线
@@ -49,6 +49,12 @@ lib/llm-provider-store.js       LLM provider 文件选择、单向迁移和 futu
 lib/appearance-config.js        四主题/双布局外观 schema 规范化
 lib/appearance-store.js         appearance.json 读取、原子保存和 future-schema 保护
 lib/window-bounds.js            主显示器逻辑工作区初始尺寸计算
+lib/model-catalog.js            schema-v2 产品 Catalog 的严格加载与冻结
+lib/asr-provider-factory.js     受信任 streaming Provider 创建边界
+lib/asr-selection-store.js      asr-selection.json 读取与原子保存
+lib/asr-model-service.js        启动恢复、单 controller 切换与失败回退
+lib/model-install-controller.js 独立安装任务、进度、取消和重试
+lib/asr-model-management*.js    模型操作路由、脱敏状态与受限设置窗口 IPC
 lib/custom-prompt-config.js     自定义规则 schema、迁移与有界口癖解析
 lib/atomic-json-store.js        userData JSON 的同盘原子写
 lib/safe-log.js                 有界错误文本与凭据模式脱敏
@@ -87,10 +93,10 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 | 音频节点 | AudioWorklet + 320 帧 mono Float32 collector | capture epoch 隔离暂停前旧块；正常 stop flush tail；固定 Electron fixture 覆盖 16/44.1/48 kHz |
 | 权限桥接 | Preload `contextBridge` + `ipcRenderer.invoke` | `contextIsolation:true`、`nodeIntegration:false` |
 | ASR 引擎 | `sherpa-onnx-node` `1.13.3`（精确版本） | 仅由 utility process 内的 Paraformer Provider 延迟加载，Main 不 require；packaged native-load smoke 已通过 |
-| ASR 模型 | `paraformer-bilingual-zh-en/2024-03-10` | registry 固定 archive/runtime；INT8 encoder/decoder + tokens 安装到 `userData/models`，权重不纳入 Git |
+| ASR 模型 | Paraformer、Zipformer Small、Zipformer Large | schema-v2 Catalog 固定 archive/runtime；模型安装到 `userData/models`，权重不纳入 Git；当前 Catalog 默认是 Zipformer Large，但公开分发仍受许可约束 |
 | 本地分析 | `lib/lexicon.js` + `data/emotion-lexicon.json` + `shared/expression-rules.js` | 146 个情绪词；16 个填充词、14 个犹豫词、20 组笼统词映射由 Renderer/Main 共用；未启用数据不放入活跃 `data/` 目录 |
 | LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接/实时/报告分别为 10/15/60 秒超时，并支持 AbortSignal、按 Renderer 取消和异常响应验证 |
-| 设置 | `userData/appearance.json`、`userData/llm-provider-settings.json`、legacy `userData/settings.json`、`userData/custom-prompt.json` | Appearance 与 LLM provider 各自为 schema version 1 且互不覆盖；两者均保护 future-schema 显式保存；小文件同步但以同盘临时文件/fsync/rename 原子发布；API Key 明文 |
+| 设置 | `userData/appearance.json`、`userData/asr-selection.json`、`userData/llm-provider-settings.json`、legacy `userData/settings.json`、`userData/custom-prompt.json` | Appearance、ASR 选择与 LLM provider 各自持久化且互不覆盖；小文件以同盘临时文件/fsync/rename 原子发布；API Key 明文 |
 | 输出 | Clipboard + Electron Save Dialog + Markdown | 原文与报告 |
 | 构建/测试 | Node test + Electron smoke + Electron Forge 7.5/Squirrel | `package`/`make` 固定 Windows x64；packaged smoke 覆盖 Fake 产品流、utility-only Sherpa native load、完整 DLL unpack 和外部模型目录；尚无 CI |
 
@@ -102,7 +108,9 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 
 ### 3.2 Model Manager 与生产模型
 
-产品 registry 与 Model Manager 独立于 benchmark。模型安装到 `userData/models`，经过大小和 hash 校验、白名单解压、不可变版本发布与 native 初始化后才激活；中断、空间不足或校验失败不替换上一可用版本。当前版本失败时只探测并切换一次上一版本。
+产品层以 `models/registry.json` 作为唯一 schema-v2 Catalog，不依赖 `benchmark/`。Catalog 只描述三款 streaming 模型；Factory 只接受代码内冻结的 Paraformer 与 online CTC Provider 类型。模型安装到 `userData/models`，经过大小和 hash 校验、白名单解压、不可变版本发布与 native 初始化后才激活；中断、空间不足或校验失败不替换上一可用版本。
+
+`AsrModelService` 按严格命令行覆盖、持久选择、Catalog 默认值启动，并保证任意时刻最多一个识别 utility。模型切换先验证目标，再销毁旧 controller；失败时创建新的原模型 controller 回退，双失败进入 unavailable。安装由独立短生命周期 utility 执行，支持有界进度、取消和重试，不占用当前识别 controller。模型管理 IPC 只允许设置窗口调用四个固定 channel，Renderer 只接收脱敏快照并提交精确模型 ID。
 
 ### 3.3 Packaging、安装与升级
 
@@ -248,7 +256,7 @@ providers.custom     { apiKey, baseUrl, model, customModel }
 
 旧版扁平字段、缺失 provider 字段和旧文件名 `settings.json` 在读取时迁移为 schema version 1；canonical 文件优先，迁移后不删除 legacy 文件，也不按时间戳合并。损坏 JSON 使用默认配置运行并保留原文件，未知 provider 配置块不会在规范化时被删除。canonical 或 legacy future schema 可读取已知子集，显式保存则返回稳定错误且不写文件。LLM provider 与 custom-prompt 都使用同盘原子写，发布失败保留旧文件并清理临时文件。API Key 仍为明文；当前内部阶段不为此增加 native keychain 依赖，发布前再按平台成本评估。`custom-prompt.json` 保存 versioned goals、customRules、styleRef、customWords。训练文本、统计和报告仅在 Renderer 内存中，除非用户手动复制/保存。
 
-`appearance.json` 只保存四个主题和两个布局标识；缺失、损坏或未知值回退 Graphite/coach-rail，future schema 可读取已知值但拒绝显式保存。设置页外观区域即时保存并独立于 LLM 保存/连接测试。多模型选择仍为 Planned，后续使用独立 `asr-selection.json`，不重新并入 LLM provider 或 Appearance 配置。
+`appearance.json` 只保存四个主题和两个布局标识；缺失、损坏或未知值回退 Graphite/coach-rail，future schema 可读取已知值但拒绝显式保存。`asr-selection.json` 只保存 `selectedModelId`；缺失或稳定损坏在默认模型成功后原子恢复，瞬时初始化失败不改写选择。外观和模型操作都独立于 LLM 保存/连接测试。
 
 ### 5.8 Benchmark dataset boundary (BM-01)
 
@@ -366,6 +374,6 @@ Settings/Prompt Renderer
 - 接近资格线性能、真实麦克风和 Experimental 平台仍无证据；
 - 首次安装与 1.0.0→1.0.1 升级已可复现，后续只维护能发现实质回归的验证。
 
-结论：当前内部基线的运行时、评测和交付边界已经收敛。剩余风险应随 Appearance、多模型或公开发布的实际变化渐进处理，不开展脱离当前任务的全面重构。
+结论：当前内部基线的运行时、评测和交付边界已经收敛。剩余风险应随 ASR-M04、utterance 轨道或公开发布的实际变化渐进处理，不开展脱离当前任务的全面重构。
 
 需要补充的设备、平台和公开发布证据统一维护在[支持矩阵](../support-matrix.md)与[Roadmap](../roadmap.md)，本文件不复制验证待办。

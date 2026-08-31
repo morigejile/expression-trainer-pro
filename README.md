@@ -17,6 +17,8 @@
 ## 功能
 
 - 🎤 **实时语音识别**：基于 Sherpa-ONNX，完全离线，中文优化
+- 📦 **模型管理**：在设置中安装、取消、重试和切换三款受信任的 streaming ASR 模型
+- 🎨 **外观与布局**：四套主题及 coach-rail/focus-hud 两种响应式布局
 - 📝 **全屏字幕显示**：黑底大字，实时显示你说的每一句话
 - 🔍 **词库分析**：自动检测填充词、犹豫词、笼统词，给出精准替代
 - 🤖 **AI反馈**：支持 OpenAI、DeepSeek、Ollama 与自定义 OpenAI-compatible 后端
@@ -43,7 +45,7 @@ npm ci
 npm start
 ```
 
-首次开始录音时，应用会自动下载并校验 Sherpa-ONNX streaming Paraformer 中英双语模型（archive 约 1.05 GB），安装到 Electron `userData/models`。请预留下载与解包空间；内部开发阶段需要系统提供 `tar`。模型文件不进入 Git，详细边界见[开发与可复现安装](docs/development.md)。
+首次使用默认模型时，应用会下载并校验 Catalog 中的 Zipformer Large；也可在设置页安装并选择 Paraformer 或 Zipformer Small。模型安装到 Electron `userData/models`，请预留下载与解包空间；内部开发阶段需要系统提供 `tar`。模型文件不进入 Git，详细边界见[开发与可复现安装](docs/development.md)。
 
 ### 3. 配置 AI 后端
 
@@ -85,9 +87,10 @@ Renderer / Web Audio / UI
 Electron Main（窗口、设置、分析、LLM 路由、ASR 控制器）
         │ session-aware IPC
         ▼
-ASR Utility Process（Model Manager + Sherpa Provider）
+ASR Utility Process（单一当前 Sherpa Provider）
         │
-        └── userData/models 中的版本化 Paraformer
+        ├── 独立短生命周期 Model Install Utility
+        └── userData/models 中的版本化 Catalog 模型
 ```
 
 Main 不加载 Sherpa native addon，也不执行同步识别；音频采集在 Renderer 的独立 `AudioCapture`/AudioWorklet 中完成，ASR 推理在 utility process 中隔离。完整职责、数据流和已知技术债见[当前架构](docs/architecture/current.md)。
