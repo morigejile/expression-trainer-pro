@@ -30,6 +30,9 @@ const {
   createBundledDefaultSmokeOptions,
   createMainAsrProvider
 } = require('./lib/asr-main-composition');
+const {createAsrModelManagementRouter} = require('./lib/asr-model-management');
+const {registerAsrModelManagementIpc} = require('./lib/asr-model-management-ipc');
+const {createModelInstallController} = require('./lib/model-install-controller');
 const {runManagedModelSmoke} = require('./lib/managed-model-smoke');
 const modelRegistry = require('./models/registry.json');
 const bundledModelArchive = resolveBundledModelArchive({
@@ -123,6 +126,73 @@ const asrProvider = isSmokeTest
         })
       });
 const asrIpc = createAsrIpcRouter({provider: asrProvider});
+const managementModelManager = createModelManager({
+  userDataPath: app.getPath('userData'),
+  appVersion: app.getVersion(),
+  registry: modelRegistry
+});
+const fallbackManagementState = {
+  status: 'ready',
+  selectedModelId: 'paraformer-bilingual-zh-en',
+  effectiveModelId: 'paraformer-bilingual-zh-en',
+  overrideModelId: null,
+  activeSession: false,
+  targetModelId: null
+};
+const managementModelService = typeof asrProvider.switchModel === 'function'
+  ? asrProvider
+  : {
+      snapshot: () => ({...fallbackManagementState}),
+      async switchModel(modelId) {
+        if (fallbackManagementState.activeSession) {
+          const error = new Error('End the active recording before switching ASR models');
+          error.code = 'asr-switch-active-session';
+          throw error;
+        }
+        fallbackManagementState.effectiveModelId = modelId;
+        fallbackManagementState.selectedModelId = modelId;
+      }
+    };
+function createSmokeModelInstallTask() {
+  let state = {status: 'idle', modelId: null, phase: null, receivedBytes: 0, totalBytes: null, errorCode: null};
+  return Object.freeze({
+    snapshot: () => ({...state}),
+    async start(modelId) {
+      state = {status: 'running', modelId, phase: 'downloading', receivedBytes: 1024, totalBytes: 4096, errorCode: null};
+      await refreshAsrModelState();
+    },
+    async cancel(modelId) {
+      if (state.status !== 'running' || state.modelId !== modelId) {
+        const error = new Error('ASR model install is not running');
+        error.code = 'asr-install-not-running';
+        throw error;
+      }
+      state = {status: 'idle', modelId: null, phase: null, receivedBytes: 0, totalBytes: null, errorCode: null};
+      await refreshAsrModelState();
+    },
+    async dispose() {
+      state = {status: 'idle', modelId: null, phase: null, receivedBytes: 0, totalBytes: null, errorCode: null};
+    }
+  });
+}
+const modelInstallController = isSmokeTest ? createSmokeModelInstallTask() : createModelInstallController({
+  spawn: modelId => utilityProcess.fork(
+    path.join(__dirname, 'lib', 'model-install-utility-process.js'),
+    createAsrUtilityArgs({
+      userDataPath: app.getPath('userData'),
+      appVersion: app.getVersion(),
+      modelId
+    }),
+    {serviceName: 'expression-trainer-model-install', stdio: 'pipe'}
+  ),
+  onStateChange: () => { void refreshAsrModelState(); }
+});
+const asrModelManagement = createAsrModelManagementRouter({
+  catalog: modelRegistry,
+  modelManager: managementModelManager,
+  modelService: managementModelService,
+  installTask: modelInstallController
+});
 
 // 覆盖应用显示名称（菜单栏、Dock、任务栏、窗口标题）
 app.setName('宇宙无敌表达训练');
@@ -134,6 +204,24 @@ const llmRequests = createRequestCoordinator();
 let asrShutdownStarted = false;
 let asrShutdownComplete = false;
 let lastAsrErrorCategory = null;
+
+function publishAsrModelState(state) {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.webContents.send('asr-model-state-changed', state);
+  }
+}
+
+async function refreshAsrModelState() {
+  const result = await asrModelManagement.getModelState();
+  if (result.ok) publishAsrModelState(result.state);
+}
+
+registerAsrModelManagementIpc({
+  ipcMain,
+  router: asrModelManagement,
+  isAllowedSender: sender => settingsWindow?.webContents === sender,
+  publishState: publishAsrModelState
+});
 
 async function trackAsrResult(operation) {
   try {
@@ -432,8 +520,10 @@ ipcMain.handle('close-current-window', (event) => {
 });
 
 // 语音识别相关 - Web Audio方案
-ipcMain.handle('start-asr', (event, command) => {
-  return trackAsrResult(asrIpc.start(command));
+ipcMain.handle('start-asr', async (event, command) => {
+  const result = await trackAsrResult(asrIpc.start(command));
+  if (isSmokeTest && result?.ok) fallbackManagementState.activeSession = true;
+  return result;
 });
 
 app.on('before-quit', event => {
@@ -441,8 +531,7 @@ app.on('before-quit', event => {
   event.preventDefault();
   if (asrShutdownStarted) return;
   asrShutdownStarted = true;
-  void asrProvider.dispose()
-    .catch(() => {})
+  void Promise.allSettled([asrProvider.dispose(), modelInstallController.dispose()])
     .finally(() => {
       asrShutdownComplete = true;
       app.quit();
@@ -454,12 +543,16 @@ ipcMain.handle('feed-audio', (event, command) => {
   return trackAsrResult(asrIpc.feed(command));
 });
 
-ipcMain.handle('stop-asr', (event, command) => {
-  return trackAsrResult(asrIpc.stop(command));
+ipcMain.handle('stop-asr', async (event, command) => {
+  const result = await trackAsrResult(asrIpc.stop(command));
+  if (isSmokeTest && result?.ok) fallbackManagementState.activeSession = false;
+  return result;
 });
 
-ipcMain.handle('cancel-asr', (event, command) => {
-  return trackAsrResult(asrIpc.cancel(command));
+ipcMain.handle('cancel-asr', async (event, command) => {
+  const result = await trackAsrResult(asrIpc.cancel(command));
+  if (isSmokeTest && result?.ok) fallbackManagementState.activeSession = false;
+  return result;
 });
 
 // LLM 连通性测试

@@ -196,6 +196,8 @@
 
   Verified the Catalog archive at 127,965,713 bytes and SHA-256 `f2ab7a5deb02717801f6a5b26c751b42f8a2db891b07f5b095e6da7442081448`. Internal Forge/Squirrel make completed; the packaged app's first offline import/native initialization took 16.903 seconds and its second offline startup took 2.324 seconds.
 
+  After merging the independently completed ASR-M03, the combined 370-test suite passed with 368 pass, 0 fail, and 2 host symlink skips. Internal Forge/Squirrel make passed again; the combined packaged app took 17.154 seconds on first offline import/native initialization and 2.547 seconds on the second offline startup.
+
 - [x] **Step 5: Update canonical documentation without claiming public completion**
 
   Mark only `ASR-M04a Internal Qualification` complete when the real artifact smoke passes. Keep ASR-M03 independent, ASR-M04 public delivery externally gated, Zipformer Large `redistribution: not-approved`, and signing/public release unfinished.

@@ -32,6 +32,7 @@ test('package payload excludes development-only trees but keeps runtime assets',
   assert.equal(ignore('/node_modules/electron/dist/electron.exe'), true);
   assert.equal(ignore('/node_modules/sherpa-onnx-win-x64/sherpa-onnx.node'), false);
   assert.equal(ignore('/lib/asr-utility-process.js'), false);
+  assert.equal(ignore('/lib/model-install-utility-process.js'), false);
   assert.equal(ignore('/models/registry.json'), false);
   assert.equal(ignore('/smoke/electron-smoke-runner.js'), false);
   assert.equal(ignore('/src/index.html'), false);

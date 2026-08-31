@@ -73,7 +73,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | FR-P10 | Existing | 本地训练在 LLM 不可用时仍应工作。 | 离线、无 API Key 或 LLM 请求失败时，录音、本地 ASR 和基础词库分析仍可完成。 |
 | FR-P11 | Existing | LLM Provider 配置应具有独立且可识别的持久化与接口命名。 | `8b93f88` 已实现 `settings.json` 到 `llm-provider-settings.json` 的单向迁移；配置模块、Preload API 和 IPC 使用 LLM provider 语义名称；canonical 或 legacy 来源遇到高于当前支持版本的 schema 时拒绝显式保存；不与 Appearance 或 ASR 选择共享完整快照。 |
 | FR-P12 | Planned | 用户应能选择四个内置主题和 coach-rail/focus-hud 两种响应式布局。 | 外观使用独立 `appearance.json`；主题与布局可即时切换、跨窗口同步和重启恢复；训练中切换不重建 DOM，不改变 session、内容、pending 请求或滚动位置；最小窗口下字幕和反馈不被遮挡。 |
-| FR-P13 | Partial | 用户应能安装、选择和切换受信任 Catalog 中的 streaming ASR 模型。 | ASR-M01/M02 已完成三模型 Catalog/Factory、独立 `asr-selection.json`、启动恢复、严格 `--asr-model=<modelId>` 覆盖和单 controller 切换/失败回退；ASR-M04a 已验证显式内部包可离线导入 Catalog 默认 Zipformer Large。切换服务尚未暴露给 Renderer；模型管理 IPC、取消/重试和设置页属于 ASR-M03，公开包内分发仍受许可门禁。 |
+| FR-P13 | Existing | 用户应能安装、选择和切换受信任 Catalog 中的 streaming ASR 模型。 | ASR-M01～M03 已完成三模型 Catalog/Factory、独立 `asr-selection.json`、启动恢复、严格 `--asr-model=<modelId>` 覆盖、单 controller 切换/失败回退、独立安装 utility、受限 IPC 与设置页即时操作；Renderer 只提交精确模型 ID，不接收路径、URL、hash 或 provider type。ASR-M04a 已验证显式内部包可离线导入 Catalog 默认 Zipformer Large，公开包内分发仍受许可门禁。 |
 | FR-P14 | Planned | 产品可在 streaming 轨道稳定后支持明确列出的 utterance ASR 模型。 | 第二批只含 SenseVoiceSmall 和 FireRedASR2；停止后解码、无 partial、5 分钟有界 PCM、cancel、失败和 session 隔离通过；不得阻塞第一批 streaming 交付或为其他候选预建适配器。 |
 
 ## 5. 非功能需求（NFR）
@@ -146,5 +146,5 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 - 当前实现：[Current Architecture](../architecture/current.md)
 - 决策记录：[ADR Index](../architecture/adr/README.md)
 - 交付顺序：[Roadmap](../roadmap.md)
-- 部分实现的多模型设计（ASR-M01/M02、ASR-M04a 已完成）：[Multi-ASR Productization](../superpowers/specs/2026-08-30-multi-asr-models-design.md)
+- 部分实现的多模型设计（ASR-M01～M03、ASR-M04a 已完成，完整 ASR-M04 仍受外部门槛约束）：[Multi-ASR Productization](../superpowers/specs/2026-08-30-multi-asr-models-design.md)
 - Planned 外观设计：[Responsive Themed UI](../superpowers/specs/2026-08-31-responsive-themed-ui-design.md)

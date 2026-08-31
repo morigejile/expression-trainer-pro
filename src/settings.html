@@ -25,6 +25,23 @@
       color: #fff;
     }
 
+    h2 { color: #fff; font-size: 16px; margin: 28px 0 8px; }
+    .section-hint { color: #888; font-size: 12px; margin-bottom: 12px; }
+    .asr-model-list { display: grid; gap: 10px; }
+    .asr-model-card { position: relative; padding: 14px; border: 1px solid #3f3f3f; border-radius: 10px; background: #242424; }
+    .asr-model-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .asr-model-heading h3 { margin: 0; color: #fff; font-size: 14px; }
+    .asr-model-badge { flex: none; color: #aaa; font-size: 11px; }
+    .status-installed { color: #69db7c; }
+    .status-corrupt, .status-failed, .status-unavailable { color: #ff8787; }
+    .status-installing { color: #74c0fc; }
+    .asr-model-description, .asr-model-meta, .asr-model-empty { margin: 8px 0 0; color: #999; font-size: 12px; line-height: 1.5; }
+    .asr-model-meta { color: #777; }
+    .asr-model-card progress { width: 100%; height: 6px; margin-top: 10px; accent-color: #4dabf7; }
+    .asr-model-action { margin-top: 10px; padding: 7px 12px; border: 1px solid #555; border-radius: 7px; background: transparent; color: #ddd; cursor: pointer; }
+    .asr-model-action:hover:not(:disabled) { border-color: #4dabf7; color: #fff; }
+    .asr-model-action:disabled { opacity: 0.5; cursor: default; }
+
     .form-group {
       margin-bottom: 20px;
     }
@@ -174,6 +191,14 @@
 <body>
   <div class="settings-container">
     <h1>⚙️ 设置</h1>
+
+    <section aria-labelledby="asr-model-title">
+      <h2 id="asr-model-title">语音识别模型</h2>
+      <p class="section-hint" id="asr-model-status" aria-live="polite">正在读取模型状态…</p>
+      <div class="asr-model-list" id="asr-model-list"></div>
+    </section>
+
+    <h2>AI 反馈</h2>
 
     <div class="form-group">
       <label>AI 后端</label>

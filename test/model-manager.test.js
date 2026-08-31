@@ -138,6 +138,7 @@ test('a matching bundled archive uses the existing install transaction without n
   const archivePath = path.join(data.userDataPath, 'packaged-model.tar.bz2');
   fs.writeFileSync(archivePath, data.archive);
   let extractedArchive;
+  const progress = [];
   const manager = createModelManager({
     ...data,
     appVersion: '1.0.0',
@@ -149,13 +150,21 @@ test('a matching bundled archive uses the existing install transaction without n
     }
   });
 
-  const installed = await manager.install(data.model.id, {activate: true});
+  const installed = await manager.install(data.model.id, {
+    activate: true,
+    onProgress(value) { progress.push(value); }
+  });
 
   assert.deepEqual(extractedArchive, data.archive);
   assert.equal(installed.reused, false);
   assert.equal((await manager.getActive(data.model.id)).version, data.model.version);
   assert.deepEqual(fs.readFileSync(archivePath), data.archive);
   assert.deepEqual(fs.readdirSync(path.join(data.userDataPath, 'models', '.staging')), []);
+  assert.equal(progress[0].phase, 'downloading');
+  assert.equal(progress[0].receivedBytes, 0);
+  assert.ok(progress.some(value => value.phase === 'downloading' && value.receivedBytes === data.archive.length));
+  assert.ok(progress.some(value => value.phase === 'verifying'));
+  assert.ok(progress.some(value => value.phase === 'installing'));
 });
 
 test('a corrupt bundled archive leaves no version, pointer, or staging operation', async (t) => {
@@ -193,6 +202,23 @@ test('ModelManager rejects a bundled archive that does not identify the Catalog 
     appVersion: '1.0.0',
     bundledArchive: {modelId: data.model.id, version: '2025-01-01', archivePath}
   }), /must match the Catalog default model and version/);
+});
+
+test('install reports bounded monotonic download and verification phases', async (t) => {
+  const {createModelManager} = require('../lib/model-manager');
+  const data = fixture(t);
+  const progress = [];
+  const manager = createModelManager({...data, appVersion: '1.0.0'});
+  await manager.install(data.model.id, {onProgress(value) { progress.push(value); }});
+  assert.equal(progress[0].phase, 'downloading');
+  assert.equal(progress[0].receivedBytes, 0);
+  assert.ok(progress.some(value => value.phase === 'downloading' && value.receivedBytes === data.archive.length));
+  assert.ok(progress.some(value => value.phase === 'verifying'));
+  assert.ok(progress.some(value => value.phase === 'installing'));
+  for (const value of progress) {
+    assert.deepEqual(Object.keys(value).sort(), ['phase', 'receivedBytes', 'totalBytes']);
+    assert.ok(value.receivedBytes >= 0 && value.receivedBytes <= value.totalBytes);
+  }
 });
 
 test('an interrupted download leaves the active version and staging area unchanged', async (t) => {
