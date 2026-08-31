@@ -35,13 +35,13 @@ feat: evolve the product ASR catalog
 
 ## Task 2: Adapt ModelManager to the validated Catalog
 
-- [ ] Update existing ModelManager tests first to pass a validated schema-v2 Catalog and cover rejection of unsupported/multiple source shapes on the current streaming install path.
-- [ ] Run `test/model-manager.test.js` and confirm failures identify the old inline schema/archive assumptions.
-- [ ] Move registry validation ownership out of `lib/model-manager.js`; accept only Catalog data validated by `lib/model-catalog.js`.
-- [ ] Adapt current archive download, resume, extraction, verification, activation, rollback, and installed-path behavior to `sources[]` without changing its safety or atomicity semantics.
-- [ ] Keep the existing single fixed archive install path for all three streaming entries; defer multi-source file installation to the later utterance batch.
-- [ ] Run ModelManager and managed-provider focused tests.
-- [ ] Commit with an English subject and a Chinese body.
+- [x] Update existing ModelManager tests first to pass a validated schema-v2 Catalog and cover rejection of unsupported/multiple source shapes on the current streaming install path.
+- [x] Run `test/model-manager.test.js` and confirm failures identify the old inline schema/archive assumptions.
+- [x] Move registry validation ownership out of `lib/model-manager.js`; accept only Catalog data validated by `lib/model-catalog.js`.
+- [x] Adapt current archive download, resume, extraction, verification, activation, rollback, and installed-path behavior to `sources[]` without changing its safety or atomicity semantics.
+- [x] Keep the existing single fixed archive install path for all three streaming entries; defer multi-source file installation to the later utterance batch.
+- [x] Run ModelManager and managed-provider focused tests.
+- [x] Commit with an English subject and a Chinese body.
 
 Expected commit:
 

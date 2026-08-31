@@ -59,7 +59,7 @@ test('model Catalog rejects unknown keys, duplicate identities, roles, and unsaf
 
   const duplicateModel = fixture();
   duplicateModel.models.push(structuredClone(duplicateModel.models[0]));
-  assert.throws(() => loadModelCatalog(duplicateModel), /duplicate modelId/);
+  assert.throws(() => loadModelCatalog(duplicateModel), /duplicate model version/);
 
   const duplicateRole = fixture();
   duplicateRole.models[0].files[1].role = 'model';
