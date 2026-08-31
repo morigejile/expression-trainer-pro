@@ -2,7 +2,7 @@
 
 > 状态：Active execution baseline
 > 更新日期：2026-08-31
-> 当前进度：Phase 0-5 的内部基线、R-01～R-09、PKG-01～PKG-04、OPS-02/OPS-05、七候选 benchmark 与 CONV-01～CONV-03 已完成。下一主线是 UI-01/UI-02 与 ASR-M01～ASR-M03；两条轨道使用独立分支，ASR-M04 继续受许可和公开制品条件约束。
+> 当前进度：Phase 0-5 的内部基线、R-01～R-09、PKG-01～PKG-04、OPS-02/OPS-05、七候选 benchmark、CONV-01～CONV-03 与 UI-01 已完成。下一主线是 UI-02 与 ASR-M01～ASR-M03；两条轨道使用独立分支，ASR-M04 继续受许可和公开制品条件约束。
 > 当前模式：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞后续工作；只有它们使当前技术实验无法运行或结论失效时，才阻塞当前路径。
 
 ## 1. 目标与排序原则
@@ -82,7 +82,7 @@ CONV-02 与 CONV-03 使用独立实施计划和提交，不与 Appearance、多�
 
 | ID | P | 状态 | 任务 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
-| UI-01 | P1 | Planned | 独立 AppearanceStore、四主题、窗口同步和响应式初始尺寸 | CONV-02,CONV-03 | `appearance.json` 可恢复、原子持久化和跨窗口同步；不读写 LLM provider 配置；读取失败时页面仍可见 |
+| UI-01 | P1 | Completed | 独立 AppearanceStore、四主题、窗口同步和响应式初始尺寸 | CONV-02,CONV-03 | `appearance.json` 已实现损坏恢复、原子持久化和 future-schema 保存保护；四主题及布局标识通过根属性跨主窗口/设置/训练规则页同步；窗口按逻辑工作区计算并居中；读取失败时 HTML 默认外观仍可见 |
 | UI-02 | P1 | Planned | coach-rail/focus-hud 双布局、统一图标和代表性视觉验收 | UI-01 | 训练中切换不改变 session、内容、pending 请求或滚动；最小尺寸不遮挡字幕；不增加视觉审批系统 |
 
 ### 4.3 Streaming ASR Productization

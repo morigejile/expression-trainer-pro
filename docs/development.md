@@ -73,13 +73,13 @@ git commit -m "<English subject>" -m "中文：<简短说明>"
 
 ## 配置文件边界
 
-当前产品把 LLM provider 配置保存到 `userData/llm-provider-settings.json`，并使用 `lib/llm-provider-config.js`、`lib/llm-provider-store.js`、`getLlmProviderSettings`/`saveLlmProviderSettings` 和 `get-llm-provider-settings`/`save-llm-provider-settings`。通用的 `src/settings.*` 名称只表示设置页面，后续 Appearance 和模型管理仍可在该页面提供独立区域。
+当前产品把 Appearance 保存到 `userData/appearance.json`，把 LLM provider 配置保存到 `userData/llm-provider-settings.json`。Appearance 使用 `lib/appearance-config.js`、`lib/appearance-store.js`、`getAppearance`/`saveAppearance`/`onAppearanceChanged` 和字段明确的 IPC；LLM provider 继续使用 `lib/llm-provider-config.js`、`lib/llm-provider-store.js` 及独立接口。两者只共用设置页面，不共用配置快照。
 
 新文件不存在时从 legacy `settings.json` 单向迁移，不删除旧文件，也不做跨版本双向同步；新文件存在后以新文件为准。canonical 或 legacy 来源的 schema 高于当前支持版本时，读取可识别字段但拒绝所有显式保存。测试覆盖旧文件迁移、原子发布失败、新文件优先、future schema 拒绝保存，以及设置页“保存”和“测试连接”保持独立。
 
-Appearance 和 ASR selection 分别使用 Planned 的 `appearance.json` 与 `asr-selection.json`，不得合并进 LLM provider 配置快照。
+Appearance schema version 1 只保存四主题和两个布局标识；缺失、损坏或未知值回退 Graphite/coach-rail，future schema 拒绝显式保存。聚焦验证入口为 `test/appearance-config.test.js`、`test/appearance-store.test.js`、`test/appearance-page.test.js`、`test/window-bounds.test.js`、`test/settings-page.test.js` 和 Electron smoke。ASR selection 仍使用 Planned 的独立 `asr-selection.json`；两者均不得合并进 LLM provider 配置快照。
 
-CONV-02/CONV-03 收尾已在 Node 24.20.0/npm 11.19.0 运行完整 `npm test`：297 项中 295 pass、0 fail、2 skip；两项 skip 是当前 Windows host 不允许创建 file symlink，directory junction 边界测试仍通过。
+UI-01 收尾在 Node 24 系列运行完整 `node --test`：323 项中 321 pass、0 fail、2 skip；两项 skip 是当前 Windows host 不允许创建 file symlink，directory junction 边界测试仍通过。本轮未改依赖、benchmark/model schema、native 或安装边界，因此不重复运行 audit、benchmark dry-run、Forge make 或 packaged smoke。
 
 ## ASR 模型
 

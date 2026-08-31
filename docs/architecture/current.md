@@ -1,6 +1,6 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09、PKG-01～PKG-04 与 CONV-01～CONV-03 Completed；ADR-0009 采用 Zipformer Large 技术默认
+> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09、PKG-01～PKG-04、CONV-01～CONV-03 与 UI-01 Completed；ADR-0009 采用 Zipformer Large 技术默认
 > 基线日期：2026-08-31
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
 > 描述对象：截至 Phase 4 / R-09；保留 Electron 43 与 T-04～T-08 行为基线
@@ -22,7 +22,8 @@ main.js                         Electron Main、窗口、设置、IPC、ASR/分�
 preload.js                      contextBridge API
 src/index.html / app.js         主 UI、录音、训练状态和展示
 src/safe-rendering.js           安全高亮 token、DOM 渲染、报告允许列表和 HTML 转义
-src/settings.html / settings.js LLM 设置
+src/settings.html / settings.js 外观与 LLM 设置
+src/appearance.js               Renderer 根节点主题/布局应用与广播订阅
 src/prompt-editor.html          自定义训练规则
 shared/expression-rules.js      Renderer 高亮与 Main 分析共用的确定性规则
 lib/asr-provider.js             initialize/start/feed/stop/cancel/dispose 契约校验
@@ -45,6 +46,9 @@ lib/ai-feedback.js              多 LLM 后端 fetch
 lib/prompts.js                  实时反馈/报告 prompt
 lib/llm-provider-config.js      LLM provider 默认值、解析和 schema 迁移纯函数
 lib/llm-provider-store.js       LLM provider 文件选择、单向迁移和 future-schema 保存保护
+lib/appearance-config.js        四主题/双布局外观 schema 规范化
+lib/appearance-store.js         appearance.json 读取、原子保存和 future-schema 保护
+lib/window-bounds.js            主显示器逻辑工作区初始尺寸计算
 lib/custom-prompt-config.js     自定义规则 schema、迁移与有界口癖解析
 lib/atomic-json-store.js        userData JSON 的同盘原子写
 lib/safe-log.js                 有界错误文本与凭据模式脱敏
@@ -85,7 +89,7 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 | ASR 模型 | `paraformer-bilingual-zh-en/2024-03-10` | registry 固定 archive/runtime；INT8 encoder/decoder + tokens 安装到 `userData/models`，权重不纳入 Git |
 | 本地分析 | `lib/lexicon.js` + `data/emotion-lexicon.json` + `shared/expression-rules.js` | 146 个情绪词；16 个填充词、14 个犹豫词、20 组笼统词映射由 Renderer/Main 共用；未启用数据不放入活跃 `data/` 目录 |
 | LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接/实时/报告分别为 10/15/60 秒超时，并支持 AbortSignal、按 Renderer 取消和异常响应验证 |
-| 设置 | `userData/llm-provider-settings.json`、legacy `userData/settings.json`、`userData/custom-prompt.json` | 当前 schema version 1；LLM provider 从旧文件单向迁移且保留旧文件，canonical/legacy future schema 显式保存被拒绝；小文件同步但以同盘临时文件/fsync/rename 原子发布；API Key 明文 |
+| 设置 | `userData/appearance.json`、`userData/llm-provider-settings.json`、legacy `userData/settings.json`、`userData/custom-prompt.json` | Appearance 与 LLM provider 各自为 schema version 1 且互不覆盖；两者均保护 future-schema 显式保存；小文件同步但以同盘临时文件/fsync/rename 原子发布；API Key 明文 |
 | 输出 | Clipboard + Electron Save Dialog + Markdown | 原文与报告 |
 | 构建/测试 | Node test + Electron smoke + Electron Forge 7.5/Squirrel | `package`/`make` 固定 Windows x64；packaged smoke 覆盖 Fake 产品流、utility-only Sherpa native load、完整 DLL unpack 和外部模型目录；尚无 CI |
 
@@ -173,23 +177,26 @@ Main 负责 Electron 控制面、词库分析、小型 userData JSON 原子文�
 - 展示 partial 临时字幕；final 与粘贴字幕通过 text node 和受控 `span` token 高亮词语，不解析输入中的 HTML。
 - 支持粘贴逐字稿、生成报告、复制/保存原文和报告、清空当前内存状态。
 - LLM 报告只渲染标题、加粗、行内代码、引用、普通行和换行等严格允许列表；LLM/HTTP 错误作为纯文本显示。
+- `src/appearance.js` 只更新根节点 `data-theme`/`data-layout`；四套主题共用语义 CSS token，初始化读取失败时保留 Graphite/coach-rail HTML 默认值，广播不会移动或重建训练 DOM。
 
 R-02 已建立 ASR session/event 状态，R-03/R-04 已把采集生命周期和 Web Audio 节点移出 `ExpressionTrainer`，但尚未形成覆盖权限、录音、分析等全部阶段的显式训练状态机。替换 session、启动/麦克风/worklet/feed 失败和清空会立即使旧 session 失效；正常 stop 使用单飞操作完成 tail flush、feed drain、ASR stop/final 和 UI 收尾。T-06 的 LLM pending 请求协调和 Renderer 代际过滤继续独立生效。
 
 ### 5.2 Preload / `preload.js`
 
-使用 `contextBridge.exposeInMainWorld('api', ...)` 暴露设置、Prompt、ASR、分析、LLM 和文件保存共 17 个能力方法。BrowserWindow 均设置 `contextIsolation:true`、`nodeIntegration:false`。
+使用 `contextBridge.exposeInMainWorld('api', ...)` 暴露 Appearance、设置、Prompt、ASR、分析、LLM 和文件保存共 22 个能力方法。BrowserWindow 均设置 `contextIsolation:true`、`nodeIntegration:false`。
 
 关键事实：
 
 - ASR 公开能力名为 `startASR`、`feedAudio`、`stopASR`、`cancelASR`；`feedAudio` 保留 command 元数据并把 samples 规范为 `Float32Array`，再逐块 `ipcRenderer.invoke('feed-audio', ...)`。
 - LLM API 暴露反馈、报告、连接测试和显式取消；取消只作用于当前 Renderer 的 pending LLM 请求。
+- Appearance API 暴露读取、显式保存和带精确 listener 清理的变更订阅；Renderer 只接收规范化的 `{schemaVersion,theme,layout}`。
 - ASR Router 对四类 command 做精确字段、非空 session、16 kHz、sequence、有限 Float32 样本等校验；settings、文本和 filename 等其他 payload 仍没有同等级 schema/大小校验。
 
 ### 5.3 Main / `main.js`
 
-- 创建主窗口、设置 modal 和 Prompt 编辑窗口；设置应用菜单和生命周期。
+- 根据主显示器逻辑工作区计算主窗口 86%×88% 初始尺寸并限制为 1200–1920×720–1200，保留 960×640 最小尺寸并居中；创建设置 modal 和 Prompt 编辑窗口，设置应用菜单和生命周期。
 - 同步读取并原子写入 `llm-provider-settings.json` 与 `custom-prompt.json`；只在 canonical LLM provider 文件不存在时读取 legacy `settings.json`。
+- 独立读取和原子写入 `appearance.json`；保存后向存活的主窗口、设置窗口和 Prompt 窗口广播规范化外观，失败不广播且不影响训练流程。
 - 通过 LLM provider/custom-prompt config 模块规范化、迁移旧 schema；损坏 JSON 回退默认值且不覆盖原文件。LLM provider 的 canonical 或 legacy future schema 可读取已知字段，但显式保存返回 `unsupported-schema-version`；迁移不删除旧文件，也不做双向同步。
 - 在启动时同步加载词库。
 - 注册所有 IPC handlers。
@@ -254,7 +261,7 @@ providers.custom     { apiKey, baseUrl, model, customModel }
 
 旧版扁平字段、缺失 provider 字段和旧文件名 `settings.json` 在读取时迁移为 schema version 1；canonical 文件优先，迁移后不删除 legacy 文件，也不按时间戳合并。损坏 JSON 使用默认配置运行并保留原文件，未知 provider 配置块不会在规范化时被删除。canonical 或 legacy future schema 可读取已知子集，显式保存则返回稳定错误且不写文件。LLM provider 与 custom-prompt 都使用同盘原子写，发布失败保留旧文件并清理临时文件。API Key 仍为明文；当前内部阶段不为此增加 native keychain 依赖，发布前再按平台成本评估。`custom-prompt.json` 保存 versioned goals、customRules、styleRef、customWords。训练文本、统计和报告仅在 Renderer 内存中，除非用户手动复制/保存。
 
-Appearance 和多模型选择仍为 Planned，尚不存在于当前用户数据结构；后续分别使用 `appearance.json` 与 `asr-selection.json`，不重新并入 LLM provider 配置。
+`appearance.json` 已实现 schema version 1，只保存 `theme` 与 `layout`；合法值固定为 Graphite/Midnight/Paper/Mist 和 coach-rail/focus-hud。缺失或损坏文件使用默认值且不覆盖原文件，future schema 可读取已知值但拒绝显式保存。设置页外观区域即时保存并独立于 LLM 保存/连接测试。多模型选择仍为 Planned，后续使用独立 `asr-selection.json`，不重新并入 LLM provider 或 Appearance 配置。
 
 ### 5.8 Benchmark dataset boundary (BM-01)
 
@@ -385,7 +392,7 @@ Settings/Prompt Renderer
 
 1. 在显式清空 npm 与 Electron 下载缓存的独立环境复跑 Electron 43 首次 CLI 下载；当前首次 43.4.1 下载和后续校验缓存恢复均成功。
 2. 验证当前模型下载源、大小、hash、许可证和三个文件的兼容性。
-3. 自动 Electron smoke 已覆盖 BrowserWindow、18 项 Preload API（含诊断导出入口）、设置页、utility-process Fake ASR 的 session/event、stale feed、强制退出报告与重建、Fake LLM、粘贴分析以及 16/44.1/48 kHz graph fixture，并确认 Main 不加载真实 Sherpa。PKG-02/PKG-03 进一步证明打包后的 utility process 可加载 native addon 并运行真实 Paraformer 最小会话；真实麦克风和人工交互仍需运行验证。
+3. 自动 Electron smoke 已覆盖 BrowserWindow、22 项 Preload API、三窗口 Appearance 同步与训练 DOM 引用保持、设置页即时外观控件、utility-process Fake ASR 的 session/event、stale feed、强制退出报告与重建、Fake LLM、粘贴分析以及 16/44.1/48 kHz graph fixture，并确认 Main 不加载真实 Sherpa。PKG-02/PKG-03 进一步证明打包后的 utility process 可加载 native addon 并运行真实 Paraformer 最小会话；真实麦克风和人工交互仍需运行验证。
 4. 以真实可配置的 16/44.1/48 kHz 麦克风/驱动复核已记录的请求、context 与 track rate；该项为非阻塞 follow-up。
 5. profile TD-01～TD-04 的 Main 延迟、GC、CPU、RAM 和队列。
 6. 其他 OS/arch 在各自产生 package/smoke/native-model 证据前保持 Experimental；Windows x64 公开发布仍需签名与真实设备证据。
