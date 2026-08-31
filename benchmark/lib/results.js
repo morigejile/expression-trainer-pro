@@ -109,6 +109,12 @@ async function reserveRunDirectory(runDir) {
   };
 }
 
+async function awaitArtifactWrites(promises) {
+  const results = await Promise.allSettled(promises);
+  const failure = results.find((result) => result.status === 'rejected');
+  if (failure) throw failure.reason;
+}
+
 async function writeResults(runDir, samples, environment, { candidateFailures = [], reservation = null } = {}) {
   if (!Array.isArray(samples)) throw new TypeError('samples must be an array');
   if (!Array.isArray(candidateFailures)) throw new TypeError('candidateFailures must be an array');
@@ -122,7 +128,7 @@ async function writeResults(runDir, samples, environment, { candidateFailures = 
   };
   await fs.mkdir(temporaryDir);
   try {
-    await Promise.all([
+    await awaitArtifactWrites([
       fs.writeFile(path.join(temporaryDir, 'samples.jsonl'), samples.map((sample) => JSON.stringify(sample)).join('\n') + (samples.length ? '\n' : ''), 'utf8'),
       fs.writeFile(path.join(temporaryDir, 'summary.json'), `${JSON.stringify(summary, null, 2)}\n`, 'utf8'),
       fs.writeFile(path.join(temporaryDir, 'summary.csv'), buildSummaryCsv(summary), 'utf8'),

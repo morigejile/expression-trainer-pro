@@ -48,7 +48,7 @@ function createDeferred() {
 
 test('settings actions stay disabled until loading completes', async (t) => {
   const settings = createDeferred();
-  global.window = { api: { getSettings: async () => settings.promise } };
+  global.window = { api: { getLlmProviderSettings: async () => settings.promise } };
   t.after(() => { delete global.window; });
   const page = createPage();
   page.settings = undefined;
@@ -65,7 +65,7 @@ test('settings actions stay disabled until loading completes', async (t) => {
 });
 
 test('settings load failure keeps actions disabled and explains the failure', async (t) => {
-  global.window = { api: { getSettings: async () => { throw new Error('ipc unavailable'); } } };
+  global.window = { api: { getLlmProviderSettings: async () => { throw new Error('ipc unavailable'); } } };
   t.after(() => { delete global.window; });
   const page = createPage();
   page.settings = undefined;
@@ -82,7 +82,7 @@ test('saving persists the draft without performing a connection test', async (t)
   const calls = [];
   global.window = {
     api: {
-      saveSettings: async settings => { calls.push(['save', settings]); return { success: true }; },
+      saveLlmProviderSettings: async settings => { calls.push(['save', settings]); return { success: true }; },
       testLLMConnection: async () => assert.fail('save must not test connectivity')
     }
   };
@@ -103,7 +103,7 @@ test('testing connection checks the draft without saving it', async (t) => {
   global.window = {
     api: {
       testLLMConnection: async settings => { calls.push(['test', settings]); return { success: true }; },
-      saveSettings: async () => assert.fail('connection test must not save')
+      saveLlmProviderSettings: async () => assert.fail('connection test must not save')
     }
   };
   t.after(() => { delete global.window; });
@@ -123,7 +123,7 @@ test('connection failure reports its specific reason without claiming save faile
   global.window = {
     api: {
       testLLMConnection: async () => ({ success: false, error: 'API Key 无效或无权限' }),
-      saveSettings: async () => assert.fail('failed connection test must not save')
+      saveLlmProviderSettings: async () => assert.fail('failed connection test must not save')
     }
   };
   t.after(() => { delete global.window; });
@@ -139,7 +139,7 @@ test('connection failure reports its specific reason without claiming save faile
 test('save rejection restores its button and shows a save-specific error', async (t) => {
   global.window = {
     api: {
-      saveSettings: async () => { throw new Error('ipc unavailable'); }
+      saveLlmProviderSettings: async () => { throw new Error('ipc unavailable'); }
     }
   };
   t.after(() => { delete global.window; });
@@ -150,4 +150,23 @@ test('save rejection restores its button and shows a save-specific error', async
   assert.equal(page.connectionError.textContent, '保存失败，请重试');
   assert.equal(page.btnSave.textContent, '保存设置');
   assert.equal(page.btnSave.disabled, false);
+});
+
+test('save result failure shows its specific reason without claiming success', async (t) => {
+  global.window = {
+    api: {
+      saveLlmProviderSettings: async () => ({
+        success: false,
+        error: '当前版本无法保存更高版本的 LLM Provider 配置'
+      })
+    }
+  };
+  t.after(() => { delete global.window; });
+  const page = createPage();
+
+  await page.save();
+
+  assert.equal(page.connectionError.textContent, '当前版本无法保存更高版本的 LLM Provider 配置');
+  assert.equal(page.connectionError.classList.contains('show'), true);
+  assert.equal(page.saveSuccess.classList.contains('show'), false);
 });

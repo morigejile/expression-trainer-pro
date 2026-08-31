@@ -1,7 +1,7 @@
 # 多 ASR 模型产品化设计
 
 - Date: 2026-08-30
-- Status: Approved in design review; awaiting written-spec review
+- Status: Approved; convergence review incorporated; Planned
 - Scope: Paraformer、Zipformer Small、Zipformer Large、SenseVoiceSmall、FireRedASR2 CTC INT8
 
 ## 1. 目标
@@ -56,9 +56,19 @@ Zipformer Large 在 streaming 候选中准确率最佳，模型体积低于现�
 
 ## 4. 组件与职责
 
-### 4.1 ModelCatalog
+以下名称表示六种职责，但目标代码只有五个实现单元：Catalog 数据与加载器、内含 ProviderRegistry 映射的 ProviderFactory、ModelManager、AsrSelectionStore、AsrModelService。职责边界用于隔离变化和失败，不要求每个名称对应一个公开 class 或 service；实现中若出现无行为的转发层，应直接内联。
 
-Catalog 是产品信任的固定模型清单。每个版本包含：
+| 实现单元 | 单独存在的原因 |
+|---|---|
+| Catalog 数据与加载器 | 产品允许的模型和资源元数据会变化，但不应因此改写安装事务或 native 构造代码 |
+| ProviderFactory（含 Registry） | 运行时构造器必须来自代码内受信任映射，不能由 Renderer 或 Catalog 指定模块路径 |
+| ModelManager | 下载、hash、解包、版本和 active pointer 属于文件生命周期，失败时不应改用户选择 |
+| AsrSelectionStore | 用户偏好只需小型持久化，不检查文件、不下载模型、不创建 native provider |
+| AsrModelService | 启动恢复和切换需要跨上述边界编排，并对 Renderer 提供唯一受限入口 |
+
+### 4.1 Catalog 数据与加载器
+
+Catalog 是现有 `models/registry.json` 的 schema 演进和产品信任清单，不新增第二个 product catalog 文件，也不建立 `ModelCatalog` service。一个小型加载器负责 schema 与条目校验；每个版本包含：
 
 - `modelId`、`version`、显示名称和说明；
 - `providerType`；
@@ -77,7 +87,7 @@ Catalog 是产品信任的固定模型清单。每个版本包含：
 
 `builtIn` 是来源属性；`not-installed`、`installed`、`corrupt`、`current` 等是本机状态，两者不得压缩为同一个互斥枚举。
 
-### 4.2 ProviderRegistry
+### 4.2 ProviderRegistry 规则
 
 代码内显式注册：
 
@@ -96,11 +106,11 @@ emitsPartial: boolean
 sampleRateHz: 16000
 ```
 
-Zipformer Small 和 Large 共用 `sherpa.online-ctc`。不得为 Qwen3-ASR、新版 SenseVoice 或其他未来模型预注册虚构适配器。
+ProviderRegistry 不作为独立 service 或公开可变 registry，而是 ProviderFactory 模块内的冻结映射。Zipformer Small 和 Large 共用 `sherpa.online-ctc`。不得为 Qwen3-ASR、新版 SenseVoice 或其他未来模型预注册虚构适配器。
 
 ### 4.3 ProviderFactory
 
-Factory：
+Factory 是包含上述受信任映射的单一 `asr-provider-factory` 实现单元：
 
 1. 按 `providerType` 查找显式 builder；
 2. 校验已安装模型提供全部必需文件角色；
@@ -129,13 +139,13 @@ ModelManager 不保存用户当前选择哪个模型。
 userData/asr-selection.json
 ```
 
-首期只保存当前 schema 版本和 `selectedModelId`。文件使用现有同目录临时文件、fsync、rename 的原子 JSON 写入方式。它不进入现有 LLM `settings.json`，避免设置页旧快照覆盖 ASR 选择。
+首期只保存当前 schema 版本和 `selectedModelId`。文件使用现有同目录临时文件、fsync、rename 的原子 JSON 写入方式。它不进入当前 `llm-provider-settings.json`。这样设置页旧快照不会覆盖 ASR 选择。
 
 ### 4.6 AsrModelService
 
 Main 中的轻量 service 协调：
 
-- Catalog、ModelManager、SelectionStore；
+- Catalog、ProviderFactory、ModelManager、SelectionStore；
 - 当前 ASR controller；
 - 下载任务 utility process；
 - 启动选择、切换、回退和不可用状态；
@@ -153,7 +163,7 @@ Main 中的轻量 service 协调：
 
 ### 5.2 Model-management utility process
 
-下载、hash、解包和磁盘安装在独立 utility process 执行：
+只有在产品需要安装任务与当前识别并行时，下载、hash、解包和磁盘安装才在独立 utility process 执行：
 
 - 只在安装任务期间存活；
 - 同时只允许一个任务；
@@ -161,7 +171,7 @@ Main 中的轻量 service 协调：
 - 切换或重启 ASR utility 不会终止下载；
 - 应用退出时接受有界取消，超时后终止并由下次 ModelManager 清理陈旧 staging。
 
-不在 Renderer 或 Main 执行大文件操作，也不建设常驻下载服务。
+不在 Renderer 执行大文件操作，也不建设常驻下载服务。若实现阶段取消并行安装需求，ModelManager 可以在受控的非 Renderer 执行边界完成该任务，并删除临时 model-management process；不得仅为保持拓扑图而保留进程。
 
 ## 6. 安装和存储
 
@@ -218,13 +228,15 @@ FireRedASR2 官方 archive 缺少 `tokens.txt`，因此第二批使用一个 `ar
 
 启动参数严格匹配 Catalog `modelId`，只影响当前运行。指定模型未安装、损坏或无法初始化时返回明确 ASR 错误；不下载、不回退到其他模型、不修改用户选择。
 
-若用户选择在启动时损坏或被外部删除：
+若用户选择在启动时发生可稳定复现的文件缺失、hash 不符、结构损坏或被外部删除：
 
 1. 将该模型标为不可用；
 2. 导入或初始化 Zipformer Large；
 3. 默认成功后原子恢复持久选择为默认；
 4. 本次运行展示一次恢复提示；
 5. 默认也失败时进入 ASR unavailable，其他应用功能继续启动。
+
+native 初始化失败、资源不足、进程退出或其他可能瞬时错误只影响本次运行：保留 `selectedModelId`，进入带明确错误的 unavailable 状态，不永久写回默认选择。只有 Catalog/文件完整性检查确认稳定损坏时才执行上述持久恢复。
 
 从旧版本升级且不存在 `asr-selection.json` 时，采用 Zipformer Large 默认值；已有 Paraformer 文件保留，不自动删除。首期固定模型版本，不设计未来内置版本自动升级语义。
 
@@ -334,7 +346,7 @@ UI、IPC 和诊断不得暴露完整本地路径、stack、原始 native 错误�
 
 覆盖：
 
-- Catalog/Registry/Factory 的身份、角色、能力和来源约束；
+- Catalog/Factory 的身份、角色、能力、来源约束和内部受信任映射；
 - 内置与网络安装复用同一安全安装路径；
 - hash、路径逃逸、同盘 staging、原子发布、取消、重试和单任务锁；
 - SelectionStore 默认、原子写入、损坏恢复和启动参数不持久化；
@@ -390,7 +402,7 @@ UI、IPC 和诊断不得暴露完整本地路径、stack、原始 native 错误�
 
 ### 第一批：Streaming
 
-- Catalog、Registry、Factory；
+- Catalog 与内含受信任 Registry 映射的 Factory；
 - Zipformer Large 内置导入和离线运行；
 - Paraformer、Zipformer Small、Zipformer Large Provider；
 - 网络安装、取消和重试；
@@ -409,6 +421,6 @@ UI、IPC 和诊断不得暴露完整本地路径、stack、原始 native 错误�
 
 ## 16. 文档与迁移
 
-实施必须新增 ADR-0009 supersede ADR-0005，而不改写历史选择理由。实现完成后只更新受当前行为影响的 requirements、roadmap、current architecture、ADR 索引、README/支持说明和 release checklist。
+ADR-0009 已 Accepted 并 supersede ADR-0005，不改写历史选择理由。实现完成后只更新受当前行为影响的 requirements、roadmap、current architecture、ADR 索引、README/支持说明和 release checklist。
 
 规格和实施在独立分支完成，不混入原工作区的未提交改动。benchmark 代码和数据继续遵循 ADR-0008 的非发布边界，产品运行时不得依赖 `benchmark/`。

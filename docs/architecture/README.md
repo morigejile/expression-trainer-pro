@@ -1,117 +1,22 @@
-# Expression Trainer 架构入口
+# Expression Trainer 架构文档入口
 
-> 方法：arc42-lite + C4（Context/Container）+ ADR  
-> 状态：Current Documentation Index
-> 基线日期：2026-08-30
-> 源码基线：`main`，已完成 R-01～R-09 与 PKG-01～PKG-04
+本页只提供导航，不维护当前状态、剩余工作或 ADR 状态副本。
 
-## 1. 如何阅读
-
-| 文档 | 回答的问题 | 生命周期 |
+| 问题 | 唯一入口 | 维护规则 |
 |---|---|---|
-| [需求基线](../requirements/requirements.md) | 系统需要做什么？ | Existing 与 Planned 持续维护 |
-| [当前架构](current.md) | 现在实际如何实现？ | 必须与可运行代码一致 |
-| [ADR](adr/README.md) | 为什么做出关键决策？ | 永久保留，变更时 Supersede |
-| [Roadmap](../roadmap.md) | 按什么顺序落地？ | 随执行状态更新 |
-| [支持矩阵](../support-matrix.md) | 首发平台和验证边界是什么？ | 随制品证据提升等级 |
+| 系统现在如何运行？ | [当前架构](current.md) | 必须与可运行源码一致，只描述 As-Is |
+| 系统需要什么能力？ | [需求基线](../requirements/requirements.md) | 使用 Existing、Partial、Planned 区分状态 |
+| 为什么做出关键选择？ | [ADR 索引](adr/README.md) | 决策永久保留；变化时新增或 Supersede ADR |
+| 下一步按什么顺序做？ | [Roadmap](../roadmap.md) | 只记录任务、依赖、优先级和完成标准 |
+| Planned 需求准备如何实现？ | [设计规格](../superpowers/specs/) | 仅在需求落地前承担 To-Be 设计职责 |
+| 平台和制品验证到什么范围？ | [支持矩阵](../support-matrix.md) | 只记录已有验证证据，不推断支持 |
 
-上一轮目标架构已经实现并合并进 `current.md`，短期 `target.md` 已从活跃文档树移除。新的结构性变更先进入 Roadmap；只有需要跨多个里程碑维持独立 To-Be 视图时才重新建立目标架构文档。ADR 不删除。
+## 文档生命周期
 
-## 2. 架构目标
+- `current.md` 是唯一当前架构真相源。Accepted ADR 中尚未实现的方向不得写成当前能力。
+- ADR 索引是唯一决策状态表，本页和 Roadmap 不复制 ADR 快照。
+- Design spec 在对应需求为 Planned 时有效；实现完成后标记 Implemented/Historical，并把长期事实回写需求、当前架构或 ADR。
+- Implementation plan 是一次性执行材料；完成后只保留状态和落地提交，复选框不承担 Roadmap 进度。
+- 只有跨多个里程碑、且 Roadmap 与 spec 无法清楚表达时才建立临时 Target Architecture；落地后合并进 `current.md` 并移除。
 
-1. 保留已经克制的技术栈：Electron + 原生 JS/HTML/CSS + Sherpa-ONNX。
-2. 将 Audio、ASR、Analysis、LLM、UI 分成少量且边界明确的职责。
-3. 降低最终用户安装、模型获取、应用升级和跨平台发布成本。
-4. 让第三方 ASR 模型与 LLM 服务成为可替换件，但不建设通用插件框架。
-5. 先用测试和 benchmark 建立证据，再接受关键 ADR。
-
-## 3. 关键质量属性
-
-优先级从高到低：
-
-1. 可维护性与可复现构建
-2. 音频正确性与识别体验
-3. 安装/升级简单性
-4. UI/Main 响应性与故障隔离
-5. 跨平台可验证性
-6. 安全、隐私与可诊断性
-
-## 4. C4 Level 1：系统上下文
-
-```mermaid
-flowchart LR
-  User[训练用户]
-  App[Expression Trainer\nElectron 桌面应用]
-  LLM[外部 LLM 服务\n可选/需网络]
-  Models[模型分发源\nExternal]
-  Maintainer[项目维护者]
-
-  User -->|讲话、操作、查看反馈| App
-  App -->|经用户配置后发送文本| LLM
-  Models -->|模型文件、版本与校验信息| App
-  Maintainer -->|构建、测试、发布| App
-```
-
-系统边界内完成麦克风采集、本地 ASR、词库分析、设置和结果展示；LLM 请求与模型下载是明确的外部依赖。
-
-## 5. 架构原则
-
-- **总体复杂度优先**：不为减少 Electron 体积而默认引入 Rust/C++/FFI 或第二套 UI 技术栈。
-- **必要边界，不造框架**：Provider 是小型契约，不是依赖注入容器；Model Manager 是清单 + 文件操作，不是模型平台。
-- **事实先于结论**：当前产品运行时仍使用 Paraformer；ADR-0009 已根据七候选 benchmark 选择 Zipformer Large 作为后续产品化的技术默认，两种状态必须明确区分。
-- **渐进迁移**：先包住现有行为，再替换内部实现；每一步都应保持可运行和可回退。
-- **用户零开发依赖**：开发者可使用 Node/npm/Forge，最终用户不安装 Node、Python 或编译工具链。
-- **当前即事实**：代码变化应同步更新 `current.md`；未来工作写入 Roadmap，重大方向变化用 Proposed ADR。
-
-## 6. 当前状态摘要
-
-源码确认当前链路为：
-
-```text
-Renderer/Web Audio → 10-block 有界队列 → Preload/IPC → Main Router
-                                                        ↓
-                                            ASR utility process
-                                                        ↓
-                                          sherpa-onnx-node/Paraformer
-```
-
-停止尾部文本、LLM 请求控制、安全渲染、ASR session/Provider、AudioCapture、AudioWorklet、10-block 有界音频发送、utility-process 推理隔离、版本化模型自动准备、原子配置持久化、诊断导出和 Windows x64 内部安装/升级闭环已完成。剩余工作集中在 CI、签名、真实设备和扩展平台证据。详情见 [current.md](current.md) 与 [Roadmap](../roadmap.md)。
-
-## 7. 已落地的运行边界
-
-当前已经形成：
-
-```text
-Renderer UI + Chromium graph/AudioWorklet collector
-                ↓ 有界音频流
-Preload 最小桥接 → Main（窗口/设置/生命周期/分析/LLM/ASR 控制）
-                              ↓
-                    独立 ASR 执行单元
-                              ↓
-                 轻量 AsrProvider + Sherpa-ONNX
-                              ↓
-                   可版本化 Model Manager
-```
-
-该图是当前事实，不再维护第二份 Target Architecture。后续收敛项以 Roadmap 为计划源，落地后同步更新 [current.md](current.md)。
-
-## 8. 决策状态快照
-
-| ADR | 状态 | 摘要 |
-|---|---|---|
-| [0001](adr/0001-retain-electron-and-native-web-stack.md) | Accepted | 保留 Electron + 原生 Web 技术栈 |
-| [0002](adr/0002-retain-sherpa-onnx.md) | Accepted | 保留 Sherpa-ONNX 作为默认 ASR 引擎 |
-| [0003](adr/0003-separate-audio-and-asr.md) | Accepted | 分离 Audio 与 ASR，使用轻量契约 |
-| [0004](adr/0004-manage-models-separately.md) | Accepted | 模型与应用解耦并校验安装 |
-| [0005](adr/0005-select-default-asr-model-by-benchmark.md) | Superseded | 三候选阶段保留 Paraformer 的历史决策，由 ADR-0009 取代 |
-| [0006](adr/0006-move-asr-out-of-main.md) | Accepted | 使用单个 Electron utility process 隔离 ASR |
-| [0007](adr/0007-package-with-electron-forge.md) | Accepted | 使用 Electron Forge 打包发布 |
-| [0008](adr/0008-keep-benchmark-as-isolated-non-shipping-tool.md) | Accepted | 核心 benchmark 同仓库隔离保留，一次性数据流程归档 |
-| [0009](adr/0009-productize-multiple-asr-models.md) | Accepted | Zipformer Large 作为后续产品化技术默认；当前 Paraformer 运行时尚未切换 |
-
-## 9. 文档维护规则
-
-- 每个 PR 若改变运行边界、数据流、外部依赖或模型策略，必须检查架构文档。
-- Accepted ADR 不改写结论；新建 ADR 并把旧 ADR 标为 Superseded。
-- `TBD` 必须对应 Roadmap 中的核验任务；已确认后删除标记并附提交/测试证据。
-- Mermaid 图只维护 C4 Context/Container 两级；没有必要时不增加 Component/Code 图。
+项目总入口仍是根 [README](../../README.md)，不建立第二份文档总览。

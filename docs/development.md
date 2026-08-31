@@ -1,7 +1,7 @@
 # 开发与验证
 
 > 当前开发基线：Windows 11 25H2 build 26200 x64、Node.js 24.20.0、npm 11.19.0、Electron 43.4.1、sherpa-onnx-node 1.13.3
-> 更新日期：2026-08-30
+> 更新日期：2026-08-31
 > 当前用途：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞跟进，除非它们使当前技术实验无法运行或结论失效。
 
 ## 环境与安装
@@ -36,6 +36,8 @@ npm run smoke:package
 - `package`/`make` 只生成当前 Tier 1 的 Windows x64 目录制品与 Squirrel 安装制品；输出位于 Git 忽略的 `out/`。
 - `smoke:package` 在 `out/` 中验证打包后的 Fake ASR 产品流、UtilityProcess 中的 Sherpa native load、完整相邻 DLL 和外部模型目录边界；它不下载模型。
 
+`smoke/` 是随包验证支持代码，会进入当前安装包但只在显式 smoke 参数和隔离 `userData` 下执行；普通启动不得进入 Fake 模式。`test/`、`benchmark/`、`scripts/` 和 `docs/` 不进入安装包。
+
 内部快速迭代默认只运行与改动直接相关的 focused tests。完整 `npm test` 只在 Roadmap 里程碑收尾运行；`benchmark:dry-run` 只在 Benchmark、model registry/candidate、adapter 或 manifest/schema 变化时运行；`npm audit` 只在依赖变化时运行；`npm ci`、package/make 和 packaged smoke 只在依赖、打包、native、安装相关改动或里程碑验收时运行。
 
 ### 内测快速交付口径
@@ -69,15 +71,25 @@ git commit -m "<English subject>" -m "中文：<简短说明>"
 3. 确认安装制品版本与 `package.json` 一致，且 userData/模型策略没有未记录变化；
 4. 使用英文提交主题和简短中文正文。公开发布时再增加 tag、签名、checksums 和 release notes；内部测试不伪装完成这些外部步骤。
 
+## 配置文件边界
+
+当前产品把 LLM provider 配置保存到 `userData/llm-provider-settings.json`，并使用 `lib/llm-provider-config.js`、`lib/llm-provider-store.js`、`getLlmProviderSettings`/`saveLlmProviderSettings` 和 `get-llm-provider-settings`/`save-llm-provider-settings`。通用的 `src/settings.*` 名称只表示设置页面，后续 Appearance 和模型管理仍可在该页面提供独立区域。
+
+新文件不存在时从 legacy `settings.json` 单向迁移，不删除旧文件，也不做跨版本双向同步；新文件存在后以新文件为准。canonical 或 legacy 来源的 schema 高于当前支持版本时，读取可识别字段但拒绝所有显式保存。测试覆盖旧文件迁移、原子发布失败、新文件优先、future schema 拒绝保存，以及设置页“保存”和“测试连接”保持独立。
+
+Appearance 和 ASR selection 分别使用 Planned 的 `appearance.json` 与 `asr-selection.json`，不得合并进 LLM provider 配置快照。
+
+CONV-02/CONV-03 收尾已在 Node 24.20.0/npm 11.19.0 运行完整 `npm test`：297 项中 295 pass、0 fail、2 skip；两项 skip 是当前 Windows host 不允许创建 file symlink，directory junction 边界测试仍通过。
+
 ## ASR 模型
 
 模型权重不进入 Git。当前已实现的产品运行时仍由 utility process 根据 `models/registry.json` 自动下载并校验 Paraformer，安装到 Electron `userData/models/paraformer-bilingual-zh-en/2024-03-10/`；native 初始化成功后才更新 active pointer。ADR-0009 已选择 Zipformer Large 作为后续产品化的技术默认，但模型切换和交付尚未接入这条运行时路径。archive/runtime 的固定大小、hash 与再分发状态见 registry 和 ADR-0004/0009。
 
 内部开发阶段 `.tar.bz2` 解包调用系统 `tar`。PKG-03 已证明 packaged utility 可从零下载并校验真实约 1 GB Paraformer、调用系统 `tar`、完成 native 初始化和强制离线二次启动，且模型仍位于安装目录外。真实麦克风、接近资格线硬件、macOS/Linux 和正式发布制品仍需对应环境证据。
 
-耗时模型资产统一留在 Git 外的本机缓存中；当前开发机使用 `D:\model-prep\archives`。只有首次安装/下载链路 smoke 从空目录验证完整下载，其余模型开发与测试复用已下载缓存，不重复拉取。下载中的文件使用 `.partial` 后缀，完成后再原子改名；缓存本身不构成 native-load、Benchmark 或发布许可证据。
+耗时模型资产统一留在 Git 外的本机缓存中。只有首次安装/下载链路 smoke 从空目录验证完整下载，其余模型开发与测试可以复用已校验缓存；缓存本身不构成 native-load、benchmark 或发布许可证据。候选 URL、大小和 hash 的 canonical 来源是 registry，历史准备过程见证据索引和 Git 历史，本文件不维护本机路径、下载代理或一次性速度记录。
 
-当前缓存已包含 Zipformer Large CTC INT8（127,965,713 bytes，SHA-256 `f2ab7a5deb02717801f6a5b26c751b42f8a2db891b07f5b095e6da7442081448`）和 FireRedASR2 CTC INT8（520,516,278 bytes，SHA-256 `1da8b737ecc5e29f36759a4460c754863e7c919a4ba325aea187331fbfc83274`），均与 GitHub 官方 release API 的 size/digest 一致。FireRed 复用既有 partial，经 1 MiB Range 同区段 hash 测速选择 `ghfast.top` 代理后，用缓存于 `D:\model-prep\tools` 的已校验 aria2 1.37.0 以 4 路续传完成；4 路已达到约 8 MiB/s，未提高到 8 路。未来换源继续先核对官方 metadata、Range/Content-Range 和小样本 hash，最终必须匹配官方完整 digest。
+许可批准前可以保留显式 internal 模型制品模式，用于验证包内默认模型的离线导入和真实包装路径。该模式必须标为不可公开发布，不能绕过 product registry 的 `redistribution` 状态或公开 release checklist；如果不再需要验证包内默认模型，应删除该模式。
 
 ## Benchmark 边界
 
@@ -85,8 +97,8 @@ git commit -m "<English subject>" -m "中文：<简短说明>"
 
 - [数据集契约](../benchmark/datasets/README.md)
 - [Harness](benchmark/harness.md)
-- [候选模型证据](benchmark/model-inventory.md)
-- [2026-08-27 比较结果](benchmark/bm02-comparison-2026-08-27.md)
+- [候选证据索引](benchmark/model-inventory.md)
+- [七候选最终比较](benchmark/bm04-seven-model-comparison-2026-08-30.md)
 
 BM-01 已完成的数据采集、人工 review 和 freeze 工具已归档到 Git 历史，不再作为当前维护入口。若引入新语料，必须先明确重开该工作并重新评估所需工具，不能把现有冻结结果当作通用数据治理平台。
 

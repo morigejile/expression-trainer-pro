@@ -1,10 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-test('new settings use the current provider schema', () => {
-  const { createDefaultSettings } = require('../lib/settings-config');
+test('new LLM provider settings use the current schema', () => {
+  const { createDefaultLlmProviderSettings } = require('../lib/llm-provider-config');
 
-  assert.deepEqual(createDefaultSettings(), {
+  assert.deepEqual(createDefaultLlmProviderSettings(), {
     schemaVersion: 1,
     provider: 'deepseek',
     providers: {
@@ -16,8 +16,8 @@ test('new settings use the current provider schema', () => {
   });
 });
 
-test('legacy flat settings migrate every supported provider field', () => {
-  const { parseSettingsJson } = require('../lib/settings-config');
+test('legacy flat LLM provider settings migrate every supported field', () => {
+  const { parseLlmProviderSettingsJson } = require('../lib/llm-provider-config');
   const cases = [
     {
       raw: { provider: 'openai', apiKey: 'openai-key', model: 'gpt-4o' },
@@ -52,18 +52,19 @@ test('legacy flat settings migrate every supported provider field', () => {
   ];
 
   for (const { raw, provider, expected } of cases) {
-    const result = parseSettingsJson(JSON.stringify(raw));
+    const result = parseLlmProviderSettingsJson(JSON.stringify(raw));
     assert.equal(result.error, null, provider);
     assert.equal(result.shouldPersist, true, provider);
+    assert.equal(result.isFutureSchema, false, provider);
     assert.equal(result.settings.schemaVersion, 1, provider);
     assert.equal(result.settings.provider, provider, provider);
     assert.deepEqual(result.settings.providers[provider], expected, provider);
   }
 });
 
-test('structured settings receive missing provider defaults without losing values', () => {
-  const { parseSettingsJson } = require('../lib/settings-config');
-  const result = parseSettingsJson(JSON.stringify({
+test('structured LLM provider settings receive missing defaults without losing values', () => {
+  const { parseLlmProviderSettingsJson } = require('../lib/llm-provider-config');
+  const result = parseLlmProviderSettingsJson(JSON.stringify({
     providers: {
       openai: { apiKey: 'preserved-key' }
     }
@@ -71,6 +72,7 @@ test('structured settings receive missing provider defaults without losing value
 
   assert.equal(result.error, null);
   assert.equal(result.shouldPersist, true);
+  assert.equal(result.isFutureSchema, false);
   assert.equal(result.settings.schemaVersion, 1);
   assert.equal(result.settings.provider, 'deepseek');
   assert.deepEqual(result.settings.providers.openai, {
@@ -93,19 +95,20 @@ test('structured settings receive missing provider defaults without losing value
   });
 });
 
-test('invalid JSON recovers with defaults without requesting persistence', () => {
-  const { createDefaultSettings, parseSettingsJson } = require('../lib/settings-config');
-  const result = parseSettingsJson('{"provider":');
+test('invalid JSON recovers with LLM provider defaults without requesting persistence', () => {
+  const { createDefaultLlmProviderSettings, parseLlmProviderSettingsJson } = require('../lib/llm-provider-config');
+  const result = parseLlmProviderSettingsJson('{"provider":');
 
-  assert.deepEqual(result.settings, createDefaultSettings());
+  assert.deepEqual(result.settings, createDefaultLlmProviderSettings());
   assert.equal(result.shouldPersist, false);
+  assert.equal(result.isFutureSchema, false);
   assert.equal(result.error, 'invalid-json');
 });
 
 test('current provider lookup falls back to deepseek for an unknown provider', () => {
-  const { getCurrentProviderSettings } = require('../lib/settings-config');
+  const { getSelectedLlmProviderSettings } = require('../lib/llm-provider-config');
 
-  assert.deepEqual(getCurrentProviderSettings({
+  assert.deepEqual(getSelectedLlmProviderSettings({
     schemaVersion: 1,
     provider: 'unknown',
     providers: {
@@ -118,8 +121,8 @@ test('current provider lookup falls back to deepseek for an unknown provider', (
 });
 
 test('unknown provider blocks survive normalization while selection falls back', () => {
-  const { normalizeSettings } = require('../lib/settings-config');
-  const settings = normalizeSettings({
+  const { normalizeLlmProviderSettings } = require('../lib/llm-provider-config');
+  const settings = normalizeLlmProviderSettings({
     schemaVersion: 1,
     provider: 'future-provider',
     providers: {
@@ -136,8 +139,8 @@ test('unknown provider blocks survive normalization while selection falls back',
 });
 
 test('future settings schema is read without requesting a destructive downgrade', () => {
-  const {parseSettingsJson} = require('../lib/settings-config');
-  const result = parseSettingsJson(JSON.stringify({
+  const {parseLlmProviderSettingsJson} = require('../lib/llm-provider-config');
+  const result = parseLlmProviderSettingsJson(JSON.stringify({
     schemaVersion: 99,
     provider: 'deepseek',
     providers: {deepseek: {apiKey: 'kept-key', model: 'future-model'}},
@@ -146,5 +149,6 @@ test('future settings schema is read without requesting a destructive downgrade'
 
   assert.equal(result.settings.providers.deepseek.apiKey, 'kept-key');
   assert.equal(result.shouldPersist, false);
+  assert.equal(result.isFutureSchema, true);
   assert.equal(result.error, null);
 });

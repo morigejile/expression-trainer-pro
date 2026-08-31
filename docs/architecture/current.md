@@ -1,7 +1,7 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09 与 PKG-01～PKG-04 Completed；ADR-0009 采用 Zipformer Large 技术默认
-> 基线日期：2026-08-30
+> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09、PKG-01～PKG-04 与 CONV-01～CONV-03 Completed；ADR-0009 采用 Zipformer Large 技术默认
+> 基线日期：2026-08-31
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
 > 描述对象：截至 Phase 4 / R-09；保留 Electron 43 与 T-04～T-08 行为基线
 
@@ -43,7 +43,8 @@ src/audio-feed-queue.js         10-block 串行队列、drain、overrun 与指�
 lib/lexicon.js                  本地确定性文本分析
 lib/ai-feedback.js              多 LLM 后端 fetch
 lib/prompts.js                  实时反馈/报告 prompt
-lib/settings-config.js          设置默认值、解析和 schema 迁移纯函数
+lib/llm-provider-config.js      LLM provider 默认值、解析和 schema 迁移纯函数
+lib/llm-provider-store.js       LLM provider 文件选择、单向迁移和 future-schema 保存保护
 lib/custom-prompt-config.js     自定义规则 schema、迁移与有界口癖解析
 lib/atomic-json-store.js        userData JSON 的同盘原子写
 lib/safe-log.js                 有界错误文本与凭据模式脱敏
@@ -84,7 +85,7 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 | ASR 模型 | `paraformer-bilingual-zh-en/2024-03-10` | registry 固定 archive/runtime；INT8 encoder/decoder + tokens 安装到 `userData/models`，权重不纳入 Git |
 | 本地分析 | `lib/lexicon.js` + `data/emotion-lexicon.json` + `shared/expression-rules.js` | 146 个情绪词；16 个填充词、14 个犹豫词、20 组笼统词映射由 Renderer/Main 共用；未启用数据不放入活跃 `data/` 目录 |
 | LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接/实时/报告分别为 10/15/60 秒超时，并支持 AbortSignal、按 Renderer 取消和异常响应验证 |
-| 设置 | `userData/settings.json`、`userData/custom-prompt.json` | 两者 schema version 1；旧结构迁移、未来 schema 防降级覆盖；小文件同步但以同盘临时文件/fsync/rename 原子发布；API Key 明文 |
+| 设置 | `userData/llm-provider-settings.json`、legacy `userData/settings.json`、`userData/custom-prompt.json` | 当前 schema version 1；LLM provider 从旧文件单向迁移且保留旧文件，canonical/legacy future schema 显式保存被拒绝；小文件同步但以同盘临时文件/fsync/rename 原子发布；API Key 明文 |
 | 输出 | Clipboard + Electron Save Dialog + Markdown | 原文与报告 |
 | 构建/测试 | Node test + Electron smoke + Electron Forge 7.5/Squirrel | `package`/`make` 固定 Windows x64；packaged smoke 覆盖 Fake 产品流、utility-only Sherpa native load、完整 DLL unpack 和外部模型目录；尚无 CI |
 
@@ -118,7 +119,7 @@ R-08 已由 Main 向正常 utility process 传入 `userData` 与 app version；F
 
 PKG-04 保存 1.0.0 Setup 作为真实基线，先静默安装并在隔离 userData 写入 settings、custom prompt 和模型标记，再用 1.0.1 Setup 前向升级。安装后的 `RELEASES` 指向 1.0.1，packaged smoke 通过，三类用户数据逐字节不变；Squirrel 卸载移除应用但保留安装目录外的 userData，随后 smoke 只清理精确测试目录。
 
-实测手工运行旧 1.0.0 完整 Setup 会以成功退出码将应用二进制降级；旧安装器无法由 1.0.1 追溯加固。数据仍保持不变，settings/custom prompt 的 future-schema 保护限制旧应用覆盖新格式，重新运行当前 Setup 可恢复 1.0.1。项目因此将受支持更新路径定义为向前安装，并把旧完整安装器降级列为已知边界，而不是为内部测试引入额外 updater 或安装器框架。
+实测手工运行旧 1.0.0 完整 Setup 会以成功退出码将应用二进制降级；旧安装器无法由 1.0.1 追溯加固。降级与卸载过程本身没有删除 userData。CONV-03 迁移后的 LLM provider canonical 文件与旧应用写入的 `settings.json` 隔离；旧应用仍可能显式保存并按旧 schema 覆盖 `custom-prompt.json` 等共享文件。重新运行当前 Setup 只能恢复应用版本，不能恢复已经被旧应用覆盖的共享数据。项目因此将受支持更新路径定义为向前安装，并把旧完整安装器降级列为已知边界，而不是为内部测试引入额外 updater 或安装器框架。
 
 ## 4. C4 Level 2：当前容器/运行边界
 
@@ -127,7 +128,7 @@ flowchart LR
   Mic[系统麦克风]
   LLM[OpenAI / DeepSeek / Ollama / Custom]
   Model[(userData/models\n版本目录 + active pointer)]
-  UserData[(userData/settings.json\ncustom-prompt.json)]
+  UserData[(userData/llm-provider-settings.json\nlegacy settings.json\ncustom-prompt.json)]
 
   subgraph Electron[Expression Trainer / Electron]
     R[Renderer\nUI + Web Audio + 训练状态\nsrc/app.js]
@@ -188,8 +189,8 @@ R-02 已建立 ASR session/event 状态，R-03/R-04 已把采集生命周期和 
 ### 5.3 Main / `main.js`
 
 - 创建主窗口、设置 modal 和 Prompt 编辑窗口；设置应用菜单和生命周期。
-- 同步读取并原子写入 `settings.json` 与 `custom-prompt.json`。
-- 通过 settings/custom-prompt config 模块规范化、迁移旧 schema；损坏 JSON 回退默认值且不覆盖原文件，未来 schema 兼容读取但不被旧版本自动写回。
+- 同步读取并原子写入 `llm-provider-settings.json` 与 `custom-prompt.json`；只在 canonical LLM provider 文件不存在时读取 legacy `settings.json`。
+- 通过 LLM provider/custom-prompt config 模块规范化、迁移旧 schema；损坏 JSON 回退默认值且不覆盖原文件。LLM provider 的 canonical 或 legacy future schema 可读取已知字段，但显式保存返回 `unsupported-schema-version`；迁移不删除旧文件，也不做双向同步。
 - 在启动时同步加载词库。
 - 注册所有 IPC handlers。
 - 仅在显式 `--smoke-test` 参数下让 utility process 组合最小 Fake ASR，并在 Main 组合 Fake LLM、临时 `userData` 和自动驱动；正常启动向 utility process 传入 `userData`/app version 并组合 managed Paraformer Provider。
@@ -236,11 +237,11 @@ T-06 后的请求边界具有以下事实：
 - 同一 Renderer 的同类新请求会取消旧请求，会话边界可显式取消全部 pending LLM 请求；Main 协调层抑制不配合 AbortSignal 的迟到结果，Renderer 代际校验继续抑制取消前已完成 IPC 返回的旧结果；
 - 无 Key、429、其他 HTTP 错误、超时、取消、坏 JSON，以及缺失 `choices[0].message.content` 均返回稳定错误；
 - 不读取或透传 HTTP 错误正文，未知 fetch 异常被泛化，避免错误信息泄露 API Key、Authorization 或完整敏感响应；
-- 没有自动重试。设置页先校验并测试连接，成功后才保存；失败时保留上一份可用配置并显示安全错误原因。
+- 没有自动重试。设置页的“保存设置”和“测试连接”是独立动作：保存只校验并持久化当前草稿，测试只验证当前草稿且不保存；两者分别显示忙碌状态和安全错误原因。
 
 ### 5.7 设置与数据
 
-`settings.json` 位于 Electron `userData`，当前 schema 是：
+`llm-provider-settings.json` 位于 Electron `userData`，当前 schema 是：
 
 ```text
 schemaVersion: 1
@@ -251,7 +252,9 @@ providers.ollama     { ollamaUrl, model }
 providers.custom     { apiKey, baseUrl, model, customModel }
 ```
 
-旧版扁平字段和缺失 provider 字段在加载时迁移为 schema version 1；损坏 JSON 使用默认配置运行并保留原文件，未知 provider 配置块不会在规范化时被删除。future schema 可读取已知子集但不会被旧应用降级写回。settings 与 custom-prompt 都使用同盘原子写，发布失败保留旧文件并清理临时文件。API Key 仍为明文；当前内部阶段不为此增加 native keychain 依赖，发布前再按平台成本评估。`custom-prompt.json` 保存 versioned goals、customRules、styleRef、customWords。训练文本、统计和报告仅在 Renderer 内存中，除非用户手动复制/保存。
+旧版扁平字段、缺失 provider 字段和旧文件名 `settings.json` 在读取时迁移为 schema version 1；canonical 文件优先，迁移后不删除 legacy 文件，也不按时间戳合并。损坏 JSON 使用默认配置运行并保留原文件，未知 provider 配置块不会在规范化时被删除。canonical 或 legacy future schema 可读取已知子集，显式保存则返回稳定错误且不写文件。LLM provider 与 custom-prompt 都使用同盘原子写，发布失败保留旧文件并清理临时文件。API Key 仍为明文；当前内部阶段不为此增加 native keychain 依赖，发布前再按平台成本评估。`custom-prompt.json` 保存 versioned goals、customRules、styleRef、customWords。训练文本、统计和报告仅在 Renderer 内存中，除非用户手动复制/保存。
+
+Appearance 和多模型选择仍为 Planned，尚不存在于当前用户数据结构；后续分别使用 `appearance.json` 与 `asr-selection.json`，不重新并入 LLM provider 配置。
 
 ### 5.8 Benchmark dataset boundary (BM-01)
 
@@ -325,11 +328,13 @@ Settings/Prompt Renderer
 
 - `package.json` 有开发、测试、benchmark、Forge package/make 与 packaged smoke scripts；没有 publish script。
 - Electron Forge 7.5/Squirrel 已固定为 Windows x64 最小打包配置；没有 GitHub Actions。
+- `smoke/` 随安装包进入 ASAR，只在显式 smoke 参数和隔离 `userData` 下执行；`test/`、`benchmark/`、`scripts/` 与 `docs/` 不进入制品。普通启动不得进入 Fake ASR/LLM 路径。
 - `models/` 跟踪版本化产品 registry；模型权重由首次 ASR 初始化自动下载、校验并安装到 `userData/models`。
 - 已有 canonical 支持矩阵、Windows x64 首发选择、未签名内部安装制品，以及真实首次安装/模型和 1.0.0→1.0.1 升级/卸载数据保留闭环；仍无签名、公证或自动更新。
 - 主窗口可按需导出固定 JSON 诊断；Main 组合系统/active 模型/controller 状态，Renderer 只提供经过严格字段校验的采样率，不后台记录或上传用户内容。
 - 原有 `package-lock.json` 清理已由负责人确认纳入 Phase 0；陈旧 `node-microphone` 条目已删除，lockfile 与 `package.json` 一致。
 - 开发基线已迁移为 Node 24.20.0/npm 11.19.0，并由 `.nvmrc`、`package.json#packageManager/engines` 和 lockfile 根包共同约束。2026-08-30 已在该精确基线完成 clean `npm ci`、254 项 Node/Electron 测试、Forge package/make 与 packaged smoke；Squirrel/NuGet make 需要正常文件系统权限，在受限沙箱压缩 Electron DLL 会产生误导性的 closed-stream 错误。
+- CONV-02/CONV-03 完成后，2026-08-31 使用规范 Node 24.20.0/npm 11.19.0 全量运行 297 项测试，295 pass、0 fail、2 skip；两项 skip 均因当前 Windows host 不允许创建 file symlink，directory junction 安全测试通过。
 
 这些发布级缺口及未确认的模型再分发权利在当前内部开发/测试中是非阻塞后续工作；若它们使本地技术实验无法运行或使结论失效，才需要提前处理。
 
@@ -345,7 +350,7 @@ Settings/Prompt Renderer
 | TD-06 | **R-07/R-08/PKG-03/PKG-04 已关闭内部开发边界** | registry、校验、安装锁、严格续传、原子安装/激活、native 成功后切换、一次安全回退及应用升级数据保留已验证 | Model Manager/managed provider 聚焦测试、产品 registry、first-install 与 upgrade smoke | 公开发布前补模型许可和目标环境证据 |
 | TD-07 | **T-04/R-02/R-04 已缓解**：stop 单飞执行 worklet tail flush、feed drain、ASR final 与分析；旧 session、迟到/倒序事件和清空/重启竞态受过滤 | 尾部语音进入字幕、统计、分析和报告；完整训练阶段状态机仍未建立 | AudioCapture、ASR event state 与 transcript 竞态回归测试 | 后续只在实际状态复杂度需要时收敛状态机 |
 | TD-08 | 已有 Node/Electron/packaged/first-install/upgrade smoke 与 Windows x64 Forge 打包，但无 CI | 已可发现产品流、packaged native、真实首次模型和应用升级数据保留；仍无法证明真实麦克风或跨平台制品 | 集成测试、Forge 配置与 PKG-03/PKG-04 制品 | OPS-01 再加最小 CI；Experimental 平台按实际需要验证 |
-| TD-09 | **R-09/PKG-04 已关闭配置损坏、降级覆盖和安装升级数据丢失风险**；API Key 仍明文 | settings/custom-prompt 原子发布、损坏文件保留、future schema 不降级，升级/卸载保留 userData；明文凭据仍是发布前权衡 | atomic store、older/current/future schema、脱敏测试与 upgrade smoke | 只有收益超过 native/跨平台成本时才采用 keychain |
+| TD-09 | **R-09/PKG-04/CONV-03 已关闭配置损坏、LLM provider future-schema 保存降级与安装升级数据丢失风险**；API Key 仍明文 | canonical/legacy future schema 保存被拒绝；LLM provider/custom-prompt 原子发布、损坏文件保留、升级/卸载保留 userData | atomic store、LLM provider store、older/current/future schema、脱敏测试与 upgrade smoke | keychain 只在收益超过 native/跨平台成本时采用；custom-prompt future schema 继续维持只读不自动写回边界 |
 | TD-10 | **R-02 已部分缓解**：ASR command 已校验精确字段、session、sequence、16 kHz 与有限样本；其他 IPC payload 仍缺少同等级校验 | settings、文本、filename 等大 payload 或类型错误仍可能影响 Main | ASR IPC 测试与其余 handler 源码确认 | 后续按当前具体风险逐 channel 限定类型/长度，不建设通用 schema 框架 |
 | TD-11 | **T-05 已缓解**：ASR/粘贴文本使用受控 DOM token，LLM 报告使用严格允许列表，错误使用纯文本 | 主应用不再从不可信文本创建标签或事件属性 | `src/safe-rendering.js`、安全渲染测试、Electron smoke、`src/app.js` 无 `innerHTML` | 后续若词库改为外部数据，继续按不可信输入处理 |
 | TD-12 | LLM fetch 控制风险已由 T-06 缓解；仍无自动重试 | 请求已有超时、取消、Main/Renderer 双层迟到抑制、结构验证和脱敏错误；瞬时失败仍需用户重试 | 25 项 fake-fetch 与 3 项 Renderer 竞态测试、源码确认 | 保留错误契约回归测试；是否重试需单独产品策略，不在请求层盲目加入 |
