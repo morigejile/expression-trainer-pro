@@ -43,18 +43,20 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 
 | ID | 需求 | 验收标准 |
 |---|---|---|
-| FR-E01 | 应用应提供 Electron 桌面界面和训练操作入口。 | `npm start` 应打开主窗口；运行验收仍需在有模型/麦克风环境执行。 |
-| FR-E02 | 用户应能开始、暂停、继续和结束一次录音训练。 | 开始后采集麦克风；暂停期间不送入 ASR；继续后恢复；结束时释放 processor、AudioContext 和 MediaStream tracks。 |
+| FR-E01 | 应用应提供 Electron 桌面界面和训练操作入口。 | `npm start` 应打开主窗口；主窗口最小保持 960×640，核心图标操作同时提供文字和可访问名称；运行验收仍需在有模型/麦克风环境执行。 |
+| FR-E02 | 用户应能开始、暂停、继续和结束一次录音训练。 | 开始准备、结束收尾期间显示明确忙碌状态并阻止重复提交；开始后采集麦克风；暂停期间不送入 ASR；继续后恢复；结束时释放 processor、AudioContext 和 MediaStream tracks。 |
 | FR-E03 | 应用应使用本地 `sherpa-onnx-node` 与 streaming Paraformer 中英双语 INT8 模型识别。 | utility process 从 `userData/models/<id>/<version>/` 按 registry role 加载 encoder、decoder、tokens 的绝对路径；首次缺失时自动安装，native 初始化成功后才激活。 |
 | FR-E04 | 应用应展示 partial 和 endpoint/final 识别文本。 | partial 更新临时字幕；endpoint 结果进入完整文本、统计和高亮；停止时尚未 endpoint 的 `finalText` 已由 Renderer 去重合并并有自动化测试。 |
-| FR-E05 | 应用应分析填充词、犹豫词、笼统词、情绪词和表达密度。 | 返回计数、位置、精准替代和建议，并在左右面板更新统计/反馈。 |
-| FR-E06 | 用户应能粘贴逐字稿并复用本地分析和 LLM 反馈。 | 粘贴文本按句展示和分析，无需麦克风或 ASR 模型。 |
+| FR-E05 | 应用应分析填充词、犹豫词、笼统词、情绪词和表达密度。 | 返回计数、位置、精准替代和建议，并在左右面板更新统计/反馈；界面说明表达密度的计算含义。 |
+| FR-E06 | 用户应能粘贴逐字稿并复用本地分析和 LLM 反馈。 | 粘贴文本按句展示和分析，无需麦克风或 ASR 模型；录音中禁止替换，已有内容时替换需用户确认。 |
 | FR-E07 | 用户配置 LLM 后，应用应生成实时反馈和最终报告。 | 当前实现支持 OpenAI、DeepSeek、Ollama 与自定义 OpenAI-compatible endpoint；每新增约 30 个字符触发实时反馈，用户可手动生成最终报告。 |
-| FR-E08 | 应用应保存各 LLM Provider 配置并兼容旧版扁平配置。 | 配置原子写入 Electron `userData/settings.json`，按 provider 保存；旧字段在读取时迁移，未来 schema 不被旧版本自动降级覆盖。API Key 当前为明文，属于发布前安全权衡。 |
-| FR-E09 | 用户应能编辑训练目标、自定义规则、风格参考和额外口癖词。 | versioned 内容原子写入 `userData/custom-prompt.json`；实时/报告 prompt 读取，额外口癖词也作为最多 64 个有界 filler 参与本地统计。 |
-| FR-E10 | 用户应能复制或保存原文与报告。 | 原文可复制/保存为 Markdown；报告可复制/保存为 Markdown；保存路径通过系统对话框选择。 |
+| FR-E08 | 应用应保存各 LLM Provider 配置并兼容旧版扁平配置。 | “保存设置”只持久化，“测试连接”只验证当前表单草稿，两者具有独立忙碌和结果状态；配置原子写入 Electron `userData/settings.json`，按 provider 保存；旧字段在读取时迁移，未来 schema 不被旧版本自动降级覆盖。API Key 当前为明文，属于发布前安全权衡。 |
+| FR-E09 | 用户应能编辑训练目标、自定义规则、风格参考和额外口癖词。 | versioned 内容原子写入 `userData/custom-prompt.json`；实时/报告 prompt 读取，额外口癖词也作为最多 64 个有界 filler 参与本地统计；存在未保存修改时离开编辑器需确认。 |
+| FR-E10 | 用户应能复制或保存原文与报告。 | 原文可复制/保存为 Markdown；报告可复制/保存为 Markdown；保存路径通过系统对话框选择；取消或失败时给出可见反馈。 |
 | FR-E11 | 当前 Paraformer 应通过轻量 ASR Provider 边界访问。 | Main 只依赖 initialize/start/feed/stop/cancel/dispose 契约；Fake Provider 可在不加载真实 Paraformer/Sherpa 模块时验证业务与 Electron smoke 路径。 |
-| FR-E12 | 默认中文模型选择应由项目数据 benchmark 和明确产品取舍支持。 | 三候选比较结果可复跑；ADR-0005 记录继续使用 Paraformer 的 streaming UX 与渐进迁移理由。 |
+| FR-E12 | 默认中文模型选择应由项目数据 benchmark 和明确产品取舍支持。 | 七候选比较结果可复跑；ADR-0009 记录采用 Zipformer Large 技术默认、保留 streaming UX 与按批次产品化的理由。 |
+| FR-E13 | 用户应能在应用内查看帮助并记录内部测试反馈。 | 主页面“帮助”弹窗提供快速使用说明和统一的“问题和建议”在线文档入口；诊断信息沿用脱敏 JSON 导出并由用户按需补充到在线文档。 |
+| FR-E14 | 用户配置或操作无法完成时应获得可恢复的具体提示。 | 设置页显示校验或连接失败原因；实时反馈和报告的配置错误可直接打开设置；空粘贴、重复请求和内容覆盖有明确保护。 |
 | FR-P01 | 音频采集与 ASR 推理应成为独立职责。 | AudioCapture 独立持有权限、track/context/worklet 与 chunk 元数据；Renderer 只编排训练/session，Provider 隔离 Sherpa 配置。 |
 | FR-P02 | 音频链路应使用 16 kHz AudioContext、Electron/Chromium graph 采样率适配与 AudioWorklet collector。 | 已记录请求/context/track rate，固定 Electron OfflineAudioContext/AudioBufferSource fixture 覆盖 16/44.1/48 kHz 确定性缓冲；worklet 下混并汇集 320 帧 mono Float32 chunk，正常停止 flush 非空 tail，ScriptProcessor 已移除。真实 MediaStream 麦克风仍为非阻塞 follow-up。 |
 | FR-P03 | ASR Provider 应提供 session 和规范事件语义。 | `startASR/feedAudio/stopASR/cancelASR` 使用 `sessionId` 和 sequence，返回 `ready/partial/final/error/stopped` 事件的安全 envelope；旧 session、迟到/倒序事件不污染当前训练，stop/cancel/dispose 可重复处理。 |
@@ -86,6 +88,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | NFR-10 | Partial | 可移植性 | 首个 Tier 1 目标选定 Windows 11 25H2+ x64；Windows ARM64、macOS、Linux 保持 Experimental，只有对应 package/smoke/native-model 证据才能升级支持等级。 |
 | NFR-11 | Existing | 可升级性 | 设置/自定义规则已有 schemaVersion、旧配置迁移、未来 schema 防降级覆盖与原子写；模型具备不可变版本目录、原子 active pointer 和上一版本回退。PKG-04 已验证 1.0.0→1.0.1 安装制品升级与卸载保留 userData；旧完整 Setup 仍可降级二进制，重装当前 Setup 可恢复。自动更新服务不属于首个基线。 |
 | NFR-12 | Existing | 可观测性 | 用户可主动导出 app/OS/arch、active 模型、请求/context/track sample rate、ASR 初始化耗时和受控错误类别；固定白名单不含设置、密钥、路径、stack、音频、逐字稿或 LLM 内容，且不后台持久化或上传。 |
+| NFR-13 | Existing | 桌面可用性 | 对话框提供 dialog 语义、Esc 关闭、焦点约束与焦点回归；键盘焦点可见，支持系统减少动态效果偏好；Electron smoke 覆盖关键交互。 |
 
 ## 6. 约束
 
@@ -93,8 +96,8 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 - 默认不引入 React、Vue、Vite、Webpack、TypeScript、Python、PyTorch、FunASR、FastAPI、Docker、数据库或插件框架。
 - 目标是降低总体维护和交付复杂度，而不是机械减少文件数、模块数或安装包体积。
 - ASR Provider 和 Model Manager 必须保持轻量；不建设通用框架、模型数据库或模型市场。
-- ADR-0005 已根据三候选 benchmark 接受保留 Paraformer 为默认；Zipformer 与 SenseVoiceSmall 的结果作为后续复审基线，不向普通用户暴露多模型选择。
-- 仅重开 Zipformer Large CTC INT8 与 FireRedASR2 CTC INT8 两个内部候选：前者保持 streaming，后者仅做 utterance spike；不进行通用模型扩张，Paraformer 仍为默认。
+- BM-04 已完成七候选比较；ADR-0009 采用 Zipformer Large 作为技术默认，并保留 streaming 交互。公开分发仍受模型许可与打包验收约束。
+- 七个 registry 候选均已具备 hash、native-load 与 benchmark 证据；候选验证不等于公开再分发获批，也不表示响应式主题设计已经实现。
 - 架构迁移采用渐进重构，不推倒重写，不以切换 Electron/Tauri/WASM 为默认路径。
 
 ## 7. 发布级验收场景
@@ -112,6 +115,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | AC-07 | 模型完整性 | 下载被中断或校验失败时不激活损坏模型，也不覆盖上一可用模型。 |
 | AC-08 | 升级保护 | PKG-04 已证明 1.0.0→1.0.1 升级及卸载后设置、自定义规则和外部模型目录仍在；旧完整 Setup 的二进制降级行为及当前版本恢复路径已有文档。 |
 | AC-09 | 模型选型 | benchmark 原始结果、环境和汇总可复跑；ADR 只依据实测数据形成 Accepted 结论。 |
+| AC-10 | 交互保护 | 重复异步提交被阻止；覆盖现有逐字稿、清空内容和离开未保存规则前均需确认；复制、保存、LLM 和模型错误均有可见反馈。 |
 
 ## 8. Out of Scope
 
@@ -119,7 +123,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 - 默认引入 Python/FunASR、GPU/CUDA 或云端 ASR 运行栈。
 - 引入 React/Vue、Vite、TypeScript 或复杂状态管理以“现代化”界面。
 - 用户账户、云同步、多人协作、数据库、模型市场和通用插件系统。
-- 把当前内部三候选结果外推为公开权威 benchmark、跨设备性能承诺或未测试模型的排名。
+- 把当前内部七候选结果外推为公开权威 benchmark、跨设备性能承诺或未测试模型的排名。
 - 首阶段建设自动更新服务、遥测平台或完整崩溃上报后端。
 - 把 SenseVoice 情绪/事件标签直接解释为表达质量评分。
 

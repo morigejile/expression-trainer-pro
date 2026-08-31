@@ -129,6 +129,11 @@
       opacity: 1;
     }
 
+    .connection-error.success {
+      color: #69db7c;
+      opacity: 1;
+    }
+
     .model-presets {
       font-size: 12px;
       color: #666;
@@ -139,6 +144,31 @@
       opacity: 0.6;
       pointer-events: none;
     }
+
+    .settings-actions {
+      display: flex;
+      gap: 10px;
+      margin-top: 24px;
+    }
+
+    .settings-actions .btn-save {
+      margin-top: 0;
+    }
+
+    .btn-test-connection {
+      width: 42%;
+      padding: 12px;
+      background: transparent;
+      color: #aaa;
+      border: 1px solid #555;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .btn-test-connection:hover { color: #fff; border-color: #4dabf7; }
+    .btn-test-connection.loading { opacity: 0.6; pointer-events: none; }
   </style>
 </head>
 <body>
@@ -189,7 +219,10 @@
       <div class="save-success" id="save-success">✓ 已保存</div>
       <div class="connection-error" id="connection-error"></div>
     </div>
-    <button class="btn-save" id="btn-save">保存设置</button>
+    <div class="settings-actions">
+      <button class="btn-test-connection" id="btn-test-connection">测试连接</button>
+      <button class="btn-save" id="btn-save">保存设置</button>
+    </div>
   </div>
 
   <script src="settings.js"></script>

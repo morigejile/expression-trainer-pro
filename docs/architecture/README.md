@@ -58,7 +58,7 @@ flowchart LR
 
 - **总体复杂度优先**：不为减少 Electron 体积而默认引入 Rust/C++/FFI 或第二套 UI 技术栈。
 - **必要边界，不造框架**：Provider 是小型契约，不是依赖注入容器；Model Manager 是清单 + 文件操作，不是模型平台。
-- **事实先于结论**：候选 benchmark 结果与产品默认决策分别记录；当前 ADR-0005 保留 Paraformer 默认。
+- **事实先于结论**：当前产品运行时仍使用 Paraformer；ADR-0009 已根据七候选 benchmark 选择 Zipformer Large 作为后续产品化的技术默认，两种状态必须明确区分。
 - **渐进迁移**：先包住现有行为，再替换内部实现；每一步都应保持可运行和可回退。
 - **用户零开发依赖**：开发者可使用 Node/npm/Forge，最终用户不安装 Node、Python 或编译工具链。
 - **当前即事实**：代码变化应同步更新 `current.md`；未来工作写入 Roadmap，重大方向变化用 Proposed ADR。
@@ -103,10 +103,11 @@ Preload 最小桥接 → Main（窗口/设置/生命周期/分析/LLM/ASR 控制
 | [0002](adr/0002-retain-sherpa-onnx.md) | Accepted | 保留 Sherpa-ONNX 作为默认 ASR 引擎 |
 | [0003](adr/0003-separate-audio-and-asr.md) | Accepted | 分离 Audio 与 ASR，使用轻量契约 |
 | [0004](adr/0004-manage-models-separately.md) | Accepted | 模型与应用解耦并校验安装 |
-| [0005](adr/0005-select-default-asr-model-by-benchmark.md) | Accepted | 保留 Paraformer 默认，候选结果作为后续优化基线 |
+| [0005](adr/0005-select-default-asr-model-by-benchmark.md) | Superseded | 三候选阶段保留 Paraformer 的历史决策，由 ADR-0009 取代 |
 | [0006](adr/0006-move-asr-out-of-main.md) | Accepted | 使用单个 Electron utility process 隔离 ASR |
 | [0007](adr/0007-package-with-electron-forge.md) | Accepted | 使用 Electron Forge 打包发布 |
 | [0008](adr/0008-keep-benchmark-as-isolated-non-shipping-tool.md) | Accepted | 核心 benchmark 同仓库隔离保留，一次性数据流程归档 |
+| [0009](adr/0009-productize-multiple-asr-models.md) | Accepted | Zipformer Large 作为后续产品化技术默认；当前 Paraformer 运行时尚未切换 |
 
 ## 9. 文档维护规则
 

@@ -5,7 +5,11 @@ const { normalizeCandidateConfig } = require('./candidate-config');
 const SHERPA_CANDIDATES = [
   'paraformer-bilingual-zh-en-control',
   'zipformer-small-ctc-zh-int8-2025-04-01',
-  'sensevoice-small-int8-2024-07-17'
+  'zipformer-large-ctc-zh-int8-2025-06-30',
+  'fire-red-asr2-ctc-zh-en-int8-2026-02-25',
+  'sensevoice-small-int8-2024-07-17',
+  'qwen3-asr-0-6b-int8-2026-03-25',
+  'sensevoice-small-int8-2025-09-09'
 ];
 const ADAPTER_FACTORIES = { fake: createFakeAdapter };
 for (const candidateId of SHERPA_CANDIDATES) {

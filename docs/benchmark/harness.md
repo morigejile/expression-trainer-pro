@@ -44,4 +44,4 @@ node benchmark/run.js `
 
 ## 当前边界
 
-截至 2026-08-27，BM-01 已冻结 `expression-zh-fleurs/v1` 的 100 条人工核查终稿；BM-02 已接入 Paraformer、small Zipformer 和 SenseVoiceSmall，并完成每候选一轮 100 条比较。结果和边界见 `docs/benchmark/bm02-comparison-2026-08-27.md`。这次比较不测生产 Audio/IPC/UI、真实时间流式体验或模型许可证可交付性，因此不能单独接受 ADR-0005 或修改生产默认模型。
+截至 2026-08-30，BM-01 已冻结 `expression-zh-fleurs/v1` 的 100 条人工核查终稿；harness 已接入 Paraformer、Zipformer Small、Zipformer Large、FireRedASR2 CTC、两个 SenseVoice 版本和 Qwen3-ASR，共七个候选。三候选基线、五候选复跑和七候选综合评估分别见 BM-02、BM-03 与 BM-04 结果文档。这些比较不测生产 Audio/IPC/UI、真实时间流式体验或模型许可证可交付性，因此默认决策还需 ADR 与产品链路验收。

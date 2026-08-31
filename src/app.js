@@ -35,6 +35,18 @@ const AudioFeedQueue = typeof module !== 'undefined' && module.exports
   ? require('./audio-feed-queue')
   : window.AudioFeedQueue;
 const { createAudioFeedQueue } = AudioFeedQueue;
+const SupportLinks = typeof module !== 'undefined' && module.exports
+  ? require('../shared/support-links')
+  : window.SupportLinks;
+const { FEEDBACK_DOCUMENT_URL } = SupportLinks;
+const CONFIG_ERROR_CODES = new Set([
+  'missing-api-key',
+  'missing-endpoint',
+  'missing-model',
+  'invalid-endpoint',
+  'invalid-provider',
+  'unauthorized'
+]);
 
 class ExpressionTrainer {
   constructor({ audioCaptureFactory = createAudioCapture } = {}) {
@@ -56,7 +68,12 @@ class ExpressionTrainer {
     this.stats = { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 0, duration: 0 };
     this.lastFeedbackText = '';
     this.lastReport = '';
+    this.reportRequestPending = false;
+    this.pasteAnalysisPending = false;
+    this.pasteAnalysisGeneration = 0;
     this.llmGeneration = 0;
+    this.activeModal = null;
+    this.modalOpener = null;
     this.asrEventState = createAsrEventState();
     this.asrStartAttempt = null;
     this.asrGeneration = 0;
@@ -67,12 +84,15 @@ class ExpressionTrainer {
 
   initElements() {
     this.btnStart = document.getElementById('btn-start');
+    this.btnStartLabel = this.btnStart.querySelector('.btn-label');
     this.btnPaste = document.getElementById('btn-paste');
     this.btnPause = document.getElementById('btn-pause');
     this.btnResume = document.getElementById('btn-resume');
     this.btnStop = document.getElementById('btn-stop');
+    this.btnStopLabel = this.btnStop.querySelector('.btn-label');
     this.btnReport = document.getElementById('btn-report');
     this.btnSettings = document.getElementById('btn-settings');
+    this.btnHelp = document.getElementById('btn-help');
     this.btnDiagnostics = document.getElementById('btn-diagnostics');
     this.btnCloseReport = document.getElementById('btn-close-report');
     this.btnClosePaste = document.getElementById('btn-close-paste');
@@ -89,6 +109,16 @@ class ExpressionTrainer {
     this.feedbackContent = document.getElementById('feedback-content');
     this.reportModal = document.getElementById('report-modal');
     this.reportBody = document.getElementById('report-body');
+    this.userMessage = document.getElementById('user-message');
+    this.userMessageText = document.getElementById('user-message-text');
+    this.userMessageAction = document.getElementById('user-message-action');
+    this.trainingStatus = document.getElementById('training-status');
+    this.feedbackStatus = document.getElementById('feedback-status');
+    this.helpModal = document.getElementById('help-modal');
+    this.btnCloseHelp = document.getElementById('btn-close-help');
+    this.btnHelpDiagnostics = document.getElementById('btn-help-diagnostics');
+    this.btnOpenFeedbackDocument = document.getElementById('btn-open-feedback-document');
+    this.feedbackLinkError = document.getElementById('feedback-link-error');
     this.statFillers = document.getElementById('stat-fillers');
     this.statHedges = document.getElementById('stat-hedges');
     this.statVague = document.getElementById('stat-vague');
@@ -103,38 +133,77 @@ class ExpressionTrainer {
     this.btnStop.addEventListener('click', () => this.stopRecording());
     this.btnReport.addEventListener('click', () => this.generateReport());
     this.btnSettings.addEventListener('click', () => window.api.openSettings());
+    this.userMessageAction.addEventListener('click', () => window.api.openSettings());
+    this.btnHelp.addEventListener('click', () => this.openHelpModal());
     this.btnDiagnostics.addEventListener('click', () => this.exportDiagnostics());
+    this.btnCloseHelp.addEventListener('click', () => this.closeModal(this.helpModal));
+    this.btnHelpDiagnostics.addEventListener('click', () => this.exportDiagnostics(this.btnHelpDiagnostics));
+    this.btnOpenFeedbackDocument.addEventListener('click', () => this.openFeedbackDocument());
     document.getElementById('btn-prompt-editor').addEventListener('click', () => window.api.openPromptEditor());
-    this.btnCloseReport.addEventListener('click', () => this.reportModal.classList.add('hidden'));
+    this.btnCloseReport.addEventListener('click', () => this.closeModal(this.reportModal));
     this.btnCopyReport.addEventListener('click', () => {
       const reportText = this.reportBody.innerText;
       navigator.clipboard.writeText(reportText).then(() => {
         this.btnCopyReport.textContent = '✅ 已复制';
         setTimeout(() => { this.btnCopyReport.textContent = '📋 复制全文'; }, 2000);
-      });
+      }).catch(() => this.showUserMessage('复制报告失败，请重试'));
     });
-    this.btnClosePaste.addEventListener('click', () => this.pasteModal.classList.add('hidden'));
+    this.btnClosePaste.addEventListener('click', () => this.closeModal(this.pasteModal));
     this.btnAnalyzePaste.addEventListener('click', () => this.analyzePastedText());
     this.btnCopyText.addEventListener('click', () => this.copyOriginalText());
     this.btnSaveText.addEventListener('click', () => this.saveOriginalText());
     this.btnClear.addEventListener('click', () => this.clearAll());
+    document.addEventListener('keydown', event => this.handleModalKeydown(event));
   }
 
-  async exportDiagnostics() {
-    const original = this.btnDiagnostics.textContent;
+  async exportDiagnostics(triggerButton = this.btnDiagnostics) {
+    const original = triggerButton.textContent;
     try {
       const result = await window.api.exportDiagnostics(this.lastAudioCaptureRates);
       if (!result?.success) return;
-      this.btnDiagnostics.textContent = '✓';
-      setTimeout(() => { this.btnDiagnostics.textContent = original; }, 2000);
+      triggerButton.textContent = '✓ 已导出';
+      setTimeout(() => { triggerButton.textContent = original; }, 2000);
     } catch (error) {
       alert(`导出诊断失败: ${error.message}`);
+    }
+  }
+
+  openHelpModal() {
+    this.feedbackLinkError.textContent = '';
+    this.openModal(this.helpModal, this.btnCloseHelp);
+  }
+
+  async openFeedbackDocument() {
+    this.feedbackLinkError.textContent = '';
+    try {
+      const result = await window.api.openSupportLink(FEEDBACK_DOCUMENT_URL);
+      if (!result?.success) {
+        this.feedbackLinkError.textContent = result?.error || '无法打开问题和建议文档';
+      }
+    } catch (error) {
+      this.feedbackLinkError.textContent = error.message;
     }
   }
 
   // ===== 录制控制 =====
 
   async startRecording() {
+    if (this.asrStartAttempt) {
+      this.showUserMessage('录制正在启动，请稍候');
+      return;
+    }
+    if (this.pasteAnalysisPending) {
+      this.showUserMessage('逐字稿正在分析，请稍候');
+      return;
+    }
+    if (!this.isRecording
+        && this.fullText.trim()
+        && !window.confirm('开始新录制将替换当前内容，是否继续？')) {
+      return;
+    }
+    this.trainingStatus.textContent = '正在准备语音识别，首次运行可能需要数分钟';
+    this.btnStart.disabled = true;
+    this.btnPaste.disabled = true;
     const startAttempt = {};
     this.asrStartAttempt = startAttempt;
     this.asrGeneration = (this.asrGeneration ?? 0) + 1;
@@ -146,8 +215,20 @@ class ExpressionTrainer {
       this.cancelActiveAsrSession(replacedSessionId, () => false);
     }
     this.advanceLLMGeneration();
-    await window.api.cancelLLMRequests();
-    if (this.asrStartAttempt !== startAttempt) return;
+    try {
+      await window.api.cancelLLMRequests();
+    } catch {
+      if (this.asrStartAttempt === startAttempt) {
+        this.asrStartAttempt = null;
+        this.showError('录制启动失败: 无法准备大模型请求');
+        this.finishTrainingPreparation();
+      }
+      return;
+    }
+    if (this.asrStartAttempt !== startAttempt) {
+      if (!this.asrStartAttempt) this.finishTrainingPreparation();
+      return;
+    }
 
     const sessionId = globalThis.crypto.randomUUID();
     this.asrEventState = beginAsrSession(this.asrEventState, sessionId);
@@ -162,6 +243,7 @@ class ExpressionTrainer {
         this.asrEventState = invalidateAsrSession(this.asrEventState);
         this.showError(`语音识别启动失败: ${error.message}`);
         this.asrStartAttempt = null;
+        this.finishTrainingPreparation();
       }
       return;
     }
@@ -177,6 +259,7 @@ class ExpressionTrainer {
       }
       if (this.asrStartAttempt === startAttempt) {
         this.asrStartAttempt = null;
+        this.finishTrainingPreparation();
       } else if (startResponse?.ok) {
         await this.cancelActiveAsrSession(sessionId, () => false);
       }
@@ -222,6 +305,7 @@ class ExpressionTrainer {
       if (failureOwned && this.asrStartAttempt === startAttempt) {
         this.showError(`麦克风访问失败: ${err.message}`);
         this.asrStartAttempt = null;
+        this.finishTrainingPreparation();
       }
       return;
     }
@@ -248,9 +332,12 @@ class ExpressionTrainer {
     this.btnClear.classList.add('hidden');
     this.btnResume.classList.add('hidden');
     this.timer.classList.add('active');
+    this.trainingStatus.textContent = '正在录音';
+    this.btnPaste.disabled = true;
 
     this.timerInterval = setInterval(() => this.updateTimer(), 1000);
     this.audioCapture.setEnabled(true);
+    this.btnStart.disabled = false;
   }
 
   pauseRecording() {
@@ -261,6 +348,7 @@ class ExpressionTrainer {
     this.btnPause.classList.add('hidden');
     this.btnResume.classList.remove('hidden');
     this.timer.classList.remove('active');
+    this.trainingStatus.textContent = '录音已暂停';
   }
 
   resumeRecording() {
@@ -272,6 +360,7 @@ class ExpressionTrainer {
     this.btnResume.classList.add('hidden');
     this.btnPause.classList.remove('hidden');
     this.timer.classList.add('active');
+    this.trainingStatus.textContent = '正在录音';
   }
 
   teardownRecordingCapture() {
@@ -289,6 +378,8 @@ class ExpressionTrainer {
     this.btnPause.classList.add('hidden');
     this.btnResume.classList.add('hidden');
     this.btnStart.classList.remove('hidden');
+    this.btnStart.disabled = false;
+    this.btnPaste.disabled = false;
     this.btnReport.classList.add('hidden');
     this.btnCopyText.classList.add('hidden');
     this.btnSaveText.classList.add('hidden');
@@ -372,6 +463,10 @@ class ExpressionTrainer {
       feedTracker: this.audioFeedTracker,
       promise: null
     };
+    this.trainingStatus.textContent = '正在结束并整理尾部文字…';
+    this.btnStop.disabled = true;
+    this.btnPause.disabled = true;
+    this.btnResume.disabled = true;
     this.recordingStopOperation = operation;
     operation.promise = this.completeRecordingStop(operation);
     return operation.promise;
@@ -396,6 +491,12 @@ class ExpressionTrainer {
       if (this.recordingStopOperation === operation) {
         this.recordingStopOperation = null;
       }
+      this.trainingStatus.textContent = '本次训练已结束';
+      this.btnStop.disabled = false;
+      this.btnPause.disabled = false;
+      this.btnResume.disabled = false;
+      this.btnStart.disabled = false;
+      this.btnPaste.disabled = false;
     }
   }
 
@@ -611,13 +712,25 @@ class ExpressionTrainer {
   async requestRealtimeFeedback() {
     const generation = this.llmGeneration;
     this.lastFeedbackText = this.fullText;
-    const result = await window.api.getRealtimeFeedback(this.fullText);
+    this.feedbackStatus.textContent = '本地分析正常，AI 建议生成中…';
+    let result;
+    try {
+      result = await window.api.getRealtimeFeedback(this.fullText);
+    } catch {
+      result = { success: false, error: '实时反馈请求失败，请重试', errorCode: 'generic' };
+    }
     if (generation !== this.llmGeneration) return;
     if (result.success && result.feedback) {
+      this.feedbackStatus.textContent = '本地分析正常，AI 建议已更新';
       const lines = result.feedback.split('\n').filter(l => l.trim());
       lines.forEach(line => {
         const type = this.classifyFeedback(line.trim());
         this.addFeedbackItem(line.trim(), type);
+      });
+    } else if (result.errorCode !== 'cancelled') {
+      this.feedbackStatus.textContent = '本地分析正常，AI 建议暂不可用';
+      this.showUserMessage(`实时反馈失败：${result.error || '未知错误'}`, {
+        openSettings: CONFIG_ERROR_CODES.has(result.errorCode)
       });
     }
   }
@@ -637,21 +750,36 @@ class ExpressionTrainer {
 
   addFeedbackItem(text, type = 'ai') {
     // 去重：如果前3条已经有相同内容，跳过
-    const existing = Array.from(this.feedbackContent.children).slice(0, 3);
+    const existing = Array.from(this.feedbackContent.children).slice(-3);
     if (existing.some(el => el.textContent === text)) return;
 
     const item = document.createElement('div');
     item.className = `feedback-item type-${type}`;
     item.textContent = text;
-    this.feedbackContent.insertBefore(item, this.feedbackContent.firstChild);
+    this.feedbackContent.appendChild(item);
     while (this.feedbackContent.children.length > 12) {
-      this.feedbackContent.removeChild(this.feedbackContent.lastChild);
+      this.feedbackContent.removeChild(this.feedbackContent.firstChild);
     }
+    this.feedbackContent.scrollTop = this.feedbackContent.scrollHeight;
   }
 
   // ===== 报告 =====
 
   async generateReport() {
+    if (this.pasteAnalysisPending) {
+      this.showUserMessage('逐字稿统计尚未完成，请稍候');
+      return;
+    }
+    if (this.reportRequestPending) {
+      this.showUserMessage('报告正在生成，请稍候');
+      return;
+    }
+    if (!this.fullText.trim()) {
+      this.showUserMessage('暂无可生成报告的训练内容');
+      return;
+    }
+    this.reportRequestPending = true;
+    this.btnReport.disabled = true;
     const generation = this.llmGeneration;
     const loading = document.createElement('p');
     loading.style.textAlign = 'center';
@@ -659,22 +787,40 @@ class ExpressionTrainer {
     loading.style.padding = '40px';
     loading.textContent = '正在生成报告...';
     this.reportBody.replaceChildren(loading);
-    this.reportModal.classList.remove('hidden');
+    this.openModal(this.reportModal, this.btnCloseReport);
 
-    const result = await window.api.getFinalReport({
-      fullText: this.fullText,
-      stats: this.stats
-    });
+    try {
+      let result;
+      try {
+        result = await window.api.getFinalReport({
+          fullText: this.fullText,
+          stats: this.stats
+        });
+      } catch {
+        result = { success: false, error: '报告请求失败，请重试', errorCode: 'generic' };
+      }
 
-    if (generation !== this.llmGeneration) return;
-    if (result.success) {
-      this.lastReport = result.report;
-      this.renderReport(result.report);
-    } else {
-      const error = document.createElement('p');
-      error.style.color = '#ff6b6b';
-      error.textContent = `生成失败: ${result.error}`;
-      this.reportBody.replaceChildren(error);
+      if (generation !== this.llmGeneration) return;
+      if (result.success) {
+        this.lastReport = result.report;
+        this.renderReport(result.report);
+      } else if (result.errorCode !== 'cancelled') {
+        const message = `生成报告失败：${result.error || '未知错误'}`;
+        const error = document.createElement('p');
+        error.style.color = '#ff6b6b';
+        error.textContent = message;
+        const retryButton = document.createElement('button');
+        retryButton.className = 'btn-report-retry';
+        retryButton.textContent = '重试生成';
+        retryButton.addEventListener('click', () => this.generateReport());
+        this.reportBody.replaceChildren(error, retryButton);
+        this.showUserMessage(message, {
+          openSettings: CONFIG_ERROR_CODES.has(result.errorCode)
+        });
+      }
+    } finally {
+      this.reportRequestPending = false;
+      this.btnReport.disabled = this.pasteAnalysisPending;
     }
   }
 
@@ -717,9 +863,11 @@ class ExpressionTrainer {
         btn.textContent = '✓ 已保存';
         btn.style.background = '#333';
         setTimeout(() => { btn.textContent = '💾 保存为 Markdown'; btn.style.background = '#E5007E'; }, 2000);
+      } else {
+        this.showUserMessage(`未保存报告：${result.error || '保存操作未完成'}`);
       }
     } catch (e) {
-      alert('保存失败: ' + e.message);
+      this.showUserMessage(`保存报告失败：${e.message || '请重试'}`);
     }
   }
 
@@ -738,6 +886,7 @@ class ExpressionTrainer {
     this.stats = { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 0, duration: 0 };
     this.updateStatsDisplay();
     this.feedbackContent.replaceChildren();
+    this.feedbackStatus.textContent = '本地分析可用；AI 建议约每新增 30 字生成';
   }
 
   advanceLLMGeneration() {
@@ -753,14 +902,75 @@ class ExpressionTrainer {
     this.subtitleContainer.appendChild(line);
   }
 
+  showUserMessage(message, { openSettings = false } = {}) {
+    this.userMessageText.textContent = message;
+    this.userMessageAction.classList.toggle('hidden', !openSettings);
+    this.userMessage.classList.remove('hidden');
+  }
+
+  setPasteAnalysisPending(pending) {
+    this.pasteAnalysisPending = pending;
+    this.btnAnalyzePaste.disabled = pending;
+    this.btnAnalyzePaste.textContent = pending ? '分析中...' : '开始分析';
+    this.btnReport.disabled = pending || this.reportRequestPending;
+  }
+
+  openModal(modal, initialFocus) {
+    this.modalOpener = document.activeElement;
+    this.activeModal = modal;
+    modal.classList.remove('hidden');
+    initialFocus?.focus();
+  }
+
+  closeModal(modal) {
+    modal.classList.add('hidden');
+    if (this.activeModal === modal) this.activeModal = null;
+    const opener = this.modalOpener;
+    this.modalOpener = null;
+    opener?.focus();
+  }
+
+  handleModalKeydown(event) {
+    const modal = this.activeModal;
+    if (!modal || modal.classList.contains('hidden')) return;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      this.closeModal(modal);
+      return;
+    }
+    if (event.key !== 'Tab') return;
+    const focusable = Array.from(modal.querySelectorAll(
+      'button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])'
+    ));
+    if (focusable.length === 0) return;
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+      event.preventDefault();
+      last.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  finishTrainingPreparation() {
+    this.trainingStatus.textContent = '准备就绪';
+    this.btnStart.disabled = false;
+    this.btnPaste.disabled = false;
+  }
+
   // ===== 复制 & 保存原文 & 清空 =====
 
-  copyOriginalText() {
+  async copyOriginalText() {
     if (!this.fullText.trim()) return;
-    navigator.clipboard.writeText(this.fullText).then(() => {
+    try {
+      await navigator.clipboard.writeText(this.fullText);
       this.btnCopyText.textContent = '✓ 已复制';
       setTimeout(() => { this.btnCopyText.textContent = '📋 复制'; }, 1500);
-    });
+    } catch {
+      this.showUserMessage('复制失败，请重试');
+    }
   }
 
   async saveOriginalText() {
@@ -776,15 +986,22 @@ class ExpressionTrainer {
       if (result.success) {
         this.btnSaveText.textContent = '✓ 已保存';
         setTimeout(() => { this.btnSaveText.textContent = '💾 保存'; }, 2000);
+      } else {
+        this.showUserMessage(`未保存原文：${result.error || '保存操作未完成'}`);
       }
     } catch (e) {
-      alert('保存失败: ' + e.message);
+      this.showUserMessage(`保存原文失败：${e.message || '请重试'}`);
     }
   }
 
   clearAll() {
     const sessionId = this.asrEventState.activeSessionId;
+    const isIdleContent = !this.isRecording && !this.asrStartAttempt && !sessionId && this.fullText.trim();
+    if (isIdleContent && !window.confirm('清空后当前内容将无法恢复，是否继续？')) return false;
+    this.pasteAnalysisGeneration = (this.pasteAnalysisGeneration ?? 0) + 1;
+    this.setPasteAnalysisPending(false);
     this.asrStartAttempt = null;
+    this.finishTrainingPreparation();
     this.asrGeneration = (this.asrGeneration ?? 0) + 1;
     this.audioFeedTracker?.queue.cancel();
     this.audioFeedTracker = null;
@@ -816,63 +1033,105 @@ class ExpressionTrainer {
     this.btnCopyText.classList.add('hidden');
     this.btnSaveText.classList.add('hidden');
     this.btnClear.classList.add('hidden');
+    this.reportModal.classList.add('hidden');
+    this.btnReport.disabled = false;
+    return true;
   }
 
   // ===== 粘贴逐字稿分析 =====
 
   openPasteModal() {
-    this.pasteTextarea.value = '';
-    this.pasteModal.classList.remove('hidden');
-    this.pasteTextarea.focus();
+    if (this.pasteAnalysisPending) {
+      this.showUserMessage('逐字稿正在分析，请稍候');
+      return;
+    }
+    if (this.isRecording || this.asrStartAttempt) {
+      this.showUserMessage('请先结束当前录制，再导入逐字稿');
+      return;
+    }
+    this.openModal(this.pasteModal, this.pasteTextarea);
   }
 
   async analyzePastedText() {
+    if (this.pasteAnalysisPending) {
+      this.showUserMessage('逐字稿正在分析，请稍候');
+      return;
+    }
     const text = this.pasteTextarea.value.trim();
-    if (!text) return;
-
-    this.advanceLLMGeneration();
-    await window.api.cancelLLMRequests();
-
-    // 关闭粘贴弹窗
-    this.pasteModal.classList.add('hidden');
-
-    // 把文本显示到字幕区（高亮标记）
-    this.subtitleContainer.replaceChildren();
-    this.fullText = text;
-    this.lastFeedbackText = '';
-    this.resetStats();
-
-    // 按句号/问号/感叹号/换行分句
-    const sentences = text.split(/(?<=[。！？\n])/g).filter(s => s.trim());
-    this.sentences = sentences;
-
-    for (const sentence of sentences) {
-      const line = document.createElement('div');
-      line.className = 'subtitle-line';
-      renderHighlightedText(line, sentence.trim());
-      this.subtitleContainer.appendChild(line);
-
-      // 词库分析
-      const analysis = await window.api.analyzeText(sentence);
-      if (analysis) {
-        this.stats.fillers += analysis.fillers.length;
-        this.stats.hedges += analysis.hedges.length;
-        this.stats.vagueWords += analysis.vagueWords.length;
-        this.stats.totalWords += analysis.totalWords;
-      }
+    if (!text) {
+      this.showUserMessage('请先粘贴需要分析的逐字稿');
+      return;
+    }
+    if (this.isRecording || this.asrStartAttempt) {
+      this.showUserMessage('请先结束当前录制，再导入逐字稿');
+      return;
+    }
+    if (this.fullText.trim()
+        && text !== this.fullText.trim()
+        && !window.confirm('分析新逐字稿将替换当前内容，是否继续？')) {
+      return;
     }
 
-    this.stats.duration = 0; // 粘贴模式没有时长
-    this.updateStatsDisplay();
+    const generation = (this.pasteAnalysisGeneration ?? 0) + 1;
+    this.pasteAnalysisGeneration = generation;
+    this.setPasteAnalysisPending(true);
+    const ownsAnalysis = () => this.pasteAnalysisGeneration === generation;
 
-    // 显示操作按钮
-    this.btnReport.classList.remove('hidden');
-    this.btnCopyText.classList.remove('hidden');
-    this.btnSaveText.classList.remove('hidden');
-    this.btnClear.classList.remove('hidden');
+    try {
+      this.advanceLLMGeneration();
+      try {
+        await window.api.cancelLLMRequests();
+      } catch {
+        if (ownsAnalysis()) this.showUserMessage('无法开始逐字稿分析，请重试');
+        return;
+      }
+      if (!ownsAnalysis()) return;
 
-    // 请求AI语境化反馈
-    this.requestRealtimeFeedback();
+      // 关闭粘贴弹窗
+      this.closeModal(this.pasteModal);
+      this.pasteTextarea.value = '';
+
+      // 把文本显示到字幕区（高亮标记）
+      this.subtitleContainer.replaceChildren();
+      this.fullText = text;
+      this.lastFeedbackText = '';
+      this.resetStats();
+
+      // 按句号/问号/感叹号/换行分句
+      const sentences = text.split(/(?<=[。！？\n])/g).filter(s => s.trim());
+      this.sentences = sentences;
+
+      for (const sentence of sentences) {
+        const line = document.createElement('div');
+        line.className = 'subtitle-line';
+        renderHighlightedText(line, sentence.trim());
+        this.subtitleContainer.appendChild(line);
+
+        // 词库分析
+        const analysis = await window.api.analyzeText(sentence);
+        if (!ownsAnalysis()) return;
+        if (analysis) {
+          this.stats.fillers += analysis.fillers.length;
+          this.stats.hedges += analysis.hedges.length;
+          this.stats.vagueWords += analysis.vagueWords.length;
+          this.stats.totalWords += analysis.totalWords;
+        }
+      }
+
+      this.stats.duration = 0; // 粘贴模式没有时长
+      this.updateStatsDisplay();
+
+      // 显示操作按钮
+      this.btnReport.classList.remove('hidden');
+      this.btnCopyText.classList.remove('hidden');
+      this.btnSaveText.classList.remove('hidden');
+      this.btnClear.classList.remove('hidden');
+
+      // 请求AI语境化反馈
+      this.requestRealtimeFeedback();
+    } finally {
+      if (ownsAnalysis()) this.setPasteAnalysisPending(false);
+    }
   }
 }
 

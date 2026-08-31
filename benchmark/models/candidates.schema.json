@@ -44,7 +44,7 @@
       "required": ["id", "displayName", "family", "mode", "status", "sourceUrl", "upstreamVersion", "license", "evidence", "sampleRateHz", "numThreads", "provider", "files"],
       "properties": {
         "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]*$" }, "displayName": { "type": "string", "minLength": 1 },
-        "family": { "enum": ["paraformer", "zipformer-ctc", "sensevoice"] }, "mode": { "enum": ["streaming", "utterance"] }, "status": { "enum": ["verified", "pending"] },
+        "family": { "enum": ["paraformer", "zipformer-ctc", "sensevoice", "fire-red-asr-ctc", "qwen3-asr"] }, "mode": { "enum": ["streaming", "utterance"] }, "status": { "enum": ["verified", "pending"] },
         "sourceUrl": { "$ref": "#/$defs/httpsUrl" }, "upstreamVersion": { "type": "string", "minLength": 1 }, "license": { "$ref": "#/$defs/license" }, "evidence": { "$ref": "#/$defs/evidence" },
         "sampleRateHz": { "$ref": "#/$defs/safePositiveInteger" }, "numThreads": { "$ref": "#/$defs/safePositiveInteger" }, "provider": { "const": "cpu" },
         "files": { "type": "array", "items": { "$ref": "#/$defs/file" } },
@@ -52,7 +52,7 @@
       },
       "allOf": [
         { "if": { "properties": { "family": { "enum": ["paraformer", "zipformer-ctc"] } } }, "then": { "properties": { "mode": { "const": "streaming" } } } },
-        { "if": { "properties": { "family": { "const": "sensevoice" } } }, "then": { "properties": { "mode": { "const": "utterance" } } } },
+        { "if": { "properties": { "family": { "enum": ["sensevoice", "fire-red-asr-ctc", "qwen3-asr"] } } }, "then": { "properties": { "mode": { "const": "utterance" } } } },
         { "if": { "properties": { "status": { "const": "verified" } } }, "then": { "properties": { "files": { "minItems": 1 }, "evidence": { "properties": { "files": { "properties": { "status": { "const": "verified" } } }, "nativeLoad": { "properties": { "status": { "const": "passed" } } } } } }, "not": { "required": ["pending"] } } },
         { "if": { "properties": { "status": { "const": "pending" } } }, "then": { "required": ["pending"], "properties": { "files": { "maxItems": 0 }, "evidence": { "properties": { "files": { "properties": { "status": { "const": "pending" } } }, "nativeLoad": { "properties": { "status": { "const": "pending" } } } } } } } }
       ]

@@ -1,5 +1,7 @@
 'use strict';
 
+const path = require('node:path');
+
 const {loadCandidateRegistry} = require('../lib/candidate-registry');
 const {redactModelPath, resolveModelPath} = require('../lib/model-root');
 
@@ -23,11 +25,35 @@ function buildSenseVoiceConfig(candidate, modelRoot) {
 function buildFireRedAsrCtcConfig(candidate, modelRoot) {
   return {recognizerKind: 'offline', featConfig: {sampleRate: candidate.sampleRateHz, featureDim: 80}, modelConfig: {...baseModelConfig(candidate, modelRoot), fireRedAsrCtc: {model: filePath(modelRoot, candidate, 'model')}}};
 }
+function buildQwen3AsrConfig(candidate, modelRoot) {
+  return {
+    recognizerKind: 'offline',
+    featConfig: {sampleRate: candidate.sampleRateHz, featureDim: 80},
+    modelConfig: {
+      tokens: '',
+      numThreads: candidate.numThreads,
+      provider: candidate.provider,
+      debug: false,
+      qwen3Asr: {
+        convFrontend: filePath(modelRoot, candidate, 'conv-frontend'),
+        encoder: filePath(modelRoot, candidate, 'encoder'),
+        decoder: filePath(modelRoot, candidate, 'decoder'),
+        tokenizer: path.dirname(filePath(modelRoot, candidate, 'tokenizer-config')),
+        maxTotalLen: 512,
+        maxNewTokens: 128,
+        temperature: 0.000001,
+        topP: 0.8,
+        seed: 42
+      }
+    }
+  };
+}
 function buildSherpaConfig(candidate, modelRoot) {
   if (candidate.family === 'paraformer' && candidate.mode === 'streaming') return buildParaformerConfig(candidate, modelRoot);
   if (candidate.family === 'zipformer-ctc' && candidate.mode === 'streaming') return buildZipformerCtcConfig(candidate, modelRoot);
   if (candidate.family === 'sensevoice' && candidate.mode === 'utterance') return buildSenseVoiceConfig(candidate, modelRoot);
   if (candidate.family === 'fire-red-asr-ctc' && candidate.mode === 'utterance') return buildFireRedAsrCtcConfig(candidate, modelRoot);
+  if (candidate.family === 'qwen3-asr' && candidate.mode === 'utterance') return buildQwen3AsrConfig(candidate, modelRoot);
   throw new Error(`Unsupported candidate family/mode: ${candidate.family}/${candidate.mode}`);
 }
 

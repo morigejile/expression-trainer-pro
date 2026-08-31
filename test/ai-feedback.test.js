@@ -262,7 +262,8 @@ test('connection cancellation suppresses a late success from a fetch that ignore
 
   assert.deepEqual(await pending, {
     success: false,
-    error: '大模型请求已取消'
+    error: '大模型请求已取消',
+    errorCode: 'cancelled'
   });
 });
 
@@ -291,7 +292,8 @@ test('connection testing uses the same response validation', async () => {
 
   assert.deepEqual(result, {
     success: false,
-    error: '大模型响应结构无效'
+    error: '大模型响应结构无效',
+    errorCode: 'invalid-response'
   });
 });
 
@@ -309,7 +311,8 @@ test('connection testing generalizes an unknown provider without fetching', asyn
 
   assert.deepEqual(result, {
     success: false,
-    error: '大模型请求失败，请稍后重试'
+    error: '大模型配置不受支持',
+    errorCode: 'invalid-provider'
   });
   assert.equal(called, false);
 });
@@ -365,7 +368,8 @@ test('coordinated request returns a safe cancellation result', async () => {
 
   assert.deepEqual(await pending, {
     success: false,
-    error: '大模型请求已取消'
+    error: '大模型请求已取消',
+    errorCode: 'cancelled'
   });
 });
 
@@ -387,7 +391,8 @@ test('coordinated request suppresses a late result after session cancellation', 
 
   assert.deepEqual(await pending, {
     success: false,
-    error: '大模型请求已取消'
+    error: '大模型请求已取消',
+    errorCode: 'cancelled'
   });
 });
 
@@ -406,8 +411,73 @@ test('coordinated request generalizes unexpected failures', async () => {
 
   assert.deepEqual(result, {
     success: false,
-    error: '大模型请求失败，请稍后重试'
+    error: '大模型请求失败，请稍后重试',
+    errorCode: 'generic'
   });
+});
+
+test('connection testing rejects a missing model before fetching', async () => {
+  let called = false;
+  const result = await testConnection(
+    {
+      provider: 'custom',
+      apiKey: 'test-key',
+      baseUrl: 'https://example.test/v1',
+      customModel: ''
+    },
+    { fetchImpl: async () => { called = true; } }
+  );
+
+  assert.deepEqual(result, {
+    success: false,
+    error: '请先配置模型名称',
+    errorCode: 'missing-model'
+  });
+  assert.equal(called, false);
+});
+
+test('connection testing rejects an invalid custom endpoint before fetching', async () => {
+  let called = false;
+  const result = await testConnection(
+    {
+      provider: 'custom',
+      apiKey: 'test-key',
+      baseUrl: 'not-a-url',
+      customModel: 'test-model'
+    },
+    { fetchImpl: async () => { called = true; } }
+  );
+
+  assert.deepEqual(result, {
+    success: false,
+    error: '大模型接口地址格式无效',
+    errorCode: 'invalid-endpoint'
+  });
+  assert.equal(called, false);
+});
+
+test('custom endpoint appends the chat path before query parameters', async () => {
+  let requestedEndpoint;
+  const result = await testConnection(
+    {
+      provider: 'custom',
+      apiKey: 'test-key',
+      baseUrl: 'https://example.test/openai?api-version=2026-08-31#local-fragment',
+      customModel: 'test-model'
+    },
+    {
+      fetchImpl: async (endpoint) => {
+        requestedEndpoint = endpoint;
+        return jsonResponse({ choices: [{ message: { content: 'OK' } }] });
+      }
+    }
+  );
+
+  assert.deepEqual(result, { success: true });
+  assert.equal(
+    requestedEndpoint,
+    'https://example.test/openai/chat/completions?api-version=2026-08-31'
+  );
 });
 
 test('report failures do not mutate local analysis input', async () => {

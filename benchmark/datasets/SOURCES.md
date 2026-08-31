@@ -19,7 +19,7 @@
 
 维护者随后逐条听音并明确确认最终 transcript，冻结为 `expression-zh-fleurs/v1`；正式 manifest SHA-256 为 `600bf66fe11273e0c34b5f8859f7a59efce6eddf607cf5fa13ad186cb0469593`。原始音频、转换音频、上游元数据、人工 transcript 和正式 manifest 均保存在 Git 外。
 
-FLEURS 是朗读语音。本数据集只支持当前三候选的内部比较，不证明自然表达、快速/慢速、轻口音、中英混合、数字专名或轻噪声的完整覆盖，也不应被描述为公开权威 benchmark。
+FLEURS 是朗读语音。本数据集只支持当前七候选的内部比较，不证明自然表达、快速/慢速、轻口音、中英混合、数字专名或轻噪声的完整覆盖，也不应被描述为公开权威 benchmark。
 
 ## 获取边界
 

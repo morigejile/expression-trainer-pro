@@ -1,6 +1,6 @@
 # ADR-0005: 通过 benchmark 选择默认中文 ASR 模型
 
-- Status: Accepted
+- Status: Superseded by ADR-0009
 - Date: 2026-08-19
 - Accepted: 2026-08-27
 

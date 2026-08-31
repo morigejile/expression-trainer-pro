@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, Menu, utilityProcess } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu, shell, utilityProcess } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -11,6 +11,7 @@ const {
 } = require('./lib/custom-prompt-config');
 const {formatSafeError} = require('./lib/safe-log');
 const {createDiagnosticSnapshot} = require('./lib/diagnostics');
+const {isAllowedSupportUrl} = require('./shared/support-links');
 const { loadLexicon, analyzeText } = require('./lib/lexicon');
 const {
   createDefaultSettings,
@@ -176,6 +177,8 @@ function createMainWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
+    minWidth: 960,
+    minHeight: 640,
     backgroundColor: '#000000',
     title: '宇宙无敌表达训练',
     titleBarStyle: 'hiddenInset',
@@ -217,6 +220,18 @@ function createPromptEditorWindow() {
   });
 
   promptEditorWindow.loadFile(path.join(__dirname, 'src', 'prompt-editor.html'));
+
+  promptEditorWindow.webContents.on('will-prevent-unload', event => {
+    const choice = dialog.showMessageBoxSync(promptEditorWindow, {
+      type: 'warning',
+      buttons: ['放弃修改并离开', '继续编辑'],
+      defaultId: 1,
+      cancelId: 1,
+      title: '未保存的训练规则',
+      message: '训练规则尚未保存，确定要离开吗？'
+    });
+    if (choice === 0) event.preventDefault();
+  });
 
   promptEditorWindow.on('closed', () => {
     promptEditorWindow = null;
@@ -471,6 +486,18 @@ ipcMain.handle('export-diagnostics', async (event, audioRates) => {
   if (result.canceled || !result.filePath) return {success: false};
   fs.writeFileSync(result.filePath, `${JSON.stringify(snapshot, null, 2)}\n`, 'utf8');
   return {success: true, path: result.filePath};
+});
+
+ipcMain.handle('open-support-link', async (event, rawUrl) => {
+  if (!isAllowedSupportUrl(rawUrl)) {
+    return {success: false, error: '不支持的反馈目标'};
+  }
+  try {
+    await shell.openExternal(rawUrl);
+    return {success: true};
+  } catch {
+    return {success: false, error: '无法打开问题和建议文档'};
+  }
 });
 
 // AI反馈（传入customPrompt）
