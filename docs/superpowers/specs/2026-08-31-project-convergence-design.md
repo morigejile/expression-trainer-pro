@@ -1,7 +1,7 @@
 # Expression Trainer 项目收敛设计
 
 - Date: 2026-08-31
-- Status: Direction approved; review feedback incorporated
+- Status: Historical / Implemented by `bb8abb7`
 - Scope: recent merged requirements, architecture, Roadmap, documentation, test responsibilities, and subsequent development order
 
 ## 1. 目标

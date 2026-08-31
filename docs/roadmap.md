@@ -2,7 +2,7 @@
 
 > 状态：Active execution baseline
 > 更新日期：2026-08-31
-> 当前进度：Phase 0-5 的内部基线、R-01～R-09、PKG-01～PKG-04、OPS-02/OPS-05 与七候选 benchmark 已完成；近期合并新增了响应式外观和多 ASR 模型产品化需求。当前主线是 CONV-01 文档收敛，随后独立完成 CONV-02 benchmark writer 竞态和 CONV-03 LLM provider 配置迁移，再开始 UI/ASR 产品轨道。
+> 当前进度：Phase 0-5 的内部基线、R-01～R-09、PKG-01～PKG-04、OPS-02/OPS-05、七候选 benchmark 与 CONV-01 文档收敛已完成。下一主线是独立完成 CONV-02 benchmark writer 竞态和 CONV-03 LLM provider 配置迁移，再开始 UI/ASR 产品轨道。
 > 当前模式：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞后续工作；只有它们使当前技术实验无法运行或结论失效时，才阻塞当前路径。
 
 ## 1. 目标与排序原则
@@ -72,7 +72,7 @@ flowchart LR
 
 | ID | P | 状态 | 任务 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
-| CONV-01 | P0 | In Progress | 收敛 requirements、current architecture、ADR/spec、Roadmap、开发与验证文档 | 当前 main 基线 | 当前事实、未来设计和历史证据各有唯一来源；文档类型不扩张；本轮文档经一致性检查 |
+| CONV-01 | P0 | Completed | 收敛 requirements、current architecture、ADR/spec、Roadmap、开发与验证文档 | 当前 main 基线 | `bb8abb7` 已使当前事实、未来设计和历史证据各有唯一来源；文档类型未扩张；13 个文档通过链接、代码块和差异检查 |
 | CONV-02 | P0 | Planned | 修复 benchmark result writer 并行失败后的 staging 清理竞态 | CONV-01 | 原始写入错误不再被 Windows `ENOTEMPTY` 覆盖；聚焦故障注入和规范 Node 24.20.0 全量测试通过 |
 | CONV-03 | P1 | Planned | 显式命名和迁移 LLM provider 配置 | CONV-01 | `settings.json` 单向迁移为 `llm-provider-settings.json`；模块、Preload API 和 IPC 命名明确；future schema 显式保存被拒绝；迁移失败有聚焦测试 |
 
