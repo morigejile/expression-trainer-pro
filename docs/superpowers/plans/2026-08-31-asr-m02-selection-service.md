@@ -50,12 +50,12 @@ refactor: start managed ASR from a catalog model
 
 ## Task 3: Implement the single-controller ASR model service
 
-- [ ] Add failing `test/asr-model-service.test.js` cases for missing-selection default startup, persisted selection restore, strict command-line override, stable-corruption fallback, transient initialization failure, active-session rejection, successful switch, failed-target rollback, double failure, and concurrent-switch rejection.
-- [ ] Create `lib/asr-model-service.js` as a lightweight provider-shaped coordinator with one current controller and normalized snapshots.
-- [ ] Dispose the old controller before creating the target; on switch failure create a fresh original controller, never reuse a disposed controller or keep two processes resident.
-- [ ] Persist only a successful user switch or successful stable-corruption recovery; command-line override and transient failure must not modify selection.
-- [ ] Run service, selection-store, process-controller, and ASR IPC tests.
-- [ ] Commit with an English subject and a Chinese body.
+- [x] Add failing `test/asr-model-service.test.js` cases for missing-selection default startup, persisted selection restore, strict command-line override, stable-corruption fallback, transient initialization failure, active-session rejection, successful switch, failed-target rollback, double failure, and concurrent-switch rejection.
+- [x] Create `lib/asr-model-service.js` as a lightweight provider-shaped coordinator with one current controller and normalized snapshots.
+- [x] Dispose the old controller before creating the target; on switch failure create a fresh original controller, never reuse a disposed controller or keep two processes resident.
+- [x] Persist only a successful user switch or successful stable-corruption recovery; command-line override and transient failure must not modify selection.
+- [x] Run service, selection-store, process-controller, and ASR IPC tests.
+- [x] Commit with an English subject and a Chinese body.
 
 Expected commit:
 

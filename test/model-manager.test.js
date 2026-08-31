@@ -192,7 +192,10 @@ test('rollback can recover the previous version when the active files are corrup
   await manager.install(data.model.id, {activate: true});
   fs.writeFileSync(path.join(data.userDataPath, 'models', data.model.id, '2024-03-11', 'encoder.int8.onnx'), 'corrupt');
 
-  await assert.rejects(manager.getActive(data.model.id), /Byte-size mismatch|SHA-256 mismatch/);
+  await assert.rejects(
+    manager.getActive(data.model.id),
+    error => error.code === 'asr-model-corrupt' && /Byte-size mismatch|SHA-256 mismatch/.test(error.message)
+  );
   assert.equal((await manager.rollback(data.model.id)).version, '2024-03-10');
   assert.equal((await manager.getActive(data.model.id)).version, '2024-03-10');
 });
