@@ -27,9 +27,7 @@ const NON_RUNTIME_FILES = new Set([
   '.nvmrc',
   'CHANGELOG.md',
   'README.md',
-  'data/tiered-lexicon.json',
   'forge.config.js',
-  'models/.gitkeep',
   'package-lock.json'
 ]);
 

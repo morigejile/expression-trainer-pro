@@ -6,7 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const {createDefaultCustomPrompt} = require('../lib/custom-prompt-config');
-const {createDefaultSettings} = require('../lib/settings-config');
+const {createDefaultLlmProviderSettings} = require('../lib/llm-provider-config');
 
 const PROCESS_TIMEOUT_MS = 5 * 60_000;
 const HEADLESS_SWITCHES = ['--headless', '--disable-gpu', '--no-sandbox'];
@@ -74,7 +74,7 @@ async function runProcess(executable, args, {env = process.env, marker, allowFai
 }
 
 function seedUserData(userDataPath) {
-  const settings = createDefaultSettings();
+  const settings = createDefaultLlmProviderSettings();
   settings.providers.deepseek.model = DATA_TOKEN;
   const customPrompt = createDefaultCustomPrompt();
   customPrompt.customRules = DATA_TOKEN;

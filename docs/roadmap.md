@@ -2,7 +2,7 @@
 
 > 状态：Active
 > 更新日期：2026-08-31
-> 当前模式：内部开发/测试；UI-01/UI-02、ASR-M01～M03 与 ASR-M04a 内部资格验证已完成，完整 ASR-M04 受许可和公开制品条件约束。
+> 当前模式：内部开发/测试；公开模型分发、签名和扩展平台支持仍受外部条件约束。
 
 ## 1. 排序原则
 
@@ -17,17 +17,14 @@
 
 ```mermaid
 flowchart LR
-  B[已完成运行时、benchmark、安装基线] --> UI1[UI-01 Appearance]
-  UI1 --> UI2[UI-02 双布局]
-  B --> M1[ASR-M01 Catalog/Factory]
-  M1 --> M2[ASR-M02 Selection/Service]
-  M2 --> M3[ASR-M03 安装与设置页]
-  M3 --> M4[ASR-M04 包内默认与资格验证]
-  M3 --> U1[ASR-U01 SenseVoice]
+  B[已完成运行时、benchmark、UI、多模型与安装基线] --> M4[ASR-M04 公开包内默认资格]
+  B --> P5[PKG-05 签名与公开发布材料]
+  B --> P6[PKG-06 扩展平台证据]
+  B -. 产品重开 .-> U1[ASR-U01 SenseVoice]
   U1 --> U2[ASR-U02 FireRedASR2]
 ```
 
-UI 与 ASR 轨道可独立推进。ASR-M04 受模型再分发许可和公开制品条件约束；utterance 轨道不进入当前 streaming 关键路径。
+ASR-M04 受模型再分发许可和公开制品条件约束；utterance 轨道不进入当前 streaming 关键路径。
 
 ## 3. 已完成基线
 
@@ -40,34 +37,25 @@ UI 与 ASR 轨道可独立推进。ASR-M04 受模型再分发许可和公开制�
 | Phase 4 | ASR session/event、AudioCapture/AudioWorklet、有界传输、utility process、Model Manager、配置与诊断边界 | [当前架构](architecture/current.md) |
 | Phase 5 | Windows x64 Forge/Squirrel 制品、真实模型首次安装、离线二次启动、升级和卸载数据保留 | [支持矩阵](support-matrix.md)、[ADR-0007](architecture/adr/0007-package-with-electron-forge.md) |
 | CONV-01～03 | 文档职责收敛、benchmark writer 竞态修复、LLM provider 配置迁移 | [CHANGELOG](../CHANGELOG.md)、Git 历史 |
+| UI-01～02 | 四套主题、双布局、窗口同步和响应式尺寸 | [当前架构](architecture/current.md) |
+| ASR-M01～M04a | 三模型 Catalog/Factory、选择恢复、安装切换与内部包内默认资格 | [当前架构](architecture/current.md)、[ADR-0009](architecture/adr/0009-productize-multiple-asr-models.md) |
 
 ## 4. 当前执行轨道
 
-### 4.1 Appearance
+### 4.1 Streaming ASR public delivery
 
 | ID | P | 状态 | 任务 | 完成标准 |
 |---|---|---|---|---|
-| UI-01 | P1 | Completed | 独立 AppearanceStore、四主题、窗口同步和响应式初始尺寸 | 外观可恢复、原子持久化和跨窗口同步；读取失败时页面仍可见 |
-| UI-02 | P1 | Completed | coach-rail/focus-hud 双布局、统一图标和代表性视觉验收 | 两种布局共用现有 DOM；代表性尺寸下训练状态、控件、滚动和字幕区域保持稳定 |
-
-### 4.2 Streaming ASR productization
-
-| ID | P | 状态 | 任务 | 完成标准 |
-|---|---|---|---|---|
-| ASR-M01 | P1 | Completed | 以内含受信任映射的 Catalog/Factory 接入三款 streaming provider | 三款模型由同一工厂创建；能力来自代码，不建立空转 Registry service |
-| ASR-M02 | P1 | Completed | AsrSelectionStore、AsrModelService、启动恢复和 controller 切换 | 无活动 session 时可切换；稳定损坏与瞬时失败采用不同持久化语义 |
-| ASR-M03 | P1 | Completed | 独立安装任务、模型管理 IPC 和设置页模型区域 | 下载可取消重试；Renderer 只提交受信任模型 ID；安装不影响当前识别 |
-| ASR-M04a | P1 | Completed/Internal Only | 显式内部构建携带 Catalog 默认 Zipformer Large，并复用 ModelManager 完成包内离线导入与真实 native 初始化 | 普通制品保持 model-free；归档不进入 Git；不得公开分发 |
 | ASR-M04 | P1 | External gate | Zipformer Large 包内默认、升级保留和真实模型资格验证 | 获得再分发批准；离线首次导入、native 初始化、二次启动和升级保留通过 |
 
-### 4.3 Deferred utterance ASR
+### 4.2 Deferred utterance ASR
 
 | ID | P | 状态 | 任务 | 重开条件 |
 |---|---|---|---|---|
-| ASR-U01 | P2 | Deferred | SenseVoiceSmall utterance、5 分钟缓冲和停止后解码 | ASR-M03 完成且产品重新确认优先级 |
+| ASR-U01 | P2 | Deferred | SenseVoiceSmall utterance、5 分钟缓冲和停止后解码 | 产品重新确认优先级并明确句级交互收益 |
 | ASR-U02 | P2 | Deferred | FireRedASR2 多来源安装和 utterance UX | ASR-U01 通过上限、cancel、失败和 session 隔离验证 |
 
-### 4.4 Delivery and maintenance
+### 4.3 Delivery and maintenance
 
 | ID | P | 状态 | 任务 | 触发/完成条件 |
 |---|---|---|---|---|
@@ -82,8 +70,6 @@ UI 与 ASR 轨道可独立推进。ASR-M04 受模型再分发许可和公开制�
 
 | 里程碑 | 状态 | 包含 | 结果 |
 |---|---|---|---|
-| Baseline | Completed | Phase 0-5、CONV-01～03 | 当前运行时、评测和 Windows x64 内部交付基线可复现 |
-| M4 UI foundation | Completed | UI-01、UI-02 | 主题与两种响应式布局已集成，并在切换中保持训练状态 |
 | M5 Streaming models | In progress | ASR-M01～M04 | Catalog/Factory、选择、单 controller 切换、安装设置入口及内部包内默认资格已完成；公开资格仍受外部门槛约束 |
 | M7 Public delivery | External gate | PKG-05、PKG-06 | 签名、许可和目标平台证据满足公开发布 |
 
