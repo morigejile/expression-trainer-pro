@@ -6,6 +6,7 @@ const path = require('node:path');
 const {resolveBundledModelArchive} = require('../lib/bundled-model-source');
 const {loadModelCatalog} = require('../lib/model-catalog');
 const {verifyModelDirectory} = require('../lib/model-manager');
+const {verifyInternalModelResourceTree} = require('../lib/internal-model-build');
 
 async function sha256File(filePath) {
   const hash = crypto.createHash('sha256');
@@ -19,6 +20,7 @@ function defaultModel(catalogInput) {
 }
 
 async function verifyBundledDefaultArchive({resourcesPath, catalog} = {}) {
+  verifyInternalModelResourceTree({resourceRoot: resourcesPath, catalog});
   const model = defaultModel(catalog);
   const bundled = resolveBundledModelArchive({resourcesPath, catalog});
   if (!bundled) throw new Error('Bundled default archive is missing');

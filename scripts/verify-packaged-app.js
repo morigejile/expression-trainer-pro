@@ -5,6 +5,7 @@ const {spawn, spawnSync} = require('node:child_process');
 const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
+const {assertOrdinaryPackageModelFree} = require('../lib/package-boundary');
 
 const PROCESS_TIMEOUT_MS = 45_000;
 const HEADLESS_SWITCHES = ['--headless', '--disable-gpu', '--no-sandbox'];
@@ -76,6 +77,7 @@ async function main() {
   const packageRoot = path.resolve(process.argv[2] || 'out');
   const executable = findPackagedExecutable(packageRoot);
   const resources = path.join(path.dirname(executable), 'resources');
+  assertOrdinaryPackageModelFree(resources);
   const nativeRoot = path.join(
     resources,
     'app.asar.unpacked',

@@ -87,3 +87,12 @@ test('qualification rejects corrupt package bytes, pointer identity, and runtime
   fs.writeFileSync(path.join(data.modelPath, 'model.int8.onnx'), Buffer.from('runtime-modem'));
   await assert.rejects(verifyInstalledBundledDefault(data), /SHA-256 mismatch/);
 });
+
+test('qualification rejects extra files in the internal model resource tree', async (t) => {
+  const data = fixture(t);
+  fs.writeFileSync(path.join(data.resourcesPath, 'asr-models', 'unexpected.bin'), 'unexpected');
+  await assert.rejects(
+    verifyBundledDefaultArchive(data),
+    /exactly one fixed Catalog default archive/
+  );
+});
