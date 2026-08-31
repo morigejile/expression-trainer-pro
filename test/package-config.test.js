@@ -6,6 +6,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const forgeConfig = require('../forge.config');
+const {createForgeConfig} = forgeConfig;
 
 test('Windows package keeps the complete Sherpa native bundle outside ASAR', () => {
   assert.deepEqual(forgeConfig.packagerConfig.asar, {
@@ -53,6 +54,32 @@ test('first packaging closure targets only Windows x64 Squirrel', () => {
   assert.equal(forgeConfig.makers.length, 1);
   assert.equal(forgeConfig.makers[0].name, '@electron-forge/maker-squirrel');
   assert.deepEqual(forgeConfig.makers[0].platforms, ['win32']);
+});
+
+test('ordinary packages remain model-free', () => {
+  const config = createForgeConfig({environment: {}});
+  assert.equal(config.packagerConfig.extraResource, undefined);
+});
+
+test('internal model resources require an explicit mode and absolute staging root', () => {
+  assert.throws(
+    () => createForgeConfig({environment: {EXPRESSION_TRAINER_INTERNAL_MODEL_RESOURCE_ROOT: 'relative'}}),
+    /requires EXPRESSION_TRAINER_INTERNAL_BUILD=1/
+  );
+  assert.throws(
+    () => createForgeConfig({environment: {
+      EXPRESSION_TRAINER_INTERNAL_BUILD: '1',
+      EXPRESSION_TRAINER_INTERNAL_MODEL_RESOURCE_ROOT: 'relative'
+    }}),
+    /resource root must be absolute/
+  );
+
+  const resourceRoot = path.resolve('out', 'internal-model-resource');
+  const config = createForgeConfig({environment: {
+    EXPRESSION_TRAINER_INTERNAL_BUILD: '1',
+    EXPRESSION_TRAINER_INTERNAL_MODEL_RESOURCE_ROOT: resourceRoot
+  }});
+  assert.deepEqual(config.packagerConfig.extraResource, [path.join(resourceRoot, 'asr-models')]);
 });
 
 test('first-install smoke remains an explicit non-default command', () => {

@@ -36,11 +36,11 @@
 - Consumes: `models/registry.json` schema-v2 Catalog and an absolute archive path from `EXPRESSION_TRAINER_INTERNAL_MODEL_ARCHIVE`.
 - Produces: `stageInternalModelArchive({archivePath, outputRoot, catalog}) -> Promise<{modelId, version, archivePath, resourceRoot}>` and `createForgeConfig({environment})` with `packagerConfig.extraResource` only when `EXPRESSION_TRAINER_INTERNAL_MODEL_RESOURCE_ROOT` is present.
 
-- [ ] **Step 1: Write failing build-input tests**
+- [x] **Step 1: Write failing build-input tests**
 
   Add tests that use a tiny fixture Catalog/archive to require an absolute source path, reject a wrong byte count or SHA-256, stage exactly `asr-models/<modelId>/<version>/<URL basename>`, preserve `redistribution: not-approved`, and leave the source untouched. Add package-config tests proving ordinary builds have no `extraResource`, an internal resource root must be absolute, and explicit internal mode includes only its `asr-models` directory.
 
-- [ ] **Step 2: Run the focused tests and verify RED**
+- [x] **Step 2: Run the focused tests and verify RED**
 
   Run:
 
@@ -50,15 +50,15 @@
 
   Expected: fail because `lib/internal-model-build.js`, `stageInternalModelArchive()`, and `createForgeConfig()` do not exist.
 
-- [ ] **Step 3: Implement the minimal staging and Forge contract**
+- [x] **Step 3: Implement the minimal staging and Forge contract**
 
   `stageInternalModelArchive()` must load/freeze the Catalog, select `catalog.defaultModelId`, require one archive source, stream-hash the supplied file, compare exact bytes/hash, recreate only the caller-provided `outputRoot`, and copy the archive to the deterministic resource tree. `scripts/make-internal-model.js` must require `EXPRESSION_TRAINER_INTERNAL_MODEL_ARCHIVE`, stage below `out/internal-model-resource`, then spawn the pinned Forge CLI with `make --platform=win32 --arch=x64` and `EXPRESSION_TRAINER_INTERNAL_MODEL_RESOURCE_ROOT` set for that child only. Add `make:internal-model` without changing existing package/make scripts.
 
-- [ ] **Step 4: Run focused tests and verify GREEN**
+- [x] **Step 4: Run focused tests and verify GREEN**
 
   Run the two focused test files and confirm all pass with no warnings.
 
-- [ ] **Step 5: Commit the build boundary**
+- [x] **Step 5: Commit the build boundary**
 
   ```text
   feat: stage an explicit internal model resource
