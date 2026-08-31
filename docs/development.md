@@ -71,7 +71,7 @@ git commit -m "<English subject>" -m "中文：<简短说明>"
 
 ## ASR 模型
 
-模型权重不进入 Git。首次启动 ASR 时，utility process 根据 `models/registry.json` 自动下载并校验默认 Paraformer，安装到 Electron `userData/models/paraformer-bilingual-zh-en/2024-03-10/`；native 初始化成功后才更新 active pointer。archive/runtime 的固定大小、hash 与再分发状态见 registry 和 ADR-0004/0005。
+模型权重不进入 Git。当前已实现的产品运行时仍由 utility process 根据 `models/registry.json` 自动下载并校验 Paraformer，安装到 Electron `userData/models/paraformer-bilingual-zh-en/2024-03-10/`；native 初始化成功后才更新 active pointer。ADR-0009 已选择 Zipformer Large 作为后续产品化的技术默认，但模型切换和交付尚未接入这条运行时路径。archive/runtime 的固定大小、hash 与再分发状态见 registry 和 ADR-0004/0009。
 
 内部开发阶段 `.tar.bz2` 解包调用系统 `tar`。PKG-03 已证明 packaged utility 可从零下载并校验真实约 1 GB Paraformer、调用系统 `tar`、完成 native 初始化和强制离线二次启动，且模型仍位于安装目录外。真实麦克风、接近资格线硬件、macOS/Linux 和正式发布制品仍需对应环境证据。
 
@@ -90,7 +90,7 @@ git commit -m "<English subject>" -m "中文：<简短说明>"
 
 BM-01 已完成的数据采集、人工 review 和 freeze 工具已归档到 Git 历史，不再作为当前维护入口。若引入新语料，必须先明确重开该工作并重新评估所需工具，不能把现有冻结结果当作通用数据治理平台。
 
-模型候选只重开 Zipformer Large CTC INT8 和 FireRedASR2 CTC INT8：前者在基础工作后按现有 streaming `zipformer-ctc` benchmark 路径准备；后者在 R-02/R-04 后作为只输出 final 的 utterance spike。两者均不改变 Paraformer 默认，也不代表通用模型扩张或发布可分发性。
+BM-04 已完成七候选验证，ADR-0009 据此选择 Zipformer Large 作为后续产品化的技术默认。当前产品运行时仍固定使用 Paraformer；候选验证不代表模型切换已经实现，也不代表公开发布具备再分发授权。
 
 ## 发布边界
 

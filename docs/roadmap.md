@@ -32,7 +32,7 @@
 ```mermaid
 flowchart LR
   B[Phase 0 构建基线] --> T[Phase 1 测试/高风险缺陷]
-  T --> BM[Phase 2 数据集与三候选 benchmark]
+  T --> BM[Phase 2 数据集与七候选 benchmark]
   BM --> D2[Phase 3 默认模型决策]
   D2 --> R1[R-01 最小 Provider]
   R1 --> ZF[Zipformer Large 候选准备]
@@ -58,8 +58,8 @@ flowchart LR
 |---|---|---|
 | Phase 0 — B-01～B-06 | 文档/源码事实、lockfile 安装和开发说明；工具链原基线 Node 22.23.x/npm 12.0.x 已由 OPS-03 迁移声明替代 | [开发与验证](development.md)、[当前架构](architecture/current.md) |
 | Phase 1 — T-01～T-08 | 核心测试、设置迁移、stop final、安全渲染、LLM 控制、Electron smoke、Electron 43 升级 | `test/`、[当前架构](architecture/current.md) |
-| Phase 2 — BM-01/BM-02/BM-04～BM-06 | 100 条冻结 FLEURS 数据、可复跑 harness、三候选同机比较 | [数据集来源](../benchmark/datasets/SOURCES.md)、[Harness](benchmark/harness.md)、[比较结果](benchmark/bm02-comparison-2026-08-27.md) |
-| Phase 3 — D-01/D-02 | 冻结比较规则；ADR-0005 接受继续使用 Paraformer 默认 | [ADR-0005](architecture/adr/0005-select-default-asr-model-by-benchmark.md) |
+| Phase 2 — BM-01～BM-04 | 100 条冻结 FLEURS 数据、可复跑 harness、七候选同机比较 | [数据集来源](../benchmark/datasets/SOURCES.md)、[Harness](benchmark/harness.md)、[BM-04 结果](benchmark/bm04-seven-model-comparison-2026-08-30.md) |
+| Phase 3 — D-01/D-02 | 冻结比较规则；ADR-0009 采用 Zipformer Large 技术默认 | [ADR-0009](architecture/adr/0009-productize-multiple-asr-models.md) |
 | Phase 4 — R-01～R-09 | session/event、安全 IPC、AudioCapture/AudioWorklet、有界传输与 utility process 已建立；版本化 Paraformer 安全激活/回退；settings/custom rules 原子持久化、future-schema 防降级、共享规则与当前日志脱敏边界完成 | [当前架构](architecture/current.md) |
 | Phase 5 — PKG-01～PKG-04 | Windows 11 25H2+ x64 Tier 1 目标；Forge/Squirrel package/make、完整 Sherpa Windows native bundle ASAR unpack、packaged Fake/native-load smoke；静默安装、真实 Paraformer 首次准备、强制离线二次启动、1.0.0→1.0.1 升级及卸载数据保留 | [支持矩阵](support-matrix.md)、[ADR-0007](architecture/adr/0007-package-with-electron-forge.md) |
 
@@ -91,16 +91,16 @@ flowchart LR
 | R-08 | P1 | 激活版本化默认模型（Completed） | utility process 从 `userData/models` 解析或安装 registry 默认 Paraformer；使用 role→绝对路径配置，native 初始化成功后才原子激活；当前版本损坏或加载失败时只探测并切换一次上一版本 | R-06,R-07,D-02 | 聚焦测试覆盖首次安装、single-flight、取消、role config、激活时序、损坏 active 与失败回退；PKG-03 已完成 packaged 真实模型初始化与离线二次启动 |
 | R-09 | P1 | 收敛设置/规则/日志（Completed） | settings 与 custom-prompt 使用同盘临时文件 + fsync + rename 原子写；旧 schema 自动迁移，未来 schema 只兼容读取而不降级覆盖；字幕与本地分析共用唯一规则源，customWords 作为有界 filler 生效；现有错误日志维持脱敏边界，不引入 keychain/native 依赖 | T-03,R-07 | 聚焦测试覆盖旧/当前/未来 schema、发布失败保留旧文件、规则同源、自定义 filler 与错误脱敏；OPS-05 已补固定白名单诊断导出，API Key 明文仍留给发布前权衡 |
 
-R-01～R-09、D-03/D-04、PKG-01～PKG-04 与 C-01/C-02 已完成当前最小边界。下一步提前缓存两个具名候选资产并进入 Phase 6；Paraformer 默认不变。
+R-01～R-09、D-03/D-04、PKG-01～PKG-04 与 BM-04 已完成当前最小边界。七候选均已验证；ADR-0009 已采用 Zipformer Large 技术默认，公开分发仍取决于许可与产品链路验收。
 
-### 5.1 内部 benchmark 候选（不改变产品默认）
+### 5.1 内部 benchmark 候选（不改变当前 Paraformer 运行时）
 
 | ID | P | TODO | 推荐解决方案 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
-| C-01 | P1 | 准备 Zipformer Large CTC INT8 候选（Completed） | 已在现有 `zipformer-ctc` benchmark 路径加入 pending registry、候选列表、adapter 配置契约测试及模型库存文档；完整 archive 在 Git 外匹配官方 127,965,713 bytes/SHA-256 | Phase 0～2、R-01 | 候选准备与 archive 可复核；正式 harness allowlist、解包后的 runtime hash、native 初始化 smoke 与 benchmark 明确保留为待办 |
-| C-02 | P1 | FireRedASR2 CTC INT8 utterance spike（Completed: minimal integration） | 已在 `fire-red-asr-ctc` family 建立 pending registry 与 adapter；标准化 16 kHz 单声道音频只在结束时解码一次并产生 final；完整 archive 在 Git 外匹配官方 520,516,278 bytes/SHA-256 | R-02,R-04 | cancel/new-session 隔离与 archive 已验证；runtime hash、native-load、冻结数据集 CER/RTF/内存/冷启动/体积比较及 utterance UX 判断保留为待办 |
+| C-01 | P1 | 验证 Zipformer Large CTC INT8 候选（Completed） | registry、runtime hash、native-load 与 BM-04 benchmark 均已完成；继续使用现有 `zipformer-ctc` streaming adapter | Phase 0～2、R-01 | 候选证据可复核；公开再分发仍未获批 |
+| C-02 | P1 | 验证 FireRedASR2 CTC INT8 utterance 候选（Completed） | registry、runtime hash、native-load 与 BM-04 benchmark 均已完成；16 kHz utterance 仅输出 final | R-02,R-04 | cancel/new-session 隔离与候选证据可复核；公开再分发仍未获批 |
 
-Paraformer 继续是产品默认。上述候选仅用于内部技术验证和 benchmark，不构成生产模型选择、打包或再分发授权。
+ADR-0009 已采用 Zipformer Large 作为后续产品化的技术默认；当前已实现的产品运行时仍使用 Paraformer，切换、打包和再分发授权尚未完成。
 
 ## 6. Phase 5 — Electron Forge 打包与发布
 
@@ -130,7 +130,7 @@ Paraformer 继续是产品默认。上述候选仅用于内部技术验证和 be
 |---|---|---|---|
 | M0 基线可复现 | Completed | B-01～B-06 | 环境、依赖和说明一致 |
 | M1 可安全修改 | Completed | T-01～T-08 | 核心契约有测试，高风险缺陷受控 |
-| M2 选型有证据 | Completed | BM-01、BM-02、BM-04～BM-06、D-01、D-02 | 三候选结果和 Accepted 模型 ADR |
+| M2 选型有证据 | Completed | BM-01～BM-04、D-01、D-02 | 七候选结果和 Accepted 模型 ADR |
 | M3 架构收敛 | Completed | R-01～R-09、D-03/D-04 | Audio/ASR/模型分离，Main 不推理，模型升级可回退 |
 | M4 可安装发布 | In Progress | PKG-01～PKG-06（PKG-01～PKG-04 Completed；PKG-05/PKG-06 为外部发布跟进） | Windows x64 内部安装/升级闭环已完成；公开发布仍需签名与对应平台证据 |
 | M5 可长期维护 | In Progress | OPS-01～OPS-06（OPS-02/OPS-05 Completed） | 版本与脱敏诊断基线已完成；CI、依赖和模型生命周期待按实际风险推进 |

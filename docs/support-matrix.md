@@ -9,7 +9,7 @@
 | 维度 | 选择 | 当前证据 |
 |---|---|---|
 | OS | Windows 11 25H2 或更新的仍受支持版本 | 当前开发机为 Windows 11 Home x64，build 26200；Microsoft 将 build 26200 对应到 25H2 |
-| 架构 | x64 | Electron smoke、Sherpa native-load、三候选 benchmark 均在 Windows x64 完成 |
+| 架构 | x64 | Electron smoke、Sherpa native-load、七候选 benchmark 均在 Windows x64 完成 |
 | 应用运行时 | Electron 43.4.1 / sherpa-onnx-node 1.13.3 | lockfile、Electron smoke、D-03 与模型准备证据 |
 | 安装形态 | Electron Forge/Squirrel Windows x64 制品 | PKG-03 已执行静默安装、真实 Paraformer 准备/native 初始化和强制离线二次启动；PKG-04 已验证 1.0.0→1.0.1 升级、数据保留、当前版本恢复与卸载策略 |
 

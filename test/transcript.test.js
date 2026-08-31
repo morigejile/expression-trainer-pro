@@ -80,10 +80,13 @@ function createTrainer() {
   trainer.asrGeneration = 0;
   trainer.renderSubtitle = () => {};
   trainer.btnStop = createElement();
+  trainer.btnStopLabel = createElement();
   trainer.btnPause = createElement();
   trainer.btnResume = createElement();
   trainer.btnStart = createElement();
+  trainer.btnStartLabel = createElement();
   trainer.btnPaste = createElement();
+  trainer.btnAnalyzePaste = createElement();
   trainer.btnReport = createElement();
   trainer.btnCopyText = createElement();
   trainer.btnSaveText = createElement();
@@ -104,6 +107,10 @@ function createTrainer() {
   trainer.userMessageAction = createElement();
   trainer.trainingStatus = createElement();
   trainer.feedbackStatus = createElement();
+  trainer.pasteAnalysisPending = false;
+  trainer.pasteAnalysisGeneration = 0;
+  trainer.activeModal = null;
+  trainer.modalOpener = null;
   return trainer;
 }
 
@@ -1312,6 +1319,8 @@ for (const feedFailure of [
     assert.equal(trainer.isRecording, false);
     assert.equal(trainer.isPaused, false);
     assert.equal(trainer.btnStart.classList.contains('hidden'), false);
+    assert.equal(trainer.btnStart.disabled, false);
+    assert.equal(trainer.btnPaste.disabled, false);
     assert.equal(trainer.btnStop.classList.contains('hidden'), true);
     assert.deepEqual(shownErrors, ['语音识别处理失败，录音已停止，请重新开始']);
 
@@ -1494,4 +1503,139 @@ test('an older session stop operation cannot mask stopping the active session', 
   assert.equal(harness.calls.captureStop, 1);
   assert.equal(harness.calls.stopASR, 1);
   oldStop.resolve();
+});
+
+test('a successful first recording restores Start and Paste after normal stop', async (t) => {
+  const harness = await startAudioCaptureHarness(t);
+
+  await harness.trainer.stopRecording();
+
+  assert.equal(harness.trainer.btnStart.disabled, false);
+  assert.equal(harness.trainer.btnPaste.disabled, false);
+  assert.equal(harness.trainer.btnStart.classList.contains('hidden'), false);
+});
+
+test('pasted analysis is single-flight while the first draft is pending', async (t) => {
+  const analysis = createDeferred();
+  let analysisCalls = 0;
+  const testDocument = {
+    activeElement: null,
+    createTextNode: text => ({ textContent: text }),
+    createElement(tagName) {
+      const element = createElement(tagName);
+      element.ownerDocument = testDocument;
+      return element;
+    }
+  };
+  global.document = testDocument;
+  global.window = {
+    api: {
+      cancelLLMRequests: async () => ({ success: true }),
+      analyzeText: async () => { analysisCalls += 1; return analysis.promise; }
+    }
+  };
+  t.after(() => {
+    analysis.resolve({ totalWords: 2, fillers: [], hedges: [], vagueWords: [] });
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.fullText = '';
+  trainer.pasteTextarea.value = '第一份。';
+  trainer.requestRealtimeFeedback = () => {};
+  const first = trainer.analyzePastedText();
+  await new Promise(resolve => setImmediate(resolve));
+
+  trainer.pasteTextarea.value = '第二份。';
+  await trainer.analyzePastedText();
+
+  assert.equal(analysisCalls, 1);
+  assert.equal(trainer.fullText, '第一份。');
+  analysis.resolve({ totalWords: 2, fillers: [], hedges: [], vagueWords: [] });
+  await first;
+});
+
+test('clear invalidates ownership of an older pasted analysis', async (t) => {
+  const analysis = createDeferred();
+  const testDocument = {
+    activeElement: null,
+    createTextNode: text => ({ textContent: text }),
+    createElement(tagName) {
+      const element = createElement(tagName);
+      element.ownerDocument = testDocument;
+      return element;
+    }
+  };
+  global.document = testDocument;
+  global.window = {
+    confirm: () => true,
+    api: {
+      cancelLLMRequests: async () => ({ success: true }),
+      analyzeText: async () => analysis.promise
+    }
+  };
+  t.after(() => {
+    analysis.resolve({ totalWords: 99, fillers: [], hedges: [], vagueWords: [] });
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.fullText = '';
+  trainer.pasteTextarea.value = '旧分析。';
+  trainer.requestRealtimeFeedback = () => {};
+  const pending = trainer.analyzePastedText();
+  await new Promise(resolve => setImmediate(resolve));
+
+  trainer.clearAll();
+  analysis.resolve({ totalWords: 99, fillers: [], hedges: [], vagueWords: [] });
+  await pending;
+
+  assert.equal(trainer.fullText, '');
+  assert.equal(trainer.stats.totalWords, 0);
+  assert.equal(trainer.btnReport.classList.contains('hidden'), true);
+});
+
+test('all main modals share focus restore, Escape, and Tab trapping', () => {
+  const opener = { focused: false, focus() { this.focused = true; } };
+  const first = { focused: false, focus() { this.focused = true; } };
+  const last = { focused: false, focus() { this.focused = true; } };
+  const modal = createElement();
+  modal.querySelectorAll = () => [first, last];
+  global.document = { activeElement: opener };
+  const trainer = createTrainer();
+
+  trainer.openModal(modal, first);
+  global.document.activeElement = last;
+  let prevented = false;
+  trainer.handleModalKeydown({ key: 'Tab', shiftKey: false, preventDefault() { prevented = true; } });
+  assert.equal(prevented, true);
+  assert.equal(first.focused, true);
+
+  trainer.handleModalKeydown({ key: 'Escape', preventDefault() {} });
+  assert.equal(modal.classList.contains('hidden'), true);
+  assert.equal(opener.focused, true);
+  delete global.document;
+});
+
+test('copy rejection and saveFile success false are visible', async (t) => {
+  const originalNavigator = global.navigator;
+  Object.defineProperty(global, 'navigator', {
+    configurable: true,
+    value: { clipboard: { writeText: async () => { throw new Error('denied'); } } }
+  });
+  global.window = { api: { saveFile: async () => ({ success: false, error: '磁盘不可写' }) } };
+  t.after(() => {
+    Object.defineProperty(global, 'navigator', { configurable: true, value: originalNavigator });
+    delete global.window;
+  });
+  const messages = [];
+  const trainer = createTrainer();
+  trainer.showUserMessage = message => messages.push(message);
+
+  await trainer.copyOriginalText();
+  await trainer.saveOriginalText();
+
+  assert.deepEqual(messages, ['复制失败，请重试', '未保存原文：磁盘不可写']);
 });

@@ -1,6 +1,6 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09 与 PKG-01～PKG-04 Completed（保留 Paraformer 默认）
+> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09 与 PKG-01～PKG-04 Completed；ADR-0009 采用 Zipformer Large 技术默认
 > 基线日期：2026-08-30
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
 > 描述对象：截至 Phase 4 / R-09；保留 Electron 43 与 T-04～T-08 行为基线
@@ -92,9 +92,9 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 
 ### 3.1 BM-02 harness（Completed）
 
-BM-02 提供独立 benchmark CLI，用 manifest 输出每个 sample/repetition 的 JSONL、汇总 JSON/CSV、环境快照及 tag 分层统计；失败的 init、sample、timeout 和 dispose 事件也会被落盘。它不改动生产 `lib/asr.js`、Audio、IPC、Main 或默认模型，且没有新增依赖。2026-08-27，harness 在 clean commit `703f1630ba2bbcfcb98c914bc67c95e0b120ddc1` 上完成 Paraformer、small Zipformer 与 SenseVoiceSmall 各一轮 100 条比较，全部 0 失败；结果见 `docs/benchmark/bm02-comparison-2026-08-27.md`。维护者接受 ADR-0005 并保留现有 Paraformer 默认，因此生产代码无需切换；模型再分发许可仍是后续发布门禁。
+独立 benchmark CLI 用 manifest 输出每个 sample/repetition 的 JSONL、汇总 JSON/CSV、环境快照及 tag 分层统计；失败的 init、sample、timeout 和 dispose 事件也会被落盘。它不改动生产 Audio/IPC/Main，且没有新增依赖。BM-02、BM-03 与 BM-04 已依次完成三、五、七候选同机比较；ADR-0009 据此采用 Zipformer Large 技术默认。模型再分发许可仍是后续发布门禁。
 
-当前源码已把 Zipformer Large CTC INT8 与 FireRedASR2 CTC INT8 加入 pending benchmark registry。前者通过现有 `zipformer-ctc` / `zipformer2Ctc` 在线适配契约；后者使用 `OfflineRecognizer` 的 `fireRedAsrCtc` 单模型配置，整段 16 kHz 单声道 utterance 只解码一次、只输出 final，并覆盖取消后下一调用的隔离。两个完整 archive 已缓存到 Git 外并匹配 GitHub 官方 size/SHA-256；尚未解包生成 runtime-file hash，也没有 native-load 或 benchmark 证据，未进入生产模型选择；Paraformer 默认不变。
+当前 registry 的七个候选均为 `verified`，具备固定 runtime-file hash、native-load 与 BM-04 benchmark 证据；其中 FireRedASR2 CTC、Qwen3-ASR 和两个 SenseVoice 版本按 utterance 契约只输出 final。模型证据保存在 Git 外，所有候选继续保持 `redistribution: not-approved`；技术验证不等于公开打包获批。
 
 ### 3.2 R-07/R-08 Model Manager 与生产接入（Completed）
 

@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const fs = require('fs');
 const path = require('path');
 
 function validCandidate(overrides = {}) {
@@ -211,4 +212,17 @@ test('committed registry represents all downloaded candidates as hash-verified w
     true
   );
   assert.equal(registry.candidates.every(({ license }) => license.redistribution === 'not-approved'), true);
+});
+
+test('candidate schema recognizes every committed model family and utterance contract', () => {
+  const schema = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'benchmark', 'models', 'candidates.schema.json'), 'utf8'));
+  const familyEnum = schema.$defs.candidate.properties.family.enum;
+  const utteranceFamilies = schema.$defs.candidate.allOf
+    .find(rule => rule.then?.properties?.mode?.const === 'utterance')
+    .if.properties.family.enum;
+
+  assert.equal(familyEnum.includes('fire-red-asr-ctc'), true);
+  assert.equal(familyEnum.includes('qwen3-asr'), true);
+  assert.equal(utteranceFamilies.includes('fire-red-asr-ctc'), true);
+  assert.equal(utteranceFamilies.includes('qwen3-asr'), true);
 });

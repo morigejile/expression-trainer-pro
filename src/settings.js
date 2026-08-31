@@ -44,6 +44,7 @@ class SettingsPage {
     this.customBaseUrlInput = document.getElementById('custom-base-url');
     this.customModelInput = document.getElementById('custom-model');
     this.btnSave = document.getElementById('btn-save');
+    this.btnTestConnection = document.getElementById('btn-test-connection');
     this.saveSuccess = document.getElementById('save-success');
     this.connectionError = document.getElementById('connection-error');
 
@@ -52,22 +53,35 @@ class SettingsPage {
     this.groupCustom = document.getElementById('group-custom');
     this.groupCustomModel = document.getElementById('group-custom-model');
 
+    this.setActionsEnabled(false);
     this.bindEvents();
-    this.loadSettings();
+    this.loadPromise = this.loadSettings();
   }
 
   bindEvents() {
     this.providerSelect.addEventListener('change', () => this.onProviderChange());
     this.btnSave.addEventListener('click', () => this.save());
+    this.btnTestConnection.addEventListener('click', () => this.testConnection());
   }
 
   async loadSettings() {
-    this.settings = await window.api.getSettings();
+    this.setActionsEnabled(false);
+    try {
+      this.settings = await window.api.getSettings();
+      this.providerSelect.value = this.settings.provider || 'deepseek';
+      // 先填充模型列表再加载字段值
+      this.onProviderChange();
+      this.setActionsEnabled(true);
+    } catch {
+      this.settings = undefined;
+      this.connectionError.textContent = '设置加载失败，请关闭后重试';
+      this.connectionError.classList.add('show');
+    }
+  }
 
-    this.providerSelect.value = this.settings.provider || 'deepseek';
-
-    // 先填充模型列表再加载字段值
-    this.onProviderChange();
+  setActionsEnabled(enabled) {
+    this.btnSave.disabled = !enabled;
+    this.btnTestConnection.disabled = !enabled;
   }
 
   /** 加载指定 provider 的配置到表单字段 */
@@ -118,16 +132,8 @@ class SettingsPage {
     this.loadProviderFields(provider);
   }
 
-  async save() {
+  buildDraftSettings() {
     const provider = this.providerSelect.value;
-    const idleButtonLabel = this.btnSave.textContent;
-
-    // 隐藏上次的错误提示
-    const errorEl = this.connectionError;
-    errorEl.classList.remove('show');
-    errorEl.textContent = '';
-
-    // 在已加载的配置副本上更新，连接测试失败时不覆盖上一份可用配置。
     const settings = structuredClone(this.settings);
 
     // 只更新当前 provider 的配置
@@ -155,34 +161,70 @@ class SettingsPage {
       };
     }
 
-    this.btnSave.textContent = '⏳ 测试连接中...';
+    return settings;
+  }
+
+  clearMessages() {
+    this.saveSuccess.classList.remove('show');
+    this.connectionError.classList.remove('show', 'success');
+    this.connectionError.textContent = '';
+  }
+
+  async save() {
+    if (this.loadPromise) await this.loadPromise;
+    this.clearMessages();
+    if (!this.settings) {
+      this.connectionError.textContent = '设置尚未加载，暂时无法保存';
+      this.connectionError.classList.add('show');
+      return;
+    }
+    this.btnSave.textContent = '保存中...';
+    this.btnSave.disabled = true;
     this.btnSave.classList.add('loading');
     try {
-      const result = await window.api.testLLMConnection(settings);
-      if (!result.success) {
-        errorEl.textContent = result.error || '连接测试失败，请重试';
-        errorEl.classList.add('show');
-        return;
-      }
-
-      try {
-        await window.api.saveSettings(settings);
-      } catch {
-        errorEl.textContent = '设置保存失败，请重试';
-        errorEl.classList.add('show');
-        return;
-      }
+      const settings = this.buildDraftSettings();
+      await window.api.saveSettings(settings);
       this.settings = settings;
+      this.saveSuccess.textContent = '✓ 已保存';
       this.saveSuccess.classList.add('show');
-      setTimeout(() => {
-        window.close();
-      }, 800);
     } catch {
-      errorEl.textContent = '连接测试失败，请重试';
-      errorEl.classList.add('show');
+      this.connectionError.textContent = '保存失败，请重试';
+      this.connectionError.classList.add('show');
     } finally {
-      this.btnSave.textContent = idleButtonLabel;
+      this.btnSave.textContent = '保存设置';
+      this.btnSave.disabled = false;
       this.btnSave.classList.remove('loading');
+    }
+  }
+
+  async testConnection() {
+    if (this.loadPromise) await this.loadPromise;
+    this.clearMessages();
+    if (!this.settings) {
+      this.connectionError.textContent = '设置尚未加载，暂时无法测试连接';
+      this.connectionError.classList.add('show');
+      return;
+    }
+    this.btnTestConnection.textContent = '测试中...';
+    this.btnTestConnection.disabled = true;
+    this.btnTestConnection.classList.add('loading');
+    try {
+      const settings = this.buildDraftSettings();
+      const result = await window.api.testLLMConnection(settings);
+      if (result.success) {
+        this.connectionError.textContent = '✓ 连接成功';
+        this.connectionError.classList.add('success');
+      } else {
+        this.connectionError.textContent = `连接失败：${result.error || '请核对配置后重试'}`;
+        this.connectionError.classList.add('show');
+      }
+    } catch {
+      this.connectionError.textContent = '连接失败：连接测试请求异常，请重试';
+      this.connectionError.classList.add('show');
+    } finally {
+      this.btnTestConnection.textContent = '测试连接';
+      this.btnTestConnection.disabled = false;
+      this.btnTestConnection.classList.remove('loading');
     }
   }
 }

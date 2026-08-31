@@ -54,7 +54,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | FR-E09 | 用户应能编辑训练目标、自定义规则、风格参考和额外口癖词。 | versioned 内容原子写入 `userData/custom-prompt.json`；实时/报告 prompt 读取，额外口癖词也作为最多 64 个有界 filler 参与本地统计；存在未保存修改时离开编辑器需确认。 |
 | FR-E10 | 用户应能复制或保存原文与报告。 | 原文可复制/保存为 Markdown；报告可复制/保存为 Markdown；保存路径通过系统对话框选择；取消或失败时给出可见反馈。 |
 | FR-E11 | 当前 Paraformer 应通过轻量 ASR Provider 边界访问。 | Main 只依赖 initialize/start/feed/stop/cancel/dispose 契约；Fake Provider 可在不加载真实 Paraformer/Sherpa 模块时验证业务与 Electron smoke 路径。 |
-| FR-E12 | 默认中文模型选择应由项目数据 benchmark 和明确产品取舍支持。 | 三候选比较结果可复跑；ADR-0005 记录继续使用 Paraformer 的 streaming UX 与渐进迁移理由。 |
+| FR-E12 | 默认中文模型选择应由项目数据 benchmark 和明确产品取舍支持。 | 七候选比较结果可复跑；ADR-0009 记录采用 Zipformer Large 技术默认、保留 streaming UX 与按批次产品化的理由。 |
 | FR-E13 | 用户应能在应用内查看帮助并记录内部测试反馈。 | 主页面“帮助”弹窗提供快速使用说明和统一的“问题和建议”在线文档入口；诊断信息沿用脱敏 JSON 导出并由用户按需补充到在线文档。 |
 | FR-E14 | 用户配置或操作无法完成时应获得可恢复的具体提示。 | 设置页显示校验或连接失败原因；实时反馈和报告的配置错误可直接打开设置；空粘贴、重复请求和内容覆盖有明确保护。 |
 | FR-P01 | 音频采集与 ASR 推理应成为独立职责。 | AudioCapture 独立持有权限、track/context/worklet 与 chunk 元数据；Renderer 只编排训练/session，Provider 隔离 Sherpa 配置。 |
@@ -96,8 +96,8 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 - 默认不引入 React、Vue、Vite、Webpack、TypeScript、Python、PyTorch、FunASR、FastAPI、Docker、数据库或插件框架。
 - 目标是降低总体维护和交付复杂度，而不是机械减少文件数、模块数或安装包体积。
 - ASR Provider 和 Model Manager 必须保持轻量；不建设通用框架、模型数据库或模型市场。
-- ADR-0005 已根据三候选 benchmark 接受保留 Paraformer 为默认；Zipformer 与 SenseVoiceSmall 的结果作为后续复审基线，不向普通用户暴露多模型选择。
-- 仅重开 Zipformer Large CTC INT8 与 FireRedASR2 CTC INT8 两个内部候选：前者保持 streaming，后者仅做 utterance spike；不进行通用模型扩张，Paraformer 仍为默认。
+- BM-04 已完成七候选比较；ADR-0009 采用 Zipformer Large 作为技术默认，并保留 streaming 交互。公开分发仍受模型许可与打包验收约束。
+- 七个 registry 候选均已具备 hash、native-load 与 benchmark 证据；候选验证不等于公开再分发获批，也不表示响应式主题设计已经实现。
 - 架构迁移采用渐进重构，不推倒重写，不以切换 Electron/Tauri/WASM 为默认路径。
 
 ## 7. 发布级验收场景
@@ -123,7 +123,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 - 默认引入 Python/FunASR、GPU/CUDA 或云端 ASR 运行栈。
 - 引入 React/Vue、Vite、TypeScript 或复杂状态管理以“现代化”界面。
 - 用户账户、云同步、多人协作、数据库、模型市场和通用插件系统。
-- 把当前内部三候选结果外推为公开权威 benchmark、跨设备性能承诺或未测试模型的排名。
+- 把当前内部七候选结果外推为公开权威 benchmark、跨设备性能承诺或未测试模型的排名。
 - 首阶段建设自动更新服务、遥测平台或完整崩溃上报后端。
 - 把 SenseVoice 情绪/事件标签直接解释为表达质量评分。
 
