@@ -24,9 +24,14 @@ const { createAsrIpcRouter } = require('./lib/asr-ipc');
 const { createAsrProcessController } = require('./lib/asr-process-controller');
 const {createAsrSelectionStore} = require('./lib/asr-selection-store');
 const {createModelManager} = require('./lib/model-manager');
+const {resolveBundledModelArchive} = require('./lib/bundled-model-source');
 const {createAsrUtilityArgs, createMainAsrProvider} = require('./lib/asr-main-composition');
 const {runManagedModelSmoke} = require('./lib/managed-model-smoke');
 const modelRegistry = require('./models/registry.json');
+const bundledModelArchive = resolveBundledModelArchive({
+  resourcesPath: process.resourcesPath,
+  catalog: modelRegistry
+});
 
 const isSquirrelStartup = require('electron-squirrel-startup');
 if (isSquirrelStartup) app.quit();
@@ -66,7 +71,7 @@ function forkAsrUtility(args) {
   );
 }
 
-function processControllerFor({modelId, installedOnly = false, fake = false, offline = false} = {}) {
+function processControllerFor({modelId, installedOnly = false, fake = false, offline = false, bundledArchive = null} = {}) {
   return createAsrProcessController({
     initializeTimeoutMs: isManagedModelSmokeTest ? 45 * 60_000 : undefined,
     spawn: () => forkAsrUtility(fake
@@ -76,7 +81,8 @@ function processControllerFor({modelId, installedOnly = false, fake = false, off
           appVersion: app.getVersion(),
           modelId,
           installedOnly,
-          offline
+          offline,
+          bundledArchive
         }))
   });
 }
@@ -100,7 +106,11 @@ const asrProvider = isSmokeTest
           appVersion: app.getVersion(),
           registry: modelRegistry
         }),
-        createController: ({modelId, installedOnly}) => processControllerFor({modelId, installedOnly})
+        createController: ({modelId, installedOnly}) => processControllerFor({
+          modelId,
+          installedOnly,
+          bundledArchive: bundledModelArchive
+        })
       });
 const asrIpc = createAsrIpcRouter({provider: asrProvider});
 

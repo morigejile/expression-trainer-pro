@@ -125,11 +125,11 @@
 - Consumes: `resolveBundledModelArchive({resourcesPath: process.resourcesPath, catalog})` in Main.
 - Produces: optional trusted utility arguments `--bundled-model-id`, `--bundled-model-version`, and `--bundled-model-archive`; the utility converts them to ModelManager's `bundledArchive` object.
 
-- [ ] **Step 1: Write failing trusted-argument tests**
+- [x] **Step 1: Write failing trusted-argument tests**
 
   Require the three bundled arguments to appear together, require an absolute archive path, require model ID/version to match the Catalog default, reject duplicates, and prove normal/Fake/Paraformer smoke arguments remain unchanged when no bundled archive exists. Add a source-composition test proving Main derives the path from `process.resourcesPath`, not Renderer or CLI input.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
   ```powershell
   node --test test/asr-main-composition.test.js test/asr-utility-config.test.js test/managed-model-smoke.test.js
@@ -137,11 +137,11 @@
 
   Expected: fail because utility arguments and runtime wiring do not yet accept a bundled archive.
 
-- [ ] **Step 3: Implement the minimal trusted wiring**
+- [x] **Step 3: Implement the minimal trusted wiring**
 
   Resolve the bundled archive once in Main. Pass it only through the Main-created utility argument array. Parse the exact triplet in `resolveManagedAsrOptions()` and give it to `createModelManager()`; offline smoke must continue replacing network fetch so a successful first run proves the bundle was used.
 
-- [ ] **Step 4: Run ASR and Electron smoke tests**
+- [x] **Step 4: Run ASR and Electron smoke tests**
 
   ```powershell
   node --test test/asr-main-composition.test.js test/asr-utility-config.test.js test/model-manager.test.js test/managed-asr-provider.test.js test/electron-smoke.test.js
@@ -149,7 +149,7 @@
 
   Expected: all pass; no model-management IPC/UI is introduced.
 
-- [ ] **Step 5: Commit runtime wiring**
+- [x] **Step 5: Commit runtime wiring**
 
   ```text
   feat: wire the packaged default model into asr startup
