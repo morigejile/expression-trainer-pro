@@ -3,6 +3,7 @@
 const path = require('node:path');
 const modelCatalog = require('./models/registry.json');
 const {verifyInternalModelResourceTree} = require('./lib/internal-model-build');
+const {isModelPayloadPath} = require('./lib/package-boundary');
 
 const DEVELOPMENT_ONLY_ROOTS = new Set([
   '.agents',
@@ -37,6 +38,7 @@ function ignoreDevelopmentOnly(filePath) {
   const parts = normalizedPath.split('/').filter(Boolean);
   const root = parts[0];
   if (DEVELOPMENT_ONLY_ROOTS.has(root)) return true;
+  if (isModelPayloadPath(normalizedPath)) return true;
   if (root === 'models' && normalizedPath !== 'models' && normalizedPath !== 'models/registry.json') return true;
   if (NON_RUNTIME_FILES.has(normalizedPath)) return true;
   return root === 'node_modules' && ['.bin', 'electron', 'electron-nightly'].includes(parts[1]);

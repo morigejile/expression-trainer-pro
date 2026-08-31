@@ -2,7 +2,7 @@
 
 const {spawn} = require('node:child_process');
 const path = require('node:path');
-const {stageInternalModelArchive} = require('../lib/internal-model-build');
+const {assertArchiveOutsideProject, stageInternalModelArchive} = require('../lib/internal-model-build');
 const catalog = require('../models/registry.json');
 
 async function main() {
@@ -10,6 +10,7 @@ async function main() {
   if (!archivePath || !path.isAbsolute(archivePath)) {
     throw new Error('EXPRESSION_TRAINER_INTERNAL_MODEL_ARCHIVE must be an absolute path');
   }
+  assertArchiveOutsideProject({archivePath, projectRoot: path.resolve(__dirname, '..')});
   const outputRoot = path.resolve('out', 'internal-model-resource');
   const staged = await stageInternalModelArchive({archivePath, outputRoot, catalog});
   const cli = path.join(path.dirname(require.resolve('@electron-forge/cli/package.json')), 'dist', 'electron-forge.js');

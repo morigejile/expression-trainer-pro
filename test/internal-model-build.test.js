@@ -7,7 +7,7 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 
-const {stageInternalModelArchive} = require('../lib/internal-model-build');
+const {assertArchiveOutsideProject, stageInternalModelArchive} = require('../lib/internal-model-build');
 
 function fixtureCatalog(archiveBytes) {
   const archiveSha256 = crypto.createHash('sha256').update(archiveBytes).digest('hex');
@@ -102,4 +102,19 @@ test('internal model staging rejects a relative source and incorrect fixed evide
     stageInternalModelArchive({archivePath: source, outputRoot: path.join(root, 'wrong-hash'), catalog: wrongHashCatalog}),
     /SHA-256 mismatch/
   );
+});
+
+test('internal model source archive must remain outside the application source tree', (t) => {
+  const projectRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'internal-model-project-'));
+  t.after(() => fs.rmSync(projectRoot, {recursive: true, force: true}));
+  const archivePath = path.join(projectRoot, 'cache', 'model.tar.bz2');
+
+  assert.throws(
+    () => assertArchiveOutsideProject({archivePath, projectRoot}),
+    /must be outside the application source tree/
+  );
+  assert.doesNotThrow(() => assertArchiveOutsideProject({
+    archivePath: path.join(path.dirname(projectRoot), 'external-model.tar.bz2'),
+    projectRoot
+  }));
 });

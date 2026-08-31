@@ -65,6 +65,8 @@ test('package payload excludes development-only trees but keeps runtime assets',
   assert.equal(ignore('/models/.gitkeep'), true);
   assert.equal(ignore('/models/cache/default.tar.bz2'), true);
   assert.equal(ignore('/models/cache/default.onnx'), true);
+  assert.equal(ignore('/cache/default.tar.bz2'), true);
+  assert.equal(ignore('/local-models/default.onnx'), true);
   assert.equal(ignore('/.nvmrc'), true);
   assert.equal(ignore('/.npmrc'), true);
   assert.equal(ignore('/forge.config.js'), true);

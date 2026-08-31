@@ -19,3 +19,16 @@ test('ordinary package boundary rejects bundled ASR model resources', (t) => {
     /must not contain bundled ASR models/
   );
 });
+
+test('ordinary package boundary rejects model weights hidden inside ASAR', (t) => {
+  const resourcesPath = fs.mkdtempSync(path.join(os.tmpdir(), 'ordinary-asar-boundary-'));
+  t.after(() => fs.rmSync(resourcesPath, {recursive: true, force: true}));
+  fs.writeFileSync(path.join(resourcesPath, 'app.asar'), 'fixture');
+
+  assert.throws(
+    () => assertOrdinaryPackageModelFree(resourcesPath, {
+      listPackage: () => ['/models/registry.json', '/local-models/default.onnx']
+    }),
+    /ASAR must not contain model weights or archives/
+  );
+});
