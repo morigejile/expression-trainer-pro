@@ -111,11 +111,24 @@ test('result reservation atomically owns a run directory before artifacts are wr
 test('writer leaves no visible final run directory or reservation when staging writes fail', async () => {
   const { reserveRunDirectory, writeResults } = require('../benchmark/lib/results');
   const originalWriteFile = fs.promises.writeFile;
+  const originalRm = fs.promises.rm;
   await withTempDirectory(async (directory) => {
     const runDir = path.join(directory, 'write-failure');
+    let artifactWriteActive = false;
     fs.promises.writeFile = async (filePath, ...rest) => {
       if (filePath.endsWith('summary.json')) throw new Error('injected staging write failure');
+      if (filePath.endsWith('samples.jsonl')) {
+        artifactWriteActive = true;
+        await new Promise((resolve) => setTimeout(resolve, 30));
+        artifactWriteActive = false;
+      }
       return originalWriteFile(filePath, ...rest);
+    };
+    fs.promises.rm = async (targetPath, ...rest) => {
+      if (targetPath.includes('.benchmark-staging-') && artifactWriteActive) {
+        throw new Error('cleanup raced active writes');
+      }
+      return originalRm(targetPath, ...rest);
     };
     try {
       await assert.rejects(writeResults(runDir, [makeSample()], {}), /injected staging write failure/);
@@ -124,6 +137,7 @@ test('writer leaves no visible final run directory or reservation when staging w
       await retryReservation.release();
     } finally {
       fs.promises.writeFile = originalWriteFile;
+      fs.promises.rm = originalRm;
     }
   });
 });
