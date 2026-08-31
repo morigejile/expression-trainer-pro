@@ -48,13 +48,13 @@ UI 与 ASR 轨道可独立推进。ASR-M04 受模型再分发许可和公开制�
 | ID | P | 状态 | 任务 | 完成标准 |
 |---|---|---|---|---|
 | UI-01 | P1 | Completed on feature branch / Pending integration | 独立 AppearanceStore、四主题、窗口同步和响应式初始尺寸 | 外观可恢复、原子持久化和跨窗口同步；读取失败时页面仍可见 |
-| UI-02 | P1 | Planned | coach-rail/focus-hud 双布局、统一图标和代表性视觉验收 | 训练中切换不改变 session、内容、pending 请求或滚动；最小尺寸不遮挡字幕 |
+| UI-02 | P1 | Completed on feature branch / Pending integration | coach-rail/focus-hud 双布局、统一图标和代表性视觉验收 | 两种布局共用现有 DOM；代表性尺寸下训练状态、控件、滚动和字幕区域保持稳定 |
 
 ### 4.2 Streaming ASR productization
 
 | ID | P | 状态 | 任务 | 完成标准 |
 |---|---|---|---|---|
-| ASR-M01 | P1 | Planned | 以内含受信任映射的 Catalog/Factory 接入三款 streaming provider | 当前 Paraformer 回归不变；三款模型由同一工厂创建，不建空转 Registry service |
+| ASR-M01 | P1 | Completed on feature branch / Pending integration | 以内含受信任映射的 Catalog/Factory 接入三款 streaming provider | 当前启动仍固定 Paraformer；三款模型由同一工厂创建，不建空转 Registry service |
 | ASR-M02 | P1 | Planned | AsrSelectionStore、AsrModelService、启动恢复和 controller 切换 | 无活动 session 时可切换；稳定损坏与瞬时失败采用不同持久化语义 |
 | ASR-M03 | P1 | Planned | 独立安装任务、模型管理 IPC 和设置页模型区域 | 下载可取消重试；Renderer 不提交路径、URL 或 providerType；安装不影响当前识别 |
 | ASR-M04 | P1 | External gate | Zipformer Large 包内默认、升级保留和真实模型资格验证 | 获得再分发批准；离线首次导入、native 初始化、二次启动和升级保留通过 |
@@ -82,8 +82,8 @@ UI 与 ASR 轨道可独立推进。ASR-M04 受模型再分发许可和公开制�
 | 里程碑 | 状态 | 包含 | 结果 |
 |---|---|---|---|
 | Baseline | Completed | Phase 0-5、CONV-01～03 | 当前运行时、评测和 Windows x64 内部交付基线可复现 |
-| M4 UI foundation | In progress | UI-01、UI-02 | 主题与两种响应式布局在训练中安全切换 |
-| M5 Streaming models | Planned | ASR-M01～M04 | 可安装、选择并验证受信任 streaming 模型 |
+| M4 UI foundation | Pending integration | UI-01、UI-02 | 主题与两种响应式布局已在功能分支完成，待集成 |
+| M5 Streaming models | In progress | ASR-M01～M04 | Catalog/Factory 已在功能分支完成；选择、安装和默认模型资格仍待推进 |
 | M7 Public delivery | External gate | PKG-05、PKG-06 | 签名、许可和目标平台证据满足公开发布 |
 
 ## 6. 明确不做
