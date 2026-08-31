@@ -23,6 +23,11 @@ const {
 const { createAsrIpcRouter } = require('./lib/asr-ipc');
 const { createAsrProcessController } = require('./lib/asr-process-controller');
 const {runManagedModelSmoke} = require('./lib/managed-model-smoke');
+const {
+  requireBoundedText,
+  validateFinalReportPayload,
+  validateMarkdownSaveRequest
+} = require('./lib/ipc-input');
 
 const isSquirrelStartup = require('electron-squirrel-startup');
 if (isSquirrelStartup) app.quit();
@@ -425,20 +430,22 @@ ipcMain.handle('cancel-llm-requests', (event) => {
 // 词库分析
 ipcMain.handle('analyze-text', (event, text) => {
   const customPrompt = loadCustomPrompt();
-  return analyzeText(text, {extraFillers: customWordsToFillers(customPrompt.customWords)});
+  const normalizedText = requireBoundedText(text, {label: 'text'});
+  return analyzeText(normalizedText, {extraFillers: customWordsToFillers(customPrompt.customWords)});
 });
 
 // 文件保存
 ipcMain.handle('save-file', async (event, content, filename) => {
+  const request = validateMarkdownSaveRequest(content, filename);
   const { dialog } = require('electron');
   const result = await dialog.showSaveDialog(mainWindow, {
     title: '保存报告',
-    defaultPath: path.join(app.getPath('desktop'), filename),
+    defaultPath: path.join(app.getPath('desktop'), request.filename),
     filters: [{ name: 'Markdown', extensions: ['md'] }]
   });
 
   if (!result.canceled && result.filePath) {
-    fs.writeFileSync(result.filePath, content, 'utf-8');
+    fs.writeFileSync(result.filePath, request.content, 'utf-8');
     return { success: true, path: result.filePath };
   }
   return { success: false };
@@ -484,6 +491,7 @@ ipcMain.handle('open-support-link', async (event, rawUrl) => {
 
 // AI反馈（传入customPrompt）
 ipcMain.handle('get-realtime-feedback', async (event, text) => {
+  const normalizedText = requireBoundedText(text, {label: 'text'});
   const settings = loadLlmProviderSettings(app.getPath('userData'));
   const providerConfig = getSelectedLlmProviderSettings(settings);
   const customPrompt = loadCustomPrompt();
@@ -493,7 +501,7 @@ ipcMain.handle('get-realtime-feedback', async (event, text) => {
     'realtime',
     'feedback',
     (signal) => sendFeedback(
-      text,
+      normalizedText,
       { ...settings, ...providerConfig },
       customPrompt,
       { signal }
@@ -501,7 +509,8 @@ ipcMain.handle('get-realtime-feedback', async (event, text) => {
   );
 });
 
-ipcMain.handle('get-final-report', async (event, { fullText, stats }) => {
+ipcMain.handle('get-final-report', async (event, payload) => {
+  const {fullText, stats} = validateFinalReportPayload(payload);
   const settings = loadLlmProviderSettings(app.getPath('userData'));
   const providerConfig = getSelectedLlmProviderSettings(settings);
   const customPrompt = loadCustomPrompt();

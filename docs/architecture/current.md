@@ -3,7 +3,7 @@
 > 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09、PKG-01～PKG-04 与 CONV-01～CONV-03 Completed；ADR-0009 采用 Zipformer Large 技术默认
 > 基线日期：2026-08-31
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
-> 描述对象：截至 Phase 4 / R-09；保留 Electron 43 与 T-04～T-08 行为基线
+> 描述对象：当前 `main` 产品运行时、开发工具边界与已验证的内部安装基线
 
 ## 1. 证据边界
 
@@ -49,6 +49,7 @@ lib/custom-prompt-config.js     自定义规则 schema、迁移与有界口癖�
 lib/atomic-json-store.js        userData JSON 的同盘原子写
 lib/safe-log.js                 有界错误文本与凭据模式脱敏
 lib/diagnostics.js              固定白名单的 app/OS/model/audio/ASR 诊断快照
+lib/ipc-input.js                非 ASR 文本、报告统计和 Markdown 保存输入边界
 data/emotion-lexicon.json       运行时情绪词数据
 package.json / package-lock.json
 test/electron-smoke.test.js      Node 测试父进程、超时、日志和清理
@@ -184,7 +185,7 @@ R-02 已建立 ASR session/event 状态，R-03/R-04 已把采集生命周期和 
 
 - ASR 公开能力名为 `startASR`、`feedAudio`、`stopASR`、`cancelASR`；`feedAudio` 保留 command 元数据并把 samples 规范为 `Float32Array`，再逐块 `ipcRenderer.invoke('feed-audio', ...)`。
 - LLM API 暴露反馈、报告、连接测试和显式取消；取消只作用于当前 Renderer 的 pending LLM 请求。
-- ASR Router 对四类 command 做精确字段、非空 session、16 kHz、sequence、有限 Float32 样本等校验；settings、文本和 filename 等其他 payload 仍没有同等级 schema/大小校验。
+- ASR Router 对四类 command 做精确字段、非空 session、16 kHz、sequence、有限 Float32 样本等校验；文本分析、实时反馈、最终报告和 Markdown 保存另有轻量类型、大小、统计字段和文件名边界。settings/custom-prompt 继续由各自配置模块规范化，尚无外层 payload 大小上限。
 
 ### 5.3 Main / `main.js`
 
@@ -338,27 +339,22 @@ Settings/Prompt Renderer
 
 这些发布级缺口及未确认的模型再分发权利在当前内部开发/测试中是非阻塞后续工作；若它们使本地技术实验无法运行或使结论失效，才需要提前处理。
 
-## 8. 已确认技术债与风险
+## 8. 当前开放风险
 
-| ID | 风险 | 影响 | 证据 | 推荐验证/处理 |
-|---|---|---|---|---|
-| TD-01 | **R-06 已关闭结构风险**：ASR 初始化/decode 位于 utility process | Main 不加载 native addon；Fake smoke 覆盖退出报告和重建 | Controller tests、Electron smoke、D-03 spike | 真实 Paraformer 高负载下补量化响应数据 |
-| TD-02 | **R-04 已关闭**：`ScriptProcessorNode` 已由 AudioWorklet/320 帧 collector 替换 | 废弃节点不再存在于生产/测试/smoke 路径 | 源码、collector tests、Electron smoke | 保留回归；不增加 fallback |
-| TD-03 | **R-04 已缓解**：请求/context/track rate 可诊断，固定 Electron graph 已覆盖 16/44.1/48 kHz | 确定性图适配已有证据；真实麦克风/驱动差异仍未知 | AudioCapture tests 与 Electron graph fixture | 真实可配置设备作为非阻塞 follow-up；实测失败才评估 WASM 备选 |
-| TD-04 | **R-05 已缓解**：逐块 TypedArray/invoke/structured-clone 仍复制，但队列为 10 块且可观测 | 不再无限增长或静默丢音频；复制成本仍需真实推理 profile | Queue/Renderer tests 与 D-03 spike | 只有真实 profile 证明必要时再换通道 |
-| TD-05 | **R-06/PKG-03 已关闭当前边界**：Main 只持有 Controller，Provider/Sherpa/模型在 utility process | 退出可见、下一 start 重建；packaged Main 不加载 native addon；真实模型循环通过 | Controller tests、Electron smoke、packaged native-load 与 first-install smoke | 接近资格线硬件仅补量化响应数据 |
-| TD-06 | **R-07/R-08/PKG-03/PKG-04 已关闭内部开发边界** | registry、校验、安装锁、严格续传、原子安装/激活、native 成功后切换、一次安全回退及应用升级数据保留已验证 | Model Manager/managed provider 聚焦测试、产品 registry、first-install 与 upgrade smoke | 公开发布前补模型许可和目标环境证据 |
-| TD-07 | **T-04/R-02/R-04 已缓解**：stop 单飞执行 worklet tail flush、feed drain、ASR final 与分析；旧 session、迟到/倒序事件和清空/重启竞态受过滤 | 尾部语音进入字幕、统计、分析和报告；完整训练阶段状态机仍未建立 | AudioCapture、ASR event state 与 transcript 竞态回归测试 | 后续只在实际状态复杂度需要时收敛状态机 |
-| TD-08 | 已有 Node/Electron/packaged/first-install/upgrade smoke 与 Windows x64 Forge 打包，但无 CI | 已可发现产品流、packaged native、真实首次模型和应用升级数据保留；仍无法证明真实麦克风或跨平台制品 | 集成测试、Forge 配置与 PKG-03/PKG-04 制品 | OPS-01 再加最小 CI；Experimental 平台按实际需要验证 |
-| TD-09 | **R-09/PKG-04/CONV-03 已关闭配置损坏、LLM provider future-schema 保存降级与安装升级数据丢失风险**；API Key 仍明文 | canonical/legacy future schema 保存被拒绝；LLM provider/custom-prompt 原子发布、损坏文件保留、升级/卸载保留 userData | atomic store、LLM provider store、older/current/future schema、脱敏测试与 upgrade smoke | keychain 只在收益超过 native/跨平台成本时采用；custom-prompt future schema 继续维持只读不自动写回边界 |
-| TD-10 | **R-02 已部分缓解**：ASR command 已校验精确字段、session、sequence、16 kHz 与有限样本；其他 IPC payload 仍缺少同等级校验 | settings、文本、filename 等大 payload 或类型错误仍可能影响 Main | ASR IPC 测试与其余 handler 源码确认 | 后续按当前具体风险逐 channel 限定类型/长度，不建设通用 schema 框架 |
-| TD-11 | **T-05 已缓解**：ASR/粘贴文本使用受控 DOM token，LLM 报告使用严格允许列表，错误使用纯文本 | 主应用不再从不可信文本创建标签或事件属性 | `src/safe-rendering.js`、安全渲染测试、Electron smoke、`src/app.js` 无 `innerHTML` | 后续若词库改为外部数据，继续按不可信输入处理 |
-| TD-12 | LLM fetch 控制风险已由 T-06 缓解；仍无自动重试 | 请求已有超时、取消、Main/Renderer 双层迟到抑制、结构验证和脱敏错误；瞬时失败仍需用户重试 | 25 项 fake-fetch 与 3 项 Renderer 竞态测试、源码确认 | 保留错误契约回归测试；是否重试需单独产品策略，不在请求层盲目加入 |
-| TD-13 | **R-09/本轮数据收口已关闭**：UI 高亮与 lexicon 使用唯一共享规则源 | 内置 filler/hedge/vague 分类一致；emotion JSON 只承载运行时情绪词；customWords 进入有界本地 filler 统计 | shared rule、数据契约与 lexicon 聚焦测试 | 新表达规则只修改 canonical shared 文件 |
-| TD-14 | README 与实现漂移风险 | 用户预期错误 | Phase 0 已修正触发字数、联网边界和平台口径 | 后续行为变更同步 README 与架构文档 |
-| TD-15 | **本轮已关闭**：未启用候选词库曾容易被误认为运行时数据 | 分层候选词库已从活跃数据树与发布载荷移除 | package 配置测试与仓库引用检查 | 只有出现明确产品需求和行为测试时才以新设计重新引入 |
-| TD-16 | **OPS-02 已关闭版本口径分裂** | 应用/制品由 `package.json#version` 唯一驱动，模型独立版本化；历史产品代际名称不再冒充 SemVer | package/lock 1.0.1、CHANGELOG、开发文档 release checklist | 仅在实际安装里程碑更新版本；公开发布再增加 tag/签名/checksums |
-| TD-17 | 生产依赖审计为 0；Forge 7.5/Squirrel 的仅开发传递依赖有 19 high/1 critical 告警 | 不进入应用运行依赖，但打包工具仍处理源码和制品；为避开 Forge 新版 `@electron/rebuild` 的 Git 依赖，本轮保留已验证的 registry-only 组合 | 2026-08-29 `npm audit --omit=dev --json` 为 0；完整 audit 为 20；未使用 `audit fix --force` 或通配 Git/script 放行 | OPS-03 以 registry-only 新组合受控升级；每次重跑干净 make 与 packaged native smoke |
+已由源码和现有验证关闭的历史边界不再逐项复制到本表；理由与落地证据保留在 ADR、Roadmap 和 Git 历史。当前仍会影响后续决策的风险如下：
+
+| ID | 当前风险 | 已有边界 | 下一次触发条件 |
+|---|---|---|---|
+| TD-03 | 真实麦克风/驱动的采样率行为仍无设备证据 | 固定 Electron graph 已覆盖 16/44.1/48 kHz | 有可配置真实设备时复核；实测失败才评估 WASM 备选 |
+| TD-04 | 320 样本块仍经两次 structured clone | 10-block 队列可观测且失败关闭 | 真实推理 profile 证明复制成为瓶颈时再换通道 |
+| TD-07 | `ExpressionTrainer` 仍编排多个训练阶段 | session、stop single-flight、迟到结果和 overrun 已分别受控 | 新状态使现有局部状态无法可靠组合时再抽取状态机 |
+| TD-08 | 无 CI，Experimental 平台无制品证据 | Windows x64 Node/Electron/安装/升级 smoke 已建立 | OPS-01 或实际新增支持平台时增加最小验证 |
+| TD-09 | API Key 仍明文保存在 userData | 原子写、future-schema 防降级与日志脱敏已覆盖 | 公开发布且 keychain 收益超过 native/跨平台成本时复审 |
+| TD-10 | settings/custom-prompt 尚无外层 payload 大小上限；页面也未启用 CSP/sandbox | ASR、文本分析、实时反馈、报告统计和 Markdown 保存已有精确或轻量输入边界；Renderer 无 Node integration | 对应 payload 出现具体资源风险，或进入公开发布安全收口时逐项处理 |
+| TD-12 | LLM 瞬时失败仍需用户重试 | 超时、取消、迟到抑制、响应验证和错误脱敏已覆盖 | 产品确认重试语义后再实现，不在 fetch 层盲目重试 |
+| TD-17 | Forge/Squirrel 的仅开发传递依赖仍有安全告警 | 生产依赖审计为 0，当前组合已有完整打包证据 | 出现具体安全/兼容风险时受控升级并重跑 make/native smoke |
+
+已关闭的结构边界包括：ASR 移出 Main、AudioWorklet 替换废弃节点、Model Manager 安装与回退、配置原子写、安全 DOM 渲染、表达规则同源、未启用数据移出发布树，以及应用/模型版本口径分离。后续行为变化只更新受影响的当前事实，不恢复完整历史台账。
 
 ## 9. 当前架构评价
 
@@ -371,21 +367,14 @@ Settings/Prompt Renderer
 - `contextIsolation:true`、`nodeIntegration:false` 的权限方向；
 - 用户数据已位于 `userData` 而非安装目录。
 
-### 应降低的偶然复杂度
+### 继续控制的复杂度
 
 - Audio 逐块 invoke、TypedArray 规范化与跨进程 structured-clone 复制；
-- 真实模型路径、下载、系统 `tar` 与 Paraformer 初始化已闭环；接近资格线性能仍无证据；
-- 非 ASR IPC 与完整训练状态仍缺少同等级边界；
-- 安全编码、密钥、超时和输入验证不足；
-- 首次安装与 1.0.0→1.0.1 升级已可复现；Experimental 平台支持仍不可复现。
+- 完整训练状态仍由一个 Renderer 编排类组合，只有状态继续增长时才做局部抽取；
+- settings/custom-prompt 外层大小、页面 CSP/sandbox 与明文密钥留到对应具体风险或公开发布收口；
+- 接近资格线性能、真实麦克风和 Experimental 平台仍无证据；
+- 首次安装与 1.0.0→1.0.1 升级已可复现，后续只维护能发现实质回归的验证。
 
-结论：当前项目不是“架构过重”，而是“核心闭环已存在，产品工程边界尚未收敛”。推荐渐进重构，不推倒重写。
+结论：当前内部基线的运行时、评测和交付边界已经收敛。剩余风险应随 Appearance、多模型或公开发布的实际变化渐进处理，不开展脱离当前任务的全面重构。
 
-## 10. 仍需运行验证
-
-1. 在显式清空 npm 与 Electron 下载缓存的独立环境复跑 Electron 43 首次 CLI 下载；当前首次 43.4.1 下载和后续校验缓存恢复均成功。
-2. 验证当前模型下载源、大小、hash、许可证和三个文件的兼容性。
-3. 自动 Electron smoke 已覆盖 BrowserWindow、18 项 Preload API（含诊断导出入口）、设置页、utility-process Fake ASR 的 session/event、stale feed、强制退出报告与重建、Fake LLM、粘贴分析以及 16/44.1/48 kHz graph fixture，并确认 Main 不加载真实 Sherpa。PKG-02/PKG-03 进一步证明打包后的 utility process 可加载 native addon 并运行真实 Paraformer 最小会话；真实麦克风和人工交互仍需运行验证。
-4. 以真实可配置的 16/44.1/48 kHz 麦克风/驱动复核已记录的请求、context 与 track rate；该项为非阻塞 follow-up。
-5. profile TD-01～TD-04 的 Main 延迟、GC、CPU、RAM 和队列。
-6. 其他 OS/arch 在各自产生 package/smoke/native-model 证据前保持 Experimental；Windows x64 公开发布仍需签名与真实设备证据。
+需要补充的设备、平台和公开发布证据统一维护在[支持矩阵](../support-matrix.md)与[Roadmap](../roadmap.md)，本文件不复制验证待办。
