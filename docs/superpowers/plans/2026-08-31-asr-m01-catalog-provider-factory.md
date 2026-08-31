@@ -90,12 +90,12 @@ feat: create ASR providers through a trusted factory
 
 ## Task 5: Verify ASR-M01 and update current truth
 
-- [ ] Run the complete automated suite and record exact pass/fail/skip counts.
-- [ ] Confirm product runtime modules do not import `benchmark/`, no dependency changed, and no SelectionStore/service/UI/IPC code was added.
-- [ ] Update `docs/requirements/requirements.md`, `docs/roadmap.md`, `docs/architecture/current.md`, and `docs/development.md` to mark only ASR-M01 implemented; leave ASR-M02+ planned and public redistribution gated.
-- [ ] Mark the multi-ASR design as partially implemented through ASR-M01 and mark this plan completed with evidence.
-- [ ] Run the full suite again after documentation, then inspect `git diff --check` and `git status --short`.
-- [ ] Commit with an English subject and a Chinese body.
+- [x] Run the complete automated suite and record exact pass/fail/skip counts: 312 tests, 310 pass, 0 fail, 2 existing Windows file-symlink skips.
+- [x] Confirm product runtime modules do not import `benchmark/`, no dependency changed, and no SelectionStore/service/UI/IPC code was added.
+- [x] Update `docs/requirements/requirements.md`, `docs/roadmap.md`, `docs/architecture/current.md`, and `docs/development.md` to mark only ASR-M01 implemented; leave ASR-M02+ planned and public redistribution gated.
+- [x] Mark the multi-ASR design as partially implemented through ASR-M01 and mark this plan completed with evidence.
+- [x] Run the full suite again after documentation, then inspect `git diff --check` and `git status --short`.
+- [x] Commit with an English subject and a Chinese body.
 
 Expected commit:
 

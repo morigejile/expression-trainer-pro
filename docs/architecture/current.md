@@ -1,6 +1,6 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09、PKG-01～PKG-04 与 CONV-01～CONV-03 Completed；ADR-0009 采用 Zipformer Large 技术默认
+> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09、PKG-01～PKG-04、CONV-01～CONV-03 与 ASR-M01 Completed；ADR-0009 采用 Zipformer Large 技术默认
 > 基线日期：2026-08-31
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
 > 描述对象：截至 Phase 4 / R-09；保留 Electron 43 与 T-04～T-08 行为基线
@@ -33,8 +33,11 @@ lib/asr-utility-process.js      独立 Provider/Sherpa 执行入口
 lib/managed-asr-provider.js     版本化默认模型准备、native 探测、激活与一次回退
 lib/fake-asr-provider.js        业务与 smoke 使用的 session-aware Fake Provider
 lib/asr.js                      Paraformer adapter；封装 Sherpa、role 文件路径和固定配置
+lib/zipformer-ctc-asr-provider.js Zipformer Small/Large 共用的 streaming CTC adapter
+lib/asr-provider-factory.js     两种受信任 providerType 的冻结构造映射与代码能力声明
+lib/model-catalog.js            schema-v2 产品 Catalog 校验与深冻结加载
 lib/model-manager.js            模型下载、校验、安装锁、原子发布/激活和回退
-models/registry.json            默认产品模型的版本、兼容性、来源与 hash
+models/registry.json            三款 streaming 产品模型的版本、来源、运行文件、hash 与许可状态
 src/asr-event-state.js          Renderer 侧 session/sequence 过滤与失效
 src/audio-capture.js            麦克风、16 kHz context、AudioWorklet、epoch/flush 与资源生命周期
 src/audio-chunk-collector.mjs   可变量子下混、320 帧汇集和非空 tail
@@ -81,8 +84,8 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 | 音频 | 独立 AudioCapture：`getUserMedia` + `AudioContext({sampleRate:16000,latencyHint:'interactive'})` | Renderer 只编排 session/UI；请求/context/可用 track rate 可诊断 |
 | 音频节点 | AudioWorklet + 320 帧 mono Float32 collector | capture epoch 隔离暂停前旧块；正常 stop flush tail；固定 Electron fixture 覆盖 16/44.1/48 kHz |
 | 权限桥接 | Preload `contextBridge` + `ipcRenderer.invoke` | `contextIsolation:true`、`nodeIntegration:false` |
-| ASR 引擎 | `sherpa-onnx-node` `1.13.3`（精确版本） | 仅由 utility process 内的 Paraformer Provider 延迟加载，Main 不 require；packaged native-load smoke 已通过 |
-| ASR 模型 | `paraformer-bilingual-zh-en/2024-03-10` | registry 固定 archive/runtime；INT8 encoder/decoder + tokens 安装到 `userData/models`，权重不纳入 Git |
+| ASR 引擎 | `sherpa-onnx-node` `1.13.3`（精确版本） | 仅由 utility process 内的 Provider 延迟加载，Main 不 require；Paraformer 与 Zipformer CTC 构造由闭合 Factory 映射，packaged native-load smoke 已通过当前 Paraformer 路径 |
+| ASR 模型 | Catalog：Paraformer、Zipformer Small、Zipformer Large；当前启动：`paraformer-bilingual-zh-en/2024-03-10` | registry 固定 archive/runtime 与许可状态；权重不纳入 Git；SelectionStore 与运行时切换尚未实现 |
 | 本地分析 | `lib/lexicon.js` + `data/emotion-lexicon.json` + `shared/expression-rules.js` | 146 个情绪词；16 个填充词、14 个犹豫词、20 组笼统词映射由 Renderer/Main 共用；未启用数据不放入活跃 `data/` 目录 |
 | LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接/实时/报告分别为 10/15/60 秒超时，并支持 AbortSignal、按 Renderer 取消和异常响应验证 |
 | 设置 | `userData/llm-provider-settings.json`、legacy `userData/settings.json`、`userData/custom-prompt.json` | 当前 schema version 1；LLM provider 从旧文件单向迁移且保留旧文件，canonical/legacy future schema 显式保存被拒绝；小文件同步但以同盘临时文件/fsync/rename 原子发布；API Key 明文 |
@@ -97,11 +100,11 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 
 当前 registry 的七个候选均为 `verified`，具备固定 runtime-file hash、native-load 与 BM-04 benchmark 证据；其中 FireRedASR2 CTC、Qwen3-ASR 和两个 SenseVoice 版本按 utterance 契约只输出 final。模型证据保存在 Git 外，所有候选继续保持 `redistribution: not-approved`；技术验证不等于公开打包获批。
 
-### 3.2 R-07/R-08 Model Manager 与生产接入（Completed）
+### 3.2 R-07/R-08 Model Manager 与 ASR-M01 Catalog/Factory（Completed）
 
-产品层已有独立 `models/registry.json` 与 `lib/model-manager.js`，不依赖 `benchmark/`。registry 只固定 ADR-0005 接受的 Paraformer archive/runtime 文件 URL、大小和 SHA-256；模型安装位于 `userData/models`，使用跨 utility 安装锁、按年龄清理的同盘 `.staging`、流式下载大小上限、archive/runtime 双重校验、白名单解压、不可变 `model/version` 目录、active pointer 和显式上一版本 rollback。中断、错误 hash、解压失败或空间不足不会替换旧 active。
+产品层以 `models/registry.json` 作为唯一 schema-v2 Catalog，不依赖 `benchmark/`。它仅固定 Paraformer、Zipformer Small 与 Zipformer Large 三款 streaming 模型的 HTTPS archive、最终运行文件、大小、SHA-256、最低应用版本及许可状态；加载器执行精确字段和路径校验并深冻结结果。ModelManager 使用该 Catalog，模型安装位于 `userData/models`，保留跨 utility 安装锁、同盘 `.staging`、流式大小上限、双重校验、白名单解压、不可变 `model/version` 目录、active pointer 和显式上一版本 rollback。
 
-R-08 已由 Main 向正常 utility process 传入 `userData` 与 app version；Fake smoke 分支仍先行且不加载 Sherpa/Model Manager。生产 provider 解析 active 版本，无 active 时安装但不立即激活；只有 role 路径通过 Paraformer native 初始化后才更新 active。当前版本损坏或 native 加载失败时，上一版本也先 native 探测，成功后才切换指针，且不循环回退。初始化可取消并使用独立 30 分钟预算；PKG-03 首次安装 smoke 使用与外层一致的 45 分钟预算。`.tar.bz2` 继续调用系统 `tar`，真实 1 GB archive、系统工具和 packaged native 初始化已在 PKG-03 闭环。
+R-08 已由 Main 向正常 utility process 传入 `userData` 与 app version；Fake smoke 分支仍先行且不加载 Sherpa/Model Manager。ASR-M01 的 Factory 只接受 `sherpa.online-paraformer` 与 `sherpa.online-ctc`，校验绝对 role 路径，能力由代码声明为 16 kHz streaming/partial，不读取 Catalog 模块路径或能力。当前 managed 启动显式固定 Paraformer，只有 native 初始化成功后才激活；Zipformer Large 的技术默认、选择恢复和 controller 切换留给 ASR-M02。现有取消、一次回退与 30 分钟首次初始化预算保持不变。
 
 ### 3.3 PKG-02 Windows x64 packaging（Completed）
 
@@ -201,15 +204,15 @@ R-02 已建立 ASR session/event 状态，R-03/R-04 已把采集生命周期和 
 
 设置和 Prompt 文件仍使用同步 API，但数据量很小，写入通过同目录临时文件、fsync 与 rename 防止中断留下半文件；只有实测 Main 卡顿时才改异步 store。
 
-### 5.4 ASR Provider / `lib/asr-provider.js`、`lib/asr-session.js`、`lib/asr.js`
+### 5.4 ASR Provider / session / trusted Factory
 
-R-08 后，Main 只持有同一 Provider 契约形状的 `AsrProcessController`；实际 session wrapper、managed provider、Paraformer adapter、Sherpa 对象和模型均位于 utility process。`lib/asr-session.js` 维护单一 active session：start 创建 session 并发出 `ready`，feed 验证连续 input sequence 并发出 `partial/final/error`，stop flush 后发出可选 `final` 和必有 `stopped`，cancel 不 flush 且发出 `stopped`。生产 `createParaformerAsrProvider()` 仍只支持一个并发识别流，其固定配置包括：
+Main 只持有同一 Provider 契约形状的 `AsrProcessController`；实际 session wrapper、managed provider、adapter、Sherpa 对象和模型均位于 utility process。`lib/asr-session.js` 维护单一 active session：start 创建 session 并发出 `ready`，feed 验证连续 input sequence 并发出 `partial/final/error`，stop flush 后发出可选 `final` 和必有 `stopped`，cancel 不 flush 且发出 `stopped`。Paraformer 与两款 Zipformer 均由受信任 Factory 创建，Small/Large 共用 `zipformer2Ctc` adapter；每个 Provider 仍只支持一个并发识别流，固定配置包括：
 
-- 从 active/default 版本取得 encoder、decoder、tokens 的绝对 role 路径；
+- 从已安装版本取得 Paraformer 的 encoder/decoder/tokens 或 Zipformer 的 model/tokens 绝对 role 路径；
 - feat sample rate 16000、feature dim 80；
 - CPU、2 threads、greedy search、endpoint rules。
 
-adapter `feed()` 总以 `sampleRate:16000` 调用 `acceptWaveform`，同步循环 decode，并保持 `{text,isFinal}` / `null` 结果；adapter `stop()` flush 并返回最后的未确认文本。重复 `initialize()` 复用 recognizer，session start 创建新 stream。`lib/fake-asr-provider.js` 通过同一 session wrapper 用于普通测试与 Electron smoke；没有加入多模型注册、通用依赖注入或新依赖。
+adapter `feed()` 总以 `sampleRate:16000` 调用 `acceptWaveform`，同步循环 decode，并保持 `{text,isFinal}` / `null` 结果；adapter `stop()` flush 并返回最后的未确认文本。重复 `initialize()` 复用 recognizer，session start 创建新 stream。`lib/fake-asr-provider.js` 通过同一 session wrapper 用于普通测试与 Electron smoke；未增加公开可变 Registry、通用 Provider 插件或新依赖。
 
 T-04/R-02 后，`src/app.js` 会把当前 session 的 `final` 事件经 `mergeFinalText()` 去重后合并；非空尾部文本进入逐字稿、分析统计和后续报告，空文本或与 endpoint 相同的文本不会重复更新状态。`stopRecording()` 等待 stop envelope 中尾部 final 的本地分析完成，再开放报告操作；分析或取消失败显示安全错误，但 `finally` 仍复位录音状态和 UI。
 
@@ -254,7 +257,7 @@ providers.custom     { apiKey, baseUrl, model, customModel }
 
 旧版扁平字段、缺失 provider 字段和旧文件名 `settings.json` 在读取时迁移为 schema version 1；canonical 文件优先，迁移后不删除 legacy 文件，也不按时间戳合并。损坏 JSON 使用默认配置运行并保留原文件，未知 provider 配置块不会在规范化时被删除。canonical 或 legacy future schema 可读取已知子集，显式保存则返回稳定错误且不写文件。LLM provider 与 custom-prompt 都使用同盘原子写，发布失败保留旧文件并清理临时文件。API Key 仍为明文；当前内部阶段不为此增加 native keychain 依赖，发布前再按平台成本评估。`custom-prompt.json` 保存 versioned goals、customRules、styleRef、customWords。训练文本、统计和报告仅在 Renderer 内存中，除非用户手动复制/保存。
 
-Appearance 和多模型选择仍为 Planned，尚不存在于当前用户数据结构；后续分别使用 `appearance.json` 与 `asr-selection.json`，不重新并入 LLM provider 配置。
+Appearance 和多模型选择持久化仍未进入当前用户数据结构；后续分别使用 `appearance.json` 与 `asr-selection.json`，不重新并入 LLM provider 配置。ASR-M01 只完成 Catalog/Factory/Provider，未提前创建选择数据。
 
 ### 5.8 Benchmark dataset boundary (BM-01)
 

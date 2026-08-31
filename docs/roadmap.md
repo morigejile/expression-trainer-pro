@@ -2,7 +2,7 @@
 
 > 状态：Active execution baseline
 > 更新日期：2026-08-31
-> 当前进度：Phase 0-5 的内部基线、R-01～R-09、PKG-01～PKG-04、OPS-02/OPS-05、七候选 benchmark 与 CONV-01～CONV-03 已完成。下一主线是 UI-01/UI-02 与 ASR-M01～ASR-M03；两条轨道使用独立分支，ASR-M04 继续受许可和公开制品条件约束。
+> 当前进度：Phase 0-5 的内部基线、R-01～R-09、PKG-01～PKG-04、OPS-02/OPS-05、七候选 benchmark、CONV-01～CONV-03 与 ASR-M01 已完成。ASR 后续主线从 ASR-M02 继续；ASR-M04 仍受许可和公开制品条件约束。
 > 当前模式：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞后续工作；只有它们使当前技术实验无法运行或结论失效时，才阻塞当前路径。
 
 ## 1. 目标与排序原则
@@ -13,7 +13,8 @@
 已完成 Paraformer/安装/benchmark 基线
 → CONV-01 文档与职责收敛
 → CONV-02/CONV-03 基线代码风险
-→ UI-01/UI-02 与 ASR-M01～M03 可独立推进
+→ UI-01/UI-02 与 ASR-M01 分轨推进；ASR-M01 已完成
+→ ASR-M02/M03 继续选择、切换、安装与设置链路
 → ASR-M04 受许可与公开制品条件约束
 → ASR-U01/ASR-U02 在 streaming 稳定后再确认
 ```
@@ -89,7 +90,7 @@ CONV-02 与 CONV-03 使用独立实施计划和提交，不与 Appearance、多�
 
 | ID | P | 状态 | 任务 | 依赖 | 完成标准 |
 |---|---|---|---|---|---|
-| ASR-M01 | P1 | Planned | 演进产品 Catalog schema，以内含受信任映射的 ProviderFactory 接入三款 streaming provider | CONV-02,CONV-03,ADR-0009 | 当前 Paraformer 回归不变；三款模型由同一工厂创建；不建立独立空转 Registry service |
+| ASR-M01 | P1 | Completed | schema-v2 唯一产品 Catalog、受信任 ProviderFactory 与三款 streaming provider；当前启动固定 Paraformer | CONV-02,CONV-03,ADR-0009 | 312 项全量测试中 310 pass、0 fail、2 个既有 Windows symlink skip；无 benchmark runtime import、无新依赖或空转 Registry service |
 | ASR-M02 | P1 | Planned | AsrSelectionStore、AsrModelService、启动恢复和 controller 切换 | ASR-M01 | 无活动 session 时可切换；稳定文件损坏可恢复默认，瞬时 native/资源失败不永久改写选择 |
 | ASR-M03 | P1 | Planned | 独立安装任务、模型管理 IPC 和设置页模型区域 | ASR-M02 | 下载可取消重试；Renderer 不提交路径、URL 或 providerType；安装不影响当前识别 |
 | ASR-M04 | P1 | Planned/External Gate | Zipformer Large 包内默认、升级保留和真实模型资格验证 | ASR-M03,redistribution approved | 离线首次导入、native 初始化、二次启动和升级保留通过；公开制品满足签名与许可要求 |
@@ -124,7 +125,7 @@ Utterance 不进入当前 streaming 关键路径；开始 ASR-U01 前必须重�
 | R-08 | P1 | 激活版本化默认模型（Completed） | utility process 从 `userData/models` 解析或安装 registry 默认 Paraformer；使用 role→绝对路径配置，native 初始化成功后才原子激活；当前版本损坏或加载失败时只探测并切换一次上一版本 | R-06,R-07,D-02 | 聚焦测试覆盖首次安装、single-flight、取消、role config、激活时序、损坏 active 与失败回退；PKG-03 已完成 packaged 真实模型初始化与离线二次启动 |
 | R-09 | P1 | 收敛设置/规则/日志（Completed） | settings 与 custom-prompt 使用同盘临时文件 + fsync + rename 原子写；旧 schema 自动迁移，future schema 自动加载不写回；字幕与本地分析共用唯一规则源，customWords 作为有界 filler 生效；现有错误日志维持脱敏边界，不引入 keychain/native 依赖 | T-03,R-07 | R-09 聚焦测试覆盖读取和原子发布、规则同源、自定义 filler 与错误脱敏；当时未覆盖的 LLM provider 显式保存防降级已由 CONV-03 完成；OPS-05 已补固定白名单诊断导出 |
 
-R-01～R-09、D-03/D-04、PKG-01～PKG-04 与 BM-04 已完成当前最小边界。七候选均已验证；ADR-0009 已采用 Zipformer Large 技术默认，公开分发仍取决于许可与产品链路验收。
+R-01～R-09、D-03/D-04、PKG-01～PKG-04、BM-04 与 ASR-M01 已完成当前最小边界。产品 Catalog 已固定三款 streaming 模型并由闭合 Factory 创建；当前启动继续使用 Paraformer，选择与切换从 ASR-M02 继续。公开分发仍取决于许可与产品链路验收。
 
 ### 6.1 内部 benchmark 候选（不改变当前 Paraformer 运行时）
 
@@ -168,7 +169,7 @@ ADR-0009 已采用 Zipformer Large 作为后续产品化的技术默认；当前
 | M4 可安装发布 | In Progress | PKG-01～PKG-06（PKG-01～PKG-04 Completed；PKG-05/PKG-06 为外部发布跟进） | Windows x64 内部安装/升级闭环已完成；公开发布仍需签名与对应平台证据 |
 | M5 可长期维护 | In Progress | OPS-01～OPS-06（OPS-02/OPS-05 Completed） | 版本与脱敏诊断基线已完成；CI、依赖和模型生命周期待按实际风险推进 |
 | M6 合并后收敛 | Completed | CONV-01～CONV-03 | 文档真相源一致；benchmark writer 竞态与 LLM provider 配置边界已关闭；Node 24.20.0 全量测试通过 |
-| M7 新需求产品化 | Planned | UI-01～UI-02、ASR-M01～ASR-M04 | 响应式外观与三款 streaming 模型分轨交付；公开默认模型受许可约束 |
+| M7 新需求产品化 | In Progress | UI-01～UI-02、ASR-M01～ASR-M04（ASR-M01 Completed） | 三款 streaming Catalog/Factory 已完成；选择、安装、响应式外观及公开默认模型条件继续分轨交付 |
 
 ## 10. 明确不做
 

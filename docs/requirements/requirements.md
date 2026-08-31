@@ -53,7 +53,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | FR-E08 | 应用应保存各 LLM Provider 配置并兼容旧版扁平配置。 | “保存设置”只持久化，“测试连接”只验证当前表单草稿，两者具有独立忙碌和结果状态；配置原子写入 Electron `userData/llm-provider-settings.json`，按 provider 保存；新文件不存在时从旧 `settings.json` 单向迁移且不删除旧文件。高于当前支持版本的 canonical 或 legacy schema 可读取已知字段，但显式保存被拒绝。API Key 当前为明文，属于发布前安全权衡。 |
 | FR-E09 | 用户应能编辑训练目标、自定义规则、风格参考和额外口癖词。 | versioned 内容原子写入 `userData/custom-prompt.json`；实时/报告 prompt 读取，额外口癖词也作为最多 64 个有界 filler 参与本地统计；存在未保存修改时离开编辑器需确认。 |
 | FR-E10 | 用户应能复制或保存原文与报告。 | 原文可复制/保存为 Markdown；报告可复制/保存为 Markdown；保存路径通过系统对话框选择；取消或失败时给出可见反馈。 |
-| FR-E11 | 当前 Paraformer 应通过轻量 ASR Provider 边界访问。 | Main 只依赖 initialize/start/feed/stop/cancel/dispose 契约；Fake Provider 可在不加载真实 Paraformer/Sherpa 模块时验证业务与 Electron smoke 路径。 |
+| FR-E11 | 产品 ASR 应通过轻量 Provider 边界访问。 | Main 只依赖 initialize/start/feed/stop/cancel/dispose 契约；受信任 Factory 以代码内冻结映射创建 Paraformer 或 Zipformer CTC Provider，Fake Provider 可在不加载真实 Sherpa 模块时验证业务与 Electron smoke 路径。 |
 | FR-E12 | 默认中文模型选择应由项目数据 benchmark 和明确产品取舍支持。 | 七候选比较结果可复跑；ADR-0009 记录采用 Zipformer Large 技术默认、保留 streaming UX 与按批次产品化的理由。 |
 | FR-E13 | 用户应能在应用内查看帮助并记录内部测试反馈。 | 主页面“帮助”弹窗提供快速使用说明和统一的“问题和建议”在线文档入口；诊断信息沿用脱敏 JSON 导出并由用户按需补充到在线文档。 |
 | FR-E14 | 用户配置或操作无法完成时应获得可恢复的具体提示。 | 设置页显示校验或连接失败原因；实时反馈和报告的配置错误可直接打开设置；空粘贴、重复请求和内容覆盖有明确保护。 |
@@ -67,13 +67,13 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | ID | 状态 | 需求 | 验收标准 |
 |---|---|---|---|
 | FR-P05 | Existing | 应提供轻量 Model Manager。 | R-07/R-08 已实现独立清单、HTTPS 下载、archive/runtime SHA-256、白名单解压、安装锁、原子发布/激活，并把 active/default 路径接入生产 Provider；回退版本先通过 native 初始化才切换指针。 |
-| FR-P06 | Existing | 模型与应用版本应解耦。 | 产品清单包含 model ID、version、engine、languages、mode、采样率、兼容应用版本、archive/runtime 来源与 hash；安装目录按 model/version 不可变。 |
+| FR-P06 | Existing | 模型与应用版本应解耦。 | schema-v2 产品 Catalog 包含 model ID、version、provider type、兼容应用版本、固定 source/runtime 文件、大小、hash 与许可状态；安装目录按 model/version 不可变。 |
 | FR-P08 | Existing | 应用应能生成普通用户可安装的桌面制品。 | Electron Forge/Squirrel 已生成 Windows x64 Setup/nupkg/RELEASES；PKG-03/PKG-04 证明安装、启动、真实模型、升级与卸载路径不要求终端用户安装 Node.js、Python、CMake 或编译器。公开发布仍需签名与目标环境证据。 |
 | FR-P09 | Existing | 设置、用户数据、模型、缓存和日志应与程序文件分离。 | 设置与版本化模型位于 Electron `userData`；PKG-04 已验证应用升级、手工旧安装器降级、恢复当前版本及卸载均不静默删除这些数据。日志与模型资产缓存仍按各自开发/运行目录管理。 |
 | FR-P10 | Existing | 本地训练在 LLM 不可用时仍应工作。 | 离线、无 API Key 或 LLM 请求失败时，录音、本地 ASR 和基础词库分析仍可完成。 |
 | FR-P11 | Existing | LLM Provider 配置应具有独立且可识别的持久化与接口命名。 | `8b93f88` 已实现 `settings.json` 到 `llm-provider-settings.json` 的单向迁移；配置模块、Preload API 和 IPC 使用 LLM provider 语义名称；canonical 或 legacy 来源遇到高于当前支持版本的 schema 时拒绝显式保存；不与 Appearance 或 ASR 选择共享完整快照。 |
 | FR-P12 | Planned | 用户应能选择四个内置主题和 coach-rail/focus-hud 两种响应式布局。 | 外观使用独立 `appearance.json`；主题与布局可即时切换、跨窗口同步和重启恢复；训练中切换不重建 DOM，不改变 session、内容、pending 请求或滚动位置；最小窗口下字幕和反馈不被遮挡。 |
-| FR-P13 | Planned | 用户应能安装、选择和切换受信任 Catalog 中的 streaming ASR 模型。 | 第一批仅含 Paraformer、Zipformer Small 和 Zipformer Large；产品 registry 是唯一 Catalog 数据源；下载、hash、解包与版本生命周期由 ModelManager 管理；无活动 session 时由 AsrModelService 切换单一 controller；稳定损坏与瞬时初始化失败采用不同持久化语义。 |
+| FR-P13 | Partial | 用户应能安装、选择和切换受信任 Catalog 中的 streaming ASR 模型。 | ASR-M01 已完成仅含 Paraformer、Zipformer Small 和 Zipformer Large 的唯一产品 Catalog、固定来源/文件校验及闭合 ProviderFactory；当前启动仍固定 Paraformer。SelectionStore、AsrModelService、controller 切换、模型管理 IPC/UI 属于 ASR-M02/M03。 |
 | FR-P14 | Planned | 产品可在 streaming 轨道稳定后支持明确列出的 utterance ASR 模型。 | 第二批只含 SenseVoiceSmall 和 FireRedASR2；停止后解码、无 partial、5 分钟有界 PCM、cancel、失败和 session 隔离通过；不得阻塞第一批 streaming 交付或为其他候选预建适配器。 |
 
 ## 5. 非功能需求（NFR）
@@ -101,7 +101,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 - 目标是降低总体维护和交付复杂度，而不是机械减少文件数、模块数或安装包体积。
 - ASR Provider 和 Model Manager 必须保持轻量；不建设通用框架、模型数据库或模型市场。
 - BM-04 已完成七候选比较；ADR-0009 采用 Zipformer Large 作为技术默认，并保留 streaming 交互。公开分发仍受模型许可与打包验收约束。
-- 七个 registry 候选均已具备 hash、native-load 与 benchmark 证据；候选验证不等于公开再分发获批，也不表示响应式主题设计已经实现。
+- benchmark 的七个候选均已有 hash、native-load 与比较证据；产品 Catalog 仅纳入首批三款 streaming 模型，且全部保持 `redistribution: not-approved`。候选验证与产品接入均不等于公开再分发获批。
 - 架构迁移采用渐进重构，不推倒重写，不以切换 Electron/Tauri/WASM 为默认路径。
 
 ## 7. 发布级验收场景
@@ -146,5 +146,5 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 - 当前实现：[Current Architecture](../architecture/current.md)
 - 决策记录：[ADR Index](../architecture/adr/README.md)
 - 交付顺序：[Roadmap](../roadmap.md)
-- Planned 多模型设计：[Multi-ASR Productization](../superpowers/specs/2026-08-30-multi-asr-models-design.md)
+- 部分实现的多模型设计（ASR-M01 已完成）：[Multi-ASR Productization](../superpowers/specs/2026-08-30-multi-asr-models-design.md)
 - Planned 外观设计：[Responsive Themed UI](../superpowers/specs/2026-08-31-responsive-themed-ui-design.md)

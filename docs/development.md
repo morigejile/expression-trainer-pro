@@ -79,11 +79,11 @@ git commit -m "<English subject>" -m "中文：<简短说明>"
 
 Appearance 和 ASR selection 分别使用 Planned 的 `appearance.json` 与 `asr-selection.json`，不得合并进 LLM provider 配置快照。
 
-CONV-02/CONV-03 收尾已在 Node 24.20.0/npm 11.19.0 运行完整 `npm test`：297 项中 295 pass、0 fail、2 skip；两项 skip 是当前 Windows host 不允许创建 file symlink，directory junction 边界测试仍通过。
+ASR-M01 收尾在 Node 24.20.0 运行完整 `node --test`：312 项中 310 pass、0 fail、2 skip；两项 skip 是当前 Windows host 不允许创建 file symlink，directory junction 边界测试仍通过。
 
 ## ASR 模型
 
-模型权重不进入 Git。当前已实现的产品运行时仍由 utility process 根据 `models/registry.json` 自动下载并校验 Paraformer，安装到 Electron `userData/models/paraformer-bilingual-zh-en/2024-03-10/`；native 初始化成功后才更新 active pointer。ADR-0009 已选择 Zipformer Large 作为后续产品化的技术默认，但模型切换和交付尚未接入这条运行时路径。archive/runtime 的固定大小、hash 与再分发状态见 registry 和 ADR-0004/0009。
+模型权重不进入 Git。`models/registry.json` 已演进为唯一 schema-v2 产品 Catalog，仅包含 Paraformer、Zipformer Small 和 Zipformer Large 三款 streaming 模型；固定 archive/runtime 大小、SHA-256、role、最低应用版本与 `redistribution: not-approved`。`lib/asr-provider-factory.js` 只以代码内冻结映射创建 Paraformer 或 Zipformer CTC Provider，Catalog 不提供模块路径或运行能力。当前 utility 启动仍显式固定 Paraformer，并在 native 初始化成功后才更新 active pointer；选择与切换从 ASR-M02 继续。
 
 内部开发阶段 `.tar.bz2` 解包调用系统 `tar`。PKG-03 已证明 packaged utility 可从零下载并校验真实约 1 GB Paraformer、调用系统 `tar`、完成 native 初始化和强制离线二次启动，且模型仍位于安装目录外。真实麦克风、接近资格线硬件、macOS/Linux 和正式发布制品仍需对应环境证据。
 
@@ -102,7 +102,7 @@ CONV-02/CONV-03 收尾已在 Node 24.20.0/npm 11.19.0 运行完整 `npm test`：
 
 BM-01 已完成的数据采集、人工 review 和 freeze 工具已归档到 Git 历史，不再作为当前维护入口。若引入新语料，必须先明确重开该工作并重新评估所需工具，不能把现有冻结结果当作通用数据治理平台。
 
-BM-04 已完成七候选验证，ADR-0009 据此选择 Zipformer Large 作为后续产品化的技术默认。当前产品运行时仍固定使用 Paraformer；候选验证不代表模型切换已经实现，也不代表公开发布具备再分发授权。
+BM-04 已完成七候选验证，ADR-0009 据此选择 Zipformer Large 作为技术默认。ASR-M01 已把三款 streaming 模型接入产品 Catalog/Factory，但当前启动仍固定 Paraformer；候选验证和技术接入均不代表模型切换已经实现，也不代表公开发布具备再分发授权。
 
 ## 发布边界
 
