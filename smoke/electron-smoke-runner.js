@@ -182,6 +182,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     hedgeClass: 'stat-value stat-orange',
     densityHelp: '有效词数（排除填充词和犹豫词）占总词数的比例'
   });
+  if (process.platform !== 'darwin') {
+    assert.equal(mainWindow.isMenuBarVisible(), false, 'main window must not render a second menu header');
+  }
 
   const appearanceIpcState = await mainWindow.webContents.executeJavaScript(`(async () => {
     const received = [];
@@ -583,6 +586,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     });
   });
   await waitForPage(settingsWindow, 'settings.html');
+  if (process.platform !== 'darwin') {
+    assert.equal(settingsWindow.isMenuBarVisible(), false, 'settings window must not render a second menu header');
+  }
   const settingsState = await waitUntil('settings page initialization', async () => {
     return settingsWindow.webContents.executeJavaScript(`(() => {
       const provider = document.getElementById('provider');
@@ -727,6 +733,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     });
   });
   await waitForPage(promptEditorWindow, 'prompt-editor.html');
+  if (process.platform !== 'darwin') {
+    assert.equal(promptEditorWindow.isMenuBarVisible(), false, 'prompt editor must not render a second menu header');
+  }
   assert.equal(
     promptEditorWindow.webContents.listenerCount('will-prevent-unload') > 0,
     true,
