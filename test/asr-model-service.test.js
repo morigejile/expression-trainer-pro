@@ -63,7 +63,8 @@ test('missing selection starts the Catalog default and persists it only after in
   assert.deepEqual(service.snapshot(), {
     status: 'ready', selectedModelId: LARGE, effectiveModelId: LARGE,
     overrideModelId: null, targetModelId: null, activeSession: false,
-    recoveryNotice: null, lastErrorCode: null
+    recoveryNotice: null, lastErrorCode: null,
+    lastInitializationElapsedMs: null, lastErrorCategory: null
   });
 });
 

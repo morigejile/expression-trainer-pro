@@ -67,12 +67,12 @@ feat: coordinate ASR selection and controller switching
 
 ## Task 4: Integrate startup selection into Electron Main
 
-- [ ] Add or update Electron smoke/source tests first for service composition, exact `--asr-model=<modelId>` parsing, selected model propagation, and bounded shutdown.
-- [ ] Compose Catalog, ModelManager, SelectionStore, controller factory, and AsrModelService in Main; pass only the selected model ID and installed-only flag to the utility process.
-- [ ] Keep the existing recording IPC contract unchanged; do not expose switch/install IPC before ASR-M03.
-- [ ] Preserve managed-model smoke by explicitly selecting the current Paraformer fixture path.
-- [ ] Run Electron smoke, managed-model smoke tests, diagnostics, packaging config, and complete ASR tests.
-- [ ] Commit with an English subject and a Chinese body.
+- [x] Add or update Electron smoke/source tests first for service composition, exact `--asr-model=<modelId>` parsing, selected model propagation, and bounded shutdown.
+- [x] Compose Catalog, ModelManager, SelectionStore, controller factory, and AsrModelService in Main; pass only the selected model ID and installed-only flag to the utility process.
+- [x] Keep the existing recording IPC contract unchanged; do not expose switch/install IPC before ASR-M03.
+- [x] Preserve managed-model smoke by explicitly selecting the current Paraformer fixture path.
+- [x] Run Electron smoke, managed-model smoke tests, diagnostics, packaging config, and complete ASR tests.
+- [x] Commit with an English subject and a Chinese body.
 
 Expected commit:
 

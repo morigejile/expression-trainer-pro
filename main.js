@@ -22,7 +22,11 @@ const {
 } = require('./lib/llm-provider-store');
 const { createAsrIpcRouter } = require('./lib/asr-ipc');
 const { createAsrProcessController } = require('./lib/asr-process-controller');
+const {createAsrSelectionStore} = require('./lib/asr-selection-store');
+const {createModelManager} = require('./lib/model-manager');
+const {createAsrUtilityArgs, createMainAsrProvider} = require('./lib/asr-main-composition');
 const {runManagedModelSmoke} = require('./lib/managed-model-smoke');
+const modelRegistry = require('./models/registry.json');
 
 const isSquirrelStartup = require('electron-squirrel-startup');
 if (isSquirrelStartup) app.quit();
@@ -33,25 +37,6 @@ const isManagedModelSmokeTest = process.argv.includes('--managed-model-smoke-tes
 const isOfflineModelSmoke = process.env.EXPRESSION_TRAINER_MODEL_SMOKE_OFFLINE === '1';
 if (isNativeAddonSmokeTest || isManagedModelSmokeTest) app.disableHardwareAcceleration();
 const smokeTest = isSmokeTest ? require('./smoke/electron-smoke-runner') : null;
-const asrProvider = createAsrProcessController({
-  initializeTimeoutMs: isManagedModelSmokeTest ? 45 * 60_000 : undefined,
-  spawn: () => {
-    const args = isSmokeTest
-      ? ['--fake-asr']
-      : [
-          '--user-data-path', app.getPath('userData'),
-          '--app-version', app.getVersion(),
-          '--model-id', 'paraformer-bilingual-zh-en'
-        ];
-    if (isManagedModelSmokeTest && isOfflineModelSmoke) args.push('--offline-model-smoke');
-    return utilityProcess.fork(
-      path.join(__dirname, 'lib', 'asr-utility-process.js'),
-      args,
-      { serviceName: 'expression-trainer-asr', stdio: 'pipe' }
-    );
-  }
-});
-const asrIpc = createAsrIpcRouter({ provider: asrProvider });
 const {
   createRequestCoordinator,
   runCoordinatedRequest,
@@ -72,6 +57,52 @@ if (isNativeAddonSmokeTest || isManagedModelSmokeTest) {
   }
   app.setPath('userData', userDataPath);
 }
+
+function forkAsrUtility(args) {
+  return utilityProcess.fork(
+    path.join(__dirname, 'lib', 'asr-utility-process.js'),
+    args,
+    {serviceName: 'expression-trainer-asr', stdio: 'pipe'}
+  );
+}
+
+function processControllerFor({modelId, installedOnly = false, fake = false, offline = false} = {}) {
+  return createAsrProcessController({
+    initializeTimeoutMs: isManagedModelSmokeTest ? 45 * 60_000 : undefined,
+    spawn: () => forkAsrUtility(fake
+      ? ['--fake-asr']
+      : createAsrUtilityArgs({
+          userDataPath: app.getPath('userData'),
+          appVersion: app.getVersion(),
+          modelId,
+          installedOnly,
+          offline
+        }))
+  });
+}
+
+const asrProvider = isSmokeTest
+  ? processControllerFor({fake: true})
+  : isManagedModelSmokeTest
+    ? processControllerFor({
+        modelId: 'paraformer-bilingual-zh-en',
+        offline: isOfflineModelSmoke
+      })
+    : createMainAsrProvider({
+        argv: process.argv,
+        catalog: modelRegistry,
+        selectionStore: createAsrSelectionStore({
+          userDataPath: app.getPath('userData'),
+          catalog: modelRegistry
+        }),
+        modelManager: createModelManager({
+          userDataPath: app.getPath('userData'),
+          appVersion: app.getVersion(),
+          registry: modelRegistry
+        }),
+        createController: ({modelId, installedOnly}) => processControllerFor({modelId, installedOnly})
+      });
+const asrIpc = createAsrIpcRouter({provider: asrProvider});
 
 // 覆盖应用显示名称（菜单栏、Dock、任务栏、窗口标题）
 app.setName('宇宙无敌表达训练');
@@ -459,8 +490,8 @@ ipcMain.handle('export-diagnostics', async (event, audioRates) => {
     osRelease: os.release(),
     audioRates,
     asr: {
-      initializationElapsedMs: controller.lastInitializationElapsedMs,
-      lastErrorCategory: lastAsrErrorCategory ?? controller.lastErrorCategory
+      initializationElapsedMs: controller.lastInitializationElapsedMs ?? null,
+      lastErrorCategory: lastAsrErrorCategory ?? controller.lastErrorCategory ?? controller.lastErrorCode
     }
   });
   const date = snapshot.generatedAt.slice(0, 10).replaceAll('-', '');
