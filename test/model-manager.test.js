@@ -132,6 +132,23 @@ test('install verifies staged bytes, atomically publishes a version, and activat
   assert.deepEqual(fs.readdirSync(path.join(data.userDataPath, 'models', '.staging')), []);
 });
 
+test('install reports bounded monotonic download and verification phases', async (t) => {
+  const {createModelManager} = require('../lib/model-manager');
+  const data = fixture(t);
+  const progress = [];
+  const manager = createModelManager({...data, appVersion: '1.0.0'});
+  await manager.install(data.model.id, {onProgress(value) { progress.push(value); }});
+  assert.equal(progress[0].phase, 'downloading');
+  assert.equal(progress[0].receivedBytes, 0);
+  assert.ok(progress.some(value => value.phase === 'downloading' && value.receivedBytes === data.archive.length));
+  assert.ok(progress.some(value => value.phase === 'verifying'));
+  assert.ok(progress.some(value => value.phase === 'installing'));
+  for (const value of progress) {
+    assert.deepEqual(Object.keys(value).sort(), ['phase', 'receivedBytes', 'totalBytes']);
+    assert.ok(value.receivedBytes >= 0 && value.receivedBytes <= value.totalBytes);
+  }
+});
+
 test('an interrupted download leaves the active version and staging area unchanged', async (t) => {
   const {createModelManager} = require('../lib/model-manager');
   const data = fixture(t);

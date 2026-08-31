@@ -32,12 +32,12 @@ feat: define safe ASR model management commands
 
 ## Task 2: Add a short-lived independent install utility
 
-- [ ] Add failing install-controller/utility tests for one active task, progress, cancellation, retry after failure, process exit, bounded shutdown, and no impact on the ASR controller.
-- [ ] Extend ModelManager install with a bounded normalized progress callback without changing download/hash/extract/activation transactions.
-- [ ] Create a model-management utility process and controller that accept one trusted model ID, install without activation, forward safe phase/progress events, and exit after completion/cancel/failure.
-- [ ] Keep the process short-lived and single-task; do not build a generic worker pool or persistent job service.
-- [ ] Run ModelManager, install controller, utility, ASR controller, and Electron smoke tests.
-- [ ] Commit with an English subject and a Chinese body.
+- [x] Add failing install-controller/utility tests for one active task, progress, cancellation, retry after failure, process exit, bounded shutdown, and no impact on the ASR controller.
+- [x] Extend ModelManager install with a bounded normalized progress callback without changing download/hash/extract/activation transactions.
+- [x] Create a model-management utility process and controller that accept one trusted model ID, install without activation, forward safe phase/progress events, and exit after completion/cancel/failure.
+- [x] Keep the process short-lived and single-task; do not build a generic worker pool or persistent job service.
+- [x] Run ModelManager, install controller, utility, ASR controller, and Electron smoke tests.
+- [x] Commit with an English subject and a Chinese body.
 
 Expected commit:
 
