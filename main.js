@@ -25,6 +25,9 @@ const { createAsrProcessController } = require('./lib/asr-process-controller');
 const {createAsrSelectionStore} = require('./lib/asr-selection-store');
 const {createModelManager} = require('./lib/model-manager');
 const {createAsrUtilityArgs, createMainAsrProvider} = require('./lib/asr-main-composition');
+const {createAsrModelManagementRouter} = require('./lib/asr-model-management');
+const {registerAsrModelManagementIpc} = require('./lib/asr-model-management-ipc');
+const {createModelInstallController} = require('./lib/model-install-controller');
 const {runManagedModelSmoke} = require('./lib/managed-model-smoke');
 const modelRegistry = require('./models/registry.json');
 
@@ -103,6 +106,43 @@ const asrProvider = isSmokeTest
         createController: ({modelId, installedOnly}) => processControllerFor({modelId, installedOnly})
       });
 const asrIpc = createAsrIpcRouter({provider: asrProvider});
+const managementModelManager = createModelManager({
+  userDataPath: app.getPath('userData'),
+  appVersion: app.getVersion(),
+  registry: modelRegistry
+});
+const fallbackManagementState = {
+  status: 'ready',
+  selectedModelId: 'paraformer-bilingual-zh-en',
+  effectiveModelId: 'paraformer-bilingual-zh-en',
+  overrideModelId: null,
+  activeSession: false,
+  targetModelId: null
+};
+const managementModelService = typeof asrProvider.switchModel === 'function'
+  ? asrProvider
+  : {
+      snapshot: () => ({...fallbackManagementState}),
+      async switchModel(modelId) { fallbackManagementState.effectiveModelId = modelId; fallbackManagementState.selectedModelId = modelId; }
+    };
+const modelInstallController = createModelInstallController({
+  spawn: modelId => utilityProcess.fork(
+    path.join(__dirname, 'lib', 'model-install-utility-process.js'),
+    createAsrUtilityArgs({
+      userDataPath: app.getPath('userData'),
+      appVersion: app.getVersion(),
+      modelId
+    }),
+    {serviceName: 'expression-trainer-model-install', stdio: 'pipe'}
+  ),
+  onStateChange: () => { void refreshAsrModelState(); }
+});
+const asrModelManagement = createAsrModelManagementRouter({
+  catalog: modelRegistry,
+  modelManager: managementModelManager,
+  modelService: managementModelService,
+  installTask: modelInstallController
+});
 
 // 覆盖应用显示名称（菜单栏、Dock、任务栏、窗口标题）
 app.setName('宇宙无敌表达训练');
@@ -114,6 +154,24 @@ const llmRequests = createRequestCoordinator();
 let asrShutdownStarted = false;
 let asrShutdownComplete = false;
 let lastAsrErrorCategory = null;
+
+function publishAsrModelState(state) {
+  if (settingsWindow && !settingsWindow.isDestroyed()) {
+    settingsWindow.webContents.send('asr-model-state-changed', state);
+  }
+}
+
+async function refreshAsrModelState() {
+  const result = await asrModelManagement.getModelState();
+  if (result.ok) publishAsrModelState(result.state);
+}
+
+registerAsrModelManagementIpc({
+  ipcMain,
+  router: asrModelManagement,
+  isAllowedSender: sender => settingsWindow?.webContents === sender,
+  publishState: publishAsrModelState
+});
 
 async function trackAsrResult(operation) {
   try {
@@ -417,8 +475,7 @@ app.on('before-quit', event => {
   event.preventDefault();
   if (asrShutdownStarted) return;
   asrShutdownStarted = true;
-  void asrProvider.dispose()
-    .catch(() => {})
+  void Promise.allSettled([asrProvider.dispose(), modelInstallController.dispose()])
     .finally(() => {
       asrShutdownComplete = true;
       app.quit();

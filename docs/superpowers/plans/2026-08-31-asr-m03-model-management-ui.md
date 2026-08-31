@@ -49,12 +49,12 @@ feat: run ASR model installs in an independent utility
 
 ## Task 3: Wire strict model-management IPC and events
 
-- [ ] Add failing Main/Preload tests for `getModelState`, `installModel`, `cancelModelInstall`, `switchModel`, exact payload validation, allowed-window checks, and a dedicated state event.
-- [ ] Compose the management coordinator and install controller in Main; refresh state after install/switch and cancel/dispose the task during bounded app shutdown.
-- [ ] Expose only the four narrow APIs and one subscription through Preload; do not expose paths, URLs, providerType, arbitrary channels, or generic listeners.
-- [ ] Preserve existing recording and LLM IPC contracts.
-- [ ] Run IPC, Preload/source, diagnostics, packaging, and Electron smoke tests.
-- [ ] Commit with an English subject and a Chinese body.
+- [x] Add failing Main/Preload tests for `getModelState`, `installModel`, `cancelModelInstall`, `switchModel`, exact payload validation, allowed-window checks, and a dedicated state event.
+- [x] Compose the management coordinator and install controller in Main; refresh state after install/switch and cancel/dispose the task during bounded app shutdown.
+- [x] Expose only the four narrow APIs and one subscription through Preload; do not expose paths, URLs, providerType, arbitrary channels, or generic listeners.
+- [x] Preserve existing recording and LLM IPC contracts.
+- [x] Run IPC, Preload/source, diagnostics, packaging, and Electron smoke tests.
+- [x] Commit with an English subject and a Chinese body.
 
 Expected commit:
 
