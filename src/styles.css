@@ -110,6 +110,35 @@ button, input, select, .subtitle-scroll, .feedback-content, .modal-body {
 
 .hidden { display: none !important; }
 
+.icon-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.icon {
+  width: 1em;
+  height: 1em;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  flex: 0 0 auto;
+}
+
+.panel-title,
+.btn-sm,
+.btn-icon,
+.btn-main,
+.modal-header h2,
+#btn-analyze-paste {
+  display: flex;
+  align-items: center;
+  gap: 0.45em;
+}
+
 /* ===== 洋红闪烁边框（只框字幕区） ===== */
 .glow-border {
   display: none;

@@ -266,7 +266,15 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       densityDescription: densityLabel?.getAttribute('title') || '',
       reducedMotionRule: Array.from(document.styleSheets)
         .flatMap(sheet => Array.from(sheet.cssRules))
-        .some(rule => rule.conditionText?.includes('prefers-reduced-motion'))
+        .some(rule => rule.conditionText?.includes('prefers-reduced-motion')),
+      visibleTitle: document.querySelector('.app-title')?.textContent.trim(),
+      decorativeMascotPresent: Boolean(document.querySelector('.girl-icon')),
+      emojiControls: Array.from(document.querySelectorAll('button')).filter(button => {
+        return /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(button.textContent);
+      }).map(button => button.id),
+      unlabeledSvgControls: Array.from(document.querySelectorAll('button:has(svg)')).filter(button => {
+        return !(button.getAttribute('aria-label') || button.textContent.trim() || button.title);
+      }).map(button => button.id)
     };
   })()`);
   assert.deepEqual(desktopUsability.controls, [
@@ -276,6 +284,10 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   ]);
   assert.match(desktopUsability.densityDescription, /有效词数.*总词数/);
   assert.equal(desktopUsability.reducedMotionRule, true);
+  assert.equal(desktopUsability.visibleTitle, '表达训练');
+  assert.equal(desktopUsability.decorativeMascotPresent, false);
+  assert.deepEqual(desktopUsability.emojiControls, []);
+  assert.deepEqual(desktopUsability.unlabeledSvgControls, []);
 
   const modalKeyboardState = await mainWindow.webContents.executeJavaScript(`(() => {
     const opener = document.getElementById('btn-paste');
@@ -468,7 +480,11 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   await mainWindow.webContents.executeJavaScript(`(() => {
     window.__appearanceSmoke = {
       transcript: document.getElementById('subtitle-container'),
-      feedback: document.getElementById('feedback-content')
+      feedback: document.getElementById('feedback-content'),
+      insights: document.querySelector('[data-region="insights"]'),
+      trainingStatus: document.getElementById('training-status'),
+      timer: document.getElementById('timer'),
+      actions: document.querySelector('.action-bar')
     };
   })()`);
   const connectionCallsBeforeAppearance = calls.llmConnection;
@@ -492,7 +508,11 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
         theme: document.documentElement.dataset.theme,
         layout: document.documentElement.dataset.layout,
         transcriptPreserved: window.__appearanceSmoke.transcript === document.getElementById('subtitle-container'),
-        feedbackPreserved: window.__appearanceSmoke.feedback === document.getElementById('feedback-content')
+        feedbackPreserved: window.__appearanceSmoke.feedback === document.getElementById('feedback-content'),
+        insightsPreserved: window.__appearanceSmoke.insights === document.querySelector('[data-region="insights"]'),
+        trainingStatusPreserved: window.__appearanceSmoke.trainingStatus === document.getElementById('training-status'),
+        timerPreserved: window.__appearanceSmoke.timer === document.getElementById('timer'),
+        actionsPreserved: window.__appearanceSmoke.actions === document.querySelector('.action-bar')
       }))()`),
       settingsWindow.webContents.executeJavaScript(`(() => ({
         theme: document.documentElement.dataset.theme,
@@ -510,7 +530,11 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       theme: 'paper',
       layout: 'focus-hud',
       transcriptPreserved: true,
-      feedbackPreserved: true
+      feedbackPreserved: true,
+      insightsPreserved: true,
+      trainingStatusPreserved: true,
+      timerPreserved: true,
+      actionsPreserved: true
     },
     settingsState: {theme: 'paper', layout: 'focus-hud', error: '', scrollable: true}
   });
