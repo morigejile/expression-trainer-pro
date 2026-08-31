@@ -47,6 +47,8 @@ class SettingsPage {
     this.btnTestConnection = document.getElementById('btn-test-connection');
     this.saveSuccess = document.getElementById('save-success');
     this.connectionError = document.getElementById('connection-error');
+    this.asrModelList = document.getElementById('asr-model-list');
+    this.asrModelStatus = document.getElementById('asr-model-status');
 
     this.groupApikey = document.getElementById('group-apikey');
     this.groupOllama = document.getElementById('group-ollama');
@@ -56,6 +58,10 @@ class SettingsPage {
     this.setActionsEnabled(false);
     this.bindEvents();
     this.loadPromise = this.loadSettings();
+    this.asrModelActionPending = false;
+    this.unsubscribeAsrModels = window.api.onAsrModelStateChanged(state => this.applyAsrModelState(state));
+    this.asrModelLoadPromise = this.loadAsrModels();
+    window.addEventListener?.('beforeunload', () => this.unsubscribeAsrModels?.(), {once: true});
   }
 
   bindEvents() {
@@ -82,6 +88,122 @@ class SettingsPage {
   setActionsEnabled(enabled) {
     this.btnSave.disabled = !enabled;
     this.btnTestConnection.disabled = !enabled;
+  }
+
+  async loadAsrModels() {
+    this.asrModelStatus.textContent = '正在读取模型状态…';
+    try {
+      const result = await window.api.getAsrModelState();
+      if (!result?.ok) throw new Error(result?.error?.message || '模型状态不可用');
+      this.applyAsrModelState(result.state);
+    } catch {
+      this.asrModelState = undefined;
+      this.asrModelStatus.textContent = '模型状态加载失败，请关闭设置后重试';
+      this.asrModelList.replaceChildren();
+    }
+  }
+
+  applyAsrModelState(state) {
+    if (!state || !Array.isArray(state.models)) return;
+    this.asrModelState = state;
+    const effective = state.models.find(model => model.modelId === state.effectiveModelId);
+    this.asrModelStatus.textContent = state.overrideModelId
+      ? `本次启动使用：${effective?.displayName || state.effectiveModelId}（命令行覆盖）`
+      : effective ? `当前使用：${effective.displayName}` : '语音识别当前不可用';
+    this.renderAsrModels();
+  }
+
+  formatDownloadBytes(bytes) {
+    if (!Number.isFinite(bytes) || bytes <= 0) return '未知大小';
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  modelStatusText(model) {
+    return ({
+      'not-installed': '未安装',
+      installing: '安装中',
+      installed: model.current ? '使用中' : '已安装',
+      corrupt: '文件损坏',
+      failed: '安装失败',
+      unavailable: '状态不可用'
+    })[model.status] || '状态不可用';
+  }
+
+  renderAsrModels() {
+    this.asrModelList.replaceChildren();
+    const models = this.asrModelState?.models || [];
+    if (models.length === 0) {
+      const empty = document.createElement('p');
+      empty.className = 'asr-model-empty';
+      empty.textContent = '没有可管理的语音识别模型';
+      this.asrModelList.appendChild(empty);
+      return;
+    }
+    const labels = {install: '下载', cancel: '取消', retry: '重试', reinstall: '重新安装', switch: '切换'};
+    for (const model of models) {
+      const card = document.createElement('article');
+      card.className = 'asr-model-card';
+      const heading = document.createElement('div');
+      heading.className = 'asr-model-heading';
+      const name = document.createElement('h3');
+      name.textContent = model.displayName;
+      const badge = document.createElement('span');
+      badge.className = `asr-model-badge status-${model.status}`;
+      badge.textContent = this.modelStatusText(model);
+      heading.append(name, badge);
+      const description = document.createElement('p');
+      description.className = 'asr-model-description';
+      description.textContent = model.description;
+      const meta = document.createElement('p');
+      meta.className = 'asr-model-meta';
+      meta.textContent = `实时流式 · 下载 ${this.formatDownloadBytes(model.downloadBytes)}${model.builtIn ? ' · 安装包内置' : ''}`;
+      card.append(heading, description, meta);
+      if (model.status === 'installing' && this.asrModelState.installTask?.modelId === model.modelId) {
+        const progress = document.createElement('progress');
+        progress.max = this.asrModelState.installTask.totalBytes || 1;
+        progress.value = this.asrModelState.installTask.receivedBytes || 0;
+        progress.setAttribute('aria-label', `${model.displayName} 下载进度`);
+        card.appendChild(progress);
+      }
+      if (model.action && labels[model.action]) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'asr-model-action';
+        button.textContent = labels[model.action];
+        button.disabled = this.asrModelActionPending;
+        button.addEventListener('click', () => this.runAsrModelAction(model.modelId, model.action));
+        card.appendChild(button);
+      }
+      this.asrModelList.appendChild(card);
+    }
+  }
+
+  async runAsrModelAction(modelId, action) {
+    if (this.asrModelActionPending) return;
+    const operations = {
+      install: window.api.installAsrModel,
+      retry: window.api.installAsrModel,
+      reinstall: window.api.installAsrModel,
+      cancel: window.api.cancelAsrModelInstall,
+      switch: window.api.switchAsrModel
+    };
+    const operation = operations[action];
+    if (typeof operation !== 'function') return;
+    this.asrModelActionPending = true;
+    this.renderAsrModels();
+    try {
+      const result = await operation(modelId);
+      if (!result?.ok) {
+        this.asrModelStatus.textContent = result?.error?.message || '模型操作失败，请重试';
+      } else if (result.state) {
+        this.applyAsrModelState(result.state);
+      }
+    } catch {
+      this.asrModelStatus.textContent = '模型操作请求失败，请重试';
+    } finally {
+      this.asrModelActionPending = false;
+      this.renderAsrModels();
+    }
   }
 
   /** 加载指定 provider 的配置到表单字段 */

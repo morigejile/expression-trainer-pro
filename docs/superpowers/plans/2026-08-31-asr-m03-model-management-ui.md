@@ -66,12 +66,12 @@ feat: expose trusted ASR model management IPC
 
 ## Task 4: Add the Settings model-management section
 
-- [ ] Add failing settings-page tests for initial snapshot, loading/error/empty states, install/cancel/retry/switch/current actions, active-session/switch/override disabling, event refresh, and separation from LLM Save/Test.
-- [ ] Add an accessible “语音识别模型” section using existing settings styling and native controls; show name, streaming mode, download size, installation/current state, and one available action per model.
-- [ ] Keep actions immediate, single-flight, and visibly recoverable; sanitize all text and never render raw HTML from IPC data.
-- [ ] Extend Electron smoke to cover model snapshot, install cancellation, switch rejection during recording, successful fake switch, and unchanged LLM settings behavior.
-- [ ] Run settings-page, Renderer, Electron smoke, and complete ASR tests.
-- [ ] Commit with an English subject and a Chinese body.
+- [x] Add failing settings-page tests for initial snapshot, loading/error/empty states, install/cancel/retry/switch/current actions, active-session/switch/override disabling, event refresh, and separation from LLM Save/Test.
+- [x] Add an accessible “语音识别模型” section using existing settings styling and native controls; show name, streaming mode, download size, installation/current state, and one available action per model.
+- [x] Keep actions immediate, single-flight, and visibly recoverable; sanitize all text and never render raw HTML from IPC data.
+- [x] Extend Electron smoke to cover model snapshot, install cancellation, switch rejection during recording, successful fake switch, and unchanged LLM settings behavior.
+- [x] Run settings-page, Renderer, Electron smoke, and complete ASR tests.
+- [x] Commit with an English subject and a Chinese body.
 
 Expected commit:
 
