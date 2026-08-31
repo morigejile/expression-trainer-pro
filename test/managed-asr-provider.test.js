@@ -213,3 +213,40 @@ test('default managed provider forwards the Electron network fetch', () => {
   });
   assert.equal(managerOptions.fetchImpl, fetchImpl);
 });
+
+test('default managed startup stays pinned to Paraformer and creates it through the trusted factory', async () => {
+  const {
+    CURRENT_PARA_MODEL_ID,
+    createDefaultManagedParaformerProvider
+  } = require('../lib/managed-asr-provider');
+  const root = path.resolve('managed-default-paraformer');
+  const calls = [];
+  const delegate = fakeProvider();
+  const provider = createDefaultManagedParaformerProvider({
+    userDataPath: path.resolve('managed-user-data'),
+    appVersion: '1.0.0',
+    createManager({registry}) {
+      assert.notEqual(registry.defaultModelId, CURRENT_PARA_MODEL_ID);
+      return {
+        async getActive(modelId) {
+          calls.push(['getActive', modelId]);
+          return {version: '2024-03-10', files: managedFiles(root)};
+        },
+        async getPrevious() { assert.fail('getPrevious should not run'); },
+        async install() { assert.fail('install should not run'); },
+        async activate() { assert.fail('activate should not run'); }
+      };
+    },
+    createProviderFromCatalog({catalogEntry, modelFiles}) {
+      calls.push(['factory', catalogEntry.modelId, Object.keys(modelFiles).sort()]);
+      return {provider: delegate, capabilities: {mode: 'streaming', emitsPartial: true, sampleRateHz: 16000}};
+    }
+  });
+
+  await provider.initialize();
+  assert.deepEqual(calls, [
+    ['getActive', CURRENT_PARA_MODEL_ID],
+    ['factory', CURRENT_PARA_MODEL_ID, ['decoder', 'encoder', 'tokens']]
+  ]);
+  await provider.dispose();
+});

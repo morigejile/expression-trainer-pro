@@ -71,14 +71,14 @@ feat: add the streaming Zipformer CTC provider
 
 ## Task 4: Add the closed ProviderFactory and preserve current startup
 
-- [ ] Add failing `test/asr-provider-factory.test.js` cases for the two exact trusted provider types, required role validation, absolute-path validation, code-owned capabilities, unknown type rejection, and all three committed Catalog models.
-- [ ] Assert the Factory cannot load a module path or accept provider capabilities from Catalog input.
-- [ ] Run the focused test and confirm it fails because the Factory does not exist.
-- [ ] Create `lib/asr-provider-factory.js` with an internal frozen mapping for `sherpa.online-paraformer` and `sherpa.online-ctc` only.
-- [ ] Return `{provider, capabilities}` where capabilities are frozen adapter declarations: streaming, emits partial, 16 kHz.
-- [ ] Route the managed Paraformer delegate through the Factory while pinning current default startup to the preserved Paraformer product ID. Do not activate Zipformer by default before ASR-M02.
-- [ ] Run Factory, managed-provider, process-controller, Electron smoke, and current Paraformer tests.
-- [ ] Commit with an English subject and a Chinese body.
+- [x] Add failing `test/asr-provider-factory.test.js` cases for the two exact trusted provider types, required role validation, absolute-path validation, code-owned capabilities, unknown type rejection, and all three committed Catalog models.
+- [x] Assert the Factory cannot load a module path or accept provider capabilities from Catalog input.
+- [x] Run the focused test and confirm it fails because the Factory does not exist.
+- [x] Create `lib/asr-provider-factory.js` with an internal frozen mapping for `sherpa.online-paraformer` and `sherpa.online-ctc` only.
+- [x] Return `{provider, capabilities}` where capabilities are frozen adapter declarations: streaming, emits partial, 16 kHz.
+- [x] Route the managed Paraformer delegate through the Factory while pinning current default startup to the preserved Paraformer product ID. Do not activate Zipformer by default before ASR-M02.
+- [x] Run Factory, managed-provider, process-controller, Electron smoke, and current Paraformer tests.
+- [x] Commit with an English subject and a Chinese body.
 
 Expected commit:
 
