@@ -1,44 +1,93 @@
 {
-  "schemaVersion": 1,
-  "defaultModelId": "paraformer-bilingual-zh-en",
+  "schemaVersion": 2,
+  "defaultModelId": "zipformer-large-ctc-zh-int8-2025-06-30",
   "models": [
     {
-      "id": "paraformer-bilingual-zh-en",
+      "modelId": "paraformer-bilingual-zh-en",
       "version": "2024-03-10",
-      "engine": "sherpa-onnx",
-      "architecture": "paraformer",
-      "languages": ["zh", "en"],
-      "mode": "streaming",
-      "sampleRateHz": 16000,
+      "displayName": "Paraformer 中英双语",
+      "description": "当前产品兼容路径使用的中英双语流式模型。",
+      "providerType": "sherpa.online-paraformer",
       "minAppVersion": "1.0.0",
-      "archive": {
-        "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-paraformer-bilingual-zh-en.tar.bz2",
-        "sha256": "5462a1fce42693deae572af1e8c4687124b12aa85fe61ff4d3168bb5280e205f",
-        "bytes": 1047319737,
-        "format": "tar.bz2",
-        "rootDirectory": "sherpa-onnx-streaming-paraformer-bilingual-zh-en"
-      },
-      "files": [
+      "downloadBytes": 1047319737,
+      "sources": [
         {
-          "relativePath": "encoder.int8.onnx",
-          "sha256": "81a70226a8934e6ed92aa1d4fc486b428b5398e2f2619ed4897b7294cab90e9a",
-          "bytes": 165462184,
-          "role": "encoder"
-        },
-        {
-          "relativePath": "decoder.int8.onnx",
-          "sha256": "f3cca9f77bb9d93c8fcbfb63ae617b6b1ee96818df3aa3b151c40658fe38594f",
-          "bytes": 71664561,
-          "role": "decoder"
-        },
-        {
-          "relativePath": "tokens.txt",
-          "sha256": "59aba8873a2ed1e122c25fee421e25f283b63290efbde85c1f01a853d83cb6e6",
-          "bytes": 75756,
-          "role": "tokens"
+          "type": "archive",
+          "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-paraformer-bilingual-zh-en.tar.bz2",
+          "sha256": "5462a1fce42693deae572af1e8c4687124b12aa85fe61ff4d3168bb5280e205f",
+          "bytes": 1047319737,
+          "format": "tar.bz2",
+          "rootDirectory": "sherpa-onnx-streaming-paraformer-bilingual-zh-en",
+          "builtIn": false
         }
       ],
+      "files": [
+        {"relativePath": "encoder.int8.onnx", "sha256": "81a70226a8934e6ed92aa1d4fc486b428b5398e2f2619ed4897b7294cab90e9a", "bytes": 165462184, "role": "encoder"},
+        {"relativePath": "decoder.int8.onnx", "sha256": "f3cca9f77bb9d93c8fcbfb63ae617b6b1ee96818df3aa3b151c40658fe38594f", "bytes": 71664561, "role": "decoder"},
+        {"relativePath": "tokens.txt", "sha256": "59aba8873a2ed1e122c25fee421e25f283b63290efbde85c1f01a853d83cb6e6", "bytes": 75756, "role": "tokens"}
+      ],
       "license": {
+        "sourceUrl": "https://www.modelscope.cn/models/damo/speech_paraformer_asr_nat-zh-cn-16k-common-vocab8404-online/summary",
+        "notice": "模型与数据再分发授权尚未在本项目中确认。",
+        "redistribution": "not-approved"
+      }
+    },
+    {
+      "modelId": "zipformer-small-ctc-zh-int8-2025-04-01",
+      "version": "2025-04-01",
+      "displayName": "Zipformer Small CTC 中文 INT8",
+      "description": "体积较小、延迟较低的中文流式识别模型。",
+      "providerType": "sherpa.online-ctc",
+      "minAppVersion": "1.0.0",
+      "downloadBytes": 21264113,
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01.tar.bz2",
+          "sha256": "b3b309f7ce4a737195fcc6963ea19b0653a7d3401580af5ae0d3e284cbb71f0b",
+          "bytes": 21264113,
+          "format": "tar.bz2",
+          "rootDirectory": "sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01",
+          "builtIn": false
+        }
+      ],
+      "files": [
+        {"relativePath": "model.int8.onnx", "sha256": "68c9c943840f7d9cf3e8a4970ba50f404feb5277f611fa82b7e72267786fa84a", "bytes": 26342340, "role": "model"},
+        {"relativePath": "tokens.txt", "sha256": "6fed8c6c248516f38e7faa19404b57413e8ce259f1cbc1fa4aebc86eac32fdfd", "bytes": 13366, "role": "tokens"},
+        {"relativePath": "bbpe.model", "sha256": "503204e0690eff065e30d0e01898c9ab06d0e6dc376a741eb6846198f95b2f82", "bytes": 255180, "role": "bpe-vocab"}
+      ],
+      "license": {
+        "sourceUrl": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-ctc/zipformer-ctc-models.html",
+        "notice": "官方发布资产未包含可确认的模型再分发授权。",
+        "redistribution": "not-approved"
+      }
+    },
+    {
+      "modelId": "zipformer-large-ctc-zh-int8-2025-06-30",
+      "version": "2025-06-30",
+      "displayName": "Zipformer Large CTC 中文 INT8",
+      "description": "当前技术默认的高准确率中文流式识别模型。",
+      "providerType": "sherpa.online-ctc",
+      "minAppVersion": "1.0.0",
+      "downloadBytes": 127965713,
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30.tar.bz2",
+          "sha256": "f2ab7a5deb02717801f6a5b26c751b42f8a2db891b07f5b095e6da7442081448",
+          "bytes": 127965713,
+          "format": "tar.bz2",
+          "rootDirectory": "sherpa-onnx-streaming-zipformer-ctc-zh-int8-2025-06-30",
+          "builtIn": false
+        }
+      ],
+      "files": [
+        {"relativePath": "model.int8.onnx", "sha256": "24ffdc19ba9aaed5a6a9beaede1e087745217d82425cf4041bca0c696661801e", "bytes": 162290887, "role": "model"},
+        {"relativePath": "tokens.txt", "sha256": "6193c7ea1c96d0d9a1e9652789b40d13a8a913b434a5451e93158f5a09fd6652", "bytes": 20628, "role": "tokens"}
+      ],
+      "license": {
+        "sourceUrl": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-ctc/zipformer-ctc-models.html",
+        "notice": "官方发布资产未包含可确认的模型再分发授权。",
         "redistribution": "not-approved"
       }
     }
