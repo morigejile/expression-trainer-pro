@@ -6,6 +6,7 @@ const registry = require('../models/registry.json');
 
 const PARA = 'paraformer-bilingual-zh-en';
 const SMALL = 'zipformer-small-ctc-zh-int8-2025-04-01';
+const LARGE = 'zipformer-large-ctc-zh-int8-2025-06-30';
 
 function fakeController() {
   return {
@@ -47,6 +48,44 @@ test('utility arguments propagate only selected model identity and installed-onl
     '--installed-only',
     '--offline-model-smoke'
   ]);
+});
+
+test('utility arguments carry one application-owned bundled default archive triplet', () => {
+  const {createAsrUtilityArgs} = require('../lib/asr-main-composition');
+  const archivePath = 'C:\\Program Files\\ExpressionTrainer\\resources\\asr-models\\large.tar.bz2';
+  assert.deepEqual(createAsrUtilityArgs({
+    userDataPath: 'C:\\Users\\test\\data',
+    appVersion: '1.0.1',
+    modelId: LARGE,
+    bundledArchive: {modelId: LARGE, version: '2025-06-30', archivePath},
+    offline: true
+  }), [
+    '--user-data-path', 'C:\\Users\\test\\data',
+    '--app-version', '1.0.1',
+    '--model-id', LARGE,
+    '--bundled-model-id', LARGE,
+    '--bundled-model-version', '2025-06-30',
+    '--bundled-model-archive', archivePath,
+    '--offline-model-smoke'
+  ]);
+});
+
+test('bundled-default smoke selects the Catalog default and requires the packaged archive', () => {
+  const {createBundledDefaultSmokeOptions} = require('../lib/asr-main-composition');
+  const bundledArchive = {
+    modelId: LARGE,
+    version: '2025-06-30',
+    archivePath: 'C:\\Program Files\\ExpressionTrainer\\resources\\asr-models\\large.tar.bz2'
+  };
+  assert.deepEqual(createBundledDefaultSmokeOptions({catalog: registry, bundledArchive}), {
+    modelId: LARGE,
+    offline: true,
+    bundledArchive
+  });
+  assert.throws(
+    () => createBundledDefaultSmokeOptions({catalog: registry, bundledArchive: null}),
+    /requires a packaged default archive/
+  );
 });
 
 test('main composition restores the stored selection through the model service', async () => {

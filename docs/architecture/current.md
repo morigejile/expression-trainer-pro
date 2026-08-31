@@ -1,6 +1,6 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09、PKG-01～PKG-04、CONV-01～CONV-03、UI-01/UI-02 与 ASR-M01～M03 Completed；ADR-0009 采用 Zipformer Large 技术默认
+> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，R-01～R-09、PKG-01～PKG-04、CONV-01～CONV-03、UI-01/UI-02、ASR-M01～M03 与 ASR-M04a Completed；ADR-0009 采用 Zipformer Large 技术默认
 > 基线日期：2026-08-31
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
 > 描述对象：当前集成分支的产品运行时、开发工具边界与已验证的内部安装基线
@@ -117,6 +117,8 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 `forge.config.js` 是唯一打包配置，当前只构建 Windows x64 Squirrel；native Sherpa bundle 保持 ASAR unpack，模型位于 `userData/models`。内部制品已验证安装、真实模型首次准备、强制离线二次启动、1.0.0→1.0.1 前向升级和卸载数据保留，终端用户无需开发工具。
 
 受支持更新路径是向前安装。手工运行旧完整 Setup 可能降级应用二进制，并可能用旧 schema 覆盖共享用户文件；重新运行当前 Setup 只能恢复应用版本，不能恢复已被覆盖的数据。该已知边界保留在支持文档，不为内部阶段增加 updater 框架。
+
+ASR-M04a 增加显式内部构建入口：从 Git 外的绝对归档路径读取 Catalog 默认模型，校验精确字节数和 SHA-256，只把固定 `asr-models/<modelId>/<version>/<archive>` 加入 Forge `extraResource`。普通 `package`/`make` 仍不携带模型；Main 只从 `process.resourcesPath` 派生受信任包内归档位置，ModelManager 复用既有 staging、双重校验、白名单解压、原子发布和 native 初始化后激活事务。运行时始终从 `userData/models` 加载，不直接使用只读应用资源。
 
 ## 4. C4 Level 2：当前容器/运行边界
 
@@ -335,6 +337,7 @@ Settings/Prompt Renderer
 - 已有 canonical 支持矩阵、Windows x64 首发选择、未签名内部安装制品，以及真实首次安装/模型和 1.0.0→1.0.1 升级/卸载数据保留闭环；仍无签名、公证或自动更新。
 - 主窗口可按需导出固定 JSON 诊断；Main 组合系统/active 模型/controller 状态，Renderer 只提供经过严格字段校验的采样率，不后台记录或上传用户内容。
 - 开发版本由 `.nvmrc`、`package.json#packageManager/engines` 和 lockfile 共同约束；当前精确基线的 clean install、完整测试、Forge make 与 packaged smoke 已通过。具体命令和环境限制维护在[开发与验证](../development.md)。
+- ASR-M04a 已在与 ASR-M03、UI-01/UI-02 组合后完成 404 项测试（402 pass、0 fail、2 个 Windows file-symlink skip）、普通 model-free Squirrel make/packaged smoke、显式 `ExpressionTrainerInternalOnly` Squirrel make、全新隔离 `userData` 的首次离线导入/native 初始化（17.398 秒）及二次离线启动（2.510 秒）。内部源归档必须位于项目树外，内部资源树只允许 Catalog 固定默认归档；普通打包全局排除已支持的模型权重/归档后缀并在验收时检查 ASAR 清单。模型归档不进入 Git；本轮使用 Codex host 的 Node 24.19.0/npm 12.0.2，正式 PR 前仍需在声明的 Node 24.20.0/npm 11.19.0 基线上复跑。公开安装、升级、签名和再分发许可仍归完整 ASR-M04。
 
 这些发布级缺口及未确认的模型再分发权利在当前内部开发/测试中是非阻塞后续工作；若它们使本地技术实验无法运行或使结论失效，才需要提前处理。
 

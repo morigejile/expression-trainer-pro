@@ -7,6 +7,7 @@
 - 增加独立 Appearance 配置、四套主题、coach-rail/focus-hud 双布局、跨窗口同步和响应式窗口尺寸；布局切换保留训练 DOM、状态与滚动位置。
 - 增加三款 streaming ASR 的受信任 Catalog/Factory、独立选择存储、启动恢复、单 controller 切换与失败回退。
 - 增加独立模型安装 utility、受限设置窗口 IPC 和模型管理界面；安装支持进度、取消与重试，Renderer 只提交受信任模型 ID。
+- 增加显式 Internal Only 的 Zipformer Large 包内默认构建与离线导入资格路径；内部安装包使用 `ExpressionTrainerInternalOnly` 名称、只接受项目树外的 Catalog 固定归档，普通制品会全局排除并在 ASAR 验收时拒绝已支持的模型权重/归档；同时修复只读模型状态查询创建空 `models` 目录的回归。
 - 为文本分析、实时反馈、最终报告统计和 Markdown 保存增加轻量 IPC 类型/大小边界；Markdown 默认文件名只接受普通 `.md` 文件名。
 - 收敛当前架构、需求和 Roadmap：删除已完成的实施计划与临时 benchmark 范围说明，只保留当前事实、稳定需求编号、决策证据、未完成工作和外部门禁。
 
