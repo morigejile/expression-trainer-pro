@@ -54,13 +54,13 @@ feat: add responsive coach rail and focus HUD layouts
 
 ## Task 3: Remove continuous effects and normalize component styling
 
-- [ ] Extend the Electron smoke assertions to reject continuous subtitle/timer animations and verify keyboard focus remains visible.
-- [ ] Run the focused smoke test and confirm it fails on the legacy glow/pulse styles.
-- [ ] Remove subtitle glow and timer pulse keyframes; use a static, restrained recording indicator/state treatment.
-- [ ] Normalize secondary tools, action buttons, feedback, insights, modal inline colors, and SVG sizing against the existing semantic theme tokens.
-- [ ] Add a reduced-motion rule that disables nonessential transitions without hiding state changes.
-- [ ] Run the focused tests, then the full suite.
-- [ ] Commit with an English subject and a Chinese body.
+- [x] Extend the Electron smoke assertions to reject continuous subtitle/timer animations and verify keyboard focus remains visible.
+- [x] Run the focused smoke test and confirm it fails on the legacy glow/pulse styles.
+- [x] Remove subtitle glow and timer pulse keyframes; use a static, restrained recording indicator/state treatment.
+- [x] Normalize secondary tools, action buttons, feedback, insights, modal inline colors, and SVG sizing against the existing semantic theme tokens.
+- [x] Add a reduced-motion rule that disables nonessential transitions without hiding state changes.
+- [x] Run the focused tests, then the full suite.
+- [x] Commit with an English subject and a Chinese body.
 
 Expected commit:
 

@@ -228,7 +228,7 @@ button, input, select, .subtitle-scroll, .feedback-content, .modal-body {
   background: var(--color-surface);
   color: var(--color-text-muted);
   cursor: pointer;
-  transition: all 0.2s;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
   white-space: nowrap;
 }
 
@@ -337,9 +337,28 @@ button, input, select, .subtitle-scroll, .feedback-content, .modal-body {
 .app-title { font-size: 13px; color: var(--color-text-subtle); letter-spacing: 1px; }
 .topbar-right { display: flex; align-items: center; gap: 12px; }
 .timer { font-size: 16px; font-family: "SF Mono", monospace; color: var(--color-text-subtle); }
-.timer.active { color: var(--color-accent); animation: pulse 1.5s ease-in-out infinite; }
-@keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.5;} }
-.btn-icon { background:none; border:none; font-size:18px; cursor:pointer; padding:4px; }
+.timer.active { color: var(--color-accent); }
+.timer.active::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  vertical-align: 2px;
+}
+.btn-icon {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  font-size: 16px;
+  padding: 5px 7px;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.btn-icon:hover { background: var(--color-surface); border-color: var(--color-border); color: var(--color-text); }
 .btn-help {
   background: none;
   border: 1px solid var(--color-border);
@@ -413,11 +432,7 @@ textarea:focus-visible {
   border: 1.5px solid var(--color-border);
   border-radius: 12px;
   margin: 0 clamp(10px, 1.4vw, 24px);
-  animation: subtitleGlow 3s ease-in-out infinite;
-}
-@keyframes subtitleGlow {
-  0%, 100% { border-color: var(--color-border); box-shadow: none; }
-  50% { border-color: var(--color-accent); box-shadow: inset 0 0 12px color-mix(in srgb, var(--color-accent) 8%, transparent); }
+  box-shadow: inset 0 1px 0 color-mix(in srgb, var(--color-text) 3%, transparent);
 }
 .subtitle-container {
   width: min(100%, 1040px);
@@ -518,6 +533,32 @@ textarea:focus-visible {
   line-height: 1.9;
   color: var(--color-text);
 }
+.paste-modal-body { display: flex; flex-direction: column; gap: 12px; }
+.paste-intro { color: var(--color-text-muted); font-size: 13px; }
+#paste-textarea {
+  flex: 1;
+  min-height: 300px;
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  padding: 16px;
+  color: var(--color-text);
+  font: 14px/1.8 inherit;
+  resize: none;
+}
+#paste-textarea::placeholder { color: var(--color-text-subtle); }
+#btn-analyze-paste {
+  align-self: flex-end;
+  background: var(--color-accent);
+  border: 1px solid var(--color-accent);
+  border-radius: 8px;
+  color: var(--color-accent-contrast);
+  cursor: pointer;
+  font-size: 14px;
+  padding: 11px 18px;
+  transition: filter 160ms ease, transform 160ms ease;
+}
+#btn-analyze-paste:hover { filter: brightness(1.08); }
 .modal-body h2 { color: var(--color-accent); margin-top: 20px; margin-bottom: 8px; font-size: 16px; }
 .modal-body h3 { color: var(--color-text); margin-top: 14px; font-size: 14px; }
 .modal-body blockquote { border-left: 3px solid var(--color-accent); padding-left: 12px; color: var(--color-text-muted); margin: 8px 0; }

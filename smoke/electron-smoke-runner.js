@@ -289,6 +289,27 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.deepEqual(desktopUsability.emojiControls, []);
   assert.deepEqual(desktopUsability.unlabeledSvgControls, []);
 
+  const visualMotionState = await mainWindow.webContents.executeJavaScript(`(() => {
+    const subtitle = document.getElementById('subtitle-scroll');
+    const timer = document.getElementById('timer');
+    const settings = document.getElementById('btn-settings');
+    timer.classList.add('active');
+    settings.focus();
+    const state = {
+      subtitleAnimation: getComputedStyle(subtitle).animationName,
+      timerAnimation: getComputedStyle(timer).animationName,
+      focusOutlineStyle: getComputedStyle(settings).outlineStyle,
+      focusOutlineWidth: getComputedStyle(settings).outlineWidth
+    };
+    timer.classList.remove('active');
+    settings.blur();
+    return state;
+  })()`);
+  assert.equal(visualMotionState.subtitleAnimation, 'none');
+  assert.equal(visualMotionState.timerAnimation, 'none');
+  assert.notEqual(visualMotionState.focusOutlineStyle, 'none');
+  assert.notEqual(visualMotionState.focusOutlineWidth, '0px');
+
   const originalContentSize = mainWindow.getContentSize();
   await mainWindow.webContents.executeJavaScript(`(() => {
     const transcript = document.getElementById('subtitle-scroll');
