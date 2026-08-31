@@ -140,7 +140,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
 
   const apiContract = await mainWindow.webContents.executeJavaScript(`(() => {
     const expected = [
-      'getSettings', 'saveSettings', 'openSettings',
+      'getLlmProviderSettings', 'saveLlmProviderSettings', 'openSettings',
       'openPromptEditor', 'getCustomPrompt', 'saveCustomPrompt', 'closeWindow',
       'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText',
       'getRealtimeFeedback', 'getFinalReport', 'testLLMConnection',
@@ -417,14 +417,14 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       return {
         title: document.title,
         provider: provider.value,
-        hasGetSettings: typeof window.api?.getSettings === 'function'
+        hasGetLlmProviderSettings: typeof window.api?.getLlmProviderSettings === 'function'
       };
     })()`);
   });
   assert.deepEqual(settingsState, {
     title: '设置',
     provider: 'deepseek',
-    hasGetSettings: true
+    hasGetLlmProviderSettings: true
   });
   settingsWindow.close();
 

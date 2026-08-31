@@ -14,11 +14,12 @@ const {createDiagnosticSnapshot} = require('./lib/diagnostics');
 const {isAllowedSupportUrl} = require('./shared/support-links');
 const { loadLexicon, analyzeText } = require('./lib/lexicon');
 const {
-  createDefaultSettings,
-  normalizeSettings,
-  parseSettingsJson,
-  getCurrentProviderSettings
-} = require('./lib/settings-config');
+  getSelectedLlmProviderSettings
+} = require('./lib/llm-provider-config');
+const {
+  loadLlmProviderSettings,
+  saveLlmProviderSettings
+} = require('./lib/llm-provider-store');
 const { createAsrIpcRouter } = require('./lib/asr-ipc');
 const { createAsrProcessController } = require('./lib/asr-process-controller');
 const {runManagedModelSmoke} = require('./lib/managed-model-smoke');
@@ -145,32 +146,6 @@ function loadCustomPrompt() {
 
 function saveCustomPrompt(data) {
   atomicWriteJsonSync(getCustomPromptPath(), normalizeCustomPrompt(data));
-}
-
-// 设置文件路径
-function getSettingsPath() {
-  return path.join(app.getPath('userData'), 'settings.json');
-}
-
-function loadSettings() {
-  const settingsPath = getSettingsPath();
-  if (fs.existsSync(settingsPath)) {
-    const parsed = parseSettingsJson(fs.readFileSync(settingsPath, 'utf-8'));
-    if (parsed.error) {
-      console.warn('[设置] settings.json 无法解析，使用默认配置并保留原文件');
-      return parsed.settings;
-    }
-    if (parsed.shouldPersist) {
-      saveSettings(parsed.settings);
-    }
-    return parsed.settings;
-  }
-  return createDefaultSettings();
-}
-
-function saveSettings(settings) {
-  const settingsPath = getSettingsPath();
-  atomicWriteJsonSync(settingsPath, normalizeSettings(settings));
 }
 
 function createMainWindow() {
@@ -357,14 +332,21 @@ app.on('window-all-closed', () => {
 
 // IPC Handlers
 
-// 设置相关
-ipcMain.handle('get-settings', () => {
-  return loadSettings();
+// LLM Provider 设置
+ipcMain.handle('get-llm-provider-settings', () => {
+  return loadLlmProviderSettings(app.getPath('userData'));
 });
 
-ipcMain.handle('save-settings', (event, settings) => {
-  saveSettings(settings);
-  return { success: true };
+ipcMain.handle('save-llm-provider-settings', (event, settings) => {
+  try {
+    saveLlmProviderSettings(app.getPath('userData'), settings);
+    return { success: true };
+  } catch (error) {
+    if (error.code === 'unsupported-schema-version') {
+      return { success: false, error: '当前版本无法保存更高版本的 LLM Provider 配置' };
+    }
+    throw error;
+  }
 });
 
 ipcMain.handle('open-settings', () => {
@@ -423,7 +405,7 @@ ipcMain.handle('cancel-asr', (event, command) => {
 
 // LLM 连通性测试
 ipcMain.handle('test-llm-connection', async (event, settings) => {
-  const providerConfig = getCurrentProviderSettings(settings);
+  const providerConfig = getSelectedLlmProviderSettings(settings);
   const request = llmRequests.begin(event.sender.id, 'connection');
   try {
     return await testConnection(
@@ -502,8 +484,8 @@ ipcMain.handle('open-support-link', async (event, rawUrl) => {
 
 // AI反馈（传入customPrompt）
 ipcMain.handle('get-realtime-feedback', async (event, text) => {
-  const settings = loadSettings();
-  const providerConfig = getCurrentProviderSettings(settings);
+  const settings = loadLlmProviderSettings(app.getPath('userData'));
+  const providerConfig = getSelectedLlmProviderSettings(settings);
   const customPrompt = loadCustomPrompt();
   return runCoordinatedRequest(
     llmRequests,
@@ -520,8 +502,8 @@ ipcMain.handle('get-realtime-feedback', async (event, text) => {
 });
 
 ipcMain.handle('get-final-report', async (event, { fullText, stats }) => {
-  const settings = loadSettings();
-  const providerConfig = getCurrentProviderSettings(settings);
+  const settings = loadLlmProviderSettings(app.getPath('userData'));
+  const providerConfig = getSelectedLlmProviderSettings(settings);
   const customPrompt = loadCustomPrompt();
   return runCoordinatedRequest(
     llmRequests,

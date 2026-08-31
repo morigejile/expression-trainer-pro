@@ -1,9 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('api', {
-  // 设置
-  getSettings: () => ipcRenderer.invoke('get-settings'),
-  saveSettings: (settings) => ipcRenderer.invoke('save-settings', settings),
+  // LLM Provider 设置
+  getLlmProviderSettings: () => ipcRenderer.invoke('get-llm-provider-settings'),
+  saveLlmProviderSettings: (settings) => ipcRenderer.invoke('save-llm-provider-settings', settings),
   openSettings: () => ipcRenderer.invoke('open-settings'),
 
   // Prompt编辑器

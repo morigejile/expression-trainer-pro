@@ -67,7 +67,7 @@ class SettingsPage {
   async loadSettings() {
     this.setActionsEnabled(false);
     try {
-      this.settings = await window.api.getSettings();
+      this.settings = await window.api.getLlmProviderSettings();
       this.providerSelect.value = this.settings.provider || 'deepseek';
       // 先填充模型列表再加载字段值
       this.onProviderChange();
@@ -183,7 +183,12 @@ class SettingsPage {
     this.btnSave.classList.add('loading');
     try {
       const settings = this.buildDraftSettings();
-      await window.api.saveSettings(settings);
+      const result = await window.api.saveLlmProviderSettings(settings);
+      if (!result?.success) {
+        this.connectionError.textContent = result?.error || '保存失败，请重试';
+        this.connectionError.classList.add('show');
+        return;
+      }
       this.settings = settings;
       this.saveSuccess.textContent = '✓ 已保存';
       this.saveSuccess.classList.add('show');
