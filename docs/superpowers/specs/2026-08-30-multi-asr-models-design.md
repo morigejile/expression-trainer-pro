@@ -1,7 +1,7 @@
 # 多 ASR 模型产品化设计
 
 - Date: 2026-08-30
-- Status: Approved; convergence review incorporated; Planned
+- Status: Approved; ASR-M01 implemented on `feature/asr-m01-catalog-factory` and pending integration; ASR-M02～M04 remain Planned, ASR-U01/U02 remain Deferred
 - Scope: Paraformer、Zipformer Small、Zipformer Large、SenseVoiceSmall、FireRedASR2 CTC INT8
 
 ## 1. 目标
