@@ -3,7 +3,7 @@
 > 状态：Existing / Partial / Planned
 > 基线日期：2026-08-31
 > 适用范围：内部开发/测试中的当前实现（Existing/Partial）与下一阶段工程化目标（Planned）
-> 源码基线：`main`，已包含 R-01～R-09 与 PKG-01～PKG-04
+> 源码基线：当前集成分支，已包含 R-01～R-09、PKG-01～PKG-04 与 UI-01/UI-02
 
 ## 1. 文档目的
 
@@ -72,7 +72,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | FR-P09 | Existing | 设置、用户数据和模型应与程序文件分离。 | 应用升级、恢复当前版本和卸载均不静默删除用户数据。 |
 | FR-P10 | Existing | 本地训练在 LLM 不可用时仍应工作。 | 离线、无 API Key 或 LLM 请求失败时，录音、本地 ASR 和基础词库分析仍可完成。 |
 | FR-P11 | Existing | LLM Provider 配置应具有独立且可识别的持久化边界。 | 使用明确的配置与接口名称；旧设置单向迁移；不与外观或 ASR 选择共享完整快照。 |
-| FR-P12 | Planned | 用户应能选择四个内置主题和 coach-rail/focus-hud 两种响应式布局。 | 外观使用独立 `appearance.json`；主题与布局可即时切换、跨窗口同步和重启恢复；训练中切换不重建 DOM，不改变 session、内容、pending 请求或滚动位置；最小窗口下字幕和反馈不被遮挡。 |
+| FR-P12 | Existing | 用户应能选择四个内置主题和 coach-rail/focus-hud 两种响应式布局。 | 外观使用独立 `appearance.json`；主题与布局可即时切换、跨窗口同步和重启恢复；训练中切换只更新根属性，保留节点、控件、计时、状态、内容和滚动位置；代表性最小、标准和宽屏尺寸下字幕与反馈不遮挡。 |
 | FR-P13 | Planned | 用户应能安装、选择和切换受信任 Catalog 中的 streaming ASR 模型。 | 第一批仅含 Paraformer、Zipformer Small 和 Zipformer Large；产品 registry 是唯一 Catalog 数据源；下载、hash、解包与版本生命周期由 ModelManager 管理；无活动 session 时由 AsrModelService 切换单一 controller；稳定损坏与瞬时初始化失败采用不同持久化语义。 |
 | FR-P14 | Planned | 产品可在 streaming 轨道稳定后支持明确列出的 utterance ASR 模型。 | 第二批只含 SenseVoiceSmall 和 FireRedASR2；停止后解码、无 partial、5 分钟有界 PCM、cancel、失败和 session 隔离通过；不得阻塞第一批 streaming 交付或为其他候选预建适配器。 |
 
@@ -144,4 +144,3 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 - 决策记录：[ADR Index](../architecture/adr/README.md)
 - 交付顺序：[Roadmap](../roadmap.md)
 - Planned 多模型设计：[Multi-ASR Productization](../superpowers/specs/2026-08-30-multi-asr-models-design.md)
-- Planned 外观设计：[Responsive Themed UI](../superpowers/specs/2026-08-31-responsive-themed-ui-design.md)

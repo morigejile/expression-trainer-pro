@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- 增加独立 Appearance 配置、四套主题、coach-rail/focus-hud 双布局、跨窗口同步和响应式窗口尺寸；布局切换保留训练 DOM、状态与滚动位置。
 - 为文本分析、实时反馈、最终报告统计和 Markdown 保存增加轻量 IPC 类型/大小边界；Markdown 默认文件名只接受普通 `.md` 文件名。
 - 收敛当前架构、需求和 Roadmap：删除已完成的实施计划与临时 benchmark 范围说明，只保留当前事实、稳定需求编号、决策证据、未完成工作和外部门禁。
 

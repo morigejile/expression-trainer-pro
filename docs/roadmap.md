@@ -47,8 +47,8 @@ UI 与 ASR 轨道可独立推进。ASR-M04 受模型再分发许可和公开制�
 
 | ID | P | 状态 | 任务 | 完成标准 |
 |---|---|---|---|---|
-| UI-01 | P1 | Completed on feature branch / Pending integration | 独立 AppearanceStore、四主题、窗口同步和响应式初始尺寸 | 外观可恢复、原子持久化和跨窗口同步；读取失败时页面仍可见 |
-| UI-02 | P1 | Completed on feature branch / Pending integration | coach-rail/focus-hud 双布局、统一图标和代表性视觉验收 | 两种布局共用现有 DOM；代表性尺寸下训练状态、控件、滚动和字幕区域保持稳定 |
+| UI-01 | P1 | Completed | 独立 AppearanceStore、四主题、窗口同步和响应式初始尺寸 | 外观可恢复、原子持久化和跨窗口同步；读取失败时页面仍可见 |
+| UI-02 | P1 | Completed | coach-rail/focus-hud 双布局、统一图标和代表性视觉验收 | 两种布局共用现有 DOM；代表性尺寸下训练状态、控件、滚动和字幕区域保持稳定 |
 
 ### 4.2 Streaming ASR productization
 
@@ -82,7 +82,7 @@ UI 与 ASR 轨道可独立推进。ASR-M04 受模型再分发许可和公开制�
 | 里程碑 | 状态 | 包含 | 结果 |
 |---|---|---|---|
 | Baseline | Completed | Phase 0-5、CONV-01～03 | 当前运行时、评测和 Windows x64 内部交付基线可复现 |
-| M4 UI foundation | Pending integration | UI-01、UI-02 | 主题与两种响应式布局已在功能分支完成，待集成 |
+| M4 UI foundation | Completed | UI-01、UI-02 | 主题与两种响应式布局已集成，并在切换中保持训练状态 |
 | M5 Streaming models | In progress | ASR-M01～M04 | Catalog/Factory 已在功能分支完成；选择、安装和默认模型资格仍待推进 |
 | M7 Public delivery | External gate | PKG-05、PKG-06 | 签名、许可和目标平台证据满足公开发布 |
 
