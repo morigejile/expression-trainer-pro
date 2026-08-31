@@ -5,6 +5,11 @@ contextBridge.exposeInMainWorld('api', {
   getLlmProviderSettings: () => ipcRenderer.invoke('get-llm-provider-settings'),
   saveLlmProviderSettings: (settings) => ipcRenderer.invoke('save-llm-provider-settings', settings),
   openSettings: () => ipcRenderer.invoke('open-settings'),
+  onLlmProviderSettingsChanged: (listener) => {
+    const wrapped = () => listener();
+    ipcRenderer.on('llm-provider-settings-changed', wrapped);
+    return () => ipcRenderer.removeListener('llm-provider-settings-changed', wrapped);
+  },
 
   // 外观设置
   getAppearance: () => ipcRenderer.invoke('get-appearance'),

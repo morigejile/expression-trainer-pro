@@ -314,6 +314,30 @@ test('realtime configuration failures show their reason with a settings action',
   }]);
 });
 
+test('user messages can be dismissed explicitly', () => {
+  const trainer = createTrainer();
+
+  trainer.showUserMessage('实时反馈失败：请先配置 API Key', {openSettings: true});
+  trainer.hideUserMessage();
+
+  assert.equal(trainer.userMessage.classList.contains('hidden'), true);
+  assert.equal(trainer.userMessageAction.classList.contains('hidden'), true);
+});
+
+test('saved LLM settings dismiss only a configuration-related message', () => {
+  const trainer = createTrainer();
+
+  trainer.showUserMessage('实时反馈失败：请先配置 API Key', {openSettings: true});
+  trainer.handleLlmProviderSettingsChanged();
+  assert.equal(trainer.userMessage.classList.contains('hidden'), true);
+  assert.equal(trainer.feedbackStatus.textContent, '本地分析可用；AI 建议将在后续表达中生成');
+
+  trainer.showUserMessage('复制失败，请重试');
+  trainer.handleLlmProviderSettingsChanged();
+  assert.equal(trainer.userMessage.classList.contains('hidden'), false);
+  assert.equal(trainer.userMessageText.textContent, '复制失败，请重试');
+});
+
 test('starting recognition immediately exposes preparation state and locks conflicting actions', async (t) => {
   const cancellation = createDeferred();
   global.document = { createElement };

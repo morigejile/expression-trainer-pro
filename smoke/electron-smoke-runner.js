@@ -143,6 +143,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   const apiContract = await mainWindow.webContents.executeJavaScript(`(() => {
     const expected = [
       'getLlmProviderSettings', 'saveLlmProviderSettings', 'openSettings',
+      'onLlmProviderSettingsChanged',
       'getAppearance', 'saveAppearance', 'onAppearanceChanged',
       'openPromptEditor', 'getCustomPrompt', 'saveCustomPrompt', 'closeWindow',
       'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText',
@@ -153,7 +154,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       title: document.title,
       missing: expected.filter(name => typeof window.api?.[name] !== 'function'),
       missingUi: [
-        'user-message', 'user-message-text', 'user-message-action',
+        'user-message', 'user-message-text', 'user-message-action', 'user-message-close',
         'training-status', 'feedback-status'
       ].filter(id => !document.getElementById(id)),
       initialUi: {
@@ -205,6 +206,17 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     }
   });
 
+  const llmSettingsNotification = await mainWindow.webContents.executeJavaScript(`(async () => {
+    let notifications = 0;
+    const unsubscribe = window.api.onLlmProviderSettingsChanged(() => { notifications += 1; });
+    const settings = await window.api.getLlmProviderSettings();
+    const saved = await window.api.saveLlmProviderSettings(settings);
+    await new Promise(resolve => setTimeout(resolve, 25));
+    unsubscribe();
+    return {saved, notifications};
+  })()`);
+  assert.deepEqual(llmSettingsNotification, {saved: {success: true}, notifications: 1});
+
   const helpState = await mainWindow.webContents.executeJavaScript(`(() => {
     const helpButton = document.getElementById('btn-help');
     const helpModal = document.getElementById('help-modal');
@@ -241,12 +253,14 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       message: document.getElementById('user-message-text').textContent.trim(),
       settingsActionHidden: document.getElementById('user-message-action').classList.contains('hidden')
     };
+    document.getElementById('user-message-close').click();
     document.getElementById('btn-close-paste').click();
-    return state;
+    return {...state, dismissed: document.getElementById('user-message').classList.contains('hidden')};
   })()`);
   assert.deepEqual(blankPasteState, {
     message: '请先粘贴需要分析的逐字稿',
-    settingsActionHidden: true
+    settingsActionHidden: true,
+    dismissed: true
   });
 
   assert.deepEqual(mainWindow.getMinimumSize(), [960, 640]);

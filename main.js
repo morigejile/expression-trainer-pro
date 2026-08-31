@@ -534,6 +534,9 @@ ipcMain.handle('get-llm-provider-settings', () => {
 ipcMain.handle('save-llm-provider-settings', (event, settings) => {
   try {
     saveLlmProviderSettings(app.getPath('userData'), settings);
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.send('llm-provider-settings-changed');
+    }
     return { success: true };
   } catch (error) {
     if (error.code === 'unsupported-schema-version') {
