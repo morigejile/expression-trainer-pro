@@ -456,6 +456,30 @@ test('connection testing rejects an invalid custom endpoint before fetching', as
   assert.equal(called, false);
 });
 
+test('custom endpoint appends the chat path before query parameters', async () => {
+  let requestedEndpoint;
+  const result = await testConnection(
+    {
+      provider: 'custom',
+      apiKey: 'test-key',
+      baseUrl: 'https://example.test/openai?api-version=2026-08-31#local-fragment',
+      customModel: 'test-model'
+    },
+    {
+      fetchImpl: async (endpoint) => {
+        requestedEndpoint = endpoint;
+        return jsonResponse({ choices: [{ message: { content: 'OK' } }] });
+      }
+    }
+  );
+
+  assert.deepEqual(result, { success: true });
+  assert.equal(
+    requestedEndpoint,
+    'https://example.test/openai/chat/completions?api-version=2026-08-31'
+  );
+});
+
 test('report failures do not mutate local analysis input', async () => {
   const stats = {
     duration: 12,
