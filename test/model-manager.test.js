@@ -116,6 +116,16 @@ test('archive entry validation rejects absolute and traversal extraction targets
   assert.throws(() => validateArchiveEntry('/outside.txt'), /unsafe path/);
 });
 
+test('read-only active lookup does not create managed model roots', async (t) => {
+  const {createModelManager} = require('../lib/model-manager');
+  const data = fixture(t);
+  const manager = createModelManager({...data, appVersion: '1.0.0'});
+  const modelsRoot = path.join(data.userDataPath, 'models');
+
+  assert.equal(await manager.getActive(data.model.id), null);
+  assert.equal(fs.existsSync(modelsRoot), false);
+});
+
 test('install verifies staged bytes, atomically publishes a version, and activates it', async (t) => {
   const {createModelManager} = require('../lib/model-manager');
   const data = fixture(t);

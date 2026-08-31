@@ -337,7 +337,7 @@ Settings/Prompt Renderer
 - 已有 canonical 支持矩阵、Windows x64 首发选择、未签名内部安装制品，以及真实首次安装/模型和 1.0.0→1.0.1 升级/卸载数据保留闭环；仍无签名、公证或自动更新。
 - 主窗口可按需导出固定 JSON 诊断；Main 组合系统/active 模型/controller 状态，Renderer 只提供经过严格字段校验的采样率，不后台记录或上传用户内容。
 - 开发版本由 `.nvmrc`、`package.json#packageManager/engines` 和 lockfile 共同约束；当前精确基线的 clean install、完整测试、Forge make 与 packaged smoke 已通过。具体命令和环境限制维护在[开发与验证](../development.md)。
-- ASR-M04a 已在与 ASR-M03 组合后完成内部 Squirrel make、全新隔离 `userData` 的首次离线导入/native 初始化，以及二次离线启动；模型归档不进入 Git，公开安装、升级、签名和再分发许可仍归完整 ASR-M04。
+- ASR-M04a 已在与 ASR-M03、UI-01/UI-02 组合后完成 400 项测试（398 pass、0 fail、2 个 Windows file-symlink skip）、普通 model-free Squirrel make/packaged smoke、内部 Squirrel make、全新隔离 `userData` 的首次离线导入/native 初始化（17.072 秒）及二次离线启动（2.805 秒）。模型归档不进入 Git；本轮使用 Codex host 的 Node 24.19.0/npm 12.0.2，正式 PR 前仍需在声明的 Node 24.20.0/npm 11.19.0 基线上复跑。公开安装、升级、签名和再分发许可仍归完整 ASR-M04。
 
 这些发布级缺口及未确认的模型再分发权利在当前内部开发/测试中是非阻塞后续工作；若它们使本地技术实验无法运行或使结论失效，才需要提前处理。
 

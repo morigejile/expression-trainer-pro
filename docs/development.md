@@ -81,7 +81,7 @@ Appearance schema version 1 只保存四主题和两个布局标识；缺失、�
 
 ASR-M04a 独立收尾运行 352 项测试：350 pass、0 fail、2 个同源 Windows symlink skip。真实内部 Squirrel make 和打包应用离线 smoke 已通过；首次导入并 native 初始化为 16.903 秒，二次离线启动为 2.324 秒。
 
-ASR-M03 与 ASR-M04a 合并后运行 370 项测试：368 pass、0 fail、2 个同源 Windows symlink skip；内部 make 再次成功，打包应用首次离线启动为 17.154 秒、二次为 2.547 秒。包内归档复制沿用 M03 的有界安装进度，不改变设置页和独立安装 utility 的边界。
+ASR-M03、UI-01/UI-02 与 ASR-M04a 在最终集成分支合并后运行 400 项测试：398 pass、0 fail、2 个同源 Windows symlink skip；普通 model-free Squirrel make 与 packaged smoke 通过。内部 make 再次成功，打包应用首次离线导入/native 初始化为 17.072 秒、二次离线启动为 2.805 秒。包内归档复制沿用 M03 的有界安装进度，不改变设置页和独立安装 utility 的边界。该轮 Codex host 仅提供 Node 24.19.0/npm 12.0.2，正式 PR 前仍需在项目声明的 Node 24.20.0/npm 11.19.0 基线上复跑完整测试和制品 smoke。
 
 ## ASR 模型
 

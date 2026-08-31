@@ -198,6 +198,8 @@
 
   After merging the independently completed ASR-M03, the combined 370-test suite passed with 368 pass, 0 fail, and 2 host symlink skips. Internal Forge/Squirrel make passed again; the combined packaged app took 17.154 seconds on first offline import/native initialization and 2.547 seconds on the second offline startup.
 
+  After the final integration branch also absorbed UI-01/UI-02 and the canonical document convergence, the 400-test suite passed with 398 pass, 0 fail, and 2 host symlink skips. Ordinary model-free Squirrel make plus packaged smoke passed after fixing the read-only model status path so it no longer creates empty managed-model roots. Internal Forge/Squirrel make passed; the first offline import/native initialization took 17.072 seconds and the second offline startup took 2.805 seconds. This requalification used the Codex host's Node 24.19.0/npm 12.0.2, so the declared Node 24.20.0/npm 11.19.0 baseline remains a final pre-PR rerun.
+
 - [x] **Step 5: Update canonical documentation without claiming public completion**
 
   Mark only `ASR-M04a Internal Qualification` complete when the real artifact smoke passes. Keep ASR-M03 independent, ASR-M04 public delivery externally gated, Zipformer Large `redistribution: not-approved`, and signing/public release unfinished.
