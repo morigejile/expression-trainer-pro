@@ -39,16 +39,30 @@ function ignoreDevelopmentOnly(filePath) {
   return root === 'node_modules' && ['.bin', 'electron', 'electron-nightly'].includes(parts[1]);
 }
 
-module.exports = {
-  packagerConfig: {
+function createForgeConfig({environment = process.env} = {}) {
+  const internalBuild = environment.EXPRESSION_TRAINER_INTERNAL_BUILD;
+  const internalResourceRoot = environment.EXPRESSION_TRAINER_INTERNAL_MODEL_RESOURCE_ROOT;
+  if (internalResourceRoot && internalBuild !== '1') {
+    throw new Error('Internal model resource root requires EXPRESSION_TRAINER_INTERNAL_BUILD=1');
+  }
+  if (internalBuild === '1' && (!internalResourceRoot || !path.isAbsolute(internalResourceRoot))) {
+    throw new Error('Internal model resource root must be absolute');
+  }
+
+  const packagerConfig = {
     arch: 'x64',
     executableName: 'ExpressionTrainer',
     asar: {
       unpackDir: path.join('node_modules', 'sherpa-onnx-win-x64')
     },
     ignore: ignoreDevelopmentOnly
-  },
-  makers: [
+  };
+  if (internalBuild === '1') {
+    packagerConfig.extraResource = [path.join(internalResourceRoot, 'asr-models')];
+  }
+  return {
+    packagerConfig,
+    makers: [
     {
       name: '@electron-forge/maker-squirrel',
       platforms: ['win32'],
@@ -57,5 +71,10 @@ module.exports = {
         setupExe: 'ExpressionTrainerSetup.exe'
       }
     }
-  ]
-};
+    ]
+  };
+}
+
+const forgeConfig = createForgeConfig();
+Object.defineProperty(forgeConfig, 'createForgeConfig', {value: createForgeConfig});
+module.exports = forgeConfig;

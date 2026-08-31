@@ -2,7 +2,7 @@
 
 > 状态：Active
 > 更新日期：2026-08-31
-> 当前模式：内部开发/测试；UI-01/UI-02 与 ASR-M01～M03 已完成，ASR-M04 受许可和公开制品条件约束。
+> 当前模式：内部开发/测试；UI-01/UI-02、ASR-M01～M03 与 ASR-M04a 内部资格验证已完成，完整 ASR-M04 受许可和公开制品条件约束。
 
 ## 1. 排序原则
 
@@ -57,6 +57,7 @@ UI 与 ASR 轨道可独立推进。ASR-M04 受模型再分发许可和公开制�
 | ASR-M01 | P1 | Completed | 以内含受信任映射的 Catalog/Factory 接入三款 streaming provider | 三款模型由同一工厂创建；能力来自代码，不建立空转 Registry service |
 | ASR-M02 | P1 | Completed | AsrSelectionStore、AsrModelService、启动恢复和 controller 切换 | 无活动 session 时可切换；稳定损坏与瞬时失败采用不同持久化语义 |
 | ASR-M03 | P1 | Completed | 独立安装任务、模型管理 IPC 和设置页模型区域 | 下载可取消重试；Renderer 只提交受信任模型 ID；安装不影响当前识别 |
+| ASR-M04a | P1 | Completed/Internal Only | 显式内部构建携带 Catalog 默认 Zipformer Large，并复用 ModelManager 完成包内离线导入与真实 native 初始化 | 普通制品保持 model-free；归档不进入 Git；不得公开分发 |
 | ASR-M04 | P1 | External gate | Zipformer Large 包内默认、升级保留和真实模型资格验证 | 获得再分发批准；离线首次导入、native 初始化、二次启动和升级保留通过 |
 
 ### 4.3 Deferred utterance ASR
@@ -83,7 +84,7 @@ UI 与 ASR 轨道可独立推进。ASR-M04 受模型再分发许可和公开制�
 |---|---|---|---|
 | Baseline | Completed | Phase 0-5、CONV-01～03 | 当前运行时、评测和 Windows x64 内部交付基线可复现 |
 | M4 UI foundation | Completed | UI-01、UI-02 | 主题与两种响应式布局已集成，并在切换中保持训练状态 |
-| M5 Streaming models | In progress | ASR-M01～M04 | Catalog/Factory、选择、单 controller 切换与安装设置入口已完成；包内默认和公开资格仍受外部门槛约束 |
+| M5 Streaming models | In progress | ASR-M01～M04 | Catalog/Factory、选择、单 controller 切换、安装设置入口及内部包内默认资格已完成；公开资格仍受外部门槛约束 |
 | M7 Public delivery | External gate | PKG-05、PKG-06 | 签名、许可和目标平台证据满足公开发布 |
 
 ## 6. 明确不做
