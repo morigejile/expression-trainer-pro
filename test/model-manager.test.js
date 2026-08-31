@@ -132,6 +132,69 @@ test('install verifies staged bytes, atomically publishes a version, and activat
   assert.deepEqual(fs.readdirSync(path.join(data.userDataPath, 'models', '.staging')), []);
 });
 
+test('a matching bundled archive uses the existing install transaction without network access', async (t) => {
+  const {createModelManager} = require('../lib/model-manager');
+  const data = fixture(t);
+  const archivePath = path.join(data.userDataPath, 'packaged-model.tar.bz2');
+  fs.writeFileSync(archivePath, data.archive);
+  let extractedArchive;
+  const manager = createModelManager({
+    ...data,
+    appVersion: '1.0.0',
+    bundledArchive: {modelId: data.model.id, version: data.model.version, archivePath},
+    fetchImpl: async () => { assert.fail('bundled install must not access the network'); },
+    extractArchive: async (options) => {
+      extractedArchive = fs.readFileSync(options.archivePath);
+      await data.extractArchive(options);
+    }
+  });
+
+  const installed = await manager.install(data.model.id, {activate: true});
+
+  assert.deepEqual(extractedArchive, data.archive);
+  assert.equal(installed.reused, false);
+  assert.equal((await manager.getActive(data.model.id)).version, data.model.version);
+  assert.deepEqual(fs.readFileSync(archivePath), data.archive);
+  assert.deepEqual(fs.readdirSync(path.join(data.userDataPath, 'models', '.staging')), []);
+});
+
+test('a corrupt bundled archive leaves no version, pointer, or staging operation', async (t) => {
+  const {createModelManager} = require('../lib/model-manager');
+  const data = fixture(t);
+  const archivePath = path.join(data.userDataPath, 'corrupt-packaged-model.tar.bz2');
+  fs.writeFileSync(archivePath, Buffer.from('fixture-archive-v0'));
+  const manager = createModelManager({
+    ...data,
+    appVersion: '1.0.0',
+    bundledArchive: {modelId: data.model.id, version: data.model.version, archivePath},
+    fetchImpl: async () => { assert.fail('corrupt bundled install must not access the network'); }
+  });
+
+  await assert.rejects(manager.install(data.model.id, {activate: true}), /SHA-256 mismatch/);
+
+  assert.equal(fs.existsSync(path.join(data.userDataPath, 'models', data.model.id, data.model.version)), false);
+  assert.equal(fs.existsSync(path.join(data.userDataPath, 'models', 'active', `${data.model.id}.json`)), false);
+  assert.deepEqual(fs.readdirSync(path.join(data.userDataPath, 'models', '.staging')), []);
+});
+
+test('ModelManager rejects a bundled archive that does not identify the Catalog default version', (t) => {
+  const {createModelManager} = require('../lib/model-manager');
+  const data = fixture(t);
+  const archivePath = path.join(data.userDataPath, 'packaged-model.tar.bz2');
+  fs.writeFileSync(archivePath, data.archive);
+
+  assert.throws(() => createModelManager({
+    ...data,
+    appVersion: '1.0.0',
+    bundledArchive: {modelId: 'other-model', version: data.model.version, archivePath}
+  }), /must match the Catalog default model and version/);
+  assert.throws(() => createModelManager({
+    ...data,
+    appVersion: '1.0.0',
+    bundledArchive: {modelId: data.model.id, version: '2025-01-01', archivePath}
+  }), /must match the Catalog default model and version/);
+});
+
 test('an interrupted download leaves the active version and staging area unchanged', async (t) => {
   const {createModelManager} = require('../lib/model-manager');
   const data = fixture(t);

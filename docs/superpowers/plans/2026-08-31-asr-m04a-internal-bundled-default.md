@@ -78,11 +78,11 @@
 - Consumes: absolute `resourcesPath`, the trusted Catalog, and optional `bundledArchive` object `{modelId, version, archivePath}` supplied by application code.
 - Produces: `resolveBundledModelArchive({resourcesPath, catalog, existsSync}) -> null | {modelId, version, archivePath}`; ModelManager uses that object only for the matching fixed model/version and otherwise keeps HTTPS installation unchanged.
 
-- [ ] **Step 1: Write failing source-resolution and import tests**
+- [x] **Step 1: Write failing source-resolution and import tests**
 
   Cover the deterministic resource path, missing-resource `null`, non-absolute resource-root rejection, and exact Catalog default identity. Extend ModelManager tests so a matching bundled archive is copied without calling `fetch`, still passes archive bytes/hash/extraction/final-file verification, cleans staging on failure, and is ignored for every other model ID/version.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
   ```powershell
   node --test test/bundled-model-source.test.js test/model-manager.test.js
@@ -90,11 +90,11 @@
 
   Expected: fail because the resolver and `bundledArchive` ModelManager option are absent.
 
-- [ ] **Step 3: Implement the minimal bundled source path**
+- [x] **Step 3: Implement the minimal bundled source path**
 
   Derive the archive filename from the Catalog HTTPS URL and construct only `asr-models/<modelId>/<version>/<filename>`. ModelManager validates the injected object against the selected Catalog entry, copies the archive into its operation staging directory with abort support, then reuses the existing exact byte/hash/extract/runtime verification and atomic publication flow. Do not add a second installer or activation path.
 
-- [ ] **Step 4: Run focused and managed-provider tests**
+- [x] **Step 4: Run focused and managed-provider tests**
 
   ```powershell
   node --test test/bundled-model-source.test.js test/model-manager.test.js test/managed-asr-provider.test.js
@@ -102,7 +102,7 @@
 
   Expected: all pass; existing network download/resume tests remain unchanged.
 
-- [ ] **Step 5: Commit the import transaction**
+- [x] **Step 5: Commit the import transaction**
 
   ```text
   feat: import a bundled model through model manager
