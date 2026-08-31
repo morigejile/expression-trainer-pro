@@ -16,6 +16,7 @@ function createClassList() {
 
 function createPage() {
   const page = Object.create(SettingsPage.prototype);
+  page.root = { dataset: { theme: 'graphite', layout: 'coach-rail' } };
   page.providerSelect = { value: 'deepseek' };
   page.apikeyInput = { value: 'test-key' };
   page.modelSelect = { value: 'deepseek-chat' };
@@ -26,6 +27,16 @@ function createPage() {
   page.btnTestConnection = { textContent: '测试连接', disabled: false, classList: createClassList() };
   page.saveSuccess = { textContent: '✓ 已保存', classList: createClassList() };
   page.connectionError = { textContent: '', classList: createClassList() };
+  page.appearanceError = { textContent: '', classList: createClassList() };
+  page.appearanceControls = [
+    { dataset: { appearanceField: 'theme' }, value: 'graphite', checked: true, disabled: false },
+    { dataset: { appearanceField: 'theme' }, value: 'midnight', checked: false, disabled: false },
+    { dataset: { appearanceField: 'theme' }, value: 'paper', checked: false, disabled: false },
+    { dataset: { appearanceField: 'theme' }, value: 'mist', checked: false, disabled: false },
+    { dataset: { appearanceField: 'layout' }, value: 'coach-rail', checked: true, disabled: false },
+    { dataset: { appearanceField: 'layout' }, value: 'focus-hud', checked: false, disabled: false }
+  ];
+  page.appearance = { schemaVersion: 1, theme: 'graphite', layout: 'coach-rail' };
   page.settings = {
     schemaVersion: 1,
     provider: 'deepseek',
@@ -169,4 +180,113 @@ test('save result failure shows its specific reason without claiming success', a
   assert.equal(page.connectionError.textContent, '当前版本无法保存更高版本的 LLM Provider 配置');
   assert.equal(page.connectionError.classList.contains('show'), true);
   assert.equal(page.saveSuccess.classList.contains('show'), false);
+});
+
+test('appearance loads independently when LLM settings fail', async (t) => {
+  global.window = {
+    Appearance: {
+      applyAppearance(root, appearance) {
+        root.dataset.theme = appearance.theme;
+        root.dataset.layout = appearance.layout;
+        return {schemaVersion: 1, theme: appearance.theme, layout: appearance.layout};
+      }
+    },
+    api: {
+      getLlmProviderSettings: async () => { throw new Error('llm unavailable'); },
+      getAppearance: async () => ({schemaVersion: 1, theme: 'mist', layout: 'focus-hud'})
+    }
+  };
+  t.after(() => { delete global.window; });
+  const page = createPage();
+  page.settings = undefined;
+
+  await Promise.all([page.loadSettings(), page.loadAppearance()]);
+
+  assert.equal(page.settings, undefined);
+  assert.deepEqual(page.appearance, {schemaVersion: 1, theme: 'mist', layout: 'focus-hud'});
+  assert.equal(page.appearanceControls.find(control => control.value === 'mist').checked, true);
+  assert.equal(page.appearanceControls.find(control => control.value === 'focus-hud').checked, true);
+});
+
+test('theme selection saves only appearance and applies the normalized result', async (t) => {
+  const calls = [];
+  global.window = {
+    Appearance: {
+      applyAppearance(root, appearance) {
+        calls.push(['apply', appearance]);
+        root.dataset.theme = appearance.theme;
+        root.dataset.layout = appearance.layout;
+        return {schemaVersion: 1, theme: appearance.theme, layout: appearance.layout};
+      }
+    },
+    api: {
+      saveAppearance: async appearance => {
+        calls.push(['appearance-save', appearance]);
+        return {success: true, appearance: {...appearance, schemaVersion: 1}};
+      },
+      saveLlmProviderSettings: async () => assert.fail('appearance must not save LLM settings'),
+      testLLMConnection: async () => assert.fail('appearance must not test connectivity')
+    }
+  };
+  t.after(() => { delete global.window; });
+  const page = createPage();
+
+  await page.selectAppearance('theme', 'paper');
+
+  assert.equal(calls.filter(([type]) => type === 'appearance-save').length, 1);
+  assert.deepEqual(calls.find(([type]) => type === 'appearance-save')[1], {
+    schemaVersion: 1,
+    theme: 'paper',
+    layout: 'coach-rail'
+  });
+  assert.equal(page.appearance.theme, 'paper');
+  assert.equal(page.root.dataset.theme, 'paper');
+  assert.equal(page.appearanceError.textContent, '');
+});
+
+test('failed appearance save restores the last persisted selection', async (t) => {
+  global.window = {
+    Appearance: {
+      applyAppearance(root, appearance) {
+        root.dataset.theme = appearance.theme;
+        root.dataset.layout = appearance.layout;
+        return {schemaVersion: 1, theme: appearance.theme, layout: appearance.layout};
+      }
+    },
+    api: {
+      saveAppearance: async () => ({success: false, error: '外观保存失败，请重试'})
+    }
+  };
+  t.after(() => { delete global.window; });
+  const page = createPage();
+
+  await page.selectAppearance('layout', 'focus-hud');
+
+  assert.deepEqual(page.appearance, {schemaVersion: 1, theme: 'graphite', layout: 'coach-rail'});
+  assert.equal(page.root.dataset.layout, 'coach-rail');
+  assert.equal(page.appearanceControls.find(control => control.value === 'coach-rail').checked, true);
+  assert.equal(page.appearanceControls.find(control => control.value === 'focus-hud').checked, false);
+  assert.equal(page.appearanceError.textContent, '外观保存失败，请重试');
+  assert.equal(page.appearanceError.classList.contains('show'), true);
+});
+
+test('appearance load failure keeps defaults usable and explains the fallback', async (t) => {
+  global.window = {
+    Appearance: {
+      applyAppearance(root, appearance) {
+        root.dataset.theme = appearance.theme;
+        root.dataset.layout = appearance.layout;
+        return {schemaVersion: 1, theme: appearance.theme, layout: appearance.layout};
+      }
+    },
+    api: {getAppearance: async () => { throw new Error('ipc unavailable'); }}
+  };
+  t.after(() => { delete global.window; });
+  const page = createPage();
+
+  await page.loadAppearance();
+
+  assert.deepEqual(page.appearance, {schemaVersion: 1, theme: 'graphite', layout: 'coach-rail'});
+  assert.equal(page.appearanceError.textContent, '外观加载失败，已使用默认外观');
+  assert.equal(page.appearanceControls.every(control => control.disabled === false), true);
 });

@@ -169,11 +169,98 @@
 
     .btn-test-connection:hover { color: var(--color-text); border-color: var(--color-focus); }
     .btn-test-connection.loading { opacity: 0.6; pointer-events: none; }
+
+    .settings-section {
+      border: 1px solid var(--color-border);
+      border-radius: 12px;
+      margin-bottom: 24px;
+      padding: 18px;
+    }
+
+    .settings-section h2 {
+      color: var(--color-text);
+      font-size: 15px;
+      margin-bottom: 14px;
+    }
+
+    .appearance-group {
+      border: 0;
+      margin-bottom: 16px;
+      padding: 0;
+    }
+
+    .appearance-group:last-of-type { margin-bottom: 0; }
+
+    .appearance-group legend {
+      color: var(--color-text-muted);
+      font-size: 12px;
+      margin-bottom: 8px;
+    }
+
+    .appearance-options {
+      display: grid;
+      gap: 8px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .appearance-option {
+      align-items: center;
+      background: var(--color-surface);
+      border: 1px solid var(--color-border);
+      border-radius: 8px;
+      color: var(--color-text-muted);
+      cursor: pointer;
+      display: flex;
+      font-size: 13px;
+      gap: 8px;
+      padding: 10px;
+    }
+
+    .appearance-option:has(input:checked) {
+      border-color: var(--color-accent);
+      color: var(--color-text);
+    }
+
+    .appearance-option input { accent-color: var(--color-accent); }
+
+    .appearance-error {
+      color: var(--color-error);
+      font-size: 12px;
+      min-height: 18px;
+      opacity: 0;
+      padding-top: 8px;
+    }
+
+    .appearance-error.show { opacity: 1; }
   </style>
 </head>
 <body>
   <div class="settings-container">
     <h1>⚙️ 设置</h1>
+
+    <section class="settings-section" aria-labelledby="appearance-heading">
+      <h2 id="appearance-heading">外观</h2>
+      <fieldset class="appearance-group">
+        <legend>主题</legend>
+        <div class="appearance-options">
+          <label class="appearance-option"><input type="radio" name="appearance-theme" value="graphite" data-appearance-field="theme" checked>石墨</label>
+          <label class="appearance-option"><input type="radio" name="appearance-theme" value="midnight" data-appearance-field="theme">深海</label>
+          <label class="appearance-option"><input type="radio" name="appearance-theme" value="paper" data-appearance-field="theme">纸张</label>
+          <label class="appearance-option"><input type="radio" name="appearance-theme" value="mist" data-appearance-field="theme">晨雾</label>
+        </div>
+      </fieldset>
+      <fieldset class="appearance-group">
+        <legend>布局</legend>
+        <div class="appearance-options">
+          <label class="appearance-option"><input type="radio" name="appearance-layout" value="coach-rail" data-appearance-field="layout" checked>教练侧栏</label>
+          <label class="appearance-option"><input type="radio" name="appearance-layout" value="focus-hud" data-appearance-field="layout">专注 HUD</label>
+        </div>
+      </fieldset>
+      <div id="appearance-error" class="appearance-error" role="status"></div>
+    </section>
+
+    <section class="settings-section" aria-labelledby="ai-heading">
+      <h2 id="ai-heading">AI 服务</h2>
 
     <div class="form-group">
       <label>AI 后端</label>
@@ -223,6 +310,7 @@
       <button class="btn-test-connection" id="btn-test-connection">测试连接</button>
       <button class="btn-save" id="btn-save">保存设置</button>
     </div>
+    </section>
   </div>
 
   <script src="appearance.js"></script>

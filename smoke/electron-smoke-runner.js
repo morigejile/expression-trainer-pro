@@ -9,7 +9,8 @@ const SMOKE_EXIT_SESSION_ID = '123e4567-e89b-42d3-a456-426614174002';
 const SMOKE_CANCEL_SESSION_ID = '123e4567-e89b-42d3-a456-426614174001';
 
 const calls = {
-  llmFeedback: 0
+  llmFeedback: 0,
+  llmConnection: 0
 };
 
 const fakeAsrProvider = createFakeAsrProvider({
@@ -91,6 +92,7 @@ const fakeLlm = {
   },
 
   async testConnection() {
+    calls.llmConnection += 1;
     return { success: true };
   }
 };
@@ -447,7 +449,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
         provider: provider.value,
         hasGetLlmProviderSettings: typeof window.api?.getLlmProviderSettings === 'function',
         theme: document.documentElement.dataset.theme,
-        layout: document.documentElement.dataset.layout
+        layout: document.documentElement.dataset.layout,
+        themeControls: document.querySelectorAll('[name="appearance-theme"]').length,
+        layoutControls: document.querySelectorAll('[name="appearance-layout"]').length
       };
     })()`);
   });
@@ -456,7 +460,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     provider: 'deepseek',
     hasGetLlmProviderSettings: true,
     theme: 'graphite',
-    layout: 'coach-rail'
+    layout: 'coach-rail',
+    themeControls: 4,
+    layoutControls: 2
   });
 
   await mainWindow.webContents.executeJavaScript(`(() => {
@@ -465,13 +471,21 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       feedback: document.getElementById('feedback-content')
     };
   })()`);
-  const settingsAppearanceSave = await settingsWindow.webContents.executeJavaScript(
-    `window.api.saveAppearance({theme: 'paper', layout: 'focus-hud'})`
-  );
-  assert.deepEqual(settingsAppearanceSave, {
-    success: true,
-    appearance: {schemaVersion: 1, theme: 'paper', layout: 'focus-hud'}
+  const connectionCallsBeforeAppearance = calls.llmConnection;
+  await settingsWindow.webContents.executeJavaScript(`(() => {
+    const control = document.querySelector('[name="appearance-theme"][value="paper"]');
+    control.checked = true;
+    control.dispatchEvent(new Event('change', {bubbles: true}));
+  })()`);
+  await waitUntil('paper theme selection', async () => {
+    const theme = await mainWindow.webContents.executeJavaScript('document.documentElement.dataset.theme');
+    return theme === 'paper';
   });
+  await settingsWindow.webContents.executeJavaScript(`(() => {
+    const control = document.querySelector('[name="appearance-layout"][value="focus-hud"]');
+    control.checked = true;
+    control.dispatchEvent(new Event('change', {bubbles: true}));
+  })()`);
   const synchronizedSettingsAppearance = await waitUntil('settings appearance synchronization', async () => {
     const [mainState, settingsState] = await Promise.all([
       mainWindow.webContents.executeJavaScript(`(() => ({
@@ -482,7 +496,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       }))()`),
       settingsWindow.webContents.executeJavaScript(`(() => ({
         theme: document.documentElement.dataset.theme,
-        layout: document.documentElement.dataset.layout
+        layout: document.documentElement.dataset.layout,
+        error: document.getElementById('appearance-error').textContent,
+        scrollable: getComputedStyle(document.body).overflowY === 'auto'
       }))()`)
     ]);
     return mainState.theme === 'paper' && settingsState.theme === 'paper'
@@ -496,8 +512,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       transcriptPreserved: true,
       feedbackPreserved: true
     },
-    settingsState: {theme: 'paper', layout: 'focus-hud'}
+    settingsState: {theme: 'paper', layout: 'focus-hud', error: '', scrollable: true}
   });
+  assert.equal(calls.llmConnection, connectionCallsBeforeAppearance);
   settingsWindow.close();
 
   await mainWindow.webContents.executeJavaScript(

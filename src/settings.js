@@ -35,6 +35,7 @@ const PROVIDER_CONFIG = {
 
 class SettingsPage {
   constructor() {
+    this.root = document.documentElement;
     this.providerSelect = document.getElementById('provider');
     this.apikeyInput = document.getElementById('apikey');
     this.apikeyHint = document.getElementById('apikey-hint');
@@ -47,6 +48,8 @@ class SettingsPage {
     this.btnTestConnection = document.getElementById('btn-test-connection');
     this.saveSuccess = document.getElementById('save-success');
     this.connectionError = document.getElementById('connection-error');
+    this.appearanceError = document.getElementById('appearance-error');
+    this.appearanceControls = Array.from(document.querySelectorAll('[data-appearance-field]'));
 
     this.groupApikey = document.getElementById('group-apikey');
     this.groupOllama = document.getElementById('group-ollama');
@@ -54,14 +57,100 @@ class SettingsPage {
     this.groupCustomModel = document.getElementById('group-custom-model');
 
     this.setActionsEnabled(false);
+    this.setAppearanceControlsEnabled(false);
     this.bindEvents();
     this.loadPromise = this.loadSettings();
+    this.appearanceLoadPromise = this.loadAppearance();
   }
 
   bindEvents() {
     this.providerSelect.addEventListener('change', () => this.onProviderChange());
     this.btnSave.addEventListener('click', () => this.save());
     this.btnTestConnection.addEventListener('click', () => this.testConnection());
+    for (const control of this.appearanceControls) {
+      control.addEventListener('change', () => {
+        if (control.checked) {
+          void this.selectAppearance(control.dataset.appearanceField, control.value);
+        }
+      });
+    }
+  }
+
+  applyAppearance(appearance) {
+    if (window.Appearance?.applyAppearance) {
+      return window.Appearance.applyAppearance(this.root, appearance);
+    }
+    const normalized = {
+      schemaVersion: 1,
+      theme: appearance?.theme || 'graphite',
+      layout: appearance?.layout || 'coach-rail'
+    };
+    this.root.dataset.theme = normalized.theme;
+    this.root.dataset.layout = normalized.layout;
+    return normalized;
+  }
+
+  reflectAppearance() {
+    for (const control of this.appearanceControls) {
+      control.checked = this.appearance?.[control.dataset.appearanceField] === control.value;
+    }
+  }
+
+  setAppearanceControlsEnabled(enabled) {
+    for (const control of this.appearanceControls) control.disabled = !enabled;
+  }
+
+  async loadAppearance() {
+    this.setAppearanceControlsEnabled(false);
+    try {
+      this.appearance = this.applyAppearance(await window.api.getAppearance());
+      this.appearanceError.textContent = '';
+      this.appearanceError.classList.remove('show');
+    } catch {
+      this.appearance = this.applyAppearance({theme: 'graphite', layout: 'coach-rail'});
+      this.appearanceError.textContent = '外观加载失败，已使用默认外观';
+      this.appearanceError.classList.add('show');
+    } finally {
+      this.reflectAppearance();
+      this.setAppearanceControlsEnabled(true);
+    }
+  }
+
+  async selectAppearance(field, value) {
+    if (this.appearanceLoadPromise) await this.appearanceLoadPromise;
+    if (field !== 'theme' && field !== 'layout') return;
+
+    const previous = {...(this.appearance || {
+      schemaVersion: 1,
+      theme: 'graphite',
+      layout: 'coach-rail'
+    })};
+    const draft = this.applyAppearance({...previous, [field]: value});
+    this.appearance = draft;
+    this.reflectAppearance();
+    this.appearanceError.textContent = '';
+    this.appearanceError.classList.remove('show');
+    this.setAppearanceControlsEnabled(false);
+
+    try {
+      const result = await window.api.saveAppearance(draft);
+      if (!result?.success || !result.appearance) {
+        this.appearance = this.applyAppearance(previous);
+        this.reflectAppearance();
+        this.appearanceError.textContent = result?.error || '外观保存失败，请重试';
+        this.appearanceError.classList.add('show');
+        return;
+      }
+      this.appearance = this.applyAppearance(result.appearance);
+      this.reflectAppearance();
+    } catch {
+      this.appearance = this.applyAppearance(previous);
+      this.reflectAppearance();
+      this.appearanceError.textContent = '外观保存失败，请重试';
+      this.appearanceError.classList.add('show');
+    } finally {
+      this.setAppearanceControlsEnabled(true);
+    }
   }
 
   async loadSettings() {
