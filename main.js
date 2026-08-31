@@ -38,7 +38,11 @@ const asrProvider = createAsrProcessController({
   spawn: () => {
     const args = isSmokeTest
       ? ['--fake-asr']
-      : ['--user-data-path', app.getPath('userData'), '--app-version', app.getVersion()];
+      : [
+          '--user-data-path', app.getPath('userData'),
+          '--app-version', app.getVersion(),
+          '--model-id', 'paraformer-bilingual-zh-en'
+        ];
     if (isManagedModelSmokeTest && isOfflineModelSmoke) args.push('--offline-model-smoke');
     return utilityProcess.fork(
       path.join(__dirname, 'lib', 'asr-utility-process.js'),

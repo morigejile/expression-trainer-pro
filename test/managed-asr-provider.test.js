@@ -250,3 +250,52 @@ test('default managed startup stays pinned to Paraformer and creates it through 
   ]);
   await provider.dispose();
 });
+
+test('catalog-managed provider maps every installed role for all three trusted models', async () => {
+  const {createManagedCatalogProvider} = require('../lib/managed-asr-provider');
+  const registry = require('../models/registry.json');
+  for (const catalogEntry of registry.models) {
+    const root = path.resolve('managed-catalog', catalogEntry.modelId);
+    const files = catalogEntry.files.map(({role}) => ({role, path: path.join(root, role)}));
+    const delegate = fakeProvider();
+    const calls = [];
+    const provider = createManagedCatalogProvider({
+      catalogEntry,
+      manager: {
+        async getActive(modelId) { calls.push(['getActive', modelId]); return {version: catalogEntry.version, files}; },
+        async getPrevious() { assert.fail('getPrevious should not run'); },
+        async install() { assert.fail('install should not run'); },
+        async activate() { assert.fail('activate should not run'); }
+      },
+      createProviderFromCatalog(options) {
+        calls.push(['factory', options]);
+        return {provider: delegate, capabilities: {mode: 'streaming'}};
+      }
+    });
+
+    await provider.initialize();
+    assert.equal(calls[0][1], catalogEntry.modelId);
+    assert.equal(calls[1][1].catalogEntry, catalogEntry);
+    assert.deepEqual(calls[1][1].modelFiles, Object.fromEntries(files.map(({role, path}) => [role, path])));
+    await provider.dispose();
+  }
+});
+
+test('installed-only managed startup never downloads a missing model', async () => {
+  const {createManagedCatalogProvider} = require('../lib/managed-asr-provider');
+  const catalogEntry = require('../models/registry.json').models[1];
+  let installs = 0;
+  const provider = createManagedCatalogProvider({
+    catalogEntry,
+    installedOnly: true,
+    manager: {
+      async getActive() { return null; },
+      async getPrevious() { return null; },
+      async install() { installs += 1; },
+      async activate() {}
+    }
+  });
+
+  await assert.rejects(provider.initialize(), error => error.code === 'asr-model-not-installed');
+  assert.equal(installs, 0);
+});

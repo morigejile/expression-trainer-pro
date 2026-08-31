@@ -33,12 +33,12 @@ feat: persist the selected ASR model independently
 
 ## Task 2: Generalize managed startup for a selected Catalog model
 
-- [ ] Add failing managed-provider and utility argument tests for all three Catalog models, generic role mapping, explicit `--asr-model`, and installed-only startup.
-- [ ] Refactor the current managed Paraformer preparation into a Catalog-driven managed provider while preserving the compatibility export and all activation/rollback behavior.
-- [ ] Make the utility require an exact Catalog model ID and create it only through ProviderFactory; installed-only mode must never download.
-- [ ] Keep Fake/Electron smoke startup unchanged and keep model selection out of Renderer commands.
-- [ ] Run managed-provider, Factory, ModelManager, utility/process-controller, Electron smoke, and Paraformer/Zipformer tests.
-- [ ] Commit with an English subject and a Chinese body.
+- [x] Add failing managed-provider and utility argument tests for all three Catalog models, generic role mapping, explicit `--asr-model`, and installed-only startup.
+- [x] Refactor the current managed Paraformer preparation into a Catalog-driven managed provider while preserving the compatibility export and all activation/rollback behavior.
+- [x] Make the utility require an exact Catalog model ID and create it only through ProviderFactory; installed-only mode must never download.
+- [x] Keep Fake/Electron smoke startup unchanged and keep model selection out of Renderer commands.
+- [x] Run managed-provider, Factory, ModelManager, utility/process-controller, Electron smoke, and Paraformer/Zipformer tests.
+- [x] Commit with an English subject and a Chinese body.
 
 Expected commit:
 
