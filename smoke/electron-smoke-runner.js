@@ -839,19 +839,33 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     const item = document.querySelector('.history-item');
     const state = {
       open: !document.getElementById('history-modal').classList.contains('hidden'),
-      text: item?.textContent || ''
+      text: item?.textContent || '',
+      itemHeight: Math.round(item?.getBoundingClientRect().height || 0),
+      actions: Array.from(item?.querySelectorAll('button') || []).map(button => button.textContent.trim())
     };
-    item?.click();
+    item?.querySelector('.history-action-original')?.click();
+    await new Promise(resolve => setTimeout(resolve, 30));
+    const originalState = {
+      restoredTranscript: document.getElementById('subtitle-container').textContent.trim(),
+      reportOpen: !document.getElementById('report-modal').classList.contains('hidden')
+    };
+    document.getElementById('btn-history').click();
+    await new Promise(resolve => setTimeout(resolve, 30));
+    document.querySelector('.history-action-report')?.click();
     await new Promise(resolve => setTimeout(resolve, 30));
     return {
       ...state,
-      restoredTranscript: document.getElementById('subtitle-container').textContent.trim(),
+      restoredTranscript: originalState.restoredTranscript,
+      originalReportOpen: originalState.reportOpen,
       restoredReportOpen: !document.getElementById('report-modal').classList.contains('hidden')
     };
   })()`);
   assert.equal(historyState.open, true);
   assert.match(historyState.text, /粘贴逐字稿.*含报告/);
+  assert.ok(historyState.itemHeight <= 120, `history item should stay compact, got ${historyState.itemHeight}px`);
+  assert.deepEqual(historyState.actions, ['查看原文', '查看报告']);
   assert.equal(historyState.restoredTranscript, '嗯我觉得这个方案很好。');
+  assert.equal(historyState.originalReportOpen, false);
   assert.equal(historyState.restoredReportOpen, true);
 
   console.log(SUCCESS_MARKER);

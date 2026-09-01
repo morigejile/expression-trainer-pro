@@ -964,8 +964,10 @@ class ExpressionTrainer {
         return;
       }
       for (const entry of entries) {
-        const button = document.createElement('button');
-        button.className = 'history-item';
+        const item = document.createElement('article');
+        item.className = 'history-item';
+        const content = document.createElement('div');
+        content.className = 'history-item-content';
         const meta = document.createElement('span');
         meta.className = 'history-item-meta';
         const date = new Date(entry.createdAt).toLocaleString('zh-CN', {hour12: false});
@@ -973,9 +975,23 @@ class ExpressionTrainer {
         const preview = document.createElement('span');
         preview.className = 'history-item-preview';
         preview.textContent = entry.preview || '（空白逐字稿）';
-        button.append(meta, preview);
-        button.addEventListener('click', () => this.restoreHistoryEntry(entry.id));
-        this.historyList.appendChild(button);
+        content.append(meta, preview);
+
+        const actions = document.createElement('div');
+        actions.className = 'history-item-actions';
+        const originalButton = document.createElement('button');
+        originalButton.className = 'history-action history-action-original';
+        originalButton.textContent = '查看原文';
+        originalButton.addEventListener('click', () => this.restoreHistoryEntry(entry.id));
+        const reportButton = document.createElement('button');
+        reportButton.className = 'history-action history-action-report';
+        reportButton.textContent = entry.hasReport ? '查看报告' : '暂无报告';
+        reportButton.disabled = !entry.hasReport;
+        reportButton.addEventListener('click', () => this.restoreHistoryEntry(entry.id, {openReport: true}));
+        actions.append(originalButton, reportButton);
+
+        item.append(content, actions);
+        this.historyList.appendChild(item);
       }
     } catch {
       const error = document.createElement('p');
@@ -985,7 +1001,7 @@ class ExpressionTrainer {
     }
   }
 
-  async restoreHistoryEntry(id) {
+  async restoreHistoryEntry(id, {openReport = false} = {}) {
     try {
       const result = await window.api.getHistoryEntry(id);
       if (!result?.success || !result.entry) throw new Error(result?.error || '记录不存在');
@@ -1012,7 +1028,7 @@ class ExpressionTrainer {
       this.btnClear.classList.remove('hidden');
       this.trainingStatus.textContent = '已载入历史训练';
       this.closeModal(this.historyModal);
-      if (this.lastReport) {
+      if (openReport && this.lastReport) {
         this.renderReport(this.lastReport);
         this.openModal(this.reportModal, this.btnCloseReport);
       }
