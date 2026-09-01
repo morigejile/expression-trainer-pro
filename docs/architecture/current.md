@@ -77,10 +77,10 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 当前系统实现两条输入路径：
 
 ```text
-麦克风 → 本地 ASR ┐
-                  ├→ 词库分析 → 可选 LLM 实时反馈/报告 → UI/Markdown
-粘贴逐字稿 ───────┘
-   └→ Renderer-only Int16/WAV（最多五条）→ 本地回放
+麦克风音频块 ┬→ 本地 ASR → final 文本 ┐
+             └→ Renderer-only Int16/WAV（最多五条）→ 本地回放
+粘贴逐字稿 ────────────────────────────┤
+                                         └→ 词库分析 → 可选 LLM 实时反馈/报告 → UI/Markdown
 ASR 最终片段 + 时间 → 结构化 LLM 回放分析 → 随播放进度显示
 ```
 

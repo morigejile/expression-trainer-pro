@@ -724,7 +724,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
         playbackVisibleAfterStop: true,
         recordOptionCount: document.getElementById('training-record-select').options.length,
         modelLabels: Array.from(document.getElementById('playback-model').options, option => option.textContent),
-        analysisStatus: '分析完成',
+        analysisStatus: document.getElementById('feedback-status').textContent.trim(),
         analysisProfileModel: record.playbackAnalysis.profile.model,
         analysisSegmentIds: record.playbackAnalysis.items.map(item => item.segmentId),
         audioType: audioBlob.type
