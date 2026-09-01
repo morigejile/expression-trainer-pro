@@ -563,7 +563,7 @@ class ExpressionTrainer {
     if (appended.limitReached && !this.limitStopPromise) {
       const limitSessionId = sessionId;
       this.trainingStatus.textContent = '已达到20分钟上限，正在结束录音…';
-      this.limitStopPromise = Promise.resolve().then(() => {
+      this.limitStopPromise = new Promise(resolve => setTimeout(resolve, 0)).then(() => {
         if (!this.isRecording
             || this.asrEventState.activeSessionId !== limitSessionId
             || this.recordingSessionId !== limitSessionId) return false;
@@ -622,7 +622,11 @@ class ExpressionTrainer {
 
   stopRecording() {
     const activeSessionId = this.asrEventState.activeSessionId;
-    if (!activeSessionId) return Promise.resolve(false);
+    const ownsRecording = Boolean(activeSessionId)
+      && this.isRecording
+      && this.recordingSessionId === activeSessionId
+      && Boolean(this.recordingPcm);
+    if (!ownsRecording) return Promise.resolve(false);
     if (this.recordingStopOperation?.sessionId === activeSessionId) {
       return this.recordingStopOperation.promise;
     }

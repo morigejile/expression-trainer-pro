@@ -151,6 +151,10 @@ function flushMicrotasks() {
   return new Promise(resolve => setImmediate(resolve));
 }
 
+function flushTimers() {
+  return new Promise(resolve => setTimeout(resolve, 0));
+}
+
 async function startAudioCaptureHarness(t, {
   captureStop,
   feedAudio,
@@ -255,6 +259,12 @@ function activateAsrSession(trainer, sessionId = 'session-a') {
   return sessionId;
 }
 
+function ownActiveRecording(trainer, sessionId = 'session-a') {
+  trainer.recordingSessionId = sessionId;
+  trainer.recordingPcm = { durationMs: 0, clear() {} };
+  trainer.pendingSegments = [];
+}
+
 function stopEnvelope(sessionId, text = '尾部文本') {
   const events = [];
   if (text.trim()) {
@@ -310,6 +320,7 @@ test('stop final text reaches transcript, analysis, and the next report', async 
   });
   const trainer = createTrainer();
   activateAsrSession(trainer);
+  ownActiveRecording(trainer);
 
   let stopResolved = false;
   const stopPromise = trainer.stopRecording().then(() => { stopResolved = true; });
@@ -422,6 +433,7 @@ test('stopping recording immediately exposes finalization state and locks record
   });
   const trainer = createTrainer();
   activateAsrSession(trainer);
+  ownActiveRecording(trainer);
   trainer.audioCapture = {
     setEnabled() {},
     stop: () => captureStop.promise
@@ -733,6 +745,7 @@ test('stop suppresses pending feedback before final analysis completes', async (
   });
   const trainer = createTrainer();
   activateAsrSession(trainer);
+  ownActiveRecording(trainer);
   trainer.fullText = '旧会话已经积累了足够长的逐字稿内容';
   trainer.addFeedbackItem = (text) => feedbackItems.push(text);
 
@@ -765,6 +778,7 @@ test('stop finalizes recording when final-text analysis fails', async (t) => {
   t.after(() => { delete global.window; });
   const trainer = createTrainer();
   activateAsrSession(trainer);
+  ownActiveRecording(trainer);
   trainer.btnStart.classList.add('hidden');
   trainer.showError = (message) => shownErrors.push(message);
 
@@ -794,6 +808,7 @@ test('an endpoint final and the matching stop final update state only once', asy
   t.after(() => { delete global.window; });
   const trainer = createTrainer();
   activateAsrSession(trainer);
+  ownActiveRecording(trainer);
 
   trainer.handleASRResult({ text: '尾部文本', isFinal: true });
   await new Promise(resolve => setImmediate(resolve));
@@ -818,6 +833,7 @@ test('blank stop final text leaves transcript state unchanged', async (t) => {
   t.after(() => { delete global.window; });
   const trainer = createTrainer();
   activateAsrSession(trainer);
+  ownActiveRecording(trainer);
 
   await trainer.stopRecording();
   await new Promise(resolve => setImmediate(resolve));
@@ -1167,6 +1183,7 @@ test('clear during stop-final analysis prevents stale analysis side effects', as
   });
   const trainer = createTrainer();
   activateAsrSession(trainer);
+  ownActiveRecording(trainer);
 
   const stopPromise = trainer.stopRecording();
   await new Promise(resolve => setImmediate(resolve));
@@ -1224,6 +1241,7 @@ test('stop rejection after clear does not display a stale error', async (t) => {
   });
   const trainer = createTrainer();
   activateAsrSession(trainer);
+  ownActiveRecording(trainer);
   trainer.showError = message => shownErrors.push(message);
 
   const stopPromise = trainer.stopRecording();
@@ -1840,7 +1858,7 @@ test('a chunk reaching the configured frame limit triggers one owned normal stop
   trainer.stopRecording = async () => { trainer.stopCalls += 1; };
 
   await trainer.handleCapturedChunk(audioChunk('session-a', new Float32Array([0.3, 0.4, 0.5])));
-  await flushMicrotasks();
+  await flushTimers();
 
   assert.equal(trainer.stopCalls, 1);
   assert.equal(trainer.trainingStatus.textContent, '已达到20分钟上限，正在结束录音…');
@@ -2197,6 +2215,7 @@ test('limit overrun failure invalidates ownership before deferred normal stop ca
   });
   await flushMicrotasks();
   await flushMicrotasks();
+  await flushTimers();
 
   assert.equal(normalStopCalls, 0);
   assert.deepEqual(cancelCommands, [{ sessionId: 'session-a' }]);
@@ -2222,4 +2241,83 @@ test('stopRecording is an inert no-op without an active owned session', async (t
   assert.equal(result, false);
   assert.equal(trainer.recordingStopOperation, null);
   assert.equal(trainer.trainingStatus.textContent, '准备就绪');
+});
+
+test('stopRecording is inert while ASR is active but the recording buffer is not owned yet', async (t) => {
+  let stopCalls = 0;
+  global.document = { createElement };
+  global.window = {
+    api: {
+      stopASR: async () => { stopCalls += 1; return stopEnvelope('session-a', ''); },
+      cancelLLMRequests: async () => ({ success: true })
+    }
+  };
+  t.after(() => {
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  activateAsrSession(trainer);
+  trainer.recordingSessionId = null;
+  trainer.recordingPcm = null;
+  trainer.trainingStatus.textContent = '正在准备语音识别，首次运行可能需要数分钟';
+
+  const result = await trainer.stopRecording();
+
+  assert.equal(result, false);
+  assert.equal(stopCalls, 0);
+  assert.equal(trainer.recordingStopOperation, null);
+  assert.equal(trainer.trainingStatus.textContent, '正在准备语音识别，首次运行可能需要数分钟');
+});
+
+test('limit chunk feed rejection wins before its deferred normal stop', async (t) => {
+  const cancelCommands = [];
+  const stopCommands = [];
+  const shownErrors = [];
+  global.window = {
+    api: {
+      feedAudio: async () => { throw new Error('same-chunk feed rejected'); },
+      cancelASR(command) {
+        cancelCommands.push(command);
+        return Promise.resolve({ ok: true, events: [] });
+      },
+      stopASR(command) {
+        stopCommands.push(command);
+        return Promise.resolve(stopEnvelope(command.sessionId, 'must not finalize'));
+      }
+    }
+  };
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  trainer.fullText = '';
+  trainer.sentences = [];
+  trainer.showError = message => shownErrors.push(message);
+  activateAsrSession(trainer);
+  trainer.recordingSessionId = 'session-a';
+  trainer.recordingPcm = createPcmWavRecorder({ sampleRateHz: 16000, maxFrames: 4 });
+  trainer.recordingPcm.append(new Float32Array([0.1, 0.2]));
+  trainer.audioFeedTracker = trainer.createAudioFeedTracker('session-a');
+  const originalStopRecording = trainer.stopRecording.bind(trainer);
+  let normalStopCalls = 0;
+  trainer.stopRecording = () => {
+    normalStopCalls += 1;
+    return originalStopRecording();
+  };
+
+  await trainer.handleCapturedChunk({
+    ...audioChunk('session-a', new Float32Array([0.3, 0.4, 0.5])),
+    sequence: 0
+  });
+  await flushMicrotasks();
+  await flushMicrotasks();
+  await flushTimers();
+
+  assert.equal(normalStopCalls, 0);
+  assert.deepEqual(cancelCommands, [{ sessionId: 'session-a' }]);
+  assert.deepEqual(stopCommands, []);
+  assert.deepEqual(shownErrors, ['语音识别处理失败，录音已停止，请重新开始']);
+  assert.equal(trainer.recordingPcm, null);
+  assert.equal(trainer.trainingRecords, undefined);
+  assert.notEqual(trainer.trainingStatus.textContent, '本次训练已结束');
 });
