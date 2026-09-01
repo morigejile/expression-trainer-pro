@@ -218,7 +218,9 @@ class ExpressionTrainer {
 
   async ensureRecordingPolicyAcknowledged() {
     if (this.recordingPolicyAcknowledged) return true;
-    if (typeof window.api.getRecordingPolicy !== 'function') return true;
+    if (typeof window.api.getRecordingPolicy !== 'function') {
+      throw new Error('录音保留策略不可用');
+    }
     const policy = await window.api.getRecordingPolicy();
     if (policy?.acknowledged) {
       this.recordingPolicyAcknowledged = true;
@@ -226,6 +228,9 @@ class ExpressionTrainer {
     }
     const accepted = await this.waitForRecordingPolicyDecision();
     if (!accepted) return false;
+    if (typeof window.api.acknowledgeRecordingPolicy !== 'function') {
+      throw new Error('录音保留策略确认不可用');
+    }
     const result = await window.api.acknowledgeRecordingPolicy();
     if (!result?.success || result.acknowledged !== true) {
       throw new Error(result?.error || '无法保存录音保留策略确认');
@@ -556,8 +561,14 @@ class ExpressionTrainer {
       });
     }
     if (appended.limitReached && !this.limitStopPromise) {
+      const limitSessionId = sessionId;
       this.trainingStatus.textContent = '已达到20分钟上限，正在结束录音…';
-      this.limitStopPromise = Promise.resolve().then(() => this.stopRecording());
+      this.limitStopPromise = Promise.resolve().then(() => {
+        if (!this.isRecording
+            || this.asrEventState.activeSessionId !== limitSessionId
+            || this.recordingSessionId !== limitSessionId) return false;
+        return this.stopRecording();
+      });
     }
     return Promise.resolve(enqueued);
   }
@@ -602,6 +613,7 @@ class ExpressionTrainer {
     this.audioFeedTracker = null;
     this.discardRecordingBuffer(sessionId);
     this.teardownRecordingCapture();
+    this.trainingStatus.textContent = '语音识别处理失败，录音已停止，请重新开始';
     const retainedRecord = this.trainingRecords?.selected();
     if (retainedRecord) this.selectTrainingRecord(retainedRecord.id);
     this.showError('语音识别处理失败，录音已停止，请重新开始');
@@ -610,6 +622,7 @@ class ExpressionTrainer {
 
   stopRecording() {
     const activeSessionId = this.asrEventState.activeSessionId;
+    if (!activeSessionId) return Promise.resolve(false);
     if (this.recordingStopOperation?.sessionId === activeSessionId) {
       return this.recordingStopOperation.promise;
     }
@@ -629,6 +642,7 @@ class ExpressionTrainer {
 
   async completeRecordingStop(operation) {
     const { sessionId, feedTracker } = operation;
+    let completedNormally = false;
     this.advanceLLMGeneration();
     try {
       await this.releaseAudioCapture({ flush: true });
@@ -639,14 +653,14 @@ class ExpressionTrainer {
       }
       if (this.asrEventState.activeSessionId !== sessionId) return;
       this.audioFeedTracker = null;
-      await this.finishOwnedAsrStopAndUi(sessionId);
+      completedNormally = await this.finishOwnedAsrStopAndUi(sessionId);
     } catch {
       await this.failActiveRecording(sessionId);
     } finally {
       if (this.recordingStopOperation === operation) {
         this.recordingStopOperation = null;
       }
-      this.trainingStatus.textContent = '本次训练已结束';
+      if (completedNormally) this.trainingStatus.textContent = '本次训练已结束';
       this.btnStop.disabled = false;
       this.btnPause.disabled = false;
       this.btnResume.disabled = false;
@@ -659,20 +673,28 @@ class ExpressionTrainer {
     const durationMs = this.recordingSessionId === sessionId && this.recordingPcm
       ? this.recordingPcm.durationMs
       : 0;
+    let tailSucceeded = false;
+    let tailErrorMessage = null;
     try {
       if (sessionId) {
         const stopResponse = await window.api.stopASR({ sessionId });
-        await this.processASRResponse(
+        tailSucceeded = await this.processASRResponse(
           stopResponse,
           '语音识别停止失败',
           '尾部文本分析失败',
-          () => this.asrEventState.activeSessionId === sessionId,
+          () => stopResponse?.ok === true && this.asrEventState.activeSessionId === sessionId,
           durationMs
         );
+        if (!tailSucceeded) {
+          const message = typeof stopResponse?.error?.message === 'string'
+            ? stopResponse.error.message
+            : '未知错误';
+          tailErrorMessage = `语音识别停止失败: ${message}`;
+        }
       }
     } catch (error) {
       if (this.asrEventState.activeSessionId === sessionId) {
-        this.showError(`语音识别停止失败: ${error.message}`);
+        tailErrorMessage = `语音识别停止失败: ${error.message}`;
       }
     } finally {
       if (this.asrEventState.activeSessionId === sessionId) {
@@ -693,7 +715,15 @@ class ExpressionTrainer {
         this.stats.duration = durationMs > 0
           ? Math.floor(durationMs / 1000)
           : Math.floor((Date.now() - this.startTime - totalPaused) / 1000);
-        if (this.recordingSessionId === sessionId) this.finalizeTrainingRecord();
+        if (tailSucceeded && this.recordingSessionId === sessionId) {
+          this.finalizeTrainingRecord();
+        } else if (this.recordingSessionId === sessionId) {
+          this.discardRecordingBuffer(sessionId);
+          const retainedRecord = this.trainingRecords?.selected();
+          if (retainedRecord) this.selectTrainingRecord(retainedRecord.id);
+          this.trainingStatus.textContent = '语音识别处理失败，录音已停止，请重新开始';
+          if (tailErrorMessage) this.showError(tailErrorMessage);
+        }
 
         // UI：显示生成报告按钮，可翻阅字幕
         this.btnStop.classList.add('hidden');
@@ -710,6 +740,7 @@ class ExpressionTrainer {
         }
       }
     }
+    return tailSucceeded;
   }
 
   // ===== ASR结果处理 =====

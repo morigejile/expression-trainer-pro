@@ -5,6 +5,7 @@ global.document = { addEventListener() {} };
 const { mergeFinalText, ExpressionTrainer } = require('../src/app');
 const { beginAsrSession, createAsrEventState, filterAsrEvent } = require('../src/asr-event-state');
 const { createAudioCapture } = require('../src/audio-capture');
+const { createPcmWavRecorder } = require('../src/pcm-wav');
 const { createTrainingRecordStore } = require('../src/training-records');
 delete global.document;
 
@@ -81,6 +82,7 @@ function createTrainer() {
   trainer.asrEventState = createAsrEventState();
   trainer.asrStartAttempt = null;
   trainer.asrGeneration = 0;
+  trainer.recordingPolicyAcknowledged = true;
   trainer.renderSubtitle = () => {};
   trainer.btnStop = createElement();
   trainer.btnStopLabel = createElement();
@@ -1726,6 +1728,7 @@ test('first recording waits for policy acknowledgement before ASR or microphone 
   const trainer = createTrainer();
   trainer.isRecording = false;
   trainer.fullText = '';
+  trainer.recordingPolicyAcknowledged = false;
   trainer.audioCaptureFactory = audio.factory;
   trainer.waitForRecordingPolicyDecision = () => acknowledgement.promise;
   t.after(() => {
@@ -1817,20 +1820,26 @@ test('a delayed final uses the producing queue item audio end instead of later c
   ]);
 });
 
-test('the chunk reaching 19,200,000 frames triggers one normal stop', async () => {
+test('a chunk reaching the configured frame limit triggers one owned normal stop', async () => {
   const trainer = createTrainer();
   activateAsrSession(trainer);
   trainer.recordingSessionId = 'session-a';
-  trainer.recordingPcm = fakeRecorder({ limitOnAppend: true });
+  trainer.recordingPcm = createPcmWavRecorder({ sampleRateHz: 16000, maxFrames: 4 });
+  trainer.recordingPcm.append(new Float32Array([0.1, 0.2]));
   trainer.audioFeedTracker = {
     sessionId: 'session-a',
-    queue: { enqueue: () => true }
+    queue: {
+      enqueue(item) {
+        assert.equal(item.samples.length, 2);
+        assert.equal(item.audioEndMs, 0.25);
+        return true;
+      }
+    }
   };
   trainer.stopCalls = 0;
   trainer.stopRecording = async () => { trainer.stopCalls += 1; };
 
-  await trainer.handleCapturedChunk(audioChunk('session-a'));
-  await trainer.handleCapturedChunk(audioChunk('session-a'));
+  await trainer.handleCapturedChunk(audioChunk('session-a', new Float32Array([0.3, 0.4, 0.5])));
   await flushMicrotasks();
 
   assert.equal(trainer.stopCalls, 1);
@@ -2000,4 +2009,217 @@ test('clear in completed-record mode removes only the selected record and revoke
   assert.deepEqual(trainer.trainingRecords.list().map(record => record.id), ['r2']);
   assert.deepEqual(revoked, ['blob:1']);
   assert.equal(trainer.viewingTrainingRecordId, 'r2');
+});
+
+function retainedRecord(number) {
+  return {
+    id: `retained-${number}`,
+    createdAt: `2026-09-01T0${number}:00:00.000Z`,
+    durationMs: number * 1000,
+    audioUrl: `blob:retained-${number}`,
+    segments: [{
+      id: 'segment-1', text: `记录${number}`, startMs: 0, endMs: number * 1000, localAnalysis: null
+    }],
+    stats: { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 3, duration: number },
+    fullText: `记录${number}`,
+    playbackAnalysis: null
+  };
+}
+
+function preloadFiveRetainedRecords(trainer, revoked) {
+  trainer.trainingRecords = createTrainingRecordStore({ revokeObjectURL: url => revoked.push(url) });
+  for (let number = 1; number <= 5; number += 1) {
+    trainer.trainingRecords.add(retainedRecord(number));
+  }
+  return trainer.trainingRecords.list().map(record => ({ id: record.id, audioUrl: record.audioUrl }));
+}
+
+for (const failure of [
+  {
+    name: 'rejection',
+    stopASR: async () => { throw new Error('tail transport unavailable'); },
+    expectedError: '语音识别停止失败: tail transport unavailable'
+  },
+  {
+    name: 'unsuccessful envelope',
+    stopASR: async () => ({
+      ok: false,
+      error: { code: 'asr-stop-failed', message: 'sanitized tail failure' }
+    }),
+    expectedError: '语音识别停止失败: sanitized tail failure'
+  }
+]) {
+  test(`ASR stop ${failure.name} discards the active buffer without evicting retained records`, async (t) => {
+    const revoked = [];
+    const created = [];
+    const shownErrors = [];
+    const harness = await startAudioCaptureHarness(t, { stopASR: failure.stopASR });
+    harness.trainer.showError = message => shownErrors.push(message);
+    window.URL = {
+      createObjectURL(blob) {
+        created.push(blob);
+        return 'blob:must-not-exist';
+      },
+      revokeObjectURL: url => revoked.push(url)
+    };
+    const before = preloadFiveRetainedRecords(harness.trainer, revoked);
+
+    await harness.trainer.stopRecording();
+
+    assert.deepEqual(
+      harness.trainer.trainingRecords.list().map(record => ({ id: record.id, audioUrl: record.audioUrl })),
+      before
+    );
+    assert.deepEqual(created, []);
+    assert.deepEqual(revoked, []);
+    assert.equal(harness.trainer.viewingTrainingRecordId, 'retained-5');
+    assert.equal(harness.trainer.recordingPcm, null);
+    assert.ok(shownErrors.includes(failure.expectedError));
+    assert.notEqual(harness.trainer.trainingStatus.textContent, '本次训练已结束');
+  });
+}
+
+test('missing recording policy capability fails closed before ASR or microphone startup', async (t) => {
+  const order = [];
+  const audio = createAudioCaptureFactoryFake({
+    start: async () => { order.push('microphone'); }
+  });
+  global.document = { createElement };
+  global.window = {
+    api: {
+      cancelLLMRequests: async () => ({ success: true }),
+      startASR: async ({ sessionId }) => {
+        order.push('asr');
+        return { ok: true, events: [{ type: 'ready', sessionId, sequence: 0 }] };
+      }
+    }
+  };
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.fullText = '';
+  trainer.recordingPolicyAcknowledged = false;
+  trainer.audioCaptureFactory = audio.factory;
+  t.after(() => {
+    clearInterval(trainer.timerInterval);
+    delete global.document;
+    delete global.window;
+  });
+
+  await trainer.startRecording();
+
+  assert.deepEqual(order, []);
+  assert.equal(trainer.isRecording, false);
+});
+
+test('recording policy persistence failure fails closed before ASR or microphone startup', async (t) => {
+  const order = [];
+  const audio = createAudioCaptureFactoryFake({
+    start: async () => { order.push('microphone'); }
+  });
+  global.document = { createElement };
+  global.window = {
+    api: {
+      getRecordingPolicy: async () => ({ acknowledged: false }),
+      acknowledgeRecordingPolicy: async () => ({
+        success: false,
+        acknowledged: false,
+        error: 'policy save unavailable'
+      }),
+      cancelLLMRequests: async () => ({ success: true }),
+      startASR: async ({ sessionId }) => {
+        order.push('asr');
+        return { ok: true, events: [{ type: 'ready', sessionId, sequence: 0 }] };
+      }
+    }
+  };
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.fullText = '';
+  trainer.recordingPolicyAcknowledged = false;
+  trainer.audioCaptureFactory = audio.factory;
+  trainer.waitForRecordingPolicyDecision = async () => true;
+  t.after(() => {
+    clearInterval(trainer.timerInterval);
+    delete global.document;
+    delete global.window;
+  });
+
+  await trainer.startRecording();
+
+  assert.deepEqual(order, []);
+  assert.equal(trainer.isRecording, false);
+  assert.equal(trainer.userMessageText.textContent, '无法开始录制：policy save unavailable');
+});
+
+test('limit overrun failure invalidates ownership before deferred normal stop can run', async (t) => {
+  const firstFeed = createDeferred();
+  const shownErrors = [];
+  const cancelCommands = [];
+  global.window = {
+    api: {
+      feedAudio: () => firstFeed.promise,
+      cancelASR(command) {
+        cancelCommands.push(command);
+        return Promise.resolve({ ok: true, events: [] });
+      }
+    }
+  };
+  t.after(() => {
+    firstFeed.resolve({ ok: true, events: [] });
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.fullText = '';
+  trainer.sentences = [];
+  trainer.showError = message => shownErrors.push(message);
+  activateAsrSession(trainer);
+  trainer.recordingSessionId = 'session-a';
+  trainer.recordingPcm = createPcmWavRecorder({ sampleRateHz: 16000, maxFrames: 4 });
+  trainer.recordingPcm.append(new Float32Array([0.1, 0.2]));
+  trainer.audioFeedTracker = trainer.createAudioFeedTracker('session-a');
+  for (let sequence = 0; sequence < 10; sequence += 1) {
+    trainer.audioFeedTracker.queue.enqueue({
+      sequence,
+      samples: new Float32Array([0.1]),
+      audioEndMs: sequence + 1
+    });
+  }
+  let normalStopCalls = 0;
+  trainer.stopRecording = () => {
+    normalStopCalls += 1;
+    trainer.trainingStatus.textContent = '本次训练已结束';
+    return Promise.resolve();
+  };
+
+  await trainer.handleCapturedChunk({
+    ...audioChunk('session-a', new Float32Array([0.3, 0.4, 0.5])),
+    sequence: 10
+  });
+  await flushMicrotasks();
+  await flushMicrotasks();
+
+  assert.equal(normalStopCalls, 0);
+  assert.deepEqual(cancelCommands, [{ sessionId: 'session-a' }]);
+  assert.deepEqual(shownErrors, ['语音识别处理失败，录音已停止，请重新开始']);
+  assert.equal(trainer.asrEventState.activeSessionId, null);
+  assert.equal(trainer.recordingPcm, null);
+  assert.notEqual(trainer.trainingStatus.textContent, '本次训练已结束');
+});
+
+test('stopRecording is an inert no-op without an active owned session', async (t) => {
+  global.document = { createElement };
+  global.window = { api: { cancelLLMRequests: async () => ({ success: true }) } };
+  t.after(() => {
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.trainingStatus.textContent = '准备就绪';
+
+  const result = await trainer.stopRecording();
+
+  assert.equal(result, false);
+  assert.equal(trainer.recordingStopOperation, null);
+  assert.equal(trainer.trainingStatus.textContent, '准备就绪');
 });
