@@ -1477,11 +1477,14 @@ class ExpressionTrainer {
     this.btnReanalyze.disabled = true;
     this.feedbackStatus.textContent = automatic ? '正在生成首次回放分析…' : '正在重新分析录音…';
     try {
-      const pendingProfileRefresh = this.playbackProfileRefreshPromise
+      let pendingProfileRefresh = this.playbackProfileRefreshPromise
         || (!this.playbackProfileSummary?.activeProfileId ? this.refreshLlmProfileOptions() : null);
-      if (pendingProfileRefresh) {
+      while (pendingProfileRefresh) {
         await pendingProfileRefresh;
         if (!ownsAnalysis()) return false;
+        const currentProfileRefresh = this.playbackProfileRefreshPromise;
+        if (!currentProfileRefresh || currentProfileRefresh === pendingProfileRefresh) break;
+        pendingProfileRefresh = currentProfileRefresh;
       }
       const profileId = this.playbackProfileSummary?.activeProfileId;
       if (!profileId) {

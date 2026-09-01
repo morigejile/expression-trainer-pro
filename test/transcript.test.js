@@ -2296,6 +2296,56 @@ test('automatic analysis waits for a pending settings broadcast before choosing 
   assert.equal(trainer.playbackModel.value, 'profile-2');
 });
 
+test('automatic analysis follows a superseding profile refresh before choosing the active profile', async (t) => {
+  const olderRefresh = createDeferred();
+  const newerRefresh = createDeferred();
+  let refreshCall = 0;
+  const payloads = [];
+  const staleSummary = {
+    activeProfileId: 'deleted-profile',
+    profiles: [{id: 'deleted-profile', name: 'Deleted', provider: 'custom', model: 'stale-model', active: true}]
+  };
+  const currentSummary = {
+    activeProfileId: 'profile-2',
+    profiles: [profileSummary.profiles[1]]
+  };
+  global.document = {createElement};
+  global.window = {api: {
+    getLlmProfileSummaries: () => (++refreshCall === 1 ? olderRefresh.promise : newerRefresh.promise),
+    analyzePlayback: async payload => {
+      payloads.push(payload);
+      return {success: true, analysis: {items: [], profile: currentSummary.profiles[0]}};
+    }
+  }};
+  t.after(() => {
+    olderRefresh.resolve(staleSummary);
+    newerRefresh.resolve(currentSummary);
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+  trainer.playbackProfileSummary = staleSummary;
+  trainer.playbackModel.value = 'deleted-profile';
+
+  const older = trainer.refreshLlmProfileOptions({supersede: true});
+  const automatic = trainer.analyzeSelectedRecording({automatic: true});
+  await flushMicrotasks();
+  const newer = trainer.handleLlmProviderSettingsChanged();
+  olderRefresh.resolve(staleSummary);
+  await older;
+  await flushMicrotasks();
+
+  assert.deepEqual(payloads, []);
+
+  newerRefresh.resolve(currentSummary);
+  await newer;
+  await automatic;
+
+  assert.deepEqual(payloads.map(payload => payload.profileId), ['profile-2']);
+  assert.equal(trainer.playbackProfileSummary.activeProfileId, 'profile-2');
+});
+
 test('a late older profile refresh cannot overwrite a newer broadcast summary', async (t) => {
   const olderRefresh = createDeferred();
   const newerRefresh = createDeferred();
