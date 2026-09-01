@@ -96,12 +96,14 @@ class ExpressionTrainer {
     this.trainingRecords = null;
     this.viewingTrainingRecordId = null;
     this.playbackProfileSummary = {activeProfileId: null, profiles: []};
+    this.playbackProfileRefreshGeneration = 0;
+    this.playbackProfileRefreshPromise = null;
     this.playbackAnalysisGeneration = 0;
     this.playbackSegmentId = null;
 
     this.initElements();
     this.bindEvents();
-    void this.loadLlmProfileOptions();
+    void this.refreshLlmProfileOptions();
   }
 
   initElements() {
@@ -1160,7 +1162,7 @@ class ExpressionTrainer {
   async handleLlmProviderSettingsChanged() {
     const dismissedConfigurationMessage = this.userMessageRequiresSettings;
     if (dismissedConfigurationMessage) this.hideUserMessage();
-    const summary = await this.loadLlmProfileOptions();
+    const summary = await this.refreshLlmProfileOptions({supersede: true});
     if (!summary) return null;
     const record = this.trainingRecords?.selected();
     if (record?.id === this.viewingTrainingRecordId) {
@@ -1416,11 +1418,29 @@ class ExpressionTrainer {
     }
   }
 
+  refreshLlmProfileOptions({supersede = false} = {}) {
+    if (!supersede && this.playbackProfileRefreshPromise) {
+      return this.playbackProfileRefreshPromise;
+    }
+    const refreshGeneration = (this.playbackProfileRefreshGeneration ?? 0) + 1;
+    this.playbackProfileRefreshGeneration = refreshGeneration;
+    const refreshPromise = this.loadLlmProfileOptions(undefined, {
+      isCurrent: () => refreshGeneration === this.playbackProfileRefreshGeneration
+    });
+    this.playbackProfileRefreshPromise = refreshPromise;
+    void refreshPromise.finally(() => {
+      if (this.playbackProfileRefreshPromise === refreshPromise) {
+        this.playbackProfileRefreshPromise = null;
+      }
+    });
+    return refreshPromise;
+  }
+
   async selectPlaybackProfile(profileId) {
     if (!profileId) return false;
     const previousActiveProfileId = this.playbackProfileSummary?.activeProfileId || '';
     const restoreSelection = async () => {
-      const refreshed = await this.loadLlmProfileOptions();
+      const refreshed = await this.refreshLlmProfileOptions({supersede: true});
       if (!refreshed && this.playbackModel) this.playbackModel.value = previousActiveProfileId;
     };
     try {
@@ -1430,6 +1450,8 @@ class ExpressionTrainer {
         this.feedbackStatus.textContent = response?.error || '无法切换分析模型';
         return false;
       }
+      this.playbackProfileRefreshGeneration = (this.playbackProfileRefreshGeneration ?? 0) + 1;
+      this.playbackProfileRefreshPromise = null;
       await this.loadLlmProfileOptions(response.summary);
       const record = this.trainingRecords?.selected();
       if (record?.id === this.viewingTrainingRecordId) {
@@ -1455,8 +1477,10 @@ class ExpressionTrainer {
     this.btnReanalyze.disabled = true;
     this.feedbackStatus.textContent = automatic ? '正在生成首次回放分析…' : '正在重新分析录音…';
     try {
-      if (!this.playbackProfileSummary?.activeProfileId) {
-        await this.loadLlmProfileOptions(undefined, {isCurrent: ownsAnalysis});
+      const pendingProfileRefresh = this.playbackProfileRefreshPromise
+        || (!this.playbackProfileSummary?.activeProfileId ? this.refreshLlmProfileOptions() : null);
+      if (pendingProfileRefresh) {
+        await pendingProfileRefresh;
         if (!ownsAnalysis()) return false;
       }
       const profileId = this.playbackProfileSummary?.activeProfileId;

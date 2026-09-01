@@ -160,6 +160,8 @@ function createTrainer() {
   trainer.playbackModel = createElement('select');
   trainer.btnReanalyze = createElement('button');
   trainer.playbackProfileSummary = {activeProfileId: null, profiles: []};
+  trainer.playbackProfileRefreshGeneration = 0;
+  trainer.playbackProfileRefreshPromise = null;
   trainer.playbackAnalysisGeneration = 0;
   trainer.playbackSegmentId = null;
   trainer.pasteAnalysisPending = false;
@@ -2252,6 +2254,83 @@ test('settings broadcast refreshes stale profile options and automatic analysis 
   assert.equal(payloads[0].profileId, 'profile-2');
 });
 
+test('automatic analysis waits for a pending settings broadcast before choosing the active profile', async (t) => {
+  const profileRefresh = createDeferred();
+  const payloads = [];
+  const currentSummary = {
+    activeProfileId: 'profile-2',
+    profiles: [profileSummary.profiles[1]]
+  };
+  global.document = {createElement};
+  global.window = {api: {
+    getLlmProfileSummaries: () => profileRefresh.promise,
+    analyzePlayback: async payload => {
+      payloads.push(payload);
+      return {success: true, analysis: {items: [], profile: currentSummary.profiles[0]}};
+    }
+  }};
+  t.after(() => {
+    profileRefresh.resolve(currentSummary);
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+  trainer.playbackProfileSummary = {
+    activeProfileId: 'deleted-profile',
+    profiles: [{id: 'deleted-profile', name: 'Deleted', provider: 'custom', model: 'stale-model', active: true}]
+  };
+  trainer.playbackModel.value = 'deleted-profile';
+
+  const broadcast = trainer.handleLlmProviderSettingsChanged();
+  const automatic = trainer.analyzeSelectedRecording({automatic: true});
+  await flushMicrotasks();
+  assert.deepEqual(payloads, []);
+
+  profileRefresh.resolve(currentSummary);
+  await broadcast;
+  await automatic;
+
+  assert.deepEqual(payloads.map(payload => payload.profileId), ['profile-2']);
+  assert.equal(trainer.playbackProfileSummary.activeProfileId, 'profile-2');
+  assert.equal(trainer.playbackModel.value, 'profile-2');
+});
+
+test('a late older profile refresh cannot overwrite a newer broadcast summary', async (t) => {
+  const olderRefresh = createDeferred();
+  const newerRefresh = createDeferred();
+  let refreshCall = 0;
+  const olderSummary = {
+    activeProfileId: 'deleted-profile',
+    profiles: [{id: 'deleted-profile', name: 'Deleted', provider: 'custom', model: 'stale-model', active: true}]
+  };
+  const newerSummary = {
+    activeProfileId: 'profile-2',
+    profiles: [profileSummary.profiles[1]]
+  };
+  global.document = {createElement};
+  global.window = {api: {
+    getLlmProfileSummaries: () => (++refreshCall === 1 ? olderRefresh.promise : newerRefresh.promise)
+  }};
+  t.after(() => {
+    olderRefresh.resolve(olderSummary);
+    newerRefresh.resolve(newerSummary);
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+
+  const older = trainer.handleLlmProviderSettingsChanged();
+  const newer = trainer.handleLlmProviderSettingsChanged();
+  newerRefresh.resolve(newerSummary);
+  await newer;
+  olderRefresh.resolve(olderSummary);
+  await older;
+
+  assert.equal(trainer.playbackProfileSummary.activeProfileId, 'profile-2');
+  assert.deepEqual(trainer.playbackModel.children.map(option => option.value), ['profile-2']);
+});
+
 test('automatic first analysis uses the active profile', async (t) => {
   const payloads = [];
   global.document = {createElement};
@@ -2274,6 +2353,7 @@ test('automatic first analysis uses the active profile', async (t) => {
 
 test('manual analysis supersedes an automatic analysis waiting for profile loading', async (t) => {
   const profileLoad = createDeferred();
+  const refreshedSummary = {...profileSummary, activeProfileId: 'profile-2'};
   const payloads = [];
   global.document = {createElement};
   global.window = {api: {
@@ -2290,7 +2370,7 @@ test('manual analysis supersedes an automatic analysis waiting for profile loadi
     }
   }};
   t.after(() => {
-    profileLoad.resolve(profileSummary);
+    profileLoad.resolve(refreshedSummary);
     delete global.document;
     delete global.window;
   });
@@ -2302,8 +2382,10 @@ test('manual analysis supersedes an automatic analysis waiting for profile loadi
   trainer.playbackProfileSummary = {...profileSummary, activeProfileId: 'profile-2'};
   trainer.playbackModel.value = 'profile-2';
   const manual = trainer.analyzeSelectedRecording();
+  await flushMicrotasks();
+  assert.deepEqual(payloads, []);
+  profileLoad.resolve(refreshedSummary);
   await manual;
-  profileLoad.resolve(profileSummary);
   await automatic;
 
   assert.deepEqual(payloads.map(payload => payload.profileId), ['profile-2']);
