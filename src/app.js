@@ -42,7 +42,7 @@ const { createPcmWavRecorder } = PcmWav;
 const TrainingRecords = typeof module !== 'undefined' && module.exports
   ? require('./training-records')
   : window.TrainingRecords;
-const { createTrainingRecordStore, formatRecordLabel } = TrainingRecords;
+const { createTrainingRecordStore, findSegmentAtTime, formatRecordLabel } = TrainingRecords;
 const SupportLinks = typeof module !== 'undefined' && module.exports
   ? require('../shared/support-links')
   : window.SupportLinks;
@@ -95,9 +95,13 @@ class ExpressionTrainer {
     this.limitStopPromise = null;
     this.trainingRecords = null;
     this.viewingTrainingRecordId = null;
+    this.playbackProfileSummary = {activeProfileId: null, profiles: []};
+    this.playbackAnalysisGeneration = 0;
+    this.playbackSegmentId = null;
 
     this.initElements();
     this.bindEvents();
+    void this.loadLlmProfileOptions();
   }
 
   initElements() {
@@ -142,6 +146,10 @@ class ExpressionTrainer {
     this.btnRecordingPolicyConfirm = document.getElementById('btn-recording-policy-confirm');
     this.btnRecordingPolicyCancel = document.getElementById('btn-recording-policy-cancel');
     this.trainingRecordSelect = document.getElementById('training-record-select');
+    this.playbackControls = document.getElementById('playback-controls');
+    this.audioPlayer = document.getElementById('recording-player');
+    this.playbackModel = document.getElementById('playback-model');
+    this.btnReanalyze = document.getElementById('btn-reanalyze');
     this.statFillers = document.getElementById('stat-fillers');
     this.statHedges = document.getElementById('stat-hedges');
     this.statVague = document.getElementById('stat-vague');
@@ -181,8 +189,12 @@ class ExpressionTrainer {
     this.btnRecordingPolicyConfirm.addEventListener('click', () => this.resolveRecordingPolicyDecision(true));
     this.btnRecordingPolicyCancel.addEventListener('click', () => this.resolveRecordingPolicyDecision(false));
     this.trainingRecordSelect.addEventListener('change', event => this.selectTrainingRecord(event.target.value));
+    this.audioPlayer.addEventListener('timeupdate', () => this.handlePlaybackTimeUpdate());
+    this.playbackModel.addEventListener('change', event => { void this.selectPlaybackProfile(event.target.value); });
+    this.btnReanalyze.addEventListener('click', () => { void this.analyzeSelectedRecording(); });
     window.addEventListener?.('beforeunload', () => this.disposeTrainingRecords());
     document.addEventListener('keydown', event => this.handleModalKeydown(event));
+    document.addEventListener('keydown', event => this.handleGlobalKeydown(event));
   }
 
   async exportDiagnostics(triggerButton = this.btnDiagnostics) {
@@ -410,6 +422,7 @@ class ExpressionTrainer {
     this.sentences = [];
     this.viewingTrainingRecordId = null;
     this.trainingRecordSelect?.classList.add('hidden');
+    this.refreshPlaybackControls();
     this.lastFeedbackText = '';
     this.resetStats();
     this.subtitleContainer.replaceChildren();
@@ -1240,6 +1253,7 @@ class ExpressionTrainer {
     this.limitStopPromise = null;
     try {
       this.selectTrainingRecord(record.id);
+      void this.analyzeSelectedRecording({automatic: true});
     } catch (error) {
       this.showUserMessage(`训练记录显示失败：${error.message}`);
     }
@@ -1263,14 +1277,40 @@ class ExpressionTrainer {
   selectTrainingRecord(recordId) {
     const record = this.getTrainingRecordStore().select(recordId);
     if (!record) return null;
+    if (this.viewingTrainingRecordId !== record.id) {
+      this.playbackAnalysisGeneration += 1;
+      this.btnReanalyze.disabled = false;
+    }
     this.viewingTrainingRecordId = record.id;
+    this.refreshPlaybackControls();
+    return record;
+  }
+
+  refreshPlaybackControls() {
+    const record = this.trainingRecords?.selected() ?? null;
+    if (!record || record.id !== this.viewingTrainingRecordId) {
+      this.playbackSegmentId = null;
+      this.playbackControls?.classList.add('hidden');
+      if (this.audioPlayer) this.audioPlayer.src = '';
+      return null;
+    }
+
+    this.playbackControls?.classList.remove('hidden');
+    if (this.audioPlayer && this.audioPlayer.src !== record.audioUrl) {
+      this.audioPlayer.src = record.audioUrl;
+    }
     this.fullText = record.fullText;
     this.sentences = record.segments.map(segment => segment.text);
     this.stats = { ...record.stats };
     this.lastFeedbackText = '';
     this.subtitleContainer.replaceChildren();
-    for (const segment of record.segments) this.renderSubtitle(segment.text, true);
-    this.feedbackContent.replaceChildren();
+    for (const segment of record.segments) {
+      const line = document.createElement('div');
+      line.className = 'subtitle-line';
+      line.dataset.segmentId = segment.id;
+      renderHighlightedText(line, segment.text);
+      this.subtitleContainer.appendChild(line);
+    }
     this.updateStatsDisplay();
     const totalSeconds = Math.max(0, Math.floor(record.durationMs / 1000));
     this.timer.textContent = `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(totalSeconds % 60).padStart(2, '0')}`;
@@ -1279,7 +1319,165 @@ class ExpressionTrainer {
     this.btnSaveText.classList.toggle('hidden', !record.fullText.trim());
     this.btnClear.classList.remove('hidden');
     this.refreshTrainingRecordSelect();
+    void this.loadLlmProfileOptions(this.playbackProfileSummary);
+    this.playbackSegmentId = null;
+    const initialSegment = findSegmentAtTime(record.segments, 0);
+    if (initialSegment) {
+      this.playbackSegmentId = initialSegment.id;
+      this.renderPlaybackSegment(initialSegment.id);
+    } else {
+      this.renderPlaybackAnalysis(record, null);
+    }
     return record;
+  }
+
+  togglePlayback() {
+    const record = this.trainingRecords?.selected() ?? null;
+    if (!record || record.id !== this.viewingTrainingRecordId || !record.audioUrl || !this.audioPlayer) return false;
+    if (this.audioPlayer.paused) {
+      const playing = this.audioPlayer.play();
+      playing?.catch?.(() => this.showUserMessage('录音播放失败，请重试'));
+    } else {
+      this.audioPlayer.pause();
+    }
+    return true;
+  }
+
+  handlePlaybackTimeUpdate() {
+    const record = this.trainingRecords?.selected() ?? null;
+    if (!record || record.id !== this.viewingTrainingRecordId || !this.audioPlayer) return;
+    const segment = findSegmentAtTime(record.segments, this.audioPlayer.currentTime * 1000);
+    const segmentId = segment?.id ?? null;
+    if (segmentId === this.playbackSegmentId) return;
+    this.playbackSegmentId = segmentId;
+    this.renderPlaybackSegment(segmentId);
+  }
+
+  renderPlaybackSegment(segmentId) {
+    const record = this.trainingRecords?.selected() ?? null;
+    if (!record || record.id !== this.viewingTrainingRecordId) return;
+    let currentLine = null;
+    for (const line of this.subtitleContainer.querySelectorAll('[data-segment-id]')) {
+      const isCurrent = line.dataset.segmentId === segmentId;
+      line.classList.toggle('playback-current', isCurrent);
+      if (isCurrent) currentLine = line;
+    }
+    currentLine?.scrollIntoView({block: 'nearest'});
+    this.renderPlaybackAnalysis(record, segmentId);
+  }
+
+  renderPlaybackAnalysis(record, segmentId) {
+    const analysis = record.playbackAnalysis;
+    if (!analysis) {
+      this.feedbackStatus.textContent = '尚未生成回放分析';
+      this.feedbackContent.textContent = '';
+      return;
+    }
+    const model = analysis.profile?.model || '未知模型';
+    this.feedbackStatus.textContent = `回放分析 · ${model}`;
+    const item = analysis.items?.find(candidate => candidate.segmentId === segmentId);
+    this.feedbackContent.textContent = item?.advice || '';
+  }
+
+  async loadLlmProfileOptions(summary) {
+    try {
+      const nextSummary = summary?.profiles
+        ? summary
+        : await window.api.getLlmProfileSummaries();
+      if (!nextSummary || !Array.isArray(nextSummary.profiles)) return null;
+      this.playbackProfileSummary = nextSummary;
+      if (this.playbackModel) {
+        const options = nextSummary.profiles.map(profile => {
+          const option = document.createElement('option');
+          option.value = profile.id;
+          option.textContent = profile.model;
+          return option;
+        });
+        this.playbackModel.replaceChildren(...options);
+        this.playbackModel.value = nextSummary.activeProfileId || '';
+      }
+      return nextSummary;
+    } catch (error) {
+      if (this.viewingTrainingRecordId) {
+        this.feedbackStatus.textContent = error?.message || '无法加载分析模型';
+      }
+      return null;
+    }
+  }
+
+  async selectPlaybackProfile(profileId) {
+    if (!profileId) return false;
+    try {
+      const response = await window.api.selectLlmProfile(profileId);
+      if (!response?.success) {
+        this.feedbackStatus.textContent = response?.error || '无法切换分析模型';
+        return false;
+      }
+      await this.loadLlmProfileOptions(response.summary);
+      const record = this.trainingRecords?.selected();
+      if (record?.id === this.viewingTrainingRecordId) {
+        this.renderPlaybackAnalysis(record, this.playbackSegmentId);
+      }
+      return true;
+    } catch (error) {
+      this.feedbackStatus.textContent = error?.message || '无法切换分析模型';
+      return false;
+    }
+  }
+
+  async analyzeSelectedRecording({automatic = false} = {}) {
+    const record = this.trainingRecords?.selected() ?? null;
+    if (!record || record.id !== this.viewingTrainingRecordId) return false;
+    if (!this.playbackProfileSummary?.activeProfileId) {
+      await this.loadLlmProfileOptions();
+    }
+    const profileId = automatic
+      ? this.playbackProfileSummary?.activeProfileId
+      : (this.playbackModel?.value || this.playbackProfileSummary?.activeProfileId);
+    if (!profileId) {
+      this.feedbackStatus.textContent = '没有可用的分析模型';
+      return false;
+    }
+
+    const generation = ++this.playbackAnalysisGeneration;
+    const recordId = record.id;
+    this.btnReanalyze.disabled = true;
+    this.feedbackStatus.textContent = automatic ? '正在生成首次回放分析…' : '正在重新分析录音…';
+    try {
+      const segments = record.segments.map(({id, text, startMs, endMs}) => ({id, text, startMs, endMs}));
+      let response;
+      try {
+        response = await window.api.analyzePlayback({profileId, segments});
+      } catch (error) {
+        response = {success: false, error: error?.message || '回放分析失败，请重试'};
+      }
+      if (generation !== this.playbackAnalysisGeneration
+          || this.trainingRecords?.selected()?.id !== recordId) return false;
+      if (!response?.success) {
+        this.feedbackStatus.textContent = response?.error || '回放分析失败，请重试';
+        return false;
+      }
+      const updated = this.trainingRecords.replace(recordId, current => ({
+        ...current,
+        playbackAnalysis: response.analysis
+      }));
+      if (updated) this.renderPlaybackAnalysis(updated, this.playbackSegmentId);
+      return Boolean(updated);
+    } finally {
+      if (generation === this.playbackAnalysisGeneration) this.btnReanalyze.disabled = false;
+    }
+  }
+
+  handleGlobalKeydown(event) {
+    if (event.code !== 'Space' || event.repeat || event.defaultPrevented) return;
+    const visibleModal = (this.activeModal && !this.activeModal.classList.contains('hidden'))
+      || document.querySelector?.('.modal:not(.hidden)');
+    if (visibleModal) return;
+    if (event.target?.closest?.('input, textarea, select, button, audio, [contenteditable="true"]')) return;
+    const record = this.trainingRecords?.selected() ?? null;
+    if (!record || record.id !== this.viewingTrainingRecordId || !record.audioUrl) return;
+    event.preventDefault();
+    this.togglePlayback();
   }
 
   removeSelectedTrainingRecord() {
@@ -1287,6 +1485,7 @@ class ExpressionTrainer {
     if (!recordId) return null;
     const removed = this.getTrainingRecordStore().remove(recordId);
     if (!removed) return null;
+    this.playbackAnalysisGeneration += 1;
     this.advanceLLMGeneration();
     try {
       const cancellation = window.api.cancelLLMRequests();
@@ -1312,12 +1511,14 @@ class ExpressionTrainer {
       this.btnSaveText.classList.add('hidden');
       this.btnClear.classList.add('hidden');
       this.refreshTrainingRecordSelect();
+      this.refreshPlaybackControls();
     }
     return removed;
   }
 
   disposeTrainingRecords() {
     this.advanceLLMGeneration();
+    this.playbackAnalysisGeneration += 1;
     try {
       const cancellation = window.api.cancelLLMRequests();
       cancellation?.catch?.(() => {});
@@ -1465,6 +1666,9 @@ class ExpressionTrainer {
       this.pasteTextarea.value = '';
       this.viewingTrainingRecordId = null;
       this.trainingRecordSelect?.classList.add('hidden');
+      this.playbackAnalysisGeneration += 1;
+      this.btnReanalyze.disabled = false;
+      this.refreshPlaybackControls();
 
       // 把文本显示到字幕区（高亮标记）
       this.subtitleContainer.replaceChildren();

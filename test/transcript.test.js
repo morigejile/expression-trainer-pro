@@ -25,17 +25,28 @@ function createClassList() {
 }
 
 function createElement(tagName = 'div') {
+  const listeners = new Map();
   return {
     tagName: tagName.toUpperCase(),
+    get ownerDocument() {
+      return {
+        createElement,
+        createTextNode: text => ({textContent: String(text)})
+      };
+    },
     classList: createClassList(),
     style: {},
     textContent: '',
+    value: '',
+    dataset: {},
+    disabled: false,
     children: [],
     get firstChild() {
       return this.children[0] ?? null;
     },
     appendChild(node) {
       this.children.push(node);
+      node.parentNode = this;
       return node;
     },
     insertBefore(node, reference) {
@@ -51,11 +62,34 @@ function createElement(tagName = 'div') {
     },
     replaceChildren(...nodes) {
       this.children = [...nodes];
+      for (const node of nodes) node.parentNode = this;
     },
-    querySelector() { return null; },
-    querySelectorAll() { return []; },
+    querySelector(selector) { return this.querySelectorAll(selector)[0] ?? null; },
+    querySelectorAll(selector) {
+      if (selector === '[data-segment-id]') {
+        return this.children.filter(node => node.dataset?.segmentId);
+      }
+      if (selector === '.interim-line') {
+        return this.children.filter(node => node.classList?.contains('interim-line'));
+      }
+      if (selector === '.subtitle-line:not(.old)') {
+        return this.children.filter(node => node.classList?.contains('subtitle-line') && !node.classList.contains('old'));
+      }
+      return [];
+    },
+    closest(selector) {
+      const editable = this.contentEditable === 'true' || this.isContentEditable === true;
+      const guardedTags = selector.includes(this.tagName.toLowerCase());
+      return guardedTags || (selector.includes('[contenteditable="true"]') && editable) ? this : null;
+    },
+    remove() {
+      if (!this.parentNode) return;
+      this.parentNode.removeChild(this);
+    },
+    scrollIntoView(options) { this.scrollIntoViewOptions = options; },
     focus() {},
-    addEventListener() {}
+    addEventListener(type, listener) { listeners.set(type, listener); },
+    dispatchEvent(event) { return listeners.get(event.type)?.(event); }
   };
 }
 
@@ -116,6 +150,16 @@ function createTrainer() {
   trainer.btnRecordingPolicyConfirm = createElement('button');
   trainer.btnRecordingPolicyCancel = createElement('button');
   trainer.trainingRecordSelect = createElement('select');
+  trainer.playbackControls = createElement();
+  trainer.audioPlayer = createElement('audio');
+  trainer.audioPlayer.paused = true;
+  trainer.audioPlayer.play = async () => { trainer.audioPlayer.paused = false; };
+  trainer.audioPlayer.pause = () => { trainer.audioPlayer.paused = true; };
+  trainer.playbackModel = createElement('select');
+  trainer.btnReanalyze = createElement('button');
+  trainer.playbackProfileSummary = {activeProfileId: null, profiles: []};
+  trainer.playbackAnalysisGeneration = 0;
+  trainer.playbackSegmentId = null;
   trainer.pasteAnalysisPending = false;
   trainer.pasteAnalysisGeneration = 0;
   trainer.activeModal = null;
@@ -871,6 +915,7 @@ test('renderer routes an active recording through the injected audio capture', a
 
   await trainer.startRecording();
   const startCommand = calls[0][1];
+  assert.equal(trainer.playbackControls.classList.contains('hidden'), true);
   assert.match(startCommand.sessionId, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
   assert.deepEqual(startCommand, { sessionId: startCommand.sessionId, sampleRateHz: 16000 });
   await audio.emit({
@@ -1625,6 +1670,7 @@ test('pasted analysis is single-flight while the first draft is pending', async 
   trainer.requestRealtimeFeedback = () => {};
   const first = trainer.analyzePastedText();
   await new Promise(resolve => setImmediate(resolve));
+  assert.equal(trainer.playbackControls.classList.contains('hidden'), true);
 
   trainer.pasteTextarea.value = '第二份。';
   await trainer.analyzePastedText();
@@ -1866,6 +1912,7 @@ test('a chunk reaching the configured frame limit triggers one owned normal stop
 
 test('normal stop creates and selects a complete WAV training record', async (t) => {
   const createdUrls = [];
+  const playbackPayloads = [];
   global.document = { createElement };
   global.window = {
     URL: {
@@ -1880,7 +1927,12 @@ test('normal stop creates and selects a complete WAV training record', async (t)
     api: {
       stopASR: async () => stopEnvelope('session-a', '完成文本'),
       cancelLLMRequests: async () => ({ success: true }),
-      analyzeText: async () => ({ totalWords: 4, fillers: [], hedges: [], vagueWords: [] })
+      analyzeText: async () => ({ totalWords: 4, fillers: [], hedges: [], vagueWords: [] }),
+      getLlmProfileSummaries: async () => profileSummary,
+      analyzePlayback: async payload => {
+        playbackPayloads.push(payload);
+        return {success: true, analysis: {items: [], profile: profileSummary.profiles[0]}};
+      }
     }
   };
   t.after(() => {
@@ -1905,6 +1957,9 @@ test('normal stop creates and selects a complete WAV training record', async (t)
   assert.equal(record.segments[0].endMs, 1500);
   assert.equal(record.segments[0].localAnalysis.totalWords, 4);
   assert.equal(trainer.viewingTrainingRecordId, record.id);
+  await flushMicrotasks();
+  assert.equal(playbackPayloads.length, 1);
+  assert.equal(playbackPayloads[0].profileId, 'profile-1');
 });
 
 test('failed record insertion revokes its newly-created URL exactly once', (t) => {
@@ -2027,6 +2082,270 @@ test('clear in completed-record mode removes only the selected record and revoke
   assert.deepEqual(trainer.trainingRecords.list().map(record => record.id), ['r2']);
   assert.deepEqual(revoked, ['blob:1']);
   assert.equal(trainer.viewingTrainingRecordId, 'r2');
+});
+
+function playbackRecord(overrides = {}) {
+  return {
+    id: 'record-playback',
+    createdAt: '2026-09-01T01:02:03.000Z',
+    durationMs: 2000,
+    audioUrl: 'blob:playback',
+    segments: [
+      {id: 'segment-1', text: '第一段', startMs: 0, endMs: 1000, localAnalysis: null},
+      {id: 'segment-2', text: '第二段', startMs: 1000, endMs: 2000, localAnalysis: null}
+    ],
+    stats: {fillers: 0, hedges: 0, vagueWords: 0, totalWords: 6, duration: 2},
+    fullText: '第一段第二段',
+    playbackAnalysis: null,
+    ...overrides
+  };
+}
+
+function installPlaybackRecord(trainer, record = playbackRecord()) {
+  trainer.trainingRecords = createTrainingRecordStore();
+  trainer.trainingRecords.add(record);
+  trainer.viewingTrainingRecordId = record.id;
+  return record;
+}
+
+function fakeAudio({paused = true} = {}) {
+  return {
+    currentTime: 0,
+    paused,
+    playCalls: 0,
+    pauseCalls: 0,
+    play() { this.playCalls += 1; this.paused = false; return Promise.resolve(); },
+    pause() { this.pauseCalls += 1; this.paused = true; }
+  };
+}
+
+function keyEvent({code = 'Space', target = createElement(), repeat = false, defaultPrevented = false} = {}) {
+  return {
+    code,
+    target,
+    repeat,
+    defaultPrevented,
+    preventDefaultCalls: 0,
+    preventDefault() { this.preventDefaultCalls += 1; this.defaultPrevented = true; }
+  };
+}
+
+const profileSummary = {
+  activeProfileId: 'profile-1',
+  profiles: [
+    {id: 'profile-1', name: 'Work', provider: 'openai', model: 'gpt-one', active: true},
+    {id: 'profile-2', name: 'Local', provider: 'ollama', model: 'qwen-two', active: false}
+  ]
+};
+
+test('space toggles playback once and is ignored for controls, visible modals, default prevention, and repeat events', (t) => {
+  let visibleModal = null;
+  global.document = {querySelector: () => visibleModal};
+  t.after(() => { delete global.document; });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+  trainer.audioPlayer = fakeAudio({paused: true});
+  const body = createElement('div');
+  const played = keyEvent({target: body});
+
+  trainer.handleGlobalKeydown(played);
+  trainer.handleGlobalKeydown(keyEvent({target: createElement('input')}));
+  trainer.handleGlobalKeydown(keyEvent({target: createElement('button')}));
+  trainer.handleGlobalKeydown(keyEvent({target: body, repeat: true}));
+  trainer.handleGlobalKeydown(keyEvent({target: body, defaultPrevented: true}));
+  visibleModal = createElement();
+  trainer.handleGlobalKeydown(keyEvent({target: body}));
+
+  assert.equal(trainer.audioPlayer.playCalls, 1);
+  assert.equal(trainer.audioPlayer.pauseCalls, 0);
+  assert.equal(played.preventDefaultCalls, 1);
+});
+
+test('timeupdate rerenders only when the active segment changes', () => {
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+  trainer.audioPlayer = fakeAudio();
+  trainer.renderedPlaybackSegmentIds = [];
+  trainer.renderPlaybackSegment = segmentId => trainer.renderedPlaybackSegmentIds.push(segmentId);
+
+  trainer.audioPlayer.currentTime = 0.2;
+  trainer.handlePlaybackTimeUpdate();
+  trainer.audioPlayer.currentTime = 0.8;
+  trainer.handlePlaybackTimeUpdate();
+  trainer.audioPlayer.currentTime = 1.2;
+  trainer.handlePlaybackTimeUpdate();
+
+  assert.deepEqual(trainer.renderedPlaybackSegmentIds, ['segment-1', 'segment-2']);
+});
+
+test('profile options expose only model text and profile ID values', async (t) => {
+  global.document = {createElement};
+  global.window = {api: {getLlmProfileSummaries: async () => profileSummary}};
+  t.after(() => { delete global.document; delete global.window; });
+  const trainer = createTrainer();
+
+  await trainer.loadLlmProfileOptions();
+
+  assert.deepEqual(trainer.playbackModel.children.map(option => ({value: option.value, text: option.textContent})), [
+    {value: 'profile-1', text: 'gpt-one'},
+    {value: 'profile-2', text: 'qwen-two'}
+  ]);
+  assert.equal(trainer.playbackModel.value, 'profile-1');
+});
+
+test('selecting a model updates the active profile without starting analysis', async (t) => {
+  const selected = [];
+  let analysisCalls = 0;
+  global.document = {createElement};
+  global.window = {api: {
+    selectLlmProfile: async profileId => {
+      selected.push(profileId);
+      return {success: true, summary: {...profileSummary, activeProfileId: profileId}};
+    },
+    analyzePlayback: async () => { analysisCalls += 1; }
+  }};
+  t.after(() => { delete global.document; delete global.window; });
+  const trainer = createTrainer();
+  trainer.playbackProfileSummary = profileSummary;
+
+  await trainer.selectPlaybackProfile('profile-2');
+
+  assert.deepEqual(selected, ['profile-2']);
+  assert.equal(analysisCalls, 0);
+  assert.equal(trainer.playbackProfileSummary.activeProfileId, 'profile-2');
+});
+
+test('automatic first analysis uses the active profile', async (t) => {
+  const payloads = [];
+  global.document = {createElement};
+  global.window = {api: {
+    getLlmProfileSummaries: async () => profileSummary,
+    analyzePlayback: async payload => {
+      payloads.push(payload);
+      return {success: true, analysis: {items: [], profile: profileSummary.profiles[0]}};
+    }
+  }};
+  t.after(() => { delete global.document; delete global.window; });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+  trainer.playbackModel.value = 'profile-2';
+
+  await trainer.analyzeSelectedRecording({automatic: true});
+
+  assert.equal(payloads[0].profileId, 'profile-1');
+});
+
+test('manual reanalysis submits only the profile ID and transport-safe segments', async (t) => {
+  const payloads = [];
+  global.window = {api: {analyzePlayback: async payload => {
+    payloads.push(payload);
+    return {success: true, analysis: {items: [], profile: profileSummary.profiles[1]}};
+  }}};
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+  trainer.playbackProfileSummary = profileSummary;
+  trainer.playbackModel.value = 'profile-2';
+
+  await trainer.analyzeSelectedRecording();
+
+  assert.deepEqual(payloads, [{
+    profileId: 'profile-2',
+    segments: [
+      {id: 'segment-1', text: '第一段', startMs: 0, endMs: 1000},
+      {id: 'segment-2', text: '第二段', startMs: 1000, endMs: 2000}
+    ]
+  }]);
+});
+
+test('failed reanalysis retains the previous playback analysis object and advice', async (t) => {
+  const previous = {items: [{segmentId: 'segment-1', advice: '保留这条建议'}], profile: profileSummary.profiles[0]};
+  global.window = {api: {analyzePlayback: async () => ({success: false, error: 'analysis unavailable'})}};
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  const record = playbackRecord({playbackAnalysis: previous});
+  installPlaybackRecord(trainer, record);
+  trainer.playbackProfileSummary = profileSummary;
+  trainer.playbackModel.value = 'profile-1';
+  trainer.feedbackContent.textContent = '保留这条建议';
+
+  await trainer.analyzeSelectedRecording();
+
+  assert.equal(trainer.trainingRecords.selected().playbackAnalysis, previous);
+  assert.equal(trainer.feedbackContent.textContent, '保留这条建议');
+  assert.equal(trainer.feedbackStatus.textContent, 'analysis unavailable');
+});
+
+test('a newer reanalysis generation suppresses a late older success', async (t) => {
+  const first = createDeferred();
+  const second = createDeferred();
+  let call = 0;
+  global.window = {api: {analyzePlayback: () => (++call === 1 ? first.promise : second.promise)}};
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+  trainer.playbackProfileSummary = profileSummary;
+  trainer.playbackModel.value = 'profile-1';
+
+  const older = trainer.analyzeSelectedRecording();
+  const newer = trainer.analyzeSelectedRecording();
+  const newestAnalysis = {items: [{segmentId: 'segment-2', advice: 'new'}], profile: profileSummary.profiles[0]};
+  const staleAnalysis = {items: [{segmentId: 'segment-1', advice: 'old'}], profile: profileSummary.profiles[0]};
+  second.resolve({success: true, analysis: newestAnalysis});
+  await newer;
+  first.resolve({success: true, analysis: staleAnalysis});
+  await older;
+
+  assert.equal(trainer.trainingRecords.selected().playbackAnalysis, newestAnalysis);
+});
+
+test('deleting the selected record while analysis is pending suppresses the result', async (t) => {
+  const pending = createDeferred();
+  global.document = {createElement};
+  global.window = {api: {
+    analyzePlayback: () => pending.promise,
+    cancelLLMRequests: async () => ({success: true})
+  }};
+  t.after(() => { delete global.document; delete global.window; });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+  trainer.playbackProfileSummary = profileSummary;
+  trainer.playbackModel.value = 'profile-1';
+
+  const request = trainer.analyzeSelectedRecording();
+  trainer.removeSelectedTrainingRecord();
+  pending.resolve({success: true, analysis: {items: [], profile: profileSummary.profiles[0]}});
+  await request;
+
+  assert.equal(trainer.trainingRecords.selected(), null);
+  assert.equal(trainer.viewingTrainingRecordId, null);
+});
+
+test('deleting an analyzed record releases the reanalyze button for the fallback record', async (t) => {
+  const pending = createDeferred();
+  global.document = {createElement};
+  global.window = {api: {
+    analyzePlayback: () => pending.promise,
+    cancelLLMRequests: async () => ({success: true})
+  }};
+  t.after(() => {
+    pending.resolve({success: false, error: 'cancelled'});
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.trainingRecords = createTrainingRecordStore();
+  trainer.trainingRecords.add(playbackRecord({id: 'fallback', audioUrl: 'blob:fallback'}));
+  trainer.trainingRecords.add(playbackRecord({id: 'pending', audioUrl: 'blob:pending'}));
+  trainer.viewingTrainingRecordId = 'pending';
+  trainer.playbackProfileSummary = profileSummary;
+  trainer.playbackModel.value = 'profile-1';
+
+  void trainer.analyzeSelectedRecording();
+  trainer.removeSelectedTrainingRecord();
+
+  assert.equal(trainer.viewingTrainingRecordId, 'fallback');
+  assert.equal(trainer.btnReanalyze.disabled, false);
 });
 
 function retainedRecord(number) {

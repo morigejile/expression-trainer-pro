@@ -96,6 +96,13 @@
         </div>
       </div>
 
+      <div id="playback-controls" class="playback-controls hidden">
+        <audio id="recording-player" controls preload="metadata"></audio>
+        <label for="playback-model">分析模型</label>
+        <select id="playback-model"></select>
+        <button id="btn-reanalyze" type="button">重新分析</button>
+      </div>
+
       <div id="training-status" class="operation-status" role="status" aria-live="polite">准备就绪</div>
 
       <!-- 底部按钮（只保留核心操作） -->
