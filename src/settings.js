@@ -324,9 +324,19 @@ class SettingsPage {
   }
 
   createProfileId() {
-    if (typeof this.idFactory === 'function') return this.idFactory();
-    if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID();
-    return `profile-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const used = new Set((this.settings?.profiles || []).map(profile => profile.id));
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const generated = typeof this.idFactory === 'function'
+        ? this.idFactory()
+        : typeof globalThis.crypto?.randomUUID === 'function'
+          ? globalThis.crypto.randomUUID()
+          : `profile-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const candidate = typeof generated === 'string' ? generated.trim() : '';
+      if (candidate && !used.has(candidate)) return candidate;
+    }
+    let suffix = used.size + 1;
+    while (used.has(`profile-${suffix}`)) suffix += 1;
+    return `profile-${suffix}`;
   }
 
   renderProfiles() {

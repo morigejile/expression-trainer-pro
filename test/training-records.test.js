@@ -47,6 +47,16 @@ test('duplicate audio URLs are revoked exactly once across eviction and clear', 
   assert.deepEqual(revoked, ['blob:shared']);
 });
 
+test('a URL reused by a later record lifetime is revoked again without retaining URL history', () => {
+  const revoked = [];
+  const store = createTrainingRecordStore({ revokeObjectURL: url => revoked.push(url) });
+  store.add(record(1, 'blob:reused'));
+  store.clear();
+  store.add(record(2, 'blob:reused'));
+  store.clear();
+  assert.deepEqual(revoked, ['blob:reused', 'blob:reused']);
+});
+
 test('segment lookup returns null before the first segment and inside gaps', () => {
   const segments = [{ id: 'a', startMs: 100, endMs: 200 }, { id: 'b', startMs: 300, endMs: 400 }];
   assert.equal(findSegmentAtTime(segments, 99), null);

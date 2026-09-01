@@ -27,17 +27,25 @@
     if (typeof revokeObjectURL !== 'function') throw new TypeError('revokeObjectURL must be a function');
     const records = [];
     let selectedId = null;
-    const revokedUrls = new Set();
+    const audioUrlReferences = new Map();
 
+    function retain(record) {
+      if (!record || typeof record.audioUrl !== 'string' || record.audioUrl === '') return;
+      audioUrlReferences.set(record.audioUrl, (audioUrlReferences.get(record.audioUrl) || 0) + 1);
+    }
     function release(record) {
-      if (record && typeof record.audioUrl === 'string' && record.audioUrl !== '' && !revokedUrls.has(record.audioUrl)) {
-        revokedUrls.add(record.audioUrl);
+      if (!record || typeof record.audioUrl !== 'string' || record.audioUrl === '') return;
+      const remaining = (audioUrlReferences.get(record.audioUrl) || 0) - 1;
+      if (remaining > 0) audioUrlReferences.set(record.audioUrl, remaining);
+      else {
+        audioUrlReferences.delete(record.audioUrl);
         revokeObjectURL(record.audioUrl);
       }
     }
     function add(record) {
       if (!record || typeof record !== 'object') throw new TypeError('record must be an object');
       records.push(record);
+      retain(record);
       selectedId = record.id;
       while (records.length > maxRecords) release(records.shift());
       return record;
@@ -56,6 +64,10 @@
       if (index < 0) return null;
       const next = updater(records[index]);
       if (!next || typeof next !== 'object') throw new TypeError('updater must return a record');
+      if (next.audioUrl !== records[index].audioUrl) {
+        retain(next);
+        release(records[index]);
+      }
       records[index] = next;
       return next;
     }

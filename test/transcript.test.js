@@ -2713,6 +2713,42 @@ for (const failure of [
   });
 }
 
+test('accepted stop envelope with error and stopped events discards the active recording', async (t) => {
+  const revoked = [];
+  const created = [];
+  const shownErrors = [];
+  const harness = await startAudioCaptureHarness(t, {
+    stopASR: async command => ({
+      ok: true,
+      events: [
+        {type: 'error', sessionId: command.sessionId, sequence: 1, code: 'tail-failed', message: '尾部识别失败'},
+        {type: 'stopped', sessionId: command.sessionId, sequence: 2}
+      ]
+    })
+  });
+  harness.trainer.showError = message => shownErrors.push(message);
+  window.URL = {
+    createObjectURL(blob) {
+      created.push(blob);
+      return 'blob:must-not-exist';
+    },
+    revokeObjectURL: url => revoked.push(url)
+  };
+  const before = preloadFiveRetainedRecords(harness.trainer, revoked);
+
+  await harness.trainer.stopRecording();
+
+  assert.deepEqual(
+    harness.trainer.trainingRecords.list().map(record => ({id: record.id, audioUrl: record.audioUrl})),
+    before
+  );
+  assert.deepEqual(created, []);
+  assert.deepEqual(revoked, []);
+  assert.equal(harness.trainer.recordingPcm, null);
+  assert.ok(shownErrors.includes('语音识别错误: 尾部识别失败'));
+  assert.notEqual(harness.trainer.trainingStatus.textContent, '本次训练已结束');
+});
+
 test('missing recording policy capability fails closed before ASR or microphone startup', async (t) => {
   const order = [];
   const audio = createAudioCaptureFactoryFake({

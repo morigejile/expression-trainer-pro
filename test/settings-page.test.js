@@ -106,6 +106,27 @@ test('profile CRUD maintains an active profile and never deletes the last profil
   assert.equal(page.settings.profiles.length, 2);
 });
 
+test('profile creation retries blank and duplicate generated IDs', () => {
+  const page = createSettingsPageWithProfiles([profile('p1')], 'p1');
+  const generated = ['', 'p1', 'p2', '', 'p2', 'p3'];
+  page.idFactory = () => generated.shift();
+
+  page.createProfile();
+  page.duplicateProfile();
+
+  assert.deepEqual(page.settings.profiles.map(candidate => candidate.id), ['p1', 'p2', 'p3']);
+  assert.equal(page.settings.activeProfileId, 'p3');
+});
+
+test('profile creation falls back deterministically when generated IDs stay invalid', () => {
+  const page = createSettingsPageWithProfiles([profile('p1'), profile('profile-3')], 'p1');
+  page.idFactory = () => 'p1';
+
+  page.createProfile();
+
+  assert.deepEqual(page.settings.profiles.map(candidate => candidate.id), ['p1', 'profile-3', 'profile-4']);
+});
+
 function createDeferred() {
   let resolve;
   let reject;

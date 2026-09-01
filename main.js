@@ -362,6 +362,12 @@ function broadcastLlmProviderSettingsChanged() {
   }
 }
 
+function rejectNonSettingsSender(event) {
+  if (settingsWindow && !settingsWindow.isDestroyed()
+      && settingsWindow.webContents === event.sender) return null;
+  return {success: false, error: '仅设置窗口可访问完整 LLM 配置'};
+}
+
 function createPromptEditorWindow() {
   if (promptEditorWindow) {
     promptEditorWindow.focus();
@@ -545,11 +551,15 @@ ipcMain.handle('save-appearance', (event, appearance) => {
 });
 
 // LLM Provider 设置
-ipcMain.handle('get-llm-provider-settings', () => {
+ipcMain.handle('get-llm-provider-settings', event => {
+  const rejection = rejectNonSettingsSender(event);
+  if (rejection) return rejection;
   return loadLlmProviderSettings(app.getPath('userData'));
 });
 
 ipcMain.handle('save-llm-provider-settings', (event, settings) => {
+  const rejection = rejectNonSettingsSender(event);
+  if (rejection) return rejection;
   try {
     saveLlmProviderSettings(app.getPath('userData'), settings);
     broadcastLlmProviderSettingsChanged();
@@ -601,6 +611,9 @@ ipcMain.handle('acknowledge-recording-policy', () => {
   } catch (error) {
     if (error.code === 'unsupported-schema-version') {
       return {success: false, error: '当前版本无法保存更高版本的录音政策配置'};
+    }
+    if (error.code === 'invalid-recording-policy-json') {
+      return {success: false, error: '录音政策配置已损坏，请修复或移除后重试'};
     }
     throw error;
   }
@@ -667,6 +680,8 @@ ipcMain.handle('cancel-asr', async (event, command) => {
 
 // LLM 连通性测试
 ipcMain.handle('test-llm-connection', async (event, settings) => {
+  const rejection = rejectNonSettingsSender(event);
+  if (rejection) return rejection;
   const providerConfig = getSelectedLlmProviderSettings(settings);
   const request = llmRequests.begin(event.sender.id, 'connection');
   try {

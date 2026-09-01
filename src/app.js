@@ -784,6 +784,7 @@ class ExpressionTrainer {
     }
 
     const events = Array.isArray(response.events) ? response.events : [];
+    let hasAcceptedError = false;
     for (const event of events) {
       const filtered = filterAsrEvent(this.asrEventState, event);
       this.asrEventState = filtered.state;
@@ -800,12 +801,13 @@ class ExpressionTrainer {
           }
         }
       } else if (filtered.effect?.type === 'error') {
+        hasAcceptedError = true;
         if (canApplySideEffects()) {
           this.showError(`语音识别错误: ${filtered.effect.message}`);
         }
       }
     }
-    return true;
+    return !hasAcceptedError;
   }
 
   async cancelActiveAsrSession(

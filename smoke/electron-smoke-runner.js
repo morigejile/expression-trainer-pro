@@ -223,7 +223,27 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     }
   });
 
-  const llmSettingsNotification = await mainWindow.webContents.executeJavaScript(`(async () => {
+  const mainLlmSettingsAccess = await mainWindow.webContents.executeJavaScript(`(async () => ({
+    get: await window.api.getLlmProviderSettings(),
+    save: await window.api.saveLlmProviderSettings({schemaVersion: 2, activeProfileId: 'not-authorized', profiles: []}),
+    test: await window.api.testLLMConnection({schemaVersion: 2, activeProfileId: 'not-authorized', profiles: []})
+  }))()`);
+  assert.deepEqual(mainLlmSettingsAccess, {
+    get: {success: false, error: '仅设置窗口可访问完整 LLM 配置'},
+    save: {success: false, error: '仅设置窗口可访问完整 LLM 配置'},
+    test: {success: false, error: '仅设置窗口可访问完整 LLM 配置'}
+  });
+  await mainWindow.webContents.executeJavaScript(
+    `document.getElementById('btn-settings').click()`
+  );
+  const settingsWindow = await waitUntil('settings window creation', () => {
+    return BrowserWindow.getAllWindows().find(window => {
+      return !window.isDestroyed() && window.webContents.getURL().endsWith('/settings.html');
+    });
+  });
+  await waitForPage(settingsWindow, 'settings.html');
+
+  const llmSettingsNotification = await settingsWindow.webContents.executeJavaScript(`(async () => {
     let notifications = 0;
     const unsubscribe = window.api.onLlmProviderSettingsChanged(() => { notifications += 1; });
     const settings = await window.api.getLlmProviderSettings();
@@ -639,10 +659,10 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.equal(require.cache[require.resolve('../lib/asr')], undefined);
   assert.equal(require.cache[require.resolve('sherpa-onnx-node')], undefined);
 
-  const originalLlmSettings = await mainWindow.webContents.executeJavaScript(
+  const originalLlmSettings = await settingsWindow.webContents.executeJavaScript(
     'window.api.getLlmProviderSettings()'
   );
-  const fakeModelSave = await mainWindow.webContents.executeJavaScript(`(async () => {
+  const fakeModelSave = await settingsWindow.webContents.executeJavaScript(`(async () => {
     const settings = await window.api.getLlmProviderSettings();
     const profiles = settings.profiles.map(profile => profile.id === settings.activeProfileId
       ? {...profile, model: 'fake-model'}
@@ -737,20 +757,23 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     acknowledged: true
   });
 
-  const restoredLlmSettings = await mainWindow.webContents.executeJavaScript(
+  const restoredLlmSettings = await settingsWindow.webContents.executeJavaScript(
     `window.api.saveLlmProviderSettings(${JSON.stringify(originalLlmSettings)})`
   );
   assert.deepEqual(restoredLlmSettings, {success: true});
-  fs.rmSync(getRecordingPolicyPath(app.getPath('userData')), {force: true});
+  const policyPath = getRecordingPolicyPath(app.getPath('userData'));
+  const corruptPolicy = '{"acknowledged":';
+  fs.writeFileSync(policyPath, corruptPolicy, 'utf8');
+  assert.deepEqual(
+    await mainWindow.webContents.executeJavaScript('window.api.acknowledgeRecordingPolicy()'),
+    {success: false, error: '录音政策配置已损坏，请修复或移除后重试'}
+  );
+  assert.equal(fs.readFileSync(policyPath, 'utf8'), corruptPolicy);
+  fs.rmSync(policyPath, {force: true});
 
   await mainWindow.webContents.executeJavaScript(
     `document.getElementById('btn-settings').click()`
   );
-  const settingsWindow = await waitUntil('settings window creation', () => {
-    return BrowserWindow.getAllWindows().find(window => {
-      return !window.isDestroyed() && window.webContents.getURL().endsWith('/settings.html');
-    });
-  });
   await waitForPage(settingsWindow, 'settings.html');
   if (process.platform !== 'darwin') {
     assert.equal(settingsWindow.isMenuBarVisible(), false, 'settings window must not render a second menu header');
