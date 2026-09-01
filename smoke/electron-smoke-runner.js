@@ -259,6 +259,10 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     error: '所选模型配置不存在',
     errorCode: 'invalid-profile-id'
   });
+  assert.deepEqual(
+    Object.keys(playbackAnalysisIpcState.success.analysis.profile).sort(),
+    ['id', 'model', 'name', 'provider']
+  );
   assert.doesNotMatch(JSON.stringify(playbackAnalysisIpcState.success.analysis.profile), /apiKey|baseUrl|ollamaUrl|customModel/);
 
   const recordingPolicyIpcState = await mainWindow.webContents.executeJavaScript(`(async () => {
