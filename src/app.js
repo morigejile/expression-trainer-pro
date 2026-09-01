@@ -277,6 +277,8 @@ class ExpressionTrainer {
       this.showUserMessage('逐字稿正在分析，请稍候');
       return;
     }
+    this.playbackAnalysisGeneration += 1;
+    this.btnReanalyze.disabled = false;
     this.trainingStatus.textContent = '正在准备语音识别，首次运行可能需要数分钟';
     this.btnStart.disabled = true;
     this.btnPaste.disabled = true;
@@ -1155,10 +1157,18 @@ class ExpressionTrainer {
     this.userMessage.classList.add('hidden');
   }
 
-  handleLlmProviderSettingsChanged() {
-    if (!this.userMessageRequiresSettings) return;
-    this.hideUserMessage();
-    this.feedbackStatus.textContent = '本地分析可用；AI 建议将在后续表达中生成';
+  async handleLlmProviderSettingsChanged() {
+    const dismissedConfigurationMessage = this.userMessageRequiresSettings;
+    if (dismissedConfigurationMessage) this.hideUserMessage();
+    const summary = await this.loadLlmProfileOptions();
+    if (!summary) return null;
+    const record = this.trainingRecords?.selected();
+    if (record?.id === this.viewingTrainingRecordId) {
+      this.renderPlaybackAnalysis(record, this.playbackSegmentId);
+    } else if (dismissedConfigurationMessage) {
+      this.feedbackStatus.textContent = '本地分析可用；AI 建议将在后续表达中生成';
+    }
+    return summary;
   }
 
   setPasteAnalysisPending(pending) {
@@ -1376,14 +1386,15 @@ class ExpressionTrainer {
     const model = analysis.profile?.model || '未知模型';
     this.feedbackStatus.textContent = `回放分析 · ${model}`;
     const item = analysis.items?.find(candidate => candidate.segmentId === segmentId);
-    this.feedbackContent.textContent = item?.advice || '';
+    this.feedbackContent.textContent = item?.advice || '该片段暂无特别建议';
   }
 
-  async loadLlmProfileOptions(summary) {
+  async loadLlmProfileOptions(summary, {isCurrent = () => true} = {}) {
     try {
       const nextSummary = summary?.profiles
         ? summary
         : await window.api.getLlmProfileSummaries();
+      if (!isCurrent()) return null;
       if (!nextSummary || !Array.isArray(nextSummary.profiles)) return null;
       this.playbackProfileSummary = nextSummary;
       if (this.playbackModel) {
@@ -1398,7 +1409,7 @@ class ExpressionTrainer {
       }
       return nextSummary;
     } catch (error) {
-      if (this.viewingTrainingRecordId) {
+      if (isCurrent() && this.viewingTrainingRecordId) {
         this.feedbackStatus.textContent = error?.message || '无法加载分析模型';
       }
       return null;
@@ -1407,9 +1418,15 @@ class ExpressionTrainer {
 
   async selectPlaybackProfile(profileId) {
     if (!profileId) return false;
+    const previousActiveProfileId = this.playbackProfileSummary?.activeProfileId || '';
+    const restoreSelection = async () => {
+      const refreshed = await this.loadLlmProfileOptions();
+      if (!refreshed && this.playbackModel) this.playbackModel.value = previousActiveProfileId;
+    };
     try {
       const response = await window.api.selectLlmProfile(profileId);
       if (!response?.success) {
+        await restoreSelection();
         this.feedbackStatus.textContent = response?.error || '无法切换分析模型';
         return false;
       }
@@ -1420,6 +1437,7 @@ class ExpressionTrainer {
       }
       return true;
     } catch (error) {
+      await restoreSelection();
       this.feedbackStatus.textContent = error?.message || '无法切换分析模型';
       return false;
     }
@@ -1427,23 +1445,25 @@ class ExpressionTrainer {
 
   async analyzeSelectedRecording({automatic = false} = {}) {
     const record = this.trainingRecords?.selected() ?? null;
-    if (!record || record.id !== this.viewingTrainingRecordId) return false;
-    if (!this.playbackProfileSummary?.activeProfileId) {
-      await this.loadLlmProfileOptions();
-    }
-    const profileId = automatic
-      ? this.playbackProfileSummary?.activeProfileId
-      : (this.playbackModel?.value || this.playbackProfileSummary?.activeProfileId);
-    if (!profileId) {
-      this.feedbackStatus.textContent = '没有可用的分析模型';
-      return false;
-    }
-
+    const viewingRecordId = this.viewingTrainingRecordId;
+    if (!record || record.id !== viewingRecordId) return false;
     const generation = ++this.playbackAnalysisGeneration;
     const recordId = record.id;
+    const ownsAnalysis = () => generation === this.playbackAnalysisGeneration
+      && this.trainingRecords?.selected()?.id === recordId
+      && this.viewingTrainingRecordId === viewingRecordId;
     this.btnReanalyze.disabled = true;
     this.feedbackStatus.textContent = automatic ? '正在生成首次回放分析…' : '正在重新分析录音…';
     try {
+      if (!this.playbackProfileSummary?.activeProfileId) {
+        await this.loadLlmProfileOptions(undefined, {isCurrent: ownsAnalysis});
+        if (!ownsAnalysis()) return false;
+      }
+      const profileId = this.playbackProfileSummary?.activeProfileId;
+      if (!profileId) {
+        if (ownsAnalysis()) this.feedbackStatus.textContent = '没有可用的分析模型';
+        return false;
+      }
       const segments = record.segments.map(({id, text, startMs, endMs}) => ({id, text, startMs, endMs}));
       let response;
       try {
@@ -1451,8 +1471,7 @@ class ExpressionTrainer {
       } catch (error) {
         response = {success: false, error: error?.message || '回放分析失败，请重试'};
       }
-      if (generation !== this.playbackAnalysisGeneration
-          || this.trainingRecords?.selected()?.id !== recordId) return false;
+      if (!ownsAnalysis()) return false;
       if (!response?.success) {
         this.feedbackStatus.textContent = response?.error || '回放分析失败，请重试';
         return false;
@@ -1464,7 +1483,7 @@ class ExpressionTrainer {
       if (updated) this.renderPlaybackAnalysis(updated, this.playbackSegmentId);
       return Boolean(updated);
     } finally {
-      if (generation === this.playbackAnalysisGeneration) this.btnReanalyze.disabled = false;
+      if (ownsAnalysis()) this.btnReanalyze.disabled = false;
     }
   }
 

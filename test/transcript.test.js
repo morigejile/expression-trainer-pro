@@ -117,6 +117,8 @@ function createTrainer() {
   trainer.asrStartAttempt = null;
   trainer.asrGeneration = 0;
   trainer.recordingPolicyAcknowledged = true;
+  trainer.trainingRecords = null;
+  trainer.viewingTrainingRecordId = null;
   trainer.renderSubtitle = () => {};
   trainer.btnStop = createElement();
   trainer.btnStopLabel = createElement();
@@ -416,16 +418,19 @@ test('user messages can be dismissed explicitly', () => {
   assert.equal(trainer.userMessageAction.classList.contains('hidden'), true);
 });
 
-test('saved LLM settings dismiss only a configuration-related message', () => {
+test('saved LLM settings dismiss only a configuration-related message', async (t) => {
+  global.document = {createElement};
+  global.window = {api: {getLlmProfileSummaries: async () => profileSummary}};
+  t.after(() => { delete global.document; delete global.window; });
   const trainer = createTrainer();
 
   trainer.showUserMessage('实时反馈失败：请先配置 API Key', {openSettings: true});
-  trainer.handleLlmProviderSettingsChanged();
+  await trainer.handleLlmProviderSettingsChanged();
   assert.equal(trainer.userMessage.classList.contains('hidden'), true);
   assert.equal(trainer.feedbackStatus.textContent, '本地分析可用；AI 建议将在后续表达中生成');
 
   trainer.showUserMessage('复制失败，请重试');
-  trainer.handleLlmProviderSettingsChanged();
+  await trainer.handleLlmProviderSettingsChanged();
   assert.equal(trainer.userMessage.classList.contains('hidden'), false);
   assert.equal(trainer.userMessageText.textContent, '复制失败，请重试');
 });
@@ -2215,6 +2220,38 @@ test('selecting a model updates the active profile without starting analysis', a
   assert.equal(trainer.playbackProfileSummary.activeProfileId, 'profile-2');
 });
 
+test('settings broadcast refreshes stale profile options and automatic analysis uses the current active profile', async (t) => {
+  const currentSummary = {
+    activeProfileId: 'profile-2',
+    profiles: [profileSummary.profiles[1]]
+  };
+  const payloads = [];
+  global.document = {createElement};
+  global.window = {api: {
+    getLlmProfileSummaries: async () => currentSummary,
+    analyzePlayback: async payload => {
+      payloads.push(payload);
+      return {success: true, analysis: {items: [], profile: currentSummary.profiles[0]}};
+    }
+  }};
+  t.after(() => { delete global.document; delete global.window; });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+  trainer.playbackProfileSummary = {
+    activeProfileId: 'deleted-profile',
+    profiles: [{id: 'deleted-profile', name: 'Deleted', provider: 'custom', model: 'stale-model', active: true}]
+  };
+  trainer.playbackModel.value = 'deleted-profile';
+
+  await trainer.handleLlmProviderSettingsChanged();
+  await trainer.analyzeSelectedRecording({automatic: true});
+
+  assert.equal(trainer.playbackProfileSummary.activeProfileId, 'profile-2');
+  assert.deepEqual(trainer.playbackModel.children.map(option => option.textContent), ['qwen-two']);
+  assert.equal(trainer.playbackModel.value, 'profile-2');
+  assert.equal(payloads[0].profileId, 'profile-2');
+});
+
 test('automatic first analysis uses the active profile', async (t) => {
   const payloads = [];
   global.document = {createElement};
@@ -2235,6 +2272,44 @@ test('automatic first analysis uses the active profile', async (t) => {
   assert.equal(payloads[0].profileId, 'profile-1');
 });
 
+test('manual analysis supersedes an automatic analysis waiting for profile loading', async (t) => {
+  const profileLoad = createDeferred();
+  const payloads = [];
+  global.document = {createElement};
+  global.window = {api: {
+    getLlmProfileSummaries: () => profileLoad.promise,
+    analyzePlayback: async payload => {
+      payloads.push(payload);
+      return {
+        success: true,
+        analysis: {
+          items: [{segmentId: 'segment-1', advice: payload.profileId}],
+          profile: profileSummary.profiles.find(profile => profile.id === payload.profileId)
+        }
+      };
+    }
+  }};
+  t.after(() => {
+    profileLoad.resolve(profileSummary);
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+
+  const automatic = trainer.analyzeSelectedRecording({automatic: true});
+  await flushMicrotasks();
+  trainer.playbackProfileSummary = {...profileSummary, activeProfileId: 'profile-2'};
+  trainer.playbackModel.value = 'profile-2';
+  const manual = trainer.analyzeSelectedRecording();
+  await manual;
+  profileLoad.resolve(profileSummary);
+  await automatic;
+
+  assert.deepEqual(payloads.map(payload => payload.profileId), ['profile-2']);
+  assert.equal(trainer.trainingRecords.selected().playbackAnalysis.profile.id, 'profile-2');
+});
+
 test('manual reanalysis submits only the profile ID and transport-safe segments', async (t) => {
   const payloads = [];
   global.window = {api: {analyzePlayback: async payload => {
@@ -2244,7 +2319,7 @@ test('manual reanalysis submits only the profile ID and transport-safe segments'
   t.after(() => { delete global.window; });
   const trainer = createTrainer();
   installPlaybackRecord(trainer);
-  trainer.playbackProfileSummary = profileSummary;
+  trainer.playbackProfileSummary = {...profileSummary, activeProfileId: 'profile-2'};
   trainer.playbackModel.value = 'profile-2';
 
   await trainer.analyzeSelectedRecording();
@@ -2257,6 +2332,44 @@ test('manual reanalysis submits only the profile ID and transport-safe segments'
     ]
   }]);
 });
+
+for (const selectionFailure of [
+  {
+    name: 'failure envelope',
+    selectLlmProfile: async () => ({success: false, error: 'profile rejected'}),
+    getLlmProfileSummaries: async () => profileSummary
+  },
+  {
+    name: 'rejection',
+    selectLlmProfile: async () => { throw new Error('profile selection unavailable'); },
+    getLlmProfileSummaries: async () => { throw new Error('profile reload unavailable'); }
+  }
+]) {
+  test(`failed profile selection ${selectionFailure.name} restores the active profile before manual analysis`, async (t) => {
+    const payloads = [];
+    global.document = {createElement};
+    global.window = {api: {
+      selectLlmProfile: selectionFailure.selectLlmProfile,
+      getLlmProfileSummaries: selectionFailure.getLlmProfileSummaries,
+      analyzePlayback: async payload => {
+        payloads.push(payload);
+        return {success: true, analysis: {items: [], profile: profileSummary.profiles[0]}};
+      }
+    }};
+    t.after(() => { delete global.document; delete global.window; });
+    const trainer = createTrainer();
+    installPlaybackRecord(trainer);
+    trainer.playbackProfileSummary = profileSummary;
+    trainer.playbackModel.value = 'profile-2';
+
+    await trainer.selectPlaybackProfile('profile-2');
+    await trainer.analyzeSelectedRecording();
+
+    assert.equal(trainer.playbackModel.value, 'profile-1');
+    assert.equal(trainer.playbackProfileSummary.activeProfileId, 'profile-1');
+    assert.equal(payloads[0].profileId, 'profile-1');
+  });
+}
 
 test('failed reanalysis retains the previous playback analysis object and advice', async (t) => {
   const previous = {items: [{segmentId: 'segment-1', advice: '保留这条建议'}], profile: profileSummary.profiles[0]};
@@ -2297,6 +2410,58 @@ test('a newer reanalysis generation suppresses a late older success', async (t) 
   await older;
 
   assert.equal(trainer.trainingRecords.selected().playbackAnalysis, newestAnalysis);
+});
+
+test('playback completion after live recording starts cannot overwrite live feedback or button state', async (t) => {
+  const pending = createDeferred();
+  const previous = {items: [{segmentId: 'segment-1', advice: 'previous'}], profile: profileSummary.profiles[0]};
+  const audio = createAudioCaptureFactoryFake();
+  global.document = {createElement};
+  global.window = {api: {
+    analyzePlayback: () => pending.promise,
+    cancelLLMRequests: async () => ({success: true}),
+    startASR: async ({sessionId}) => ({ok: true, events: [{type: 'ready', sessionId, sequence: 0}]}),
+    feedAudio: async () => ({ok: true, events: []}),
+    cancelASR: async () => ({ok: true, events: []})
+  }};
+  t.after(() => {
+    clearInterval(trainer.timerInterval);
+    pending.resolve({success: false, error: 'cancelled'});
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer, playbackRecord({playbackAnalysis: previous}));
+  trainer.playbackProfileSummary = profileSummary;
+  trainer.playbackModel.value = 'profile-1';
+  trainer.audioCaptureFactory = audio.factory;
+
+  const request = trainer.analyzeSelectedRecording();
+  await trainer.startRecording();
+  trainer.feedbackStatus.textContent = '实时反馈进行中';
+  trainer.feedbackContent.textContent = '实时建议';
+  trainer.btnReanalyze.disabled = true;
+  pending.resolve({success: true, analysis: {items: [], profile: profileSummary.profiles[1]}});
+  await request;
+
+  assert.equal(trainer.feedbackStatus.textContent, '实时反馈进行中');
+  assert.equal(trainer.feedbackContent.textContent, '实时建议');
+  assert.equal(trainer.btnReanalyze.disabled, true);
+  assert.equal(trainer.trainingRecords.selected().playbackAnalysis, previous);
+});
+
+test('playback analysis renders the exact fallback when a segment has no advice', () => {
+  const trainer = createTrainer();
+  const record = playbackRecord({
+    playbackAnalysis: {items: [], profile: profileSummary.profiles[0]}
+  });
+
+  trainer.renderPlaybackAnalysis(record, 'segment-1');
+
+  assert.equal(trainer.feedbackContent.textContent, '该片段暂无特别建议');
+  record.playbackAnalysis.items = [{segmentId: 'segment-1', advice: ''}];
+  trainer.renderPlaybackAnalysis(record, 'segment-1');
+  assert.equal(trainer.feedbackContent.textContent, '该片段暂无特别建议');
 });
 
 test('deleting the selected record while analysis is pending suppresses the result', async (t) => {
@@ -2637,6 +2802,6 @@ test('limit chunk feed rejection wins before its deferred normal stop', async (t
   assert.deepEqual(stopCommands, []);
   assert.deepEqual(shownErrors, ['语音识别处理失败，录音已停止，请重新开始']);
   assert.equal(trainer.recordingPcm, null);
-  assert.equal(trainer.trainingRecords, undefined);
+  assert.equal(trainer.trainingRecords, null);
   assert.notEqual(trainer.trainingStatus.textContent, '本次训练已结束');
 });
