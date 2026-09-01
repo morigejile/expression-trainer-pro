@@ -185,6 +185,22 @@ class SettingsPage {
   setActionsEnabled(enabled) {
     this.btnSave.disabled = !enabled;
     this.btnTestConnection.disabled = !enabled;
+    this.setProfileControlsEnabled(enabled);
+  }
+
+  setProfileControlsEnabled(enabled) {
+    this.profileControlsEnabled = enabled;
+    for (const control of [
+      this.profileSelect,
+      this.profileNameInput,
+      this.btnProfileNew,
+      this.btnProfileDuplicate
+    ]) {
+      if (control) control.disabled = !enabled;
+    }
+    if (this.btnProfileDelete) {
+      this.btnProfileDelete.disabled = !enabled || (this.settings?.profiles?.length || 0) <= 1;
+    }
   }
 
   async loadAsrModels() {
@@ -323,7 +339,9 @@ class SettingsPage {
       }));
     }
     if (this.profileSelect) this.profileSelect.value = this.settings.activeProfileId;
-    if (this.btnProfileDelete) this.btnProfileDelete.disabled = this.settings.profiles.length <= 1;
+    if (this.btnProfileDelete) {
+      this.btnProfileDelete.disabled = this.profileControlsEnabled === false || this.settings.profiles.length <= 1;
+    }
   }
 
   /** 加载当前 profile 的配置到表单字段 */

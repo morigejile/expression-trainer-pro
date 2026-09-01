@@ -20,6 +20,8 @@ function createPage() {
   page.providerSelect = { value: 'deepseek' };
   page.profileSelect = { value: '', replaceChildren(...children) { this.children = children; }, children: [] };
   page.profileNameInput = { value: '' };
+  page.btnProfileNew = { disabled: false };
+  page.btnProfileDuplicate = { disabled: false };
   page.btnProfileDelete = { disabled: false };
   page.apikeyInput = { value: 'test-key' };
   page.modelSelect = { value: 'deepseek-chat' };
@@ -185,6 +187,32 @@ test('settings actions stay disabled until loading completes', async (t) => {
   await loading;
   assert.equal(page.btnSave.disabled, false);
   assert.equal(page.btnTestConnection.disabled, false);
+});
+
+test('profile controls remain disabled while settings load and after it fails', async (t) => {
+  const settings = createDeferred();
+  global.window = { api: { getLlmProviderSettings: async () => settings.promise } };
+  t.after(() => { delete global.window; });
+  const page = createPage();
+  page.settings = undefined;
+
+  const loading = page.loadSettings();
+  assert.deepEqual([
+    page.profileSelect.disabled,
+    page.profileNameInput.disabled,
+    page.btnProfileNew.disabled,
+    page.btnProfileDuplicate.disabled,
+    page.btnProfileDelete.disabled
+  ], [true, true, true, true, true]);
+  settings.reject(new Error('ipc unavailable'));
+  await loading;
+  assert.deepEqual([
+    page.profileSelect.disabled,
+    page.profileNameInput.disabled,
+    page.btnProfileNew.disabled,
+    page.btnProfileDuplicate.disabled,
+    page.btnProfileDelete.disabled
+  ], [true, true, true, true, true]);
 });
 
 test('settings load failure keeps actions disabled and explains the failure', async (t) => {
