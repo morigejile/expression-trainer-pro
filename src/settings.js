@@ -36,6 +36,11 @@ const PROVIDER_CONFIG = {
 class SettingsPage {
   constructor() {
     this.root = document.documentElement;
+    this.profileSelect = document.getElementById('llm-profile');
+    this.profileNameInput = document.getElementById('llm-profile-name');
+    this.btnProfileNew = document.getElementById('btn-profile-new');
+    this.btnProfileDuplicate = document.getElementById('btn-profile-duplicate');
+    this.btnProfileDelete = document.getElementById('btn-profile-delete');
     this.providerSelect = document.getElementById('provider');
     this.apikeyInput = document.getElementById('apikey');
     this.apikeyHint = document.getElementById('apikey-hint');
@@ -71,6 +76,11 @@ class SettingsPage {
 
   bindEvents() {
     this.providerSelect.addEventListener('change', () => this.onProviderChange());
+    this.profileSelect.addEventListener('change', () => this.selectProfile(this.profileSelect.value));
+    this.profileNameInput.addEventListener('change', () => this.renameProfile());
+    this.btnProfileNew.addEventListener('click', () => this.createProfile());
+    this.btnProfileDuplicate.addEventListener('click', () => this.duplicateProfile());
+    this.btnProfileDelete.addEventListener('click', () => this.deleteProfile());
     this.btnSave.addEventListener('click', () => this.save());
     this.btnTestConnection.addEventListener('click', () => this.testConnection());
     for (const control of this.appearanceControls) {
@@ -163,9 +173,7 @@ class SettingsPage {
     this.setActionsEnabled(false);
     try {
       this.settings = await window.api.getLlmProviderSettings();
-      this.providerSelect.value = this.settings.provider || 'deepseek';
-      // 先填充模型列表再加载字段值
-      this.onProviderChange();
+      this.loadSelectedProfile();
       this.setActionsEnabled(true);
     } catch {
       this.settings = undefined;
@@ -177,6 +185,22 @@ class SettingsPage {
   setActionsEnabled(enabled) {
     this.btnSave.disabled = !enabled;
     this.btnTestConnection.disabled = !enabled;
+    this.setProfileControlsEnabled(enabled);
+  }
+
+  setProfileControlsEnabled(enabled) {
+    this.profileControlsEnabled = enabled;
+    for (const control of [
+      this.profileSelect,
+      this.profileNameInput,
+      this.btnProfileNew,
+      this.btnProfileDuplicate
+    ]) {
+      if (control) control.disabled = !enabled;
+    }
+    if (this.btnProfileDelete) {
+      this.btnProfileDelete.disabled = !enabled || (this.settings?.profiles?.length || 0) <= 1;
+    }
   }
 
   async loadAsrModels() {
@@ -295,9 +319,44 @@ class SettingsPage {
     }
   }
 
-  /** 加载指定 provider 的配置到表单字段 */
-  loadProviderFields(provider) {
-    const providerConfig = this.settings?.providers?.[provider] || {};
+  getActiveProfile() {
+    return this.settings?.profiles?.find(profile => profile.id === this.settings.activeProfileId) || null;
+  }
+
+  createProfileId() {
+    const used = new Set((this.settings?.profiles || []).map(profile => profile.id));
+    for (let attempt = 0; attempt < 8; attempt += 1) {
+      const generated = typeof this.idFactory === 'function'
+        ? this.idFactory()
+        : typeof globalThis.crypto?.randomUUID === 'function'
+          ? globalThis.crypto.randomUUID()
+          : `profile-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const candidate = typeof generated === 'string' ? generated.trim() : '';
+      if (candidate && !used.has(candidate)) return candidate;
+    }
+    let suffix = used.size + 1;
+    while (used.has(`profile-${suffix}`)) suffix += 1;
+    return `profile-${suffix}`;
+  }
+
+  renderProfiles() {
+    if (this.profileSelect?.replaceChildren && typeof document !== 'undefined') {
+      this.profileSelect.replaceChildren(...this.settings.profiles.map(profile => {
+        const option = document.createElement('option');
+        option.value = profile.id;
+        option.textContent = profile.name;
+        return option;
+      }));
+    }
+    if (this.profileSelect) this.profileSelect.value = this.settings.activeProfileId;
+    if (this.btnProfileDelete) {
+      this.btnProfileDelete.disabled = this.profileControlsEnabled === false || this.settings.profiles.length <= 1;
+    }
+  }
+
+  /** 加载当前 profile 的配置到表单字段 */
+  loadProviderFields(profile) {
+    const providerConfig = profile || {};
 
     this.apikeyInput.value = providerConfig.apiKey || '';
     this.ollamaUrlInput.value = providerConfig.ollamaUrl || 'http://localhost:11434';
@@ -305,9 +364,81 @@ class SettingsPage {
     this.customModelInput.value = providerConfig.customModel || '';
 
     // 设置模型下拉框（非 custom 模式）
-    if (providerConfig.model && provider !== 'custom') {
+    if (providerConfig.model && providerConfig.provider !== 'custom') {
       this.modelSelect.value = providerConfig.model;
     }
+  }
+
+  flushCurrentProfile() {
+    const profile = this.getActiveProfile();
+    if (!profile) return;
+    const provider = this.providerSelect.value;
+    profile.name = this.profileNameInput.value.trim() || profile.name;
+    profile.provider = provider;
+    profile.apiKey = this.apikeyInput.value.trim();
+    profile.ollamaUrl = this.ollamaUrlInput.value.trim();
+    profile.baseUrl = this.customBaseUrlInput.value.trim();
+    profile.customModel = this.customModelInput.value.trim();
+    profile.model = provider === 'custom' ? profile.customModel : this.modelSelect.value;
+  }
+
+  loadSelectedProfile() {
+    const profile = this.getActiveProfile();
+    if (!profile) return;
+    this.renderProfiles();
+    this.profileNameInput.value = profile.name;
+    this.providerSelect.value = profile.provider;
+    this.onProviderChange();
+    this.loadProviderFields(profile);
+  }
+
+  selectProfile(profileId) {
+    if (!this.settings?.profiles?.some(profile => profile.id === profileId)) return;
+    this.flushCurrentProfile();
+    this.settings.activeProfileId = profileId;
+    this.loadSelectedProfile();
+  }
+
+  createProfile() {
+    if (!this.settings) return;
+    this.flushCurrentProfile();
+    const profile = {
+      id: this.createProfileId(), name: '新配置', provider: 'deepseek', apiKey: '',
+      model: 'deepseek-chat', ollamaUrl: 'http://localhost:11434', baseUrl: '', customModel: ''
+    };
+    this.settings.profiles.push(profile);
+    this.settings.activeProfileId = profile.id;
+    this.loadSelectedProfile();
+  }
+
+  duplicateProfile() {
+    const profile = this.getActiveProfile();
+    if (!profile) return;
+    this.flushCurrentProfile();
+    const duplicate = {...this.getActiveProfile(), id: this.createProfileId(), name: `${this.getActiveProfile().name} 副本`};
+    this.settings.profiles.push(duplicate);
+    this.settings.activeProfileId = duplicate.id;
+    this.loadSelectedProfile();
+  }
+
+  deleteProfile() {
+    if (!this.settings || this.settings.profiles.length <= 1) {
+      this.renderProfiles();
+      return;
+    }
+    this.flushCurrentProfile();
+    this.settings.profiles = this.settings.profiles.filter(profile => profile.id !== this.settings.activeProfileId);
+    this.settings.activeProfileId = this.settings.profiles[0].id;
+    this.loadSelectedProfile();
+  }
+
+  renameProfile(name = this.profileNameInput.value) {
+    const profile = this.getActiveProfile();
+    const trimmed = name.trim();
+    if (!profile || !trimmed) return;
+    profile.name = trimmed;
+    this.profileNameInput.value = trimmed;
+    this.renderProfiles();
   }
 
   onProviderChange() {
@@ -315,64 +446,35 @@ class SettingsPage {
     const config = PROVIDER_CONFIG[provider];
 
     // 显示/隐藏条件字段
-    this.groupApikey.classList.toggle('visible', config.needsKey);
-    this.groupOllama.classList.toggle('visible', provider === 'ollama');
-    this.groupCustom.classList.toggle('visible', provider === 'custom');
-    this.groupCustomModel.classList.toggle('visible', provider === 'custom');
+    this.groupApikey?.classList.toggle('visible', config.needsKey);
+    this.groupOllama?.classList.toggle('visible', provider === 'ollama');
+    this.groupCustom?.classList.toggle('visible', provider === 'custom');
+    this.groupCustomModel?.classList.toggle('visible', provider === 'custom');
 
     // 更新key提示
     if (config.keyHint) {
-      this.apikeyHint.textContent = config.keyHint;
+      if (this.apikeyHint) this.apikeyHint.textContent = config.keyHint;
     }
 
     // 填充模型列表
-    this.modelSelect.replaceChildren();
-    if (config.models.length > 0) {
+    this.modelSelect.replaceChildren?.();
+    if (config.models.length > 0 && typeof document !== 'undefined') {
       config.models.forEach(m => {
         const opt = document.createElement('option');
         opt.value = m.value;
         opt.textContent = m.label;
-        this.modelSelect.appendChild(opt);
+        this.modelSelect.appendChild?.(opt);
       });
-      this.modelSelect.parentElement.style.display = '';
-    } else {
-      this.modelSelect.parentElement.style.display = 'none';
+      if (this.modelSelect.parentElement) this.modelSelect.parentElement.style.display = '';
+    } else if (!config.models.length) {
+      if (this.modelSelect.parentElement) this.modelSelect.parentElement.style.display = 'none';
     }
 
-    // 切换后加载该 provider 保存的配置到表单字段
-    this.loadProviderFields(provider);
   }
 
   buildDraftSettings() {
-    const provider = this.providerSelect.value;
-    const settings = structuredClone(this.settings);
-
-    // 只更新当前 provider 的配置
-    settings.provider = provider;
-    if (!settings.providers) {
-      settings.providers = {};
-    }
-
-    if (provider === 'custom') {
-      // custom 的模型名来自自定义输入框
-      settings.providers[provider] = {
-        apiKey: this.apikeyInput.value.trim(),
-        model: this.customModelInput.value.trim(),
-        ollamaUrl: this.ollamaUrlInput.value.trim(),
-        baseUrl: this.customBaseUrlInput.value.trim(),
-        customModel: this.customModelInput.value.trim()
-      };
-    } else {
-      settings.providers[provider] = {
-        apiKey: this.apikeyInput.value.trim(),
-        model: this.modelSelect.value,
-        ollamaUrl: this.ollamaUrlInput.value.trim(),
-        baseUrl: this.customBaseUrlInput.value.trim(),
-        customModel: ''
-      };
-    }
-
-    return settings;
+    this.flushCurrentProfile();
+    return structuredClone(this.settings);
   }
 
   clearMessages() {

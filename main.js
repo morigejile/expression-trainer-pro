@@ -14,13 +14,20 @@ const {createDiagnosticSnapshot} = require('./lib/diagnostics');
 const {isAllowedSupportUrl} = require('./shared/support-links');
 const { loadLexicon, analyzeText } = require('./lib/lexicon');
 const {
-  getSelectedLlmProviderSettings
+  getSelectedLlmProviderSettings,
+  getLlmProfile,
+  summarizeLlmProfiles,
+  selectActiveLlmProfile
 } = require('./lib/llm-provider-config');
 const {
   loadLlmProviderSettings,
   saveLlmProviderSettings
 } = require('./lib/llm-provider-store');
 const {loadAppearance, saveAppearance} = require('./lib/appearance-store');
+const {
+  loadRecordingPolicy,
+  acknowledgeRecordingPolicy
+} = require('./lib/recording-policy-store');
 const {calculateInitialWindowSize} = require('./lib/window-bounds');
 const { createAsrIpcRouter } = require('./lib/asr-ipc');
 const { createAsrProcessController } = require('./lib/asr-process-controller');
@@ -40,6 +47,7 @@ const {runManagedModelSmoke} = require('./lib/managed-model-smoke');
 const {
   requireBoundedText,
   validateFinalReportPayload,
+  validatePlaybackAnalysisPayload,
   validateMarkdownSaveRequest
 } = require('./lib/ipc-input');
 const modelRegistry = require('./models/registry.json');
@@ -62,6 +70,7 @@ const {
   createRequestCoordinator,
   runCoordinatedRequest,
   sendFeedback,
+  sendPlaybackAnalysis,
   sendReport,
   testConnection
 } = isSmokeTest
@@ -345,6 +354,20 @@ function broadcastAppearance(appearance) {
   }
 }
 
+function broadcastLlmProviderSettingsChanged() {
+  for (const window of [mainWindow, settingsWindow, promptEditorWindow]) {
+    if (window && !window.isDestroyed()) {
+      window.webContents.send('llm-provider-settings-changed');
+    }
+  }
+}
+
+function rejectNonSettingsSender(event) {
+  if (settingsWindow && !settingsWindow.isDestroyed()
+      && settingsWindow.webContents === event.sender) return null;
+  return {success: false, error: '仅设置窗口可访问完整 LLM 配置'};
+}
+
 function createPromptEditorWindow() {
   if (promptEditorWindow) {
     promptEditorWindow.focus();
@@ -528,20 +551,69 @@ ipcMain.handle('save-appearance', (event, appearance) => {
 });
 
 // LLM Provider 设置
-ipcMain.handle('get-llm-provider-settings', () => {
+ipcMain.handle('get-llm-provider-settings', event => {
+  const rejection = rejectNonSettingsSender(event);
+  if (rejection) return rejection;
   return loadLlmProviderSettings(app.getPath('userData'));
 });
 
 ipcMain.handle('save-llm-provider-settings', (event, settings) => {
+  const rejection = rejectNonSettingsSender(event);
+  if (rejection) return rejection;
   try {
     saveLlmProviderSettings(app.getPath('userData'), settings);
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('llm-provider-settings-changed');
-    }
+    broadcastLlmProviderSettingsChanged();
     return { success: true };
   } catch (error) {
     if (error.code === 'unsupported-schema-version') {
       return { success: false, error: '当前版本无法保存更高版本的 LLM Provider 配置' };
+    }
+    throw error;
+  }
+});
+
+ipcMain.handle('get-llm-profile-summaries', () => {
+  return summarizeLlmProfiles(loadLlmProviderSettings(app.getPath('userData')));
+});
+
+ipcMain.handle('select-llm-profile', (event, profileId) => {
+  if (typeof profileId !== 'string' || !profileId.trim() || profileId.length > 128) {
+    return {success: false, error: 'Invalid LLM profile ID'};
+  }
+
+  try {
+    const selected = selectActiveLlmProfile(
+      loadLlmProviderSettings(app.getPath('userData')),
+      profileId
+    );
+    const saved = saveLlmProviderSettings(app.getPath('userData'), selected);
+    broadcastLlmProviderSettingsChanged();
+    return {success: true, summary: summarizeLlmProfiles(saved)};
+  } catch (error) {
+    if (error.code === 'unsupported-schema-version') {
+      return {success: false, error: '当前版本无法保存更高版本的 LLM Provider 配置'};
+    }
+    if (error.code === 'invalid-profile-id') {
+      return {success: false, error: 'Unknown LLM profile ID'};
+    }
+    throw error;
+  }
+});
+
+ipcMain.handle('get-recording-policy', () => {
+  return {acknowledged: loadRecordingPolicy(app.getPath('userData')).acknowledged};
+});
+
+ipcMain.handle('acknowledge-recording-policy', () => {
+  try {
+    acknowledgeRecordingPolicy(app.getPath('userData'));
+    return {success: true, acknowledged: true};
+  } catch (error) {
+    if (error.code === 'unsupported-schema-version') {
+      return {success: false, error: '当前版本无法保存更高版本的录音政策配置'};
+    }
+    if (error.code === 'invalid-recording-policy-json') {
+      return {success: false, error: '录音政策配置已损坏，请修复或移除后重试'};
     }
     throw error;
   }
@@ -608,6 +680,8 @@ ipcMain.handle('cancel-asr', async (event, command) => {
 
 // LLM 连通性测试
 ipcMain.handle('test-llm-connection', async (event, settings) => {
+  const rejection = rejectNonSettingsSender(event);
+  if (rejection) return rejection;
   const providerConfig = getSelectedLlmProviderSettings(settings);
   const request = llmRequests.begin(event.sender.id, 'connection');
   try {
@@ -727,4 +801,27 @@ ipcMain.handle('get-final-report', async (event, payload) => {
       { signal }
     )
   );
+});
+
+ipcMain.handle('analyze-playback', async (event, payload) => {
+  const requestPayload = validatePlaybackAnalysisPayload(payload);
+  const settings = loadLlmProviderSettings(app.getPath('userData'));
+  const profile = getLlmProfile(settings, requestPayload.profileId);
+  if (!profile) return {success: false, error: '所选模型配置不存在', errorCode: 'invalid-profile-id'};
+  const customPrompt = loadCustomPrompt();
+  const result = await runCoordinatedRequest(
+    llmRequests,
+    event.sender.id,
+    'playback',
+    'analysis',
+    signal => sendPlaybackAnalysis(requestPayload.segments, profile, customPrompt, {signal})
+  );
+  if (!result.success) return result;
+  return {
+    success: true,
+    analysis: {
+      items: result.analysis,
+      profile: {id: profile.id, name: profile.name, provider: profile.provider, model: profile.model}
+    }
+  };
 });

@@ -5,6 +5,8 @@ global.document = { addEventListener() {} };
 const { mergeFinalText, ExpressionTrainer } = require('../src/app');
 const { beginAsrSession, createAsrEventState, filterAsrEvent } = require('../src/asr-event-state');
 const { createAudioCapture } = require('../src/audio-capture');
+const { createPcmWavRecorder } = require('../src/pcm-wav');
+const { createTrainingRecordStore } = require('../src/training-records');
 delete global.document;
 
 function createClassList() {
@@ -23,17 +25,28 @@ function createClassList() {
 }
 
 function createElement(tagName = 'div') {
+  const listeners = new Map();
   return {
     tagName: tagName.toUpperCase(),
+    get ownerDocument() {
+      return {
+        createElement,
+        createTextNode: text => ({textContent: String(text)})
+      };
+    },
     classList: createClassList(),
     style: {},
     textContent: '',
+    value: '',
+    dataset: {},
+    disabled: false,
     children: [],
     get firstChild() {
       return this.children[0] ?? null;
     },
     appendChild(node) {
       this.children.push(node);
+      node.parentNode = this;
       return node;
     },
     insertBefore(node, reference) {
@@ -49,9 +62,34 @@ function createElement(tagName = 'div') {
     },
     replaceChildren(...nodes) {
       this.children = [...nodes];
+      for (const node of nodes) node.parentNode = this;
     },
+    querySelector(selector) { return this.querySelectorAll(selector)[0] ?? null; },
+    querySelectorAll(selector) {
+      if (selector === '[data-segment-id]') {
+        return this.children.filter(node => node.dataset?.segmentId);
+      }
+      if (selector === '.interim-line') {
+        return this.children.filter(node => node.classList?.contains('interim-line'));
+      }
+      if (selector === '.subtitle-line:not(.old)') {
+        return this.children.filter(node => node.classList?.contains('subtitle-line') && !node.classList.contains('old'));
+      }
+      return [];
+    },
+    closest(selector) {
+      const editable = this.contentEditable === 'true' || this.isContentEditable === true;
+      const guardedTags = selector.includes(this.tagName.toLowerCase());
+      return guardedTags || (selector.includes('[contenteditable="true"]') && editable) ? this : null;
+    },
+    remove() {
+      if (!this.parentNode) return;
+      this.parentNode.removeChild(this);
+    },
+    scrollIntoView(options) { this.scrollIntoViewOptions = options; },
     focus() {},
-    addEventListener() {}
+    addEventListener(type, listener) { listeners.set(type, listener); },
+    dispatchEvent(event) { return listeners.get(event.type)?.(event); }
   };
 }
 
@@ -78,6 +116,9 @@ function createTrainer() {
   trainer.asrEventState = createAsrEventState();
   trainer.asrStartAttempt = null;
   trainer.asrGeneration = 0;
+  trainer.recordingPolicyAcknowledged = true;
+  trainer.trainingRecords = null;
+  trainer.viewingTrainingRecordId = null;
   trainer.renderSubtitle = () => {};
   trainer.btnStop = createElement();
   trainer.btnStopLabel = createElement();
@@ -107,11 +148,59 @@ function createTrainer() {
   trainer.userMessageAction = createElement();
   trainer.trainingStatus = createElement();
   trainer.feedbackStatus = createElement();
+  trainer.recordingPolicyModal = createElement();
+  trainer.btnRecordingPolicyConfirm = createElement('button');
+  trainer.btnRecordingPolicyCancel = createElement('button');
+  trainer.trainingRecordSelect = createElement('select');
+  trainer.playbackControls = createElement();
+  trainer.audioPlayer = createElement('audio');
+  trainer.audioPlayer.paused = true;
+  trainer.audioPlayer.play = async () => { trainer.audioPlayer.paused = false; };
+  trainer.audioPlayer.pause = () => { trainer.audioPlayer.paused = true; };
+  trainer.playbackModel = createElement('select');
+  trainer.btnReanalyze = createElement('button');
+  trainer.playbackProfileSummary = {activeProfileId: null, profiles: []};
+  trainer.playbackProfileRefreshGeneration = 0;
+  trainer.playbackProfileRefreshPromise = null;
+  trainer.playbackAnalysisGeneration = 0;
+  trainer.playbackSegmentId = null;
   trainer.pasteAnalysisPending = false;
   trainer.pasteAnalysisGeneration = 0;
   trainer.activeModal = null;
   trainer.modalOpener = null;
   return trainer;
+}
+
+function audioChunk(sessionId = 'session-a', samples = new Float32Array([0.25, 0.5])) {
+  return {
+    sessionId,
+    sequence: 0,
+    sampleRateHz: 16000,
+    channels: 1,
+    format: 'f32',
+    frames: samples.length,
+    samples
+  };
+}
+
+function fakeRecorder({ limitOnAppend = false, durationMs = 20 } = {}) {
+  return {
+    durationMs,
+    append(samples) {
+      this.durationMs += samples.length / 16;
+      return { acceptedFrames: samples.length, limitReached: limitOnAppend };
+    },
+    finish: () => new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/wav' }),
+    clear() {}
+  };
+}
+
+function flushMicrotasks() {
+  return new Promise(resolve => setImmediate(resolve));
+}
+
+function flushTimers() {
+  return new Promise(resolve => setTimeout(resolve, 0));
 }
 
 async function startAudioCaptureHarness(t, {
@@ -218,6 +307,12 @@ function activateAsrSession(trainer, sessionId = 'session-a') {
   return sessionId;
 }
 
+function ownActiveRecording(trainer, sessionId = 'session-a') {
+  trainer.recordingSessionId = sessionId;
+  trainer.recordingPcm = { durationMs: 0, clear() {} };
+  trainer.pendingSegments = [];
+}
+
 function stopEnvelope(sessionId, text = '尾部文本') {
   const events = [];
   if (text.trim()) {
@@ -273,6 +368,7 @@ test('stop final text reaches transcript, analysis, and the next report', async 
   });
   const trainer = createTrainer();
   activateAsrSession(trainer);
+  ownActiveRecording(trainer);
 
   let stopResolved = false;
   const stopPromise = trainer.stopRecording().then(() => { stopResolved = true; });
@@ -324,16 +420,19 @@ test('user messages can be dismissed explicitly', () => {
   assert.equal(trainer.userMessageAction.classList.contains('hidden'), true);
 });
 
-test('saved LLM settings dismiss only a configuration-related message', () => {
+test('saved LLM settings dismiss only a configuration-related message', async (t) => {
+  global.document = {createElement};
+  global.window = {api: {getLlmProfileSummaries: async () => profileSummary}};
+  t.after(() => { delete global.document; delete global.window; });
   const trainer = createTrainer();
 
   trainer.showUserMessage('实时反馈失败：请先配置 API Key', {openSettings: true});
-  trainer.handleLlmProviderSettingsChanged();
+  await trainer.handleLlmProviderSettingsChanged();
   assert.equal(trainer.userMessage.classList.contains('hidden'), true);
   assert.equal(trainer.feedbackStatus.textContent, '本地分析可用；AI 建议将在后续表达中生成');
 
   trainer.showUserMessage('复制失败，请重试');
-  trainer.handleLlmProviderSettingsChanged();
+  await trainer.handleLlmProviderSettingsChanged();
   assert.equal(trainer.userMessage.classList.contains('hidden'), false);
   assert.equal(trainer.userMessageText.textContent, '复制失败，请重试');
 });
@@ -385,6 +484,7 @@ test('stopping recording immediately exposes finalization state and locks record
   });
   const trainer = createTrainer();
   activateAsrSession(trainer);
+  ownActiveRecording(trainer);
   trainer.audioCapture = {
     setEnabled() {},
     stop: () => captureStop.promise
@@ -696,6 +796,7 @@ test('stop suppresses pending feedback before final analysis completes', async (
   });
   const trainer = createTrainer();
   activateAsrSession(trainer);
+  ownActiveRecording(trainer);
   trainer.fullText = '旧会话已经积累了足够长的逐字稿内容';
   trainer.addFeedbackItem = (text) => feedbackItems.push(text);
 
@@ -728,6 +829,7 @@ test('stop finalizes recording when final-text analysis fails', async (t) => {
   t.after(() => { delete global.window; });
   const trainer = createTrainer();
   activateAsrSession(trainer);
+  ownActiveRecording(trainer);
   trainer.btnStart.classList.add('hidden');
   trainer.showError = (message) => shownErrors.push(message);
 
@@ -757,6 +859,7 @@ test('an endpoint final and the matching stop final update state only once', asy
   t.after(() => { delete global.window; });
   const trainer = createTrainer();
   activateAsrSession(trainer);
+  ownActiveRecording(trainer);
 
   trainer.handleASRResult({ text: '尾部文本', isFinal: true });
   await new Promise(resolve => setImmediate(resolve));
@@ -781,6 +884,7 @@ test('blank stop final text leaves transcript state unchanged', async (t) => {
   t.after(() => { delete global.window; });
   const trainer = createTrainer();
   activateAsrSession(trainer);
+  ownActiveRecording(trainer);
 
   await trainer.stopRecording();
   await new Promise(resolve => setImmediate(resolve));
@@ -818,6 +922,7 @@ test('renderer routes an active recording through the injected audio capture', a
 
   await trainer.startRecording();
   const startCommand = calls[0][1];
+  assert.equal(trainer.playbackControls.classList.contains('hidden'), true);
   assert.match(startCommand.sessionId, /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
   assert.deepEqual(startCommand, { sessionId: startCommand.sessionId, sampleRateHz: 16000 });
   await audio.emit({
@@ -1130,6 +1235,7 @@ test('clear during stop-final analysis prevents stale analysis side effects', as
   });
   const trainer = createTrainer();
   activateAsrSession(trainer);
+  ownActiveRecording(trainer);
 
   const stopPromise = trainer.stopRecording();
   await new Promise(resolve => setImmediate(resolve));
@@ -1187,6 +1293,7 @@ test('stop rejection after clear does not display a stale error', async (t) => {
   });
   const trainer = createTrainer();
   activateAsrSession(trainer);
+  ownActiveRecording(trainer);
   trainer.showError = message => shownErrors.push(message);
 
   const stopPromise = trainer.stopRecording();
@@ -1570,6 +1677,7 @@ test('pasted analysis is single-flight while the first draft is pending', async 
   trainer.requestRealtimeFeedback = () => {};
   const first = trainer.analyzePastedText();
   await new Promise(resolve => setImmediate(resolve));
+  assert.equal(trainer.playbackControls.classList.contains('hidden'), true);
 
   trainer.pasteTextarea.value = '第二份。';
   await trainer.analyzePastedText();
@@ -1662,4 +1770,1206 @@ test('copy rejection and saveFile success false are visible', async (t) => {
   await trainer.saveOriginalText();
 
   assert.deepEqual(messages, ['复制失败，请重试', '未保存原文：磁盘不可写']);
+});
+
+test('first recording waits for policy acknowledgement before ASR or microphone startup', async (t) => {
+  const acknowledgement = createDeferred();
+  const order = [];
+  const audio = createAudioCaptureFactoryFake({
+    start: async () => {
+      order.push('microphone');
+      return { requestedSampleRateHz: 16000, contextSampleRateHz: 16000, trackSampleRateHz: 48000 };
+    }
+  });
+  global.document = { createElement };
+  global.window = {
+    api: {
+      getRecordingPolicy: async () => ({ acknowledged: false }),
+      acknowledgeRecordingPolicy: async () => {
+        order.push('ack');
+        return { success: true, acknowledged: true };
+      },
+      cancelLLMRequests: async () => ({ success: true }),
+      startASR: async ({ sessionId }) => {
+        order.push('asr');
+        return { ok: true, events: [{ type: 'ready', sessionId, sequence: 0 }] };
+      }
+    }
+  };
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.fullText = '';
+  trainer.recordingPolicyAcknowledged = false;
+  trainer.audioCaptureFactory = audio.factory;
+  trainer.waitForRecordingPolicyDecision = () => acknowledgement.promise;
+  t.after(() => {
+    acknowledgement.resolve(false);
+    clearInterval(trainer.timerInterval);
+    delete global.document;
+    delete global.window;
+  });
+
+  const starting = trainer.startRecording();
+  await flushMicrotasks();
+  const beforeDecision = order.slice();
+  acknowledgement.resolve(true);
+  await starting;
+
+  assert.deepEqual(beforeDecision, []);
+  assert.deepEqual(order, ['ack', 'asr', 'microphone']);
+});
+
+test('captured PCM is appended before ASR enqueue and only accepted samples carry local audioEndMs', async () => {
+  const order = [];
+  const trainer = createTrainer();
+  activateAsrSession(trainer);
+  trainer.recordingPcm = {
+    durationMs: 125,
+    append(samples) {
+      order.push(['append', Array.from(samples)]);
+      return { acceptedFrames: 2, limitReached: false };
+    }
+  };
+  trainer.recordingSessionId = 'session-a';
+  trainer.audioFeedTracker = {
+    sessionId: 'session-a',
+    queue: {
+      enqueue(item) {
+        order.push(['enqueue', Array.from(item.samples), item.audioEndMs]);
+        return true;
+      }
+    }
+  };
+
+  await trainer.handleCapturedChunk(audioChunk('session-a', new Float32Array([0.1, 0.2, 0.3])));
+
+  assert.deepEqual(order, [
+    ['append', [0.10000000149011612, 0.20000000298023224, 0.30000001192092896]],
+    ['enqueue', [0.10000000149011612, 0.20000000298023224], 125]
+  ]);
+});
+
+test('a delayed final uses the producing queue item audio end instead of later captured duration', async (t) => {
+  const firstFeed = createDeferred();
+  const feedCommands = [];
+  global.window = {
+    api: {
+      feedAudio(command) {
+        feedCommands.push(command);
+        return feedCommands.length === 1 ? firstFeed.promise : Promise.resolve({ ok: true, events: [] });
+      },
+      analyzeText: async () => ({ totalWords: 2, fillers: [], hedges: [], vagueWords: [] })
+    }
+  };
+  t.after(() => {
+    firstFeed.resolve({ ok: true, events: [] });
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.fullText = '';
+  trainer.sentences = [];
+  trainer.pendingSegments = [];
+  trainer.recordingSessionId = 'session-a';
+  trainer.recordingPcm = fakeRecorder({ durationMs: 0 });
+  activateAsrSession(trainer);
+  trainer.audioFeedTracker = trainer.createAudioFeedTracker('session-a');
+
+  void trainer.handleCapturedChunk(audioChunk('session-a', new Float32Array(16000)));
+  await flushMicrotasks();
+  void trainer.handleCapturedChunk({ ...audioChunk('session-a', new Float32Array(16000)), sequence: 1 });
+  firstFeed.resolve({
+    ok: true,
+    events: [{ type: 'final', sessionId: 'session-a', sequence: 1, text: '第一段' }]
+  });
+  await trainer.audioFeedTracker.queue.drain();
+
+  assert.equal(trainer.recordingPcm.durationMs, 2000);
+  assert.equal(trainer.pendingSegments[0].endMs, 1000);
+  assert.deepEqual(feedCommands.map(command => Object.keys(command).sort()), [
+    ['samples', 'sequence', 'sessionId'],
+    ['samples', 'sequence', 'sessionId']
+  ]);
+});
+
+test('a chunk reaching the configured frame limit triggers one owned normal stop', async () => {
+  const trainer = createTrainer();
+  activateAsrSession(trainer);
+  trainer.recordingSessionId = 'session-a';
+  trainer.recordingPcm = createPcmWavRecorder({ sampleRateHz: 16000, maxFrames: 4 });
+  trainer.recordingPcm.append(new Float32Array([0.1, 0.2]));
+  trainer.audioFeedTracker = {
+    sessionId: 'session-a',
+    queue: {
+      enqueue(item) {
+        assert.equal(item.samples.length, 2);
+        assert.equal(item.audioEndMs, 0.25);
+        return true;
+      }
+    }
+  };
+  trainer.stopCalls = 0;
+  trainer.stopRecording = async () => { trainer.stopCalls += 1; };
+
+  await trainer.handleCapturedChunk(audioChunk('session-a', new Float32Array([0.3, 0.4, 0.5])));
+  await flushTimers();
+
+  assert.equal(trainer.stopCalls, 1);
+  assert.equal(trainer.trainingStatus.textContent, '已达到20分钟上限，正在结束录音…');
+});
+
+test('normal stop creates and selects a complete WAV training record', async (t) => {
+  const createdUrls = [];
+  const playbackPayloads = [];
+  global.document = { createElement };
+  global.window = {
+    URL: {
+      createObjectURL(blob) {
+        assert.equal(blob.type, 'audio/wav');
+        const url = `blob:${createdUrls.length + 1}`;
+        createdUrls.push(url);
+        return url;
+      },
+      revokeObjectURL() {}
+    },
+    api: {
+      stopASR: async () => stopEnvelope('session-a', '完成文本'),
+      cancelLLMRequests: async () => ({ success: true }),
+      analyzeText: async () => ({ totalWords: 4, fillers: [], hedges: [], vagueWords: [] }),
+      getLlmProfileSummaries: async () => profileSummary,
+      analyzePlayback: async payload => {
+        playbackPayloads.push(payload);
+        return {success: true, analysis: {items: [], profile: profileSummary.profiles[0]}};
+      }
+    }
+  };
+  t.after(() => {
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.fullText = '';
+  trainer.sentences = [];
+  activateAsrSession(trainer);
+  trainer.beginRecordingBuffer('session-a');
+  trainer.recordingPcm = fakeRecorder({ durationMs: 1500 });
+
+  await trainer.stopRecording();
+
+  const record = trainer.trainingRecords.selected();
+  assert.equal(createdUrls.length, 1);
+  assert.equal(record.audioUrl, 'blob:1');
+  assert.equal(record.durationMs, 1500);
+  assert.equal(record.fullText, '完成文本');
+  assert.equal(record.playbackAnalysis, null);
+  assert.equal(record.segments[0].endMs, 1500);
+  assert.equal(record.segments[0].localAnalysis.totalWords, 4);
+  assert.equal(trainer.viewingTrainingRecordId, record.id);
+  await flushMicrotasks();
+  assert.equal(playbackPayloads.length, 1);
+  assert.equal(playbackPayloads[0].profileId, 'profile-1');
+});
+
+test('failed record insertion revokes its newly-created URL exactly once', (t) => {
+  const revoked = [];
+  global.document = { createElement };
+  global.window = {
+    URL: {
+      createObjectURL: () => 'blob:failed',
+      revokeObjectURL: url => revoked.push(url)
+    },
+    api: { cancelLLMRequests: async () => ({ success: true }) }
+  };
+  t.after(() => {
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.showUserMessage = () => {};
+  trainer.trainingRecords = {
+    add() { throw new Error('store unavailable'); },
+    clear() {}
+  };
+  trainer.beginRecordingBuffer('session-failed');
+  trainer.recordingPcm = fakeRecorder({ durationMs: 500 });
+
+  assert.equal(trainer.finalizeTrainingRecord(), null);
+  trainer.disposeTrainingRecords();
+
+  assert.deepEqual(revoked, ['blob:failed']);
+  assert.equal(trainer.recordingPcm, null);
+});
+
+test('six completed renderer records retain five and revoke the first URL once', (t) => {
+  const revoked = [];
+  let nextUrl = 0;
+  global.document = { createElement };
+  global.window = {
+    URL: {
+      createObjectURL: () => `blob:${++nextUrl}`,
+      revokeObjectURL: url => revoked.push(url)
+    },
+    api: { cancelLLMRequests: async () => ({ success: true }) }
+  };
+  t.after(() => {
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.trainingRecords = createTrainingRecordStore({
+    maxRecords: 5,
+    revokeObjectURL: global.window.URL.revokeObjectURL
+  });
+  for (let index = 1; index <= 6; index += 1) {
+    trainer.beginRecordingBuffer(`session-${index}`);
+    trainer.recordingPcm = fakeRecorder({ durationMs: index * 1000 });
+    trainer.fullText = `文本${index}`;
+    trainer.pendingSegments = [];
+    trainer.finalizeTrainingRecord();
+  }
+
+  assert.deepEqual(trainer.trainingRecords.list().map(record => record.audioUrl), [
+    'blob:2', 'blob:3', 'blob:4', 'blob:5', 'blob:6'
+  ]);
+  assert.deepEqual(revoked, ['blob:1']);
+});
+
+test('failed microphone startup preserves completed records without replacement confirmation', async (t) => {
+  const record = {
+    id: 'record-existing', createdAt: new Date().toISOString(), durationMs: 1000,
+    audioUrl: 'blob:existing', segments: [], stats: {}, fullText: '已完成内容', playbackAnalysis: null
+  };
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.trainingRecords = createTrainingRecordStore();
+  trainer.trainingRecords.add(record);
+  trainer.viewingTrainingRecordId = record.id;
+  trainer.fullText = record.fullText;
+  trainer.audioCaptureFactory = createAudioCaptureFactoryFake({
+    start: async () => { throw new Error('permission denied'); }
+  }).factory;
+  global.document = { createElement };
+  global.window = {
+    confirm: () => assert.fail('completed records must not use replacement confirmation'),
+    api: {
+      getRecordingPolicy: async () => ({ acknowledged: true }),
+      cancelLLMRequests: async () => ({ success: true }),
+      startASR: async ({ sessionId }) => ({ ok: true, events: [{ type: 'ready', sessionId, sequence: 0 }] }),
+      cancelASR: async () => ({ ok: true, events: [] })
+    }
+  };
+  t.after(() => {
+    delete global.document;
+    delete global.window;
+  });
+
+  await trainer.startRecording();
+
+  assert.deepEqual(trainer.trainingRecords.list(), [record]);
+  assert.equal(trainer.trainingRecords.selected(), record);
+  assert.equal(trainer.viewingTrainingRecordId, record.id);
+  assert.equal(trainer.fullText, '已完成内容');
+});
+
+test('clear in completed-record mode removes only the selected record and revokes its URL once', (t) => {
+  const revoked = [];
+  global.document = { createElement };
+  global.window = { api: { cancelLLMRequests: async () => ({ success: true }) } };
+  t.after(() => {
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.trainingRecords = createTrainingRecordStore({ revokeObjectURL: url => revoked.push(url) });
+  trainer.trainingRecords.add({ id: 'r1', audioUrl: 'blob:1', fullText: '一', segments: [], stats: {}, durationMs: 1, createdAt: new Date().toISOString() });
+  trainer.trainingRecords.add({ id: 'r2', audioUrl: 'blob:2', fullText: '二', segments: [], stats: {}, durationMs: 1, createdAt: new Date().toISOString() });
+  trainer.selectTrainingRecord('r1');
+
+  assert.equal(trainer.clearAll(), true);
+  assert.deepEqual(trainer.trainingRecords.list().map(record => record.id), ['r2']);
+  assert.deepEqual(revoked, ['blob:1']);
+  assert.equal(trainer.viewingTrainingRecordId, 'r2');
+});
+
+function playbackRecord(overrides = {}) {
+  return {
+    id: 'record-playback',
+    createdAt: '2026-09-01T01:02:03.000Z',
+    durationMs: 2000,
+    audioUrl: 'blob:playback',
+    segments: [
+      {id: 'segment-1', text: '第一段', startMs: 0, endMs: 1000, localAnalysis: null},
+      {id: 'segment-2', text: '第二段', startMs: 1000, endMs: 2000, localAnalysis: null}
+    ],
+    stats: {fillers: 0, hedges: 0, vagueWords: 0, totalWords: 6, duration: 2},
+    fullText: '第一段第二段',
+    playbackAnalysis: null,
+    ...overrides
+  };
+}
+
+function installPlaybackRecord(trainer, record = playbackRecord()) {
+  trainer.trainingRecords = createTrainingRecordStore();
+  trainer.trainingRecords.add(record);
+  trainer.viewingTrainingRecordId = record.id;
+  return record;
+}
+
+function fakeAudio({paused = true} = {}) {
+  return {
+    currentTime: 0,
+    paused,
+    playCalls: 0,
+    pauseCalls: 0,
+    play() { this.playCalls += 1; this.paused = false; return Promise.resolve(); },
+    pause() { this.pauseCalls += 1; this.paused = true; }
+  };
+}
+
+function keyEvent({code = 'Space', target = createElement(), repeat = false, defaultPrevented = false} = {}) {
+  return {
+    code,
+    target,
+    repeat,
+    defaultPrevented,
+    preventDefaultCalls: 0,
+    preventDefault() { this.preventDefaultCalls += 1; this.defaultPrevented = true; }
+  };
+}
+
+const profileSummary = {
+  activeProfileId: 'profile-1',
+  profiles: [
+    {id: 'profile-1', name: 'Work', provider: 'openai', model: 'gpt-one', active: true},
+    {id: 'profile-2', name: 'Local', provider: 'ollama', model: 'qwen-two', active: false}
+  ]
+};
+
+test('space toggles playback once and is ignored for controls, visible modals, default prevention, and repeat events', (t) => {
+  let visibleModal = null;
+  global.document = {querySelector: () => visibleModal};
+  t.after(() => { delete global.document; });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+  trainer.audioPlayer = fakeAudio({paused: true});
+  const body = createElement('div');
+  const played = keyEvent({target: body});
+
+  trainer.handleGlobalKeydown(played);
+  trainer.handleGlobalKeydown(keyEvent({target: createElement('input')}));
+  trainer.handleGlobalKeydown(keyEvent({target: createElement('button')}));
+  trainer.handleGlobalKeydown(keyEvent({target: body, repeat: true}));
+  trainer.handleGlobalKeydown(keyEvent({target: body, defaultPrevented: true}));
+  visibleModal = createElement();
+  trainer.handleGlobalKeydown(keyEvent({target: body}));
+
+  assert.equal(trainer.audioPlayer.playCalls, 1);
+  assert.equal(trainer.audioPlayer.pauseCalls, 0);
+  assert.equal(played.preventDefaultCalls, 1);
+});
+
+test('timeupdate rerenders only when the active segment changes', () => {
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+  trainer.audioPlayer = fakeAudio();
+  trainer.renderedPlaybackSegmentIds = [];
+  trainer.renderPlaybackSegment = segmentId => trainer.renderedPlaybackSegmentIds.push(segmentId);
+
+  trainer.audioPlayer.currentTime = 0.2;
+  trainer.handlePlaybackTimeUpdate();
+  trainer.audioPlayer.currentTime = 0.8;
+  trainer.handlePlaybackTimeUpdate();
+  trainer.audioPlayer.currentTime = 1.2;
+  trainer.handlePlaybackTimeUpdate();
+
+  assert.deepEqual(trainer.renderedPlaybackSegmentIds, ['segment-1', 'segment-2']);
+});
+
+test('profile options expose only model text and profile ID values', async (t) => {
+  global.document = {createElement};
+  global.window = {api: {getLlmProfileSummaries: async () => profileSummary}};
+  t.after(() => { delete global.document; delete global.window; });
+  const trainer = createTrainer();
+
+  await trainer.loadLlmProfileOptions();
+
+  assert.deepEqual(trainer.playbackModel.children.map(option => ({value: option.value, text: option.textContent})), [
+    {value: 'profile-1', text: 'gpt-one'},
+    {value: 'profile-2', text: 'qwen-two'}
+  ]);
+  assert.equal(trainer.playbackModel.value, 'profile-1');
+});
+
+test('selecting a model updates the active profile without starting analysis', async (t) => {
+  const selected = [];
+  let analysisCalls = 0;
+  global.document = {createElement};
+  global.window = {api: {
+    selectLlmProfile: async profileId => {
+      selected.push(profileId);
+      return {success: true, summary: {...profileSummary, activeProfileId: profileId}};
+    },
+    analyzePlayback: async () => { analysisCalls += 1; }
+  }};
+  t.after(() => { delete global.document; delete global.window; });
+  const trainer = createTrainer();
+  trainer.playbackProfileSummary = profileSummary;
+
+  await trainer.selectPlaybackProfile('profile-2');
+
+  assert.deepEqual(selected, ['profile-2']);
+  assert.equal(analysisCalls, 0);
+  assert.equal(trainer.playbackProfileSummary.activeProfileId, 'profile-2');
+});
+
+test('settings broadcast refreshes stale profile options and automatic analysis uses the current active profile', async (t) => {
+  const currentSummary = {
+    activeProfileId: 'profile-2',
+    profiles: [profileSummary.profiles[1]]
+  };
+  const payloads = [];
+  global.document = {createElement};
+  global.window = {api: {
+    getLlmProfileSummaries: async () => currentSummary,
+    analyzePlayback: async payload => {
+      payloads.push(payload);
+      return {success: true, analysis: {items: [], profile: currentSummary.profiles[0]}};
+    }
+  }};
+  t.after(() => { delete global.document; delete global.window; });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+  trainer.playbackProfileSummary = {
+    activeProfileId: 'deleted-profile',
+    profiles: [{id: 'deleted-profile', name: 'Deleted', provider: 'custom', model: 'stale-model', active: true}]
+  };
+  trainer.playbackModel.value = 'deleted-profile';
+
+  await trainer.handleLlmProviderSettingsChanged();
+  await trainer.analyzeSelectedRecording({automatic: true});
+
+  assert.equal(trainer.playbackProfileSummary.activeProfileId, 'profile-2');
+  assert.deepEqual(trainer.playbackModel.children.map(option => option.textContent), ['qwen-two']);
+  assert.equal(trainer.playbackModel.value, 'profile-2');
+  assert.equal(payloads[0].profileId, 'profile-2');
+});
+
+test('automatic analysis waits for a pending settings broadcast before choosing the active profile', async (t) => {
+  const profileRefresh = createDeferred();
+  const payloads = [];
+  const currentSummary = {
+    activeProfileId: 'profile-2',
+    profiles: [profileSummary.profiles[1]]
+  };
+  global.document = {createElement};
+  global.window = {api: {
+    getLlmProfileSummaries: () => profileRefresh.promise,
+    analyzePlayback: async payload => {
+      payloads.push(payload);
+      return {success: true, analysis: {items: [], profile: currentSummary.profiles[0]}};
+    }
+  }};
+  t.after(() => {
+    profileRefresh.resolve(currentSummary);
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+  trainer.playbackProfileSummary = {
+    activeProfileId: 'deleted-profile',
+    profiles: [{id: 'deleted-profile', name: 'Deleted', provider: 'custom', model: 'stale-model', active: true}]
+  };
+  trainer.playbackModel.value = 'deleted-profile';
+
+  const broadcast = trainer.handleLlmProviderSettingsChanged();
+  const automatic = trainer.analyzeSelectedRecording({automatic: true});
+  await flushMicrotasks();
+  assert.deepEqual(payloads, []);
+
+  profileRefresh.resolve(currentSummary);
+  await broadcast;
+  await automatic;
+
+  assert.deepEqual(payloads.map(payload => payload.profileId), ['profile-2']);
+  assert.equal(trainer.playbackProfileSummary.activeProfileId, 'profile-2');
+  assert.equal(trainer.playbackModel.value, 'profile-2');
+});
+
+test('automatic analysis follows a superseding profile refresh before choosing the active profile', async (t) => {
+  const olderRefresh = createDeferred();
+  const newerRefresh = createDeferred();
+  let refreshCall = 0;
+  const payloads = [];
+  const staleSummary = {
+    activeProfileId: 'deleted-profile',
+    profiles: [{id: 'deleted-profile', name: 'Deleted', provider: 'custom', model: 'stale-model', active: true}]
+  };
+  const currentSummary = {
+    activeProfileId: 'profile-2',
+    profiles: [profileSummary.profiles[1]]
+  };
+  global.document = {createElement};
+  global.window = {api: {
+    getLlmProfileSummaries: () => (++refreshCall === 1 ? olderRefresh.promise : newerRefresh.promise),
+    analyzePlayback: async payload => {
+      payloads.push(payload);
+      return {success: true, analysis: {items: [], profile: currentSummary.profiles[0]}};
+    }
+  }};
+  t.after(() => {
+    olderRefresh.resolve(staleSummary);
+    newerRefresh.resolve(currentSummary);
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+  trainer.playbackProfileSummary = staleSummary;
+  trainer.playbackModel.value = 'deleted-profile';
+
+  const older = trainer.refreshLlmProfileOptions({supersede: true});
+  const automatic = trainer.analyzeSelectedRecording({automatic: true});
+  await flushMicrotasks();
+  const newer = trainer.handleLlmProviderSettingsChanged();
+  olderRefresh.resolve(staleSummary);
+  await older;
+  await flushMicrotasks();
+
+  assert.deepEqual(payloads, []);
+
+  newerRefresh.resolve(currentSummary);
+  await newer;
+  await automatic;
+
+  assert.deepEqual(payloads.map(payload => payload.profileId), ['profile-2']);
+  assert.equal(trainer.playbackProfileSummary.activeProfileId, 'profile-2');
+});
+
+test('a late older profile refresh cannot overwrite a newer broadcast summary', async (t) => {
+  const olderRefresh = createDeferred();
+  const newerRefresh = createDeferred();
+  let refreshCall = 0;
+  const olderSummary = {
+    activeProfileId: 'deleted-profile',
+    profiles: [{id: 'deleted-profile', name: 'Deleted', provider: 'custom', model: 'stale-model', active: true}]
+  };
+  const newerSummary = {
+    activeProfileId: 'profile-2',
+    profiles: [profileSummary.profiles[1]]
+  };
+  global.document = {createElement};
+  global.window = {api: {
+    getLlmProfileSummaries: () => (++refreshCall === 1 ? olderRefresh.promise : newerRefresh.promise)
+  }};
+  t.after(() => {
+    olderRefresh.resolve(olderSummary);
+    newerRefresh.resolve(newerSummary);
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+
+  const older = trainer.handleLlmProviderSettingsChanged();
+  const newer = trainer.handleLlmProviderSettingsChanged();
+  newerRefresh.resolve(newerSummary);
+  await newer;
+  olderRefresh.resolve(olderSummary);
+  await older;
+
+  assert.equal(trainer.playbackProfileSummary.activeProfileId, 'profile-2');
+  assert.deepEqual(trainer.playbackModel.children.map(option => option.value), ['profile-2']);
+});
+
+test('automatic first analysis uses the active profile', async (t) => {
+  const payloads = [];
+  global.document = {createElement};
+  global.window = {api: {
+    getLlmProfileSummaries: async () => profileSummary,
+    analyzePlayback: async payload => {
+      payloads.push(payload);
+      return {success: true, analysis: {items: [], profile: profileSummary.profiles[0]}};
+    }
+  }};
+  t.after(() => { delete global.document; delete global.window; });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+  trainer.playbackModel.value = 'profile-2';
+
+  await trainer.analyzeSelectedRecording({automatic: true});
+
+  assert.equal(payloads[0].profileId, 'profile-1');
+});
+
+test('manual analysis supersedes an automatic analysis waiting for profile loading', async (t) => {
+  const profileLoad = createDeferred();
+  const refreshedSummary = {...profileSummary, activeProfileId: 'profile-2'};
+  const payloads = [];
+  global.document = {createElement};
+  global.window = {api: {
+    getLlmProfileSummaries: () => profileLoad.promise,
+    analyzePlayback: async payload => {
+      payloads.push(payload);
+      return {
+        success: true,
+        analysis: {
+          items: [{segmentId: 'segment-1', advice: payload.profileId}],
+          profile: profileSummary.profiles.find(profile => profile.id === payload.profileId)
+        }
+      };
+    }
+  }};
+  t.after(() => {
+    profileLoad.resolve(refreshedSummary);
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+
+  const automatic = trainer.analyzeSelectedRecording({automatic: true});
+  await flushMicrotasks();
+  trainer.playbackProfileSummary = {...profileSummary, activeProfileId: 'profile-2'};
+  trainer.playbackModel.value = 'profile-2';
+  const manual = trainer.analyzeSelectedRecording();
+  await flushMicrotasks();
+  assert.deepEqual(payloads, []);
+  profileLoad.resolve(refreshedSummary);
+  await manual;
+  await automatic;
+
+  assert.deepEqual(payloads.map(payload => payload.profileId), ['profile-2']);
+  assert.equal(trainer.trainingRecords.selected().playbackAnalysis.profile.id, 'profile-2');
+});
+
+test('manual reanalysis submits only the profile ID and transport-safe segments', async (t) => {
+  const payloads = [];
+  global.window = {api: {analyzePlayback: async payload => {
+    payloads.push(payload);
+    return {success: true, analysis: {items: [], profile: profileSummary.profiles[1]}};
+  }}};
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+  trainer.playbackProfileSummary = {...profileSummary, activeProfileId: 'profile-2'};
+  trainer.playbackModel.value = 'profile-2';
+
+  await trainer.analyzeSelectedRecording();
+
+  assert.deepEqual(payloads, [{
+    profileId: 'profile-2',
+    segments: [
+      {id: 'segment-1', text: '第一段', startMs: 0, endMs: 1000},
+      {id: 'segment-2', text: '第二段', startMs: 1000, endMs: 2000}
+    ]
+  }]);
+});
+
+for (const selectionFailure of [
+  {
+    name: 'failure envelope',
+    selectLlmProfile: async () => ({success: false, error: 'profile rejected'}),
+    getLlmProfileSummaries: async () => profileSummary
+  },
+  {
+    name: 'rejection',
+    selectLlmProfile: async () => { throw new Error('profile selection unavailable'); },
+    getLlmProfileSummaries: async () => { throw new Error('profile reload unavailable'); }
+  }
+]) {
+  test(`failed profile selection ${selectionFailure.name} restores the active profile before manual analysis`, async (t) => {
+    const payloads = [];
+    global.document = {createElement};
+    global.window = {api: {
+      selectLlmProfile: selectionFailure.selectLlmProfile,
+      getLlmProfileSummaries: selectionFailure.getLlmProfileSummaries,
+      analyzePlayback: async payload => {
+        payloads.push(payload);
+        return {success: true, analysis: {items: [], profile: profileSummary.profiles[0]}};
+      }
+    }};
+    t.after(() => { delete global.document; delete global.window; });
+    const trainer = createTrainer();
+    installPlaybackRecord(trainer);
+    trainer.playbackProfileSummary = profileSummary;
+    trainer.playbackModel.value = 'profile-2';
+
+    await trainer.selectPlaybackProfile('profile-2');
+    await trainer.analyzeSelectedRecording();
+
+    assert.equal(trainer.playbackModel.value, 'profile-1');
+    assert.equal(trainer.playbackProfileSummary.activeProfileId, 'profile-1');
+    assert.equal(payloads[0].profileId, 'profile-1');
+  });
+}
+
+test('failed reanalysis retains the previous playback analysis object and advice', async (t) => {
+  const previous = {items: [{segmentId: 'segment-1', advice: '保留这条建议'}], profile: profileSummary.profiles[0]};
+  global.window = {api: {analyzePlayback: async () => ({success: false, error: 'analysis unavailable'})}};
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  const record = playbackRecord({playbackAnalysis: previous});
+  installPlaybackRecord(trainer, record);
+  trainer.playbackProfileSummary = profileSummary;
+  trainer.playbackModel.value = 'profile-1';
+  trainer.feedbackContent.textContent = '保留这条建议';
+
+  await trainer.analyzeSelectedRecording();
+
+  assert.equal(trainer.trainingRecords.selected().playbackAnalysis, previous);
+  assert.equal(trainer.feedbackContent.textContent, '保留这条建议');
+  assert.equal(trainer.feedbackStatus.textContent, 'analysis unavailable');
+});
+
+test('a newer reanalysis generation suppresses a late older success', async (t) => {
+  const first = createDeferred();
+  const second = createDeferred();
+  let call = 0;
+  global.window = {api: {analyzePlayback: () => (++call === 1 ? first.promise : second.promise)}};
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+  trainer.playbackProfileSummary = profileSummary;
+  trainer.playbackModel.value = 'profile-1';
+
+  const older = trainer.analyzeSelectedRecording();
+  const newer = trainer.analyzeSelectedRecording();
+  const newestAnalysis = {items: [{segmentId: 'segment-2', advice: 'new'}], profile: profileSummary.profiles[0]};
+  const staleAnalysis = {items: [{segmentId: 'segment-1', advice: 'old'}], profile: profileSummary.profiles[0]};
+  second.resolve({success: true, analysis: newestAnalysis});
+  await newer;
+  first.resolve({success: true, analysis: staleAnalysis});
+  await older;
+
+  assert.equal(trainer.trainingRecords.selected().playbackAnalysis, newestAnalysis);
+});
+
+test('playback completion after live recording starts cannot overwrite live feedback or button state', async (t) => {
+  const pending = createDeferred();
+  const previous = {items: [{segmentId: 'segment-1', advice: 'previous'}], profile: profileSummary.profiles[0]};
+  const audio = createAudioCaptureFactoryFake();
+  global.document = {createElement};
+  global.window = {api: {
+    analyzePlayback: () => pending.promise,
+    cancelLLMRequests: async () => ({success: true}),
+    startASR: async ({sessionId}) => ({ok: true, events: [{type: 'ready', sessionId, sequence: 0}]}),
+    feedAudio: async () => ({ok: true, events: []}),
+    cancelASR: async () => ({ok: true, events: []})
+  }};
+  t.after(() => {
+    clearInterval(trainer.timerInterval);
+    pending.resolve({success: false, error: 'cancelled'});
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer, playbackRecord({playbackAnalysis: previous}));
+  trainer.playbackProfileSummary = profileSummary;
+  trainer.playbackModel.value = 'profile-1';
+  trainer.audioCaptureFactory = audio.factory;
+
+  const request = trainer.analyzeSelectedRecording();
+  await trainer.startRecording();
+  trainer.feedbackStatus.textContent = '实时反馈进行中';
+  trainer.feedbackContent.textContent = '实时建议';
+  trainer.btnReanalyze.disabled = true;
+  pending.resolve({success: true, analysis: {items: [], profile: profileSummary.profiles[1]}});
+  await request;
+
+  assert.equal(trainer.feedbackStatus.textContent, '实时反馈进行中');
+  assert.equal(trainer.feedbackContent.textContent, '实时建议');
+  assert.equal(trainer.btnReanalyze.disabled, true);
+  assert.equal(trainer.trainingRecords.selected().playbackAnalysis, previous);
+});
+
+test('playback analysis renders the exact fallback when a segment has no advice', () => {
+  const trainer = createTrainer();
+  const record = playbackRecord({
+    playbackAnalysis: {items: [], profile: profileSummary.profiles[0]}
+  });
+
+  trainer.renderPlaybackAnalysis(record, 'segment-1');
+
+  assert.equal(trainer.feedbackContent.textContent, '该片段暂无特别建议');
+  record.playbackAnalysis.items = [{segmentId: 'segment-1', advice: ''}];
+  trainer.renderPlaybackAnalysis(record, 'segment-1');
+  assert.equal(trainer.feedbackContent.textContent, '该片段暂无特别建议');
+});
+
+test('deleting the selected record while analysis is pending suppresses the result', async (t) => {
+  const pending = createDeferred();
+  global.document = {createElement};
+  global.window = {api: {
+    analyzePlayback: () => pending.promise,
+    cancelLLMRequests: async () => ({success: true})
+  }};
+  t.after(() => { delete global.document; delete global.window; });
+  const trainer = createTrainer();
+  installPlaybackRecord(trainer);
+  trainer.playbackProfileSummary = profileSummary;
+  trainer.playbackModel.value = 'profile-1';
+
+  const request = trainer.analyzeSelectedRecording();
+  trainer.removeSelectedTrainingRecord();
+  pending.resolve({success: true, analysis: {items: [], profile: profileSummary.profiles[0]}});
+  await request;
+
+  assert.equal(trainer.trainingRecords.selected(), null);
+  assert.equal(trainer.viewingTrainingRecordId, null);
+});
+
+test('deleting an analyzed record releases the reanalyze button for the fallback record', async (t) => {
+  const pending = createDeferred();
+  global.document = {createElement};
+  global.window = {api: {
+    analyzePlayback: () => pending.promise,
+    cancelLLMRequests: async () => ({success: true})
+  }};
+  t.after(() => {
+    pending.resolve({success: false, error: 'cancelled'});
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.trainingRecords = createTrainingRecordStore();
+  trainer.trainingRecords.add(playbackRecord({id: 'fallback', audioUrl: 'blob:fallback'}));
+  trainer.trainingRecords.add(playbackRecord({id: 'pending', audioUrl: 'blob:pending'}));
+  trainer.viewingTrainingRecordId = 'pending';
+  trainer.playbackProfileSummary = profileSummary;
+  trainer.playbackModel.value = 'profile-1';
+
+  void trainer.analyzeSelectedRecording();
+  trainer.removeSelectedTrainingRecord();
+
+  assert.equal(trainer.viewingTrainingRecordId, 'fallback');
+  assert.equal(trainer.btnReanalyze.disabled, false);
+});
+
+function retainedRecord(number) {
+  return {
+    id: `retained-${number}`,
+    createdAt: `2026-09-01T0${number}:00:00.000Z`,
+    durationMs: number * 1000,
+    audioUrl: `blob:retained-${number}`,
+    segments: [{
+      id: 'segment-1', text: `记录${number}`, startMs: 0, endMs: number * 1000, localAnalysis: null
+    }],
+    stats: { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 3, duration: number },
+    fullText: `记录${number}`,
+    playbackAnalysis: null
+  };
+}
+
+function preloadFiveRetainedRecords(trainer, revoked) {
+  trainer.trainingRecords = createTrainingRecordStore({ revokeObjectURL: url => revoked.push(url) });
+  for (let number = 1; number <= 5; number += 1) {
+    trainer.trainingRecords.add(retainedRecord(number));
+  }
+  return trainer.trainingRecords.list().map(record => ({ id: record.id, audioUrl: record.audioUrl }));
+}
+
+for (const failure of [
+  {
+    name: 'rejection',
+    stopASR: async () => { throw new Error('tail transport unavailable'); },
+    expectedError: '语音识别停止失败: tail transport unavailable'
+  },
+  {
+    name: 'unsuccessful envelope',
+    stopASR: async () => ({
+      ok: false,
+      error: { code: 'asr-stop-failed', message: 'sanitized tail failure' }
+    }),
+    expectedError: '语音识别停止失败: sanitized tail failure'
+  }
+]) {
+  test(`ASR stop ${failure.name} discards the active buffer without evicting retained records`, async (t) => {
+    const revoked = [];
+    const created = [];
+    const shownErrors = [];
+    const harness = await startAudioCaptureHarness(t, { stopASR: failure.stopASR });
+    harness.trainer.showError = message => shownErrors.push(message);
+    window.URL = {
+      createObjectURL(blob) {
+        created.push(blob);
+        return 'blob:must-not-exist';
+      },
+      revokeObjectURL: url => revoked.push(url)
+    };
+    const before = preloadFiveRetainedRecords(harness.trainer, revoked);
+
+    await harness.trainer.stopRecording();
+
+    assert.deepEqual(
+      harness.trainer.trainingRecords.list().map(record => ({ id: record.id, audioUrl: record.audioUrl })),
+      before
+    );
+    assert.deepEqual(created, []);
+    assert.deepEqual(revoked, []);
+    assert.equal(harness.trainer.viewingTrainingRecordId, 'retained-5');
+    assert.equal(harness.trainer.recordingPcm, null);
+    assert.ok(shownErrors.includes(failure.expectedError));
+    assert.notEqual(harness.trainer.trainingStatus.textContent, '本次训练已结束');
+  });
+}
+
+test('accepted stop envelope with error and stopped events discards the active recording', async (t) => {
+  const revoked = [];
+  const created = [];
+  const shownErrors = [];
+  const harness = await startAudioCaptureHarness(t, {
+    stopASR: async command => ({
+      ok: true,
+      events: [
+        {type: 'error', sessionId: command.sessionId, sequence: 1, code: 'tail-failed', message: '尾部识别失败'},
+        {type: 'stopped', sessionId: command.sessionId, sequence: 2}
+      ]
+    })
+  });
+  harness.trainer.showError = message => shownErrors.push(message);
+  window.URL = {
+    createObjectURL(blob) {
+      created.push(blob);
+      return 'blob:must-not-exist';
+    },
+    revokeObjectURL: url => revoked.push(url)
+  };
+  const before = preloadFiveRetainedRecords(harness.trainer, revoked);
+
+  await harness.trainer.stopRecording();
+
+  assert.deepEqual(
+    harness.trainer.trainingRecords.list().map(record => ({id: record.id, audioUrl: record.audioUrl})),
+    before
+  );
+  assert.deepEqual(created, []);
+  assert.deepEqual(revoked, []);
+  assert.equal(harness.trainer.recordingPcm, null);
+  assert.ok(shownErrors.includes('语音识别错误: 尾部识别失败'));
+  assert.notEqual(harness.trainer.trainingStatus.textContent, '本次训练已结束');
+});
+
+test('missing recording policy capability fails closed before ASR or microphone startup', async (t) => {
+  const order = [];
+  const audio = createAudioCaptureFactoryFake({
+    start: async () => { order.push('microphone'); }
+  });
+  global.document = { createElement };
+  global.window = {
+    api: {
+      cancelLLMRequests: async () => ({ success: true }),
+      startASR: async ({ sessionId }) => {
+        order.push('asr');
+        return { ok: true, events: [{ type: 'ready', sessionId, sequence: 0 }] };
+      }
+    }
+  };
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.fullText = '';
+  trainer.recordingPolicyAcknowledged = false;
+  trainer.audioCaptureFactory = audio.factory;
+  t.after(() => {
+    clearInterval(trainer.timerInterval);
+    delete global.document;
+    delete global.window;
+  });
+
+  await trainer.startRecording();
+
+  assert.deepEqual(order, []);
+  assert.equal(trainer.isRecording, false);
+});
+
+test('recording policy persistence failure fails closed before ASR or microphone startup', async (t) => {
+  const order = [];
+  const audio = createAudioCaptureFactoryFake({
+    start: async () => { order.push('microphone'); }
+  });
+  global.document = { createElement };
+  global.window = {
+    api: {
+      getRecordingPolicy: async () => ({ acknowledged: false }),
+      acknowledgeRecordingPolicy: async () => ({
+        success: false,
+        acknowledged: false,
+        error: 'policy save unavailable'
+      }),
+      cancelLLMRequests: async () => ({ success: true }),
+      startASR: async ({ sessionId }) => {
+        order.push('asr');
+        return { ok: true, events: [{ type: 'ready', sessionId, sequence: 0 }] };
+      }
+    }
+  };
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.fullText = '';
+  trainer.recordingPolicyAcknowledged = false;
+  trainer.audioCaptureFactory = audio.factory;
+  trainer.waitForRecordingPolicyDecision = async () => true;
+  t.after(() => {
+    clearInterval(trainer.timerInterval);
+    delete global.document;
+    delete global.window;
+  });
+
+  await trainer.startRecording();
+
+  assert.deepEqual(order, []);
+  assert.equal(trainer.isRecording, false);
+  assert.equal(trainer.userMessageText.textContent, '无法开始录制：policy save unavailable');
+});
+
+test('limit overrun failure invalidates ownership before deferred normal stop can run', async (t) => {
+  const firstFeed = createDeferred();
+  const shownErrors = [];
+  const cancelCommands = [];
+  global.window = {
+    api: {
+      feedAudio: () => firstFeed.promise,
+      cancelASR(command) {
+        cancelCommands.push(command);
+        return Promise.resolve({ ok: true, events: [] });
+      }
+    }
+  };
+  t.after(() => {
+    firstFeed.resolve({ ok: true, events: [] });
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.fullText = '';
+  trainer.sentences = [];
+  trainer.showError = message => shownErrors.push(message);
+  activateAsrSession(trainer);
+  trainer.recordingSessionId = 'session-a';
+  trainer.recordingPcm = createPcmWavRecorder({ sampleRateHz: 16000, maxFrames: 4 });
+  trainer.recordingPcm.append(new Float32Array([0.1, 0.2]));
+  trainer.audioFeedTracker = trainer.createAudioFeedTracker('session-a');
+  for (let sequence = 0; sequence < 10; sequence += 1) {
+    trainer.audioFeedTracker.queue.enqueue({
+      sequence,
+      samples: new Float32Array([0.1]),
+      audioEndMs: sequence + 1
+    });
+  }
+  let normalStopCalls = 0;
+  trainer.stopRecording = () => {
+    normalStopCalls += 1;
+    trainer.trainingStatus.textContent = '本次训练已结束';
+    return Promise.resolve();
+  };
+
+  await trainer.handleCapturedChunk({
+    ...audioChunk('session-a', new Float32Array([0.3, 0.4, 0.5])),
+    sequence: 10
+  });
+  await flushMicrotasks();
+  await flushMicrotasks();
+  await flushTimers();
+
+  assert.equal(normalStopCalls, 0);
+  assert.deepEqual(cancelCommands, [{ sessionId: 'session-a' }]);
+  assert.deepEqual(shownErrors, ['语音识别处理失败，录音已停止，请重新开始']);
+  assert.equal(trainer.asrEventState.activeSessionId, null);
+  assert.equal(trainer.recordingPcm, null);
+  assert.notEqual(trainer.trainingStatus.textContent, '本次训练已结束');
+});
+
+test('stopRecording is an inert no-op without an active owned session', async (t) => {
+  global.document = { createElement };
+  global.window = { api: { cancelLLMRequests: async () => ({ success: true }) } };
+  t.after(() => {
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.trainingStatus.textContent = '准备就绪';
+
+  const result = await trainer.stopRecording();
+
+  assert.equal(result, false);
+  assert.equal(trainer.recordingStopOperation, null);
+  assert.equal(trainer.trainingStatus.textContent, '准备就绪');
+});
+
+test('stopRecording is inert while ASR is active but the recording buffer is not owned yet', async (t) => {
+  let stopCalls = 0;
+  global.document = { createElement };
+  global.window = {
+    api: {
+      stopASR: async () => { stopCalls += 1; return stopEnvelope('session-a', ''); },
+      cancelLLMRequests: async () => ({ success: true })
+    }
+  };
+  t.after(() => {
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  activateAsrSession(trainer);
+  trainer.recordingSessionId = null;
+  trainer.recordingPcm = null;
+  trainer.trainingStatus.textContent = '正在准备语音识别，首次运行可能需要数分钟';
+
+  const result = await trainer.stopRecording();
+
+  assert.equal(result, false);
+  assert.equal(stopCalls, 0);
+  assert.equal(trainer.recordingStopOperation, null);
+  assert.equal(trainer.trainingStatus.textContent, '正在准备语音识别，首次运行可能需要数分钟');
+});
+
+test('limit chunk feed rejection wins before its deferred normal stop', async (t) => {
+  const cancelCommands = [];
+  const stopCommands = [];
+  const shownErrors = [];
+  global.window = {
+    api: {
+      feedAudio: async () => { throw new Error('same-chunk feed rejected'); },
+      cancelASR(command) {
+        cancelCommands.push(command);
+        return Promise.resolve({ ok: true, events: [] });
+      },
+      stopASR(command) {
+        stopCommands.push(command);
+        return Promise.resolve(stopEnvelope(command.sessionId, 'must not finalize'));
+      }
+    }
+  };
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  trainer.fullText = '';
+  trainer.sentences = [];
+  trainer.showError = message => shownErrors.push(message);
+  activateAsrSession(trainer);
+  trainer.recordingSessionId = 'session-a';
+  trainer.recordingPcm = createPcmWavRecorder({ sampleRateHz: 16000, maxFrames: 4 });
+  trainer.recordingPcm.append(new Float32Array([0.1, 0.2]));
+  trainer.audioFeedTracker = trainer.createAudioFeedTracker('session-a');
+  const originalStopRecording = trainer.stopRecording.bind(trainer);
+  let normalStopCalls = 0;
+  trainer.stopRecording = () => {
+    normalStopCalls += 1;
+    return originalStopRecording();
+  };
+
+  await trainer.handleCapturedChunk({
+    ...audioChunk('session-a', new Float32Array([0.3, 0.4, 0.5])),
+    sequence: 0
+  });
+  await flushMicrotasks();
+  await flushMicrotasks();
+  await flushTimers();
+
+  assert.equal(normalStopCalls, 0);
+  assert.deepEqual(cancelCommands, [{ sessionId: 'session-a' }]);
+  assert.deepEqual(stopCommands, []);
+  assert.deepEqual(shownErrors, ['语音识别处理失败，录音已停止，请重新开始']);
+  assert.equal(trainer.recordingPcm, null);
+  assert.equal(trainer.trainingRecords, null);
+  assert.notEqual(trainer.trainingStatus.textContent, '本次训练已结束');
 });

@@ -104,7 +104,7 @@ body {
   -webkit-app-region: drag;
 }
 
-button, input, select, .subtitle-scroll, .feedback-content, .modal-body {
+button, input, select, audio, .subtitle-scroll, .feedback-content, .modal-body {
   -webkit-app-region: no-drag;
 }
 
@@ -249,6 +249,24 @@ button, input, select, .subtitle-scroll, .feedback-content, .modal-body {
 .subtitle-topbar-right {
   display: flex;
   gap: 4px;
+}
+
+.subtitle-topbar-left,
+.training-record-picker {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+#training-record-select {
+  max-width: 180px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 8px;
 }
 
 .btn-paste-top {
@@ -462,11 +480,39 @@ textarea:focus-visible {
 .subtitle-line.old { color: var(--color-text-subtle); font-size: clamp(21px, 1.65vw, 30px); }
 .subtitle-line.hint { color: var(--color-text-subtle); font-size: clamp(19px, 1.45vw, 26px); }
 .subtitle-line.interim-line { color: var(--color-text-muted); }
+.subtitle-line.playback-current {
+  background: color-mix(in srgb, var(--color-accent) 14%, transparent);
+  border-radius: 8px;
+  outline: 1px solid color-mix(in srgb, var(--color-accent) 48%, transparent);
+  padding-inline: 10px;
+}
 
 /* 高亮 */
 .subtitle-line .filler { color: var(--color-filler); text-decoration: underline wavy; }
 .subtitle-line .hedge { color: var(--color-hedge); }
 .subtitle-line .vague { color: var(--color-vague); border-bottom: 2px dashed var(--color-vague); }
+
+.playback-controls {
+  align-items: center;
+  display: grid;
+  flex-shrink: 0;
+  gap: 8px;
+  grid-template-columns: minmax(180px, 1fr) auto minmax(120px, 180px) auto;
+  margin: 10px clamp(10px, 1.4vw, 24px) 0;
+}
+.playback-controls audio { height: 34px; min-width: 0; width: 100%; }
+.playback-controls label { color: var(--color-text-muted); font-size: 12px; }
+.playback-controls select,
+.playback-controls button {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 12px;
+  padding: 6px 9px;
+}
+.playback-controls button { cursor: pointer; }
 
 /* 底部按钮栏 */
 .action-bar {
@@ -577,6 +623,22 @@ textarea:focus-visible {
 .modal-body table { width: 100%; border-collapse: collapse; margin: 8px 0; }
 .modal-body th, .modal-body td { border: 1px solid var(--color-border); padding: 6px 10px; text-align: left; font-size: 13px; }
 .modal-body th { background: var(--color-surface); color: var(--color-accent); }
+
+.recording-policy-modal-content {
+  width: min(620px, 92vw);
+  height: auto;
+  max-height: 88vh;
+}
+
+.recording-policy-body > p { color: var(--color-text-muted); }
+.recording-policy-list { margin: 12px 0 0 20px; }
+.recording-policy-list li + li { margin-top: 6px; }
+.recording-policy-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
 
 /* ===== 帮助与反馈 ===== */
 .help-modal-content { width: min(760px, 92vw); height: min(760px, 88vh); }

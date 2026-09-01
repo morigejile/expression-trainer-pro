@@ -6,6 +6,7 @@ const {
   runCoordinatedRequest,
   sendFeedback,
   sendReport,
+  sendPlaybackAnalysis,
   testConnection
 } = require('../lib/ai-feedback');
 
@@ -498,4 +499,55 @@ test('report failures do not mutate local analysis input', async () => {
   );
 
   assert.deepEqual(stats, snapshot);
+});
+
+test('playback analysis uses the structured prompt, lower temperature, and strict response parser', async () => {
+  let request;
+  const segments = [{id: 's1', text: '我觉得这个方案很好。', startMs: 0, endMs: 1200}];
+
+  const result = await sendPlaybackAnalysis(segments, OPENAI_SETTINGS, null, {
+    fetchImpl: async (url, options) => {
+      request = JSON.parse(options.body);
+      return jsonResponse({
+        choices: [{message: {content: '{"items":[{"segmentId":"s1","advice":"先给结论，再补充原因。"}]}'}}]
+      });
+    }
+  });
+
+  assert.deepEqual(result, [{segmentId: 's1', advice: '先给结论，再补充原因。'}]);
+  assert.equal(request.max_tokens, 4096);
+  assert.equal(request.temperature, 0.2);
+  assert.match(request.system ? request.system : request.messages[0].content, /segmentId/);
+});
+
+test('playback analysis rejects a model response that does not reference an input segment', async () => {
+  await assert.rejects(
+    sendPlaybackAnalysis([{id: 's1', text: '文本', startMs: 0, endMs: 1000}], OPENAI_SETTINGS, null, {
+      fetchImpl: async () => jsonResponse({
+        choices: [{message: {content: '{"items":[{"segmentId":"other","advice":"建议"}]}'}}]
+      })
+    }),
+    error => error.code === 'invalid-response'
+  );
+});
+
+test('coordinated playback analysis returns a safe invalid-response result', async () => {
+  const result = await runCoordinatedRequest(
+    createRequestCoordinator(),
+    7,
+    'playback',
+    'analysis',
+    signal => sendPlaybackAnalysis([{id: 's1', text: '文本', startMs: 0, endMs: 1000}], OPENAI_SETTINGS, null, {
+      signal,
+      fetchImpl: async () => jsonResponse({
+        choices: [{message: {content: '{"items":[{"segmentId":"missing","advice":"建议"}]}'}}]
+      })
+    })
+  );
+
+  assert.deepEqual(result, {
+    success: false,
+    error: '大模型响应结构无效',
+    errorCode: 'invalid-response'
+  });
 });

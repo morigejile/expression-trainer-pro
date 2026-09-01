@@ -4,6 +4,8 @@ contextBridge.exposeInMainWorld('api', {
   // LLM Provider 设置
   getLlmProviderSettings: () => ipcRenderer.invoke('get-llm-provider-settings'),
   saveLlmProviderSettings: (settings) => ipcRenderer.invoke('save-llm-provider-settings', settings),
+  getLlmProfileSummaries: () => ipcRenderer.invoke('get-llm-profile-summaries'),
+  selectLlmProfile: profileId => ipcRenderer.invoke('select-llm-profile', profileId),
   openSettings: () => ipcRenderer.invoke('open-settings'),
   onLlmProviderSettingsChanged: (listener) => {
     const wrapped = () => listener();
@@ -14,6 +16,8 @@ contextBridge.exposeInMainWorld('api', {
   // 外观设置
   getAppearance: () => ipcRenderer.invoke('get-appearance'),
   saveAppearance: (appearance) => ipcRenderer.invoke('save-appearance', appearance),
+  getRecordingPolicy: () => ipcRenderer.invoke('get-recording-policy'),
+  acknowledgeRecordingPolicy: () => ipcRenderer.invoke('acknowledge-recording-policy'),
   onAppearanceChanged: (listener) => {
     const wrapped = (_event, appearance) => listener(appearance);
     ipcRenderer.on('appearance-changed', wrapped);
@@ -52,6 +56,7 @@ contextBridge.exposeInMainWorld('api', {
   // AI反馈
   getRealtimeFeedback: (text) => ipcRenderer.invoke('get-realtime-feedback', text),
   getFinalReport: (data) => ipcRenderer.invoke('get-final-report', data),
+  analyzePlayback: (payload) => ipcRenderer.invoke('analyze-playback', payload),
   testLLMConnection: (settings) => ipcRenderer.invoke('test-llm-connection', settings),
   cancelLLMRequests: () => ipcRenderer.invoke('cancel-llm-requests'),
 

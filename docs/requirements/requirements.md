@@ -57,6 +57,11 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | FR-E12 | 默认中文模型选择应由项目数据 benchmark 和明确产品取舍支持。 | 比较结果可复跑；Accepted ADR 记录技术默认、交互约束和产品化顺序。 |
 | FR-E13 | 用户应能在应用内查看帮助并记录内部测试反馈。 | 主页面“帮助”弹窗提供快速使用说明和统一的“问题和建议”在线文档入口；诊断信息沿用脱敏 JSON 导出并由用户按需补充到在线文档。 |
 | FR-E14 | 用户配置或操作无法完成时应获得可恢复的具体提示。 | 设置页显示校验或连接失败原因；实时反馈和报告的配置错误可直接打开设置；空粘贴、重复请求和内容覆盖有明确保护。 |
+| FR-E15 | 应用应只在本次运行期间保留最近五条已完成录音。 | 第六条完成时按先进先出顺序释放最老记录及其 Blob URL；清除当前记录和应用退出均释放对应资源；录音、时间轴和回放分析不跨重启恢复。 |
+| FR-E16 | 第一次使用录音前应明确告知保留和云端分析边界。 | 在申请麦克风权限前阻塞显示运行期保留、五条淘汰、退出释放及云端不接收音频；仅在用户确认后继续，并只持久化不含用户内容的确认布尔值；帮助页长期显示同一说明。 |
+| FR-E17 | 录音与回放分析应遵守明确资源上限。 | 单条录音最多接受 19,200,000 个 16 kHz mono 样本（20 分钟）并正常结束；稳态最多五条 WAV；只渲染当前记录；同一 Renderer 最多一个回放分析请求，输入、输出和片段数均有上限。 |
+| FR-E18 | 用户应能回放已完成录音并按播放进度查看已生成的片段分析。 | 原生播放器、拖动和受保护的空格快捷键共用片段时间轴；只在片段 ID 改变时更新高亮和建议；播放期间不重新推理，暂停保留当前结果。 |
+| FR-E19 | 用户应能通过脱敏摘要选择 LLM profile 并主动重新分析。 | 主训练窗口只接收 profile ID、名称、provider、model 和 active 状态，不接收 Key 或完整 endpoint；下拉框只显示 model；切换不自动分析；重新分析只发送逐字稿、片段 ID 和起止时间，成功后替换旧结果，失败或迟到结果不覆盖旧结果。 |
 | FR-P01 | 音频采集与 ASR 推理应保持独立职责。 | 采集层持有音频资源和 chunk 元数据；Renderer 编排训练；Provider 隔离引擎配置。 |
 | FR-P02 | 音频链路应统一为 16 kHz mono Float32，并使用 AudioWorklet。 | 常见输入采样率可确定性适配；固定大小分块且正常停止保留非空尾块；请求值、实际值和设备值可诊断。 |
 | FR-P03 | ASR Provider 应提供 session 和规范事件语义。 | 旧 session、重复或倒序事件不污染当前训练；停止、取消和释放可重复处理。 |
@@ -85,7 +90,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | NFR-04 | Partial | 音频正确性 | 常见采样率 fixture 可确定性适配到 16 kHz；真实麦克风和驱动仍需设备证据。 |
 | NFR-05 | Partial | 性能 | 首个硬件资格线为 4-core CPU、8 GB RAM、3 GB 可用磁盘；接近资格线设备的启动、识别、内存和 UI 响应仍待验证。 |
 | NFR-06 | Partial | 可靠性 | ASR session、10-block overrun 和执行单元退出重建已有受控路径；Model Manager 已覆盖下载大小/hash、严格 Range 有限续传、解压/运行文件校验、原子激活与回退，并通过真实约 1 GB 下载闭环；固定 schema 诊断导出已实现，真实设备性能预算仍待确认。 |
-| NFR-07 | Partial | 隐私与安全 | 本地 ASR 音频不上传；LLM 错误与当前应用日志不记录 Key、Authorization、完整响应或 transcript，安全错误格式有测试；API Key 明文和公开用户告知仍待发布前确认。 |
+| NFR-07 | Partial | 隐私与安全 | 本地 ASR 音频不上传；回放分析 IPC 和云端 LLM 只接收逐字稿、片段 ID 与起止时间，不接收 PCM、WAV、Blob URL 或路径；LLM 错误与当前应用日志不记录 Key、Authorization、完整响应或 transcript，安全错误格式有测试；API Key 明文仍待公开发布前确认。 |
 | NFR-08 | Existing | 权限隔离 | Renderer 不获得不受限的 Node.js 权限；当前 BrowserWindow 使用 `contextIsolation: true`、`nodeIntegration: false`，Preload 只暴露显式能力。ASR command 使用精确 schema；文本分析、实时反馈、最终报告统计和 Markdown 保存使用轻量类型、大小与文件名边界。后续新增 IPC 时继续维持该边界。 |
 | NFR-09 | Partial | 可测试性 | 确定性规则、配置迁移、ASR 生命周期、音频分块、进程退出和模型安装具有自动化测试；真实麦克风保留环境验证。 |
 | NFR-10 | Partial | 可移植性 | 首个 Tier 1 目标选定 Windows 11 25H2+ x64；Windows ARM64、macOS、Linux 保持 Experimental，只有对应 package/smoke/native-model 证据才能升级支持等级。 |

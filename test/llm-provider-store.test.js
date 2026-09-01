@@ -28,7 +28,7 @@ function providerSettings(provider, apiKey) {
   };
 }
 
-test('canonical LLM provider file wins when the legacy file also exists', async () => {
+test('canonical LLM provider file wins and migrates atomically to schema v2', async () => {
   const { loadLlmProviderSettings } = require('../lib/llm-provider-store');
   await withUserData((userDataPath) => {
     writeJson(path.join(userDataPath, 'settings.json'), providerSettings('openai', 'legacy-key'));
@@ -36,8 +36,10 @@ test('canonical LLM provider file wins when the legacy file also exists', async 
 
     const settings = loadLlmProviderSettings(userDataPath);
 
-    assert.equal(settings.provider, 'deepseek');
-    assert.equal(settings.providers.deepseek.apiKey, 'canonical-key');
+    assert.equal(settings.schemaVersion, 2);
+    assert.equal(settings.activeProfileId, 'profile-deepseek');
+    assert.equal(settings.profiles.find(profile => profile.id === 'profile-deepseek').apiKey, 'canonical-key');
+    assert.deepEqual(JSON.parse(fs.readFileSync(path.join(userDataPath, 'llm-provider-settings.json'), 'utf8')), settings);
   });
 });
 
@@ -51,8 +53,8 @@ test('valid legacy LLM provider settings migrate atomically without deleting the
 
     const settings = loadLlmProviderSettings(userDataPath);
 
-    assert.equal(settings.provider, 'openai');
-    assert.equal(settings.providers.openai.apiKey, 'legacy-key');
+    assert.equal(settings.activeProfileId, 'profile-openai');
+    assert.equal(settings.profiles.find(profile => profile.id === 'profile-openai').apiKey, 'legacy-key');
     assert.equal(fs.readFileSync(legacyPath, 'utf8'), legacyText);
     assert.deepEqual(JSON.parse(fs.readFileSync(canonicalPath, 'utf8')), settings);
   });
@@ -66,7 +68,7 @@ test('invalid legacy JSON uses defaults without creating the canonical file', as
 
     const settings = loadLlmProviderSettings(userDataPath, { logger: { warn: (message) => warnings.push(message) } });
 
-    assert.equal(settings.provider, 'deepseek');
+    assert.equal(settings.activeProfileId, 'profile-deepseek');
     assert.equal(fs.existsSync(path.join(userDataPath, 'llm-provider-settings.json')), false);
     assert.equal(warnings.length, 1);
   });
@@ -83,7 +85,7 @@ test('future-schema legacy settings are readable but are not migrated into a dow
 
     const settings = loadLlmProviderSettings(userDataPath);
 
-    assert.equal(settings.providers.deepseek.apiKey, 'future-key');
+    assert.equal(settings.profiles.find(profile => profile.id === 'profile-deepseek').apiKey, 'future-key');
     assert.equal(fs.existsSync(path.join(userDataPath, 'llm-provider-settings.json')), false);
   });
 });

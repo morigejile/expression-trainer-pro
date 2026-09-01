@@ -168,6 +168,23 @@
       margin-top: 24px;
     }
 
+    .profile-toolbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .profile-toolbar select,
+    .profile-toolbar input {
+      width: auto;
+    }
+
+    .profile-toolbar .settings-actions {
+      margin-top: 0;
+      gap: 6px;
+    }
+
     .settings-actions .btn-save {
       margin-top: 0;
     }
@@ -284,6 +301,19 @@
 
     <section class="settings-section" aria-labelledby="ai-heading">
       <h2 id="ai-heading">AI 服务</h2>
+
+    <div class="form-group">
+      <label for="llm-profile">配置</label>
+      <div class="profile-toolbar">
+        <select id="llm-profile"></select>
+        <input id="llm-profile-name" maxlength="64" aria-label="配置名称">
+        <div class="settings-actions">
+          <button id="btn-profile-new" type="button">新建</button>
+          <button id="btn-profile-duplicate" type="button">复制</button>
+          <button id="btn-profile-delete" type="button">删除</button>
+        </div>
+      </div>
+    </div>
 
     <div class="form-group">
       <label>AI 后端</label>
