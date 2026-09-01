@@ -74,9 +74,14 @@
 
       <!-- 字幕区顶部工具栏 -->
       <div class="subtitle-topbar">
-        <button id="btn-paste" class="btn-sm btn-paste-top">
-          <svg class="icon" aria-hidden="true"><use href="#icon-clipboard"/></svg>粘贴逐字稿
-        </button>
+        <div class="subtitle-topbar-left">
+          <button id="btn-paste" class="btn-sm btn-paste-top">
+            <svg class="icon" aria-hidden="true"><use href="#icon-clipboard"/></svg>粘贴逐字稿
+          </button>
+          <label class="training-record-picker">
+            <select id="training-record-select" class="hidden" aria-label="训练记录"></select>
+          </label>
+        </div>
         <div class="subtitle-topbar-right">
           <button id="btn-copy-text" class="btn-sm hidden" title="复制原文"><svg class="icon" aria-hidden="true"><use href="#icon-clipboard"/></svg>复制</button>
           <button id="btn-save-text" class="btn-sm hidden" title="保存原文"><svg class="icon" aria-hidden="true"><use href="#icon-save"/></svg>保存</button>
@@ -126,6 +131,29 @@
         <!-- 实时反馈内容 -->
       </div>
     </aside>
+  </div>
+
+  <!-- 首次录音保留策略 -->
+  <div id="recording-policy-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="recording-policy-modal-title">
+    <div class="modal-content recording-policy-modal-content">
+      <div class="modal-header">
+        <h2 id="recording-policy-modal-title">录音保留与分析说明</h2>
+      </div>
+      <div class="modal-body recording-policy-body">
+        <p>开始录音前，请了解以下说明：</p>
+        <ul class="recording-policy-list">
+          <li>录音只保存在本次应用运行期间；</li>
+          <li>最多保留五条记录，第六条完成时自动释放最老记录；</li>
+          <li>关闭应用后释放全部录音资源；</li>
+          <li>录音用于本地回放、字幕同步和用户主动选择的大模型分析；</li>
+          <li>云端大模型只接收逐字稿、片段标识和片段时间信息，不接收原始录音。</li>
+        </ul>
+        <div class="recording-policy-actions">
+          <button id="btn-recording-policy-cancel" class="btn-support btn-support-secondary">暂不录音</button>
+          <button id="btn-recording-policy-confirm" class="btn-support">我已了解并继续</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- 粘贴逐字稿弹窗 -->
@@ -182,6 +210,17 @@
             <span><b class="help-green">绿色</b>：有力表达</span>
           </div>
           <p class="help-note">“训练规则”可编辑训练目标与自定义规则；“设置”可配置 AI 服务。本应用当前处于内部开发测试阶段。</p>
+        </section>
+
+        <section class="help-section">
+          <h2>录音保留与分析说明</h2>
+          <ul class="recording-policy-list">
+            <li>录音只保存在本次应用运行期间；</li>
+            <li>最多保留五条记录，第六条完成时自动释放最老记录；</li>
+            <li>关闭应用后释放全部录音资源；</li>
+            <li>录音用于本地回放、字幕同步和用户主动选择的大模型分析；</li>
+            <li>云端大模型只接收逐字稿、片段标识和片段时间信息，不接收原始录音。</li>
+          </ul>
         </section>
 
         <section class="help-section">

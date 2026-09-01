@@ -35,6 +35,14 @@ const AudioFeedQueue = typeof module !== 'undefined' && module.exports
   ? require('./audio-feed-queue')
   : window.AudioFeedQueue;
 const { createAudioFeedQueue } = AudioFeedQueue;
+const PcmWav = typeof module !== 'undefined' && module.exports
+  ? require('./pcm-wav')
+  : window.PcmWav;
+const { createPcmWavRecorder } = PcmWav;
+const TrainingRecords = typeof module !== 'undefined' && module.exports
+  ? require('./training-records')
+  : window.TrainingRecords;
+const { createTrainingRecordStore, formatRecordLabel } = TrainingRecords;
 const SupportLinks = typeof module !== 'undefined' && module.exports
   ? require('../shared/support-links')
   : window.SupportLinks;
@@ -78,6 +86,15 @@ class ExpressionTrainer {
     this.asrEventState = createAsrEventState();
     this.asrStartAttempt = null;
     this.asrGeneration = 0;
+    this.recordingPolicyAcknowledged = false;
+    this.recordingPolicyDecision = null;
+    this.recordingPcm = null;
+    this.recordingSessionId = null;
+    this.recordingCreatedAt = null;
+    this.pendingSegments = [];
+    this.limitStopPromise = null;
+    this.trainingRecords = null;
+    this.viewingTrainingRecordId = null;
 
     this.initElements();
     this.bindEvents();
@@ -121,6 +138,10 @@ class ExpressionTrainer {
     this.btnHelpDiagnostics = document.getElementById('btn-help-diagnostics');
     this.btnOpenFeedbackDocument = document.getElementById('btn-open-feedback-document');
     this.feedbackLinkError = document.getElementById('feedback-link-error');
+    this.recordingPolicyModal = document.getElementById('recording-policy-modal');
+    this.btnRecordingPolicyConfirm = document.getElementById('btn-recording-policy-confirm');
+    this.btnRecordingPolicyCancel = document.getElementById('btn-recording-policy-cancel');
+    this.trainingRecordSelect = document.getElementById('training-record-select');
     this.statFillers = document.getElementById('stat-fillers');
     this.statHedges = document.getElementById('stat-hedges');
     this.statVague = document.getElementById('stat-vague');
@@ -157,6 +178,10 @@ class ExpressionTrainer {
     this.btnCopyText.addEventListener('click', () => this.copyOriginalText());
     this.btnSaveText.addEventListener('click', () => this.saveOriginalText());
     this.btnClear.addEventListener('click', () => this.clearAll());
+    this.btnRecordingPolicyConfirm.addEventListener('click', () => this.resolveRecordingPolicyDecision(true));
+    this.btnRecordingPolicyCancel.addEventListener('click', () => this.resolveRecordingPolicyDecision(false));
+    this.trainingRecordSelect.addEventListener('change', event => this.selectTrainingRecord(event.target.value));
+    window.addEventListener?.('beforeunload', () => this.disposeTrainingRecords());
     document.addEventListener('keydown', event => this.handleModalKeydown(event));
   }
 
@@ -191,6 +216,41 @@ class ExpressionTrainer {
 
   // ===== 录制控制 =====
 
+  async ensureRecordingPolicyAcknowledged() {
+    if (this.recordingPolicyAcknowledged) return true;
+    if (typeof window.api.getRecordingPolicy !== 'function') return true;
+    const policy = await window.api.getRecordingPolicy();
+    if (policy?.acknowledged) {
+      this.recordingPolicyAcknowledged = true;
+      return true;
+    }
+    const accepted = await this.waitForRecordingPolicyDecision();
+    if (!accepted) return false;
+    const result = await window.api.acknowledgeRecordingPolicy();
+    if (!result?.success || result.acknowledged !== true) {
+      throw new Error(result?.error || '无法保存录音保留策略确认');
+    }
+    this.recordingPolicyAcknowledged = true;
+    return true;
+  }
+
+  waitForRecordingPolicyDecision() {
+    if (this.recordingPolicyDecision) return this.recordingPolicyDecision.promise;
+    let resolveDecision;
+    const promise = new Promise(resolve => { resolveDecision = resolve; });
+    this.recordingPolicyDecision = { promise, resolve: resolveDecision };
+    this.openModal(this.recordingPolicyModal, this.btnRecordingPolicyConfirm);
+    return promise;
+  }
+
+  resolveRecordingPolicyDecision(accepted) {
+    const decision = this.recordingPolicyDecision;
+    if (!decision) return;
+    this.recordingPolicyDecision = null;
+    this.closeModal(this.recordingPolicyModal);
+    decision.resolve(Boolean(accepted));
+  }
+
   async startRecording() {
     if (this.asrStartAttempt) {
       this.showUserMessage('录制正在启动，请稍候');
@@ -200,16 +260,35 @@ class ExpressionTrainer {
       this.showUserMessage('逐字稿正在分析，请稍候');
       return;
     }
-    if (!this.isRecording
-        && this.fullText.trim()
-        && !window.confirm('开始新录制将替换当前内容，是否继续？')) {
-      return;
-    }
     this.trainingStatus.textContent = '正在准备语音识别，首次运行可能需要数分钟';
     this.btnStart.disabled = true;
     this.btnPaste.disabled = true;
     const startAttempt = {};
     this.asrStartAttempt = startAttempt;
+    let policyAccepted;
+    try {
+      policyAccepted = await this.ensureRecordingPolicyAcknowledged();
+    } catch (error) {
+      if (this.asrStartAttempt === startAttempt) {
+        this.asrStartAttempt = null;
+        this.showUserMessage(`无法开始录制：${error.message}`);
+        this.finishTrainingPreparation();
+      }
+      return;
+    }
+    if (!policyAccepted || this.asrStartAttempt !== startAttempt) {
+      if (this.asrStartAttempt === startAttempt) this.asrStartAttempt = null;
+      this.finishTrainingPreparation();
+      return;
+    }
+    if (!this.isRecording
+        && !this.viewingTrainingRecordId
+        && this.fullText.trim()
+        && !window.confirm('开始新录制将替换当前内容，是否继续？')) {
+      this.asrStartAttempt = null;
+      this.finishTrainingPreparation();
+      return;
+    }
     this.asrGeneration = (this.asrGeneration ?? 0) + 1;
     const replacedSessionId = this.asrEventState.activeSessionId;
     if (replacedSessionId) {
@@ -272,6 +351,7 @@ class ExpressionTrainer {
 
     const tracker = this.createAudioFeedTracker(sessionId);
     this.audioFeedTracker = tracker;
+    this.beginRecordingBuffer(sessionId);
     const audioCapture = this.audioCaptureFactory();
     this.audioCapture = audioCapture;
     try {
@@ -294,6 +374,7 @@ class ExpressionTrainer {
       }
       tracker.queue.cancel();
       if (this.audioFeedTracker === tracker) this.audioFeedTracker = null;
+      this.discardRecordingBuffer(sessionId);
       try {
         if (this.audioCapture === audioCapture) {
           await this.releaseAudioCapture({ flush: false });
@@ -322,6 +403,8 @@ class ExpressionTrainer {
     this.pausedTime = 0;
     this.fullText = '';
     this.sentences = [];
+    this.viewingTrainingRecordId = null;
+    this.trainingRecordSelect?.classList.add('hidden');
     this.lastFeedbackText = '';
     this.resetStats();
     this.subtitleContainer.replaceChildren();
@@ -403,6 +486,56 @@ class ExpressionTrainer {
     return this.audioCaptureStopPromise;
   }
 
+  getTrainingRecordStore() {
+    if (!this.trainingRecords) {
+      this.trainingRecords = createTrainingRecordStore({
+        maxRecords: 5,
+        revokeObjectURL: url => this.getObjectUrlApi().revokeObjectURL(url)
+      });
+    }
+    return this.trainingRecords;
+  }
+
+  getObjectUrlApi() {
+    return window.URL || globalThis.URL;
+  }
+
+  beginRecordingBuffer(sessionId) {
+    this.discardRecordingBuffer();
+    this.recordingSessionId = sessionId;
+    this.recordingCreatedAt = new Date().toISOString();
+    this.recordingPcm = createPcmWavRecorder({ sampleRateHz: 16000, maxFrames: 19_200_000 });
+    this.pendingSegments = [];
+    this.limitStopPromise = null;
+    return this.recordingPcm;
+  }
+
+  discardRecordingBuffer(expectedSessionId) {
+    if (expectedSessionId && this.recordingSessionId !== expectedSessionId) return false;
+    this.recordingPcm?.clear?.();
+    this.recordingPcm = null;
+    this.recordingSessionId = null;
+    this.recordingCreatedAt = null;
+    this.pendingSegments = [];
+    this.limitStopPromise = null;
+    return true;
+  }
+
+  appendRecordingChunk(chunk) {
+    if (!this.recordingPcm || this.recordingSessionId !== chunk.sessionId) {
+      return { acceptedSamples: null, audioEndMs: 0, limitReached: false };
+    }
+    const result = this.recordingPcm.append(chunk.samples);
+    const acceptedSamples = result.acceptedFrames === chunk.samples.length
+      ? chunk.samples
+      : chunk.samples.slice(0, result.acceptedFrames);
+    return {
+      acceptedSamples,
+      audioEndMs: this.recordingPcm.durationMs,
+      limitReached: result.limitReached
+    };
+  }
+
   handleCapturedChunk(chunk) {
     const { sessionId } = chunk;
     const tracker = this.audioFeedTracker;
@@ -412,13 +545,27 @@ class ExpressionTrainer {
         || (this.isPaused && !stoppingOwned)
         || this.asrEventState.activeSessionId !== sessionId) return Promise.resolve();
     if (!tracker || tracker.sessionId !== sessionId) return Promise.resolve();
-    return Promise.resolve(tracker.queue.enqueue(chunk));
+    const appended = this.appendRecordingChunk(chunk);
+    let enqueued = false;
+    if (appended.acceptedSamples?.length) {
+      enqueued = tracker.queue.enqueue({
+        ...chunk,
+        frames: appended.acceptedSamples.length,
+        samples: appended.acceptedSamples,
+        audioEndMs: appended.audioEndMs
+      });
+    }
+    if (appended.limitReached && !this.limitStopPromise) {
+      this.trainingStatus.textContent = '已达到20分钟上限，正在结束录音…';
+      this.limitStopPromise = Promise.resolve().then(() => this.stopRecording());
+    }
+    return Promise.resolve(enqueued);
   }
 
   createAudioFeedTracker(sessionId) {
     const queue = createAudioFeedQueue({
       maxChunks: 10,
-      send: async ({ sequence, samples }) => {
+      send: async ({ sequence, samples, audioEndMs }) => {
         const response = await window.api.feedAudio({ sessionId, sequence, samples });
         if (!response || response.ok !== true) {
           const error = new Error(response?.error?.message || 'ASR feed failed');
@@ -429,7 +576,8 @@ class ExpressionTrainer {
           response,
           '语音识别处理失败',
           '语音识别结果处理失败',
-          () => this.asrEventState.activeSessionId === sessionId
+          () => this.asrEventState.activeSessionId === sessionId,
+          audioEndMs
         );
       },
       onFailure: () => {
@@ -452,7 +600,10 @@ class ExpressionTrainer {
     }
     this.audioFeedTracker?.queue.cancel();
     this.audioFeedTracker = null;
+    this.discardRecordingBuffer(sessionId);
     this.teardownRecordingCapture();
+    const retainedRecord = this.trainingRecords?.selected();
+    if (retainedRecord) this.selectTrainingRecord(retainedRecord.id);
     this.showError('语音识别处理失败，录音已停止，请重新开始');
     return this.cancelActiveAsrSession(sessionId, () => false).then(() => true);
   }
@@ -505,6 +656,9 @@ class ExpressionTrainer {
   }
 
   async finishOwnedAsrStopAndUi(sessionId) {
+    const durationMs = this.recordingSessionId === sessionId && this.recordingPcm
+      ? this.recordingPcm.durationMs
+      : 0;
     try {
       if (sessionId) {
         const stopResponse = await window.api.stopASR({ sessionId });
@@ -512,7 +666,8 @@ class ExpressionTrainer {
           stopResponse,
           '语音识别停止失败',
           '尾部文本分析失败',
-          () => this.asrEventState.activeSessionId === sessionId
+          () => this.asrEventState.activeSessionId === sessionId,
+          durationMs
         );
       }
     } catch (error) {
@@ -535,7 +690,10 @@ class ExpressionTrainer {
         clearInterval(this.timerInterval);
         let totalPaused = this.pausedTime;
         if (this.pauseStart) totalPaused += Date.now() - this.pauseStart;
-        this.stats.duration = Math.floor((Date.now() - this.startTime - totalPaused) / 1000);
+        this.stats.duration = durationMs > 0
+          ? Math.floor(durationMs / 1000)
+          : Math.floor((Date.now() - this.startTime - totalPaused) / 1000);
+        if (this.recordingSessionId === sessionId) this.finalizeTrainingRecord();
 
         // UI：显示生成报告按钮，可翻阅字幕
         this.btnStop.classList.add('hidden');
@@ -560,7 +718,8 @@ class ExpressionTrainer {
     response,
     commandErrorPrefix,
     resultErrorPrefix = '语音识别结果处理失败',
-    canApplySideEffects = () => true
+    canApplySideEffects = () => true,
+    atMs = this.recordingPcm?.durationMs ?? 0
   ) {
     if (!response || response.ok !== true) {
       const message = typeof response?.error?.message === 'string'
@@ -580,7 +739,7 @@ class ExpressionTrainer {
         const resultGeneration = this.asrGeneration;
         const resultSessionId = event.sessionId;
         try {
-          await this.handleASRResult(filtered.effect.result, resultGeneration);
+          await this.handleASRResult(filtered.effect.result, resultGeneration, atMs);
         } catch (error) {
           if (resultGeneration === this.asrGeneration
               && this.asrEventState.activeSessionId === resultSessionId
@@ -620,7 +779,11 @@ class ExpressionTrainer {
     }
   }
 
-  handleASRResult({ text, isFinal }, resultGeneration = this.asrGeneration) {
+  handleASRResult(
+    { text, isFinal },
+    resultGeneration = this.asrGeneration,
+    atMs = this.recordingPcm?.durationMs ?? 0
+  ) {
     let analysisPromise;
     if (isFinal) {
       const merged = mergeFinalText(this.fullText, text);
@@ -629,7 +792,31 @@ class ExpressionTrainer {
       text = merged.appendedText;
       this.fullText = merged.fullText;
       this.sentences.push(text);
-      analysisPromise = this.analyzeCurrentSentence(text, resultGeneration);
+      let segment = null;
+      let ownedSegments = null;
+      if (this.recordingPcm && Array.isArray(this.pendingSegments)) {
+        const previousEndMs = this.pendingSegments.at(-1)?.endMs ?? 0;
+        const endMs = Math.max(previousEndMs, Math.min(atMs, this.recordingPcm.durationMs));
+        segment = {
+          id: `segment-${this.pendingSegments.length + 1}`,
+          text,
+          startMs: previousEndMs,
+          endMs,
+          localAnalysis: null
+        };
+        this.pendingSegments.push(segment);
+        ownedSegments = this.pendingSegments;
+      }
+      analysisPromise = Promise.resolve(this.analyzeCurrentSentence(text, resultGeneration))
+        .then(analysis => {
+          if (segment
+              && resultGeneration === this.asrGeneration
+              && this.pendingSegments === ownedSegments
+              && ownedSegments.includes(segment)) {
+            segment.localAnalysis = analysis ?? null;
+          }
+          return analysis;
+        });
 
       // 每30字触发一次AI反馈（语境化精准词建议）
       if (this.fullText.length - this.lastFeedbackText.length >= 30) {
@@ -699,6 +886,7 @@ class ExpressionTrainer {
         this.addFeedbackItem(`「${uniqueHedges.join('」「')}」→ 直接说`, 'hedge');
       }
     }
+    return analysis;
   }
 
   updateStatsDisplay() {
@@ -952,6 +1140,10 @@ class ExpressionTrainer {
     if (!modal || modal.classList.contains('hidden')) return;
     if (event.key === 'Escape') {
       event.preventDefault();
+      if (modal === this.recordingPolicyModal && this.recordingPolicyDecision) {
+        this.resolveRecordingPolicyDecision(false);
+        return;
+      }
       this.closeModal(modal);
       return;
     }
@@ -975,6 +1167,129 @@ class ExpressionTrainer {
     this.trainingStatus.textContent = '准备就绪';
     this.btnStart.disabled = false;
     this.btnPaste.disabled = false;
+  }
+
+  finalizeTrainingRecord() {
+    const recorder = this.recordingPcm;
+    if (!recorder) return null;
+    const durationMs = recorder.durationMs;
+    const segments = this.pendingSegments;
+    const finalSegment = segments.at(-1);
+    if (finalSegment) finalSegment.endMs = Math.max(finalSegment.endMs, durationMs);
+    let audioUrl = null;
+    let record;
+    try {
+      const blob = recorder.finish(window.Blob || globalThis.Blob);
+      audioUrl = this.getObjectUrlApi().createObjectURL(blob);
+      record = {
+        id: `record-${this.recordingSessionId}`,
+        createdAt: this.recordingCreatedAt || new Date().toISOString(),
+        durationMs,
+        audioUrl,
+        segments,
+        stats: { ...this.stats },
+        fullText: this.fullText,
+        playbackAnalysis: null
+      };
+      this.getTrainingRecordStore().add(record);
+    } catch (error) {
+      if (audioUrl) this.getObjectUrlApi().revokeObjectURL(audioUrl);
+      this.discardRecordingBuffer();
+      this.showUserMessage(`录音回放生成失败：${error.message}`);
+      return null;
+    }
+    this.recordingPcm = null;
+    this.recordingSessionId = null;
+    this.recordingCreatedAt = null;
+    this.pendingSegments = [];
+    this.limitStopPromise = null;
+    try {
+      this.selectTrainingRecord(record.id);
+    } catch (error) {
+      this.showUserMessage(`训练记录显示失败：${error.message}`);
+    }
+    return record;
+  }
+
+  refreshTrainingRecordSelect() {
+    if (!this.trainingRecordSelect) return;
+    const records = this.getTrainingRecordStore().list();
+    const options = records.map(record => {
+      const option = document.createElement('option');
+      option.value = record.id;
+      option.textContent = formatRecordLabel(record);
+      return option;
+    });
+    this.trainingRecordSelect.replaceChildren(...options);
+    this.trainingRecordSelect.value = this.viewingTrainingRecordId || '';
+    this.trainingRecordSelect.classList.toggle('hidden', records.length === 0 || !this.viewingTrainingRecordId);
+  }
+
+  selectTrainingRecord(recordId) {
+    const record = this.getTrainingRecordStore().select(recordId);
+    if (!record) return null;
+    this.viewingTrainingRecordId = record.id;
+    this.fullText = record.fullText;
+    this.sentences = record.segments.map(segment => segment.text);
+    this.stats = { ...record.stats };
+    this.lastFeedbackText = '';
+    this.subtitleContainer.replaceChildren();
+    for (const segment of record.segments) this.renderSubtitle(segment.text, true);
+    this.feedbackContent.replaceChildren();
+    this.updateStatsDisplay();
+    const totalSeconds = Math.max(0, Math.floor(record.durationMs / 1000));
+    this.timer.textContent = `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(totalSeconds % 60).padStart(2, '0')}`;
+    this.btnReport.classList.toggle('hidden', !record.fullText.trim());
+    this.btnCopyText.classList.toggle('hidden', !record.fullText.trim());
+    this.btnSaveText.classList.toggle('hidden', !record.fullText.trim());
+    this.btnClear.classList.remove('hidden');
+    this.refreshTrainingRecordSelect();
+    return record;
+  }
+
+  removeSelectedTrainingRecord() {
+    const recordId = this.viewingTrainingRecordId;
+    if (!recordId) return null;
+    const removed = this.getTrainingRecordStore().remove(recordId);
+    if (!removed) return null;
+    this.advanceLLMGeneration();
+    try {
+      const cancellation = window.api.cancelLLMRequests();
+      cancellation?.catch?.(() => {});
+    } catch {}
+    const next = this.getTrainingRecordStore().selected();
+    if (next) {
+      this.selectTrainingRecord(next.id);
+    } else {
+      this.viewingTrainingRecordId = null;
+      this.fullText = '';
+      this.sentences = [];
+      this.lastFeedbackText = '';
+      this.lastReport = '';
+      const hint = document.createElement('div');
+      hint.className = 'subtitle-line hint';
+      hint.textContent = '点击下方按钮开始说话';
+      this.subtitleContainer.replaceChildren(hint);
+      this.resetStats();
+      this.timer.textContent = '00:00';
+      this.btnReport.classList.add('hidden');
+      this.btnCopyText.classList.add('hidden');
+      this.btnSaveText.classList.add('hidden');
+      this.btnClear.classList.add('hidden');
+      this.refreshTrainingRecordSelect();
+    }
+    return removed;
+  }
+
+  disposeTrainingRecords() {
+    this.advanceLLMGeneration();
+    try {
+      const cancellation = window.api.cancelLLMRequests();
+      cancellation?.catch?.(() => {});
+    } catch {}
+    this.trainingRecords?.clear();
+    this.discardRecordingBuffer();
+    this.viewingTrainingRecordId = null;
   }
 
   // ===== 复制 & 保存原文 & 清空 =====
@@ -1013,6 +1328,10 @@ class ExpressionTrainer {
 
   clearAll() {
     const sessionId = this.asrEventState.activeSessionId;
+    if (!this.isRecording && !this.asrStartAttempt && !sessionId && this.viewingTrainingRecordId) {
+      this.removeSelectedTrainingRecord();
+      return true;
+    }
     const isIdleContent = !this.isRecording && !this.asrStartAttempt && !sessionId && this.fullText.trim();
     if (isIdleContent && !window.confirm('清空后当前内容将无法恢复，是否继续？')) return false;
     this.pasteAnalysisGeneration = (this.pasteAnalysisGeneration ?? 0) + 1;
@@ -1022,6 +1341,7 @@ class ExpressionTrainer {
     this.asrGeneration = (this.asrGeneration ?? 0) + 1;
     this.audioFeedTracker?.queue.cancel();
     this.audioFeedTracker = null;
+    this.discardRecordingBuffer(sessionId);
     if (sessionId) {
       this.asrEventState = invalidateAsrSession(this.asrEventState);
     }
@@ -1083,7 +1403,8 @@ class ExpressionTrainer {
       this.showUserMessage('请先结束当前录制，再导入逐字稿');
       return;
     }
-    if (this.fullText.trim()
+    if (!this.viewingTrainingRecordId
+        && this.fullText.trim()
         && text !== this.fullText.trim()
         && !window.confirm('分析新逐字稿将替换当前内容，是否继续？')) {
       return;
@@ -1107,6 +1428,8 @@ class ExpressionTrainer {
       // 关闭粘贴弹窗
       this.closeModal(this.pasteModal);
       this.pasteTextarea.value = '';
+      this.viewingTrainingRecordId = null;
+      this.trainingRecordSelect?.classList.add('hidden');
 
       // 把文本显示到字幕区（高亮标记）
       this.subtitleContainer.replaceChildren();

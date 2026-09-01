@@ -5,6 +5,7 @@ global.document = { addEventListener() {} };
 const { mergeFinalText, ExpressionTrainer } = require('../src/app');
 const { beginAsrSession, createAsrEventState, filterAsrEvent } = require('../src/asr-event-state');
 const { createAudioCapture } = require('../src/audio-capture');
+const { createTrainingRecordStore } = require('../src/training-records');
 delete global.document;
 
 function createClassList() {
@@ -50,6 +51,8 @@ function createElement(tagName = 'div') {
     replaceChildren(...nodes) {
       this.children = [...nodes];
     },
+    querySelector() { return null; },
+    querySelectorAll() { return []; },
     focus() {},
     addEventListener() {}
   };
@@ -107,11 +110,43 @@ function createTrainer() {
   trainer.userMessageAction = createElement();
   trainer.trainingStatus = createElement();
   trainer.feedbackStatus = createElement();
+  trainer.recordingPolicyModal = createElement();
+  trainer.btnRecordingPolicyConfirm = createElement('button');
+  trainer.btnRecordingPolicyCancel = createElement('button');
+  trainer.trainingRecordSelect = createElement('select');
   trainer.pasteAnalysisPending = false;
   trainer.pasteAnalysisGeneration = 0;
   trainer.activeModal = null;
   trainer.modalOpener = null;
   return trainer;
+}
+
+function audioChunk(sessionId = 'session-a', samples = new Float32Array([0.25, 0.5])) {
+  return {
+    sessionId,
+    sequence: 0,
+    sampleRateHz: 16000,
+    channels: 1,
+    format: 'f32',
+    frames: samples.length,
+    samples
+  };
+}
+
+function fakeRecorder({ limitOnAppend = false, durationMs = 20 } = {}) {
+  return {
+    durationMs,
+    append(samples) {
+      this.durationMs += samples.length / 16;
+      return { acceptedFrames: samples.length, limitReached: limitOnAppend };
+    },
+    finish: () => new Blob([new Uint8Array([1, 2, 3])], { type: 'audio/wav' }),
+    clear() {}
+  };
+}
+
+function flushMicrotasks() {
+  return new Promise(resolve => setImmediate(resolve));
 }
 
 async function startAudioCaptureHarness(t, {
@@ -1662,4 +1697,307 @@ test('copy rejection and saveFile success false are visible', async (t) => {
   await trainer.saveOriginalText();
 
   assert.deepEqual(messages, ['复制失败，请重试', '未保存原文：磁盘不可写']);
+});
+
+test('first recording waits for policy acknowledgement before ASR or microphone startup', async (t) => {
+  const acknowledgement = createDeferred();
+  const order = [];
+  const audio = createAudioCaptureFactoryFake({
+    start: async () => {
+      order.push('microphone');
+      return { requestedSampleRateHz: 16000, contextSampleRateHz: 16000, trackSampleRateHz: 48000 };
+    }
+  });
+  global.document = { createElement };
+  global.window = {
+    api: {
+      getRecordingPolicy: async () => ({ acknowledged: false }),
+      acknowledgeRecordingPolicy: async () => {
+        order.push('ack');
+        return { success: true, acknowledged: true };
+      },
+      cancelLLMRequests: async () => ({ success: true }),
+      startASR: async ({ sessionId }) => {
+        order.push('asr');
+        return { ok: true, events: [{ type: 'ready', sessionId, sequence: 0 }] };
+      }
+    }
+  };
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.fullText = '';
+  trainer.audioCaptureFactory = audio.factory;
+  trainer.waitForRecordingPolicyDecision = () => acknowledgement.promise;
+  t.after(() => {
+    acknowledgement.resolve(false);
+    clearInterval(trainer.timerInterval);
+    delete global.document;
+    delete global.window;
+  });
+
+  const starting = trainer.startRecording();
+  await flushMicrotasks();
+  const beforeDecision = order.slice();
+  acknowledgement.resolve(true);
+  await starting;
+
+  assert.deepEqual(beforeDecision, []);
+  assert.deepEqual(order, ['ack', 'asr', 'microphone']);
+});
+
+test('captured PCM is appended before ASR enqueue and only accepted samples carry local audioEndMs', async () => {
+  const order = [];
+  const trainer = createTrainer();
+  activateAsrSession(trainer);
+  trainer.recordingPcm = {
+    durationMs: 125,
+    append(samples) {
+      order.push(['append', Array.from(samples)]);
+      return { acceptedFrames: 2, limitReached: false };
+    }
+  };
+  trainer.recordingSessionId = 'session-a';
+  trainer.audioFeedTracker = {
+    sessionId: 'session-a',
+    queue: {
+      enqueue(item) {
+        order.push(['enqueue', Array.from(item.samples), item.audioEndMs]);
+        return true;
+      }
+    }
+  };
+
+  await trainer.handleCapturedChunk(audioChunk('session-a', new Float32Array([0.1, 0.2, 0.3])));
+
+  assert.deepEqual(order, [
+    ['append', [0.10000000149011612, 0.20000000298023224, 0.30000001192092896]],
+    ['enqueue', [0.10000000149011612, 0.20000000298023224], 125]
+  ]);
+});
+
+test('a delayed final uses the producing queue item audio end instead of later captured duration', async (t) => {
+  const firstFeed = createDeferred();
+  const feedCommands = [];
+  global.window = {
+    api: {
+      feedAudio(command) {
+        feedCommands.push(command);
+        return feedCommands.length === 1 ? firstFeed.promise : Promise.resolve({ ok: true, events: [] });
+      },
+      analyzeText: async () => ({ totalWords: 2, fillers: [], hedges: [], vagueWords: [] })
+    }
+  };
+  t.after(() => {
+    firstFeed.resolve({ ok: true, events: [] });
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.fullText = '';
+  trainer.sentences = [];
+  trainer.pendingSegments = [];
+  trainer.recordingSessionId = 'session-a';
+  trainer.recordingPcm = fakeRecorder({ durationMs: 0 });
+  activateAsrSession(trainer);
+  trainer.audioFeedTracker = trainer.createAudioFeedTracker('session-a');
+
+  void trainer.handleCapturedChunk(audioChunk('session-a', new Float32Array(16000)));
+  await flushMicrotasks();
+  void trainer.handleCapturedChunk({ ...audioChunk('session-a', new Float32Array(16000)), sequence: 1 });
+  firstFeed.resolve({
+    ok: true,
+    events: [{ type: 'final', sessionId: 'session-a', sequence: 1, text: '第一段' }]
+  });
+  await trainer.audioFeedTracker.queue.drain();
+
+  assert.equal(trainer.recordingPcm.durationMs, 2000);
+  assert.equal(trainer.pendingSegments[0].endMs, 1000);
+  assert.deepEqual(feedCommands.map(command => Object.keys(command).sort()), [
+    ['samples', 'sequence', 'sessionId'],
+    ['samples', 'sequence', 'sessionId']
+  ]);
+});
+
+test('the chunk reaching 19,200,000 frames triggers one normal stop', async () => {
+  const trainer = createTrainer();
+  activateAsrSession(trainer);
+  trainer.recordingSessionId = 'session-a';
+  trainer.recordingPcm = fakeRecorder({ limitOnAppend: true });
+  trainer.audioFeedTracker = {
+    sessionId: 'session-a',
+    queue: { enqueue: () => true }
+  };
+  trainer.stopCalls = 0;
+  trainer.stopRecording = async () => { trainer.stopCalls += 1; };
+
+  await trainer.handleCapturedChunk(audioChunk('session-a'));
+  await trainer.handleCapturedChunk(audioChunk('session-a'));
+  await flushMicrotasks();
+
+  assert.equal(trainer.stopCalls, 1);
+  assert.equal(trainer.trainingStatus.textContent, '已达到20分钟上限，正在结束录音…');
+});
+
+test('normal stop creates and selects a complete WAV training record', async (t) => {
+  const createdUrls = [];
+  global.document = { createElement };
+  global.window = {
+    URL: {
+      createObjectURL(blob) {
+        assert.equal(blob.type, 'audio/wav');
+        const url = `blob:${createdUrls.length + 1}`;
+        createdUrls.push(url);
+        return url;
+      },
+      revokeObjectURL() {}
+    },
+    api: {
+      stopASR: async () => stopEnvelope('session-a', '完成文本'),
+      cancelLLMRequests: async () => ({ success: true }),
+      analyzeText: async () => ({ totalWords: 4, fillers: [], hedges: [], vagueWords: [] })
+    }
+  };
+  t.after(() => {
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.fullText = '';
+  trainer.sentences = [];
+  activateAsrSession(trainer);
+  trainer.beginRecordingBuffer('session-a');
+  trainer.recordingPcm = fakeRecorder({ durationMs: 1500 });
+
+  await trainer.stopRecording();
+
+  const record = trainer.trainingRecords.selected();
+  assert.equal(createdUrls.length, 1);
+  assert.equal(record.audioUrl, 'blob:1');
+  assert.equal(record.durationMs, 1500);
+  assert.equal(record.fullText, '完成文本');
+  assert.equal(record.playbackAnalysis, null);
+  assert.equal(record.segments[0].endMs, 1500);
+  assert.equal(record.segments[0].localAnalysis.totalWords, 4);
+  assert.equal(trainer.viewingTrainingRecordId, record.id);
+});
+
+test('failed record insertion revokes its newly-created URL exactly once', (t) => {
+  const revoked = [];
+  global.document = { createElement };
+  global.window = {
+    URL: {
+      createObjectURL: () => 'blob:failed',
+      revokeObjectURL: url => revoked.push(url)
+    },
+    api: { cancelLLMRequests: async () => ({ success: true }) }
+  };
+  t.after(() => {
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.showUserMessage = () => {};
+  trainer.trainingRecords = {
+    add() { throw new Error('store unavailable'); },
+    clear() {}
+  };
+  trainer.beginRecordingBuffer('session-failed');
+  trainer.recordingPcm = fakeRecorder({ durationMs: 500 });
+
+  assert.equal(trainer.finalizeTrainingRecord(), null);
+  trainer.disposeTrainingRecords();
+
+  assert.deepEqual(revoked, ['blob:failed']);
+  assert.equal(trainer.recordingPcm, null);
+});
+
+test('six completed renderer records retain five and revoke the first URL once', (t) => {
+  const revoked = [];
+  let nextUrl = 0;
+  global.document = { createElement };
+  global.window = {
+    URL: {
+      createObjectURL: () => `blob:${++nextUrl}`,
+      revokeObjectURL: url => revoked.push(url)
+    },
+    api: { cancelLLMRequests: async () => ({ success: true }) }
+  };
+  t.after(() => {
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.trainingRecords = createTrainingRecordStore({
+    maxRecords: 5,
+    revokeObjectURL: global.window.URL.revokeObjectURL
+  });
+  for (let index = 1; index <= 6; index += 1) {
+    trainer.beginRecordingBuffer(`session-${index}`);
+    trainer.recordingPcm = fakeRecorder({ durationMs: index * 1000 });
+    trainer.fullText = `文本${index}`;
+    trainer.pendingSegments = [];
+    trainer.finalizeTrainingRecord();
+  }
+
+  assert.deepEqual(trainer.trainingRecords.list().map(record => record.audioUrl), [
+    'blob:2', 'blob:3', 'blob:4', 'blob:5', 'blob:6'
+  ]);
+  assert.deepEqual(revoked, ['blob:1']);
+});
+
+test('failed microphone startup preserves completed records without replacement confirmation', async (t) => {
+  const record = {
+    id: 'record-existing', createdAt: new Date().toISOString(), durationMs: 1000,
+    audioUrl: 'blob:existing', segments: [], stats: {}, fullText: '已完成内容', playbackAnalysis: null
+  };
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.trainingRecords = createTrainingRecordStore();
+  trainer.trainingRecords.add(record);
+  trainer.viewingTrainingRecordId = record.id;
+  trainer.fullText = record.fullText;
+  trainer.audioCaptureFactory = createAudioCaptureFactoryFake({
+    start: async () => { throw new Error('permission denied'); }
+  }).factory;
+  global.document = { createElement };
+  global.window = {
+    confirm: () => assert.fail('completed records must not use replacement confirmation'),
+    api: {
+      getRecordingPolicy: async () => ({ acknowledged: true }),
+      cancelLLMRequests: async () => ({ success: true }),
+      startASR: async ({ sessionId }) => ({ ok: true, events: [{ type: 'ready', sessionId, sequence: 0 }] }),
+      cancelASR: async () => ({ ok: true, events: [] })
+    }
+  };
+  t.after(() => {
+    delete global.document;
+    delete global.window;
+  });
+
+  await trainer.startRecording();
+
+  assert.deepEqual(trainer.trainingRecords.list(), [record]);
+  assert.equal(trainer.trainingRecords.selected(), record);
+  assert.equal(trainer.viewingTrainingRecordId, record.id);
+  assert.equal(trainer.fullText, '已完成内容');
+});
+
+test('clear in completed-record mode removes only the selected record and revokes its URL once', (t) => {
+  const revoked = [];
+  global.document = { createElement };
+  global.window = { api: { cancelLLMRequests: async () => ({ success: true }) } };
+  t.after(() => {
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.trainingRecords = createTrainingRecordStore({ revokeObjectURL: url => revoked.push(url) });
+  trainer.trainingRecords.add({ id: 'r1', audioUrl: 'blob:1', fullText: '一', segments: [], stats: {}, durationMs: 1, createdAt: new Date().toISOString() });
+  trainer.trainingRecords.add({ id: 'r2', audioUrl: 'blob:2', fullText: '二', segments: [], stats: {}, durationMs: 1, createdAt: new Date().toISOString() });
+  trainer.selectTrainingRecord('r1');
+
+  assert.equal(trainer.clearAll(), true);
+  assert.deepEqual(trainer.trainingRecords.list().map(record => record.id), ['r2']);
+  assert.deepEqual(revoked, ['blob:1']);
+  assert.equal(trainer.viewingTrainingRecordId, 'r2');
 });
