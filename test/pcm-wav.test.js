@@ -23,4 +23,3 @@ test('append truncates exactly at the 20 minute frame limit', () => {
   assert.deepEqual(result, { acceptedFrames: 4, limitReached: true });
   assert.equal(recorder.durationMs, 2000);
 });
-
