@@ -68,7 +68,7 @@ test('invalid legacy JSON uses defaults without creating the canonical file', as
 
     const settings = loadLlmProviderSettings(userDataPath, { logger: { warn: (message) => warnings.push(message) } });
 
-    assert.equal(settings.activeProfileId, 'profile-deepseek');
+    assert.deepEqual(settings, {schemaVersion: 2, activeProfileId: null, profiles: []});
     assert.equal(fs.existsSync(path.join(userDataPath, 'llm-provider-settings.json')), false);
     assert.equal(warnings.length, 1);
   });

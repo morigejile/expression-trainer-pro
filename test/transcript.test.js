@@ -326,7 +326,7 @@ function stopEnvelope(sessionId, text = '尾部文本') {
   return { ok: true, events };
 }
 
-test('stop final text is appended exactly once', () => {
+test('separate accepted final events retain repeated text', () => {
   const firstMerge = mergeFinalText('已经确认', '尾部文本');
   const secondMerge = mergeFinalText(firstMerge.fullText, '尾部文本');
 
@@ -335,8 +335,8 @@ test('stop final text is appended exactly once', () => {
     appendedText: '尾部文本'
   });
   assert.deepEqual(secondMerge, {
-    fullText: '已经确认尾部文本',
-    appendedText: ''
+    fullText: '已经确认尾部文本尾部文本',
+    appendedText: '尾部文本'
   });
 });
 
@@ -843,11 +843,9 @@ test('stop finalizes recording when final-text analysis fails', async (t) => {
   assert.deepEqual(shownErrors, ['尾部文本分析失败: analysis unavailable']);
 });
 
-test('an endpoint final and the matching stop final update state only once', async (t) => {
+test('a replayed final event sequence updates transcript state only once', async (t) => {
   global.window = {
     api: {
-      stopASR: async () => stopEnvelope('session-a'),
-      cancelLLMRequests: async () => ({ success: true }),
       analyzeText: async () => ({
         totalWords: 4,
         fillers: [],
@@ -861,10 +859,12 @@ test('an endpoint final and the matching stop final update state only once', asy
   activateAsrSession(trainer);
   ownActiveRecording(trainer);
 
-  trainer.handleASRResult({ text: '尾部文本', isFinal: true });
-  await new Promise(resolve => setImmediate(resolve));
-  await trainer.stopRecording();
-  await new Promise(resolve => setImmediate(resolve));
+  const response = {
+    ok: true,
+    events: [{type: 'final', sessionId: 'session-a', sequence: 1, text: '尾部文本'}]
+  };
+  await trainer.processASRResponse(response, '语音识别失败');
+  await trainer.processASRResponse(response, '语音识别失败');
 
   assert.equal(trainer.fullText, '已经确认尾部文本');
   assert.deepEqual(trainer.sentences, ['已经确认', '尾部文本']);
@@ -2151,6 +2151,7 @@ test('space toggles playback once and is ignored for controls, visible modals, d
   t.after(() => { delete global.document; });
   const trainer = createTrainer();
   installPlaybackRecord(trainer);
+  trainer.isRecording = false;
   trainer.audioPlayer = fakeAudio({paused: true});
   const body = createElement('div');
   const played = keyEvent({target: body});
@@ -2166,6 +2167,28 @@ test('space toggles playback once and is ignored for controls, visible modals, d
   assert.equal(trainer.audioPlayer.playCalls, 1);
   assert.equal(trainer.audioPlayer.pauseCalls, 0);
   assert.equal(played.preventDefaultCalls, 1);
+});
+
+test('space pauses and resumes an active recording before considering playback', (t) => {
+  global.document = {querySelector: () => null};
+  t.after(() => { delete global.document; });
+  const trainer = createTrainer();
+  const body = createElement('div');
+  const actions = [];
+  trainer.isRecording = true;
+  trainer.isPaused = false;
+  trainer.pauseRecording = () => { actions.push('pause'); trainer.isPaused = true; };
+  trainer.resumeRecording = () => { actions.push('resume'); trainer.isPaused = false; };
+  trainer.togglePlayback = () => assert.fail('recording shortcut must not toggle playback');
+
+  const pauseEvent = keyEvent({target: body});
+  trainer.handleGlobalKeydown(pauseEvent);
+  const resumeEvent = keyEvent({target: body});
+  trainer.handleGlobalKeydown(resumeEvent);
+
+  assert.deepEqual(actions, ['pause', 'resume']);
+  assert.equal(pauseEvent.preventDefaultCalls, 1);
+  assert.equal(resumeEvent.preventDefaultCalls, 1);
 });
 
 test('timeupdate rerenders only when the active segment changes', () => {

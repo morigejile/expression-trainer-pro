@@ -18,6 +18,7 @@ function createPage() {
   const page = Object.create(SettingsPage.prototype);
   page.root = { dataset: { theme: 'graphite', layout: 'coach-rail' } };
   page.providerSelect = { value: 'deepseek' };
+  page.activeProfileSelect = { value: '', replaceChildren(...children) { this.children = children; }, children: [] };
   page.profileSelect = { value: '', replaceChildren(...children) { this.children = children; }, children: [] };
   page.profileNameInput = { value: '' };
   page.btnProfileNew = { disabled: false };
@@ -43,6 +44,7 @@ function createPage() {
   ];
   page.appearance = { schemaVersion: 1, theme: 'graphite', layout: 'coach-rail' };
   page.settings = createSettingsWithProfiles([profile('p1')], 'p1');
+  page.editingProfileId = 'p1';
   return page;
 }
 
@@ -67,11 +69,54 @@ function createSettingsWithProfiles(profiles, activeProfileId) {
 function createSettingsPageWithProfiles(profiles, activeProfileId) {
   const page = createPage();
   page.settings = createSettingsWithProfiles(profiles, activeProfileId);
+  page.editingProfileId = activeProfileId;
   page.loadSelectedProfile();
   return page;
 }
 
-test('selecting a profile loads only that profile and save preserves its siblings', () => {
+test('active model selection is independent from the configuration being edited', () => {
+  const page = createSettingsPageWithProfiles([
+    profile('p1', {name: 'Current', apiKey: 'key-1'}),
+    profile('p2', {name: 'Editing', apiKey: 'key-2'})
+  ], 'p1');
+
+  page.selectProfile('p2');
+  assert.equal(page.settings.activeProfileId, 'p1');
+  assert.equal(page.editingProfileId, 'p2');
+
+  page.selectActiveProfile('p2');
+  assert.equal(page.settings.activeProfileId, 'p2');
+  assert.equal(page.editingProfileId, 'p2');
+});
+
+test('custom providers save the single visible model-name field', () => {
+  const page = createSettingsPageWithProfiles([
+    profile('custom-1', {provider: 'custom', model: 'old-model', customModel: 'old-model'})
+  ], 'custom-1');
+  page.providerSelect.value = 'custom';
+  page.modelSelect.value = 'deployed-model';
+  page.customModelInput.value = 'stale-hidden-value';
+
+  const draft = page.buildDraftSettings();
+
+  assert.equal(draft.profiles[0].model, 'deployed-model');
+  assert.equal(draft.profiles[0].customModel, 'deployed-model');
+});
+
+test('incomplete profiles remain manageable but are absent from active model choices', (t) => {
+  global.document = {createElement};
+  t.after(() => { delete global.document; });
+  const page = createSettingsPageWithProfiles([
+    profile('incomplete', {name: 'Incomplete', apiKey: '', model: 'legacy-default'}),
+    profile('configured', {name: 'Configured', apiKey: 'key', model: 'deployed-model'})
+  ], 'incomplete');
+
+  assert.deepEqual(page.profileSelect.children.map(option => option.value), ['incomplete', 'configured']);
+  assert.deepEqual(page.activeProfileSelect.children.map(option => option.value), ['configured']);
+  assert.equal(page.activeProfileSelect.value, 'configured');
+});
+
+test('selecting a configuration to edit preserves the active model and sibling drafts', () => {
   const page = createSettingsPageWithProfiles([
     profile('p1', {name: 'First', apiKey: 'a'}),
     profile('p2', {name: 'Second', provider: 'openai', model: 'gpt-4o', apiKey: 'b'})
@@ -81,13 +126,13 @@ test('selecting a profile loads only that profile and save preserves its sibling
   page.apikeyInput.value = 'updated';
   const draft = page.buildDraftSettings();
 
-  assert.equal(draft.activeProfileId, 'p2');
+  assert.equal(draft.activeProfileId, 'p1');
   assert.equal(draft.profiles.find(candidate => candidate.id === 'p2').apiKey, 'updated');
   assert.equal(draft.profiles.find(candidate => candidate.id === 'p1').apiKey, 'a');
   assert.equal(page.settings.profiles.find(candidate => candidate.id === 'p2').apiKey, 'updated');
 });
 
-test('profile CRUD maintains an active profile and never deletes the last profile', () => {
+test('profile CRUD maintains valid selections and permits deleting the last configured model', () => {
   const page = createSettingsPageWithProfiles([profile('p1'), profile('p2')], 'p2');
   page.idFactory = () => 'p3';
 
@@ -95,15 +140,18 @@ test('profile CRUD maintains an active profile and never deletes the last profil
   assert.equal(page.settings.profiles.find(candidate => candidate.id === 'p2').name, 'Renamed');
   page.duplicateProfile();
   assert.deepEqual(page.settings.profiles.map(candidate => candidate.id), ['p1', 'p2', 'p3']);
-  assert.equal(page.settings.activeProfileId, 'p3');
+  assert.equal(page.settings.activeProfileId, 'p2');
   page.deleteProfile();
-  assert.equal(page.settings.activeProfileId, 'p1');
+  assert.equal(page.settings.activeProfileId, 'p2');
   page.selectProfile('p2');
   page.deleteProfile();
   assert.deepEqual(page.settings.profiles.map(candidate => candidate.id), ['p1']);
-  assert.equal(page.btnProfileDelete.disabled, true);
+  page.deleteProfile();
+  assert.deepEqual(page.settings.profiles, []);
+  assert.equal(page.settings.activeProfileId, null);
+  assert.equal(page.editingProfileId, null);
   page.createProfile();
-  assert.equal(page.settings.profiles.length, 2);
+  assert.equal(page.settings.profiles.length, 1);
 });
 
 test('profile creation retries blank and duplicate generated IDs', () => {
@@ -115,7 +163,7 @@ test('profile creation retries blank and duplicate generated IDs', () => {
   page.duplicateProfile();
 
   assert.deepEqual(page.settings.profiles.map(candidate => candidate.id), ['p1', 'p2', 'p3']);
-  assert.equal(page.settings.activeProfileId, 'p3');
+  assert.equal(page.settings.activeProfileId, 'p1');
 });
 
 test('profile creation falls back deterministically when generated IDs stay invalid', () => {

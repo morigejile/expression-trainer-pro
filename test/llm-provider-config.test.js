@@ -1,9 +1,17 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-test('new LLM provider settings use one named DeepSeek profile', () => {
+test('new LLM provider settings do not invent an unconfigured model', () => {
   const { createDefaultLlmProviderSettings } = require('../lib/llm-provider-config');
-  assert.deepEqual(createDefaultLlmProviderSettings(), { schemaVersion: 2, activeProfileId: 'profile-deepseek', profiles: [{ id: 'profile-deepseek', name: 'DeepSeek', provider: 'deepseek', apiKey: '', model: 'deepseek-chat', ollamaUrl: '', baseUrl: '', customModel: '' }] });
+  assert.deepEqual(createDefaultLlmProviderSettings(), { schemaVersion: 2, activeProfileId: null, profiles: [] });
+});
+
+test('an explicitly empty profile list remains empty after normalization', () => {
+  const { normalizeLlmProviderSettings } = require('../lib/llm-provider-config');
+  assert.deepEqual(
+    normalizeLlmProviderSettings({schemaVersion: 2, activeProfileId: null, profiles: []}),
+    {schemaVersion: 2, activeProfileId: null, profiles: []}
+  );
 });
 
 test('schema v1 providers migrate to named profiles without losing configured fields', () => {
@@ -38,6 +46,20 @@ test('profile summaries never expose credentials or endpoints', () => {
   assert.deepEqual(summary.profiles, [{ id: 'p1', name: 'Work', provider: 'custom', model: 'm1', active: true }]);
   assert.equal(JSON.stringify(summary).includes('secret'), false);
   assert.equal(JSON.stringify(summary).includes('private.example'), false);
+});
+
+test('profile summaries exclude incomplete legacy defaults from selectable models', () => {
+  const {summarizeLlmProfiles} = require('../lib/llm-provider-config');
+  const summary = summarizeLlmProfiles({
+    schemaVersion: 2,
+    activeProfileId: 'legacy-default',
+    profiles: [
+      {id: 'legacy-default', name: 'DeepSeek', provider: 'deepseek', apiKey: '', model: 'deepseek-chat'},
+      {id: 'configured', name: 'Work', provider: 'deepseek', apiKey: 'key', model: 'deployed-model'}
+    ]
+  });
+  assert.equal(summary.activeProfileId, 'configured');
+  assert.deepEqual(summary.profiles.map(profile => profile.id), ['configured']);
 });
 
 test('profile selection returns a new settings object and rejects unknown IDs', () => {

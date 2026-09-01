@@ -4,7 +4,7 @@ function mergeFinalText(fullText, finalText) {
   const currentText = typeof fullText === 'string' ? fullText : '';
   const candidateText = typeof finalText === 'string' ? finalText.trim() : '';
 
-  if (!candidateText || currentText.endsWith(candidateText)) {
+  if (!candidateText) {
     return { fullText: currentText, appendedText: '' };
   }
 
@@ -1522,6 +1522,12 @@ class ExpressionTrainer {
       || document.querySelector?.('.modal:not(.hidden)');
     if (visibleModal) return;
     if (event.target?.closest?.('input, textarea, select, button, audio, [contenteditable="true"]')) return;
+    if (this.isRecording) {
+      event.preventDefault();
+      if (this.isPaused) this.resumeRecording();
+      else this.pauseRecording();
+      return;
+    }
     const record = this.trainingRecords?.selected() ?? null;
     if (!record || record.id !== this.viewingTrainingRecordId || !record.audioUrl) return;
     event.preventDefault();

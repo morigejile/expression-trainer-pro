@@ -3,39 +3,32 @@
 const PROVIDER_CONFIG = {
   openai: {
     needsKey: true,
-    keyHint: '在 platform.openai.com 获取',
-    models: [
-      { value: 'gpt-4o-mini', label: 'GPT-4o Mini（推荐）' },
-      { value: 'gpt-4o', label: 'GPT-4o' },
-      { value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' }
-    ]
+    keyHint: '在 platform.openai.com 获取'
   },
   deepseek: {
     needsKey: true,
-    keyHint: '在 platform.deepseek.com 获取',
-    models: [
-      { value: 'deepseek-chat', label: 'DeepSeek Chat（推荐）' },
-      { value: 'deepseek-coder', label: 'DeepSeek Coder' }
-    ]
+    keyHint: '在 platform.deepseek.com 获取'
   },
   ollama: {
-    needsKey: false,
-    models: [
-      { value: 'qwen2.5:7b', label: 'Qwen 2.5 7B（推荐）' },
-      { value: 'llama3.1:8b', label: 'Llama 3.1 8B' },
-      { value: 'mistral:7b', label: 'Mistral 7B' }
-    ]
+    needsKey: false
   },
   custom: {
     needsKey: true,
-    keyHint: '自定义 API Key',
-    models: []
+    keyHint: '自定义 API Key'
   }
 };
+
+function isConfiguredProfile(profile) {
+  if (!profile?.model?.trim()) return false;
+  if (profile.provider === 'ollama') return Boolean(profile.ollamaUrl?.trim());
+  if (profile.provider === 'custom') return Boolean(profile.apiKey?.trim() && profile.baseUrl?.trim());
+  return Boolean(profile.apiKey?.trim());
+}
 
 class SettingsPage {
   constructor() {
     this.root = document.documentElement;
+    this.activeProfileSelect = document.getElementById('llm-active-profile');
     this.profileSelect = document.getElementById('llm-profile');
     this.profileNameInput = document.getElementById('llm-profile-name');
     this.btnProfileNew = document.getElementById('btn-profile-new');
@@ -48,7 +41,6 @@ class SettingsPage {
     this.modelHint = document.getElementById('model-hint');
     this.ollamaUrlInput = document.getElementById('ollama-url');
     this.customBaseUrlInput = document.getElementById('custom-base-url');
-    this.customModelInput = document.getElementById('custom-model');
     this.btnSave = document.getElementById('btn-save');
     this.btnTestConnection = document.getElementById('btn-test-connection');
     this.saveSuccess = document.getElementById('save-success');
@@ -61,7 +53,6 @@ class SettingsPage {
     this.groupApikey = document.getElementById('group-apikey');
     this.groupOllama = document.getElementById('group-ollama');
     this.groupCustom = document.getElementById('group-custom');
-    this.groupCustomModel = document.getElementById('group-custom-model');
 
     this.setActionsEnabled(false);
     this.setAppearanceControlsEnabled(false);
@@ -76,6 +67,7 @@ class SettingsPage {
 
   bindEvents() {
     this.providerSelect.addEventListener('change', () => this.onProviderChange());
+    this.activeProfileSelect.addEventListener('change', () => this.selectActiveProfile(this.activeProfileSelect.value));
     this.profileSelect.addEventListener('change', () => this.selectProfile(this.profileSelect.value));
     this.profileNameInput.addEventListener('change', () => this.renameProfile());
     this.btnProfileNew.addEventListener('click', () => this.createProfile());
@@ -173,6 +165,7 @@ class SettingsPage {
     this.setActionsEnabled(false);
     try {
       this.settings = await window.api.getLlmProviderSettings();
+      this.editingProfileId = this.settings.activeProfileId || this.settings.profiles[0]?.id || null;
       this.loadSelectedProfile();
       this.setActionsEnabled(true);
     } catch {
@@ -192,6 +185,7 @@ class SettingsPage {
     this.profileControlsEnabled = enabled;
     for (const control of [
       this.profileSelect,
+      this.activeProfileSelect,
       this.profileNameInput,
       this.btnProfileNew,
       this.btnProfileDuplicate
@@ -199,7 +193,7 @@ class SettingsPage {
       if (control) control.disabled = !enabled;
     }
     if (this.btnProfileDelete) {
-      this.btnProfileDelete.disabled = !enabled || (this.settings?.profiles?.length || 0) <= 1;
+      this.btnProfileDelete.disabled = !enabled || (this.settings?.profiles?.length || 0) === 0;
     }
   }
 
@@ -319,8 +313,8 @@ class SettingsPage {
     }
   }
 
-  getActiveProfile() {
-    return this.settings?.profiles?.find(profile => profile.id === this.settings.activeProfileId) || null;
+  getEditingProfile() {
+    return this.settings?.profiles?.find(profile => profile.id === this.editingProfileId) || null;
   }
 
   createProfileId() {
@@ -340,17 +334,29 @@ class SettingsPage {
   }
 
   renderProfiles() {
-    if (this.profileSelect?.replaceChildren && typeof document !== 'undefined') {
-      this.profileSelect.replaceChildren(...this.settings.profiles.map(profile => {
+    if (typeof document !== 'undefined') {
+      const createOptions = (labelFor) => this.settings.profiles.map(profile => {
         const option = document.createElement('option');
         option.value = profile.id;
-        option.textContent = profile.name;
+        option.textContent = labelFor(profile);
+        return option;
+      });
+      this.profileSelect?.replaceChildren?.(...createOptions(profile => profile.name));
+      const configuredProfiles = this.settings.profiles.filter(isConfiguredProfile);
+      this.activeProfileSelect?.replaceChildren?.(...configuredProfiles.map(profile => {
+        const option = document.createElement('option');
+        option.value = profile.id;
+        option.textContent = `${profile.name} · ${profile.model}`;
         return option;
       }));
+      if (!configuredProfiles.some(profile => profile.id === this.settings.activeProfileId)) {
+        this.settings.activeProfileId = configuredProfiles[0]?.id || this.settings.activeProfileId;
+      }
     }
-    if (this.profileSelect) this.profileSelect.value = this.settings.activeProfileId;
+    if (this.profileSelect) this.profileSelect.value = this.editingProfileId || '';
+    if (this.activeProfileSelect) this.activeProfileSelect.value = this.settings.activeProfileId || '';
     if (this.btnProfileDelete) {
-      this.btnProfileDelete.disabled = this.profileControlsEnabled === false || this.settings.profiles.length <= 1;
+      this.btnProfileDelete.disabled = this.profileControlsEnabled === false || this.settings.profiles.length === 0;
     }
   }
 
@@ -361,16 +367,11 @@ class SettingsPage {
     this.apikeyInput.value = providerConfig.apiKey || '';
     this.ollamaUrlInput.value = providerConfig.ollamaUrl || 'http://localhost:11434';
     this.customBaseUrlInput.value = providerConfig.baseUrl || '';
-    this.customModelInput.value = providerConfig.customModel || '';
-
-    // 设置模型下拉框（非 custom 模式）
-    if (providerConfig.model && providerConfig.provider !== 'custom') {
-      this.modelSelect.value = providerConfig.model;
-    }
+    this.modelSelect.value = providerConfig.model || providerConfig.customModel || '';
   }
 
   flushCurrentProfile() {
-    const profile = this.getActiveProfile();
+    const profile = this.getEditingProfile();
     if (!profile) return;
     const provider = this.providerSelect.value;
     profile.name = this.profileNameInput.value.trim() || profile.name;
@@ -378,14 +379,21 @@ class SettingsPage {
     profile.apiKey = this.apikeyInput.value.trim();
     profile.ollamaUrl = this.ollamaUrlInput.value.trim();
     profile.baseUrl = this.customBaseUrlInput.value.trim();
-    profile.customModel = this.customModelInput.value.trim();
-    profile.model = provider === 'custom' ? profile.customModel : this.modelSelect.value;
+    profile.model = this.modelSelect.value.trim();
+    profile.customModel = provider === 'custom' ? profile.model : '';
   }
 
   loadSelectedProfile() {
-    const profile = this.getActiveProfile();
-    if (!profile) return;
+    const profile = this.getEditingProfile();
     this.renderProfiles();
+    if (!profile) {
+      this.profileNameInput.value = '';
+      this.apikeyInput.value = '';
+      this.modelSelect.value = '';
+      this.ollamaUrlInput.value = 'http://localhost:11434';
+      this.customBaseUrlInput.value = '';
+      return;
+    }
     this.profileNameInput.value = profile.name;
     this.providerSelect.value = profile.provider;
     this.onProviderChange();
@@ -395,8 +403,14 @@ class SettingsPage {
   selectProfile(profileId) {
     if (!this.settings?.profiles?.some(profile => profile.id === profileId)) return;
     this.flushCurrentProfile();
-    this.settings.activeProfileId = profileId;
+    this.editingProfileId = profileId;
     this.loadSelectedProfile();
+  }
+
+  selectActiveProfile(profileId) {
+    if (!this.settings?.profiles?.some(profile => profile.id === profileId && isConfiguredProfile(profile))) return;
+    this.settings.activeProfileId = profileId;
+    this.renderProfiles();
   }
 
   createProfile() {
@@ -404,36 +418,42 @@ class SettingsPage {
     this.flushCurrentProfile();
     const profile = {
       id: this.createProfileId(), name: '新配置', provider: 'deepseek', apiKey: '',
-      model: 'deepseek-chat', ollamaUrl: 'http://localhost:11434', baseUrl: '', customModel: ''
+      model: '', ollamaUrl: 'http://localhost:11434', baseUrl: '', customModel: ''
     };
     this.settings.profiles.push(profile);
-    this.settings.activeProfileId = profile.id;
+    this.editingProfileId = profile.id;
+    if (!this.settings.activeProfileId) this.settings.activeProfileId = profile.id;
     this.loadSelectedProfile();
   }
 
   duplicateProfile() {
-    const profile = this.getActiveProfile();
+    const profile = this.getEditingProfile();
     if (!profile) return;
     this.flushCurrentProfile();
-    const duplicate = {...this.getActiveProfile(), id: this.createProfileId(), name: `${this.getActiveProfile().name} 副本`};
+    const source = this.getEditingProfile();
+    const duplicate = {...source, id: this.createProfileId(), name: `${source.name} 副本`};
     this.settings.profiles.push(duplicate);
-    this.settings.activeProfileId = duplicate.id;
+    this.editingProfileId = duplicate.id;
     this.loadSelectedProfile();
   }
 
   deleteProfile() {
-    if (!this.settings || this.settings.profiles.length <= 1) {
+    if (!this.settings || !this.editingProfileId) {
       this.renderProfiles();
       return;
     }
     this.flushCurrentProfile();
-    this.settings.profiles = this.settings.profiles.filter(profile => profile.id !== this.settings.activeProfileId);
-    this.settings.activeProfileId = this.settings.profiles[0].id;
+    const deletedProfileId = this.editingProfileId;
+    this.settings.profiles = this.settings.profiles.filter(profile => profile.id !== deletedProfileId);
+    if (this.settings.activeProfileId === deletedProfileId) {
+      this.settings.activeProfileId = this.settings.profiles[0]?.id || null;
+    }
+    this.editingProfileId = this.settings.profiles[0]?.id || null;
     this.loadSelectedProfile();
   }
 
   renameProfile(name = this.profileNameInput.value) {
-    const profile = this.getActiveProfile();
+    const profile = this.getEditingProfile();
     const trimmed = name.trim();
     if (!profile || !trimmed) return;
     profile.name = trimmed;
@@ -449,25 +469,10 @@ class SettingsPage {
     this.groupApikey?.classList.toggle('visible', config.needsKey);
     this.groupOllama?.classList.toggle('visible', provider === 'ollama');
     this.groupCustom?.classList.toggle('visible', provider === 'custom');
-    this.groupCustomModel?.classList.toggle('visible', provider === 'custom');
 
     // 更新key提示
     if (config.keyHint) {
       if (this.apikeyHint) this.apikeyHint.textContent = config.keyHint;
-    }
-
-    // 填充模型列表
-    this.modelSelect.replaceChildren?.();
-    if (config.models.length > 0 && typeof document !== 'undefined') {
-      config.models.forEach(m => {
-        const opt = document.createElement('option');
-        opt.value = m.value;
-        opt.textContent = m.label;
-        this.modelSelect.appendChild?.(opt);
-      });
-      if (this.modelSelect.parentElement) this.modelSelect.parentElement.style.display = '';
-    } else if (!config.models.length) {
-      if (this.modelSelect.parentElement) this.modelSelect.parentElement.style.display = 'none';
     }
 
   }

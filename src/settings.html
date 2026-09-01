@@ -303,7 +303,13 @@
       <h2 id="ai-heading">AI 服务</h2>
 
     <div class="form-group">
-      <label for="llm-profile">配置</label>
+      <label for="llm-active-profile">当前使用模型</label>
+      <select id="llm-active-profile"></select>
+      <div class="hint">这里只显示已经添加并保存的模型配置</div>
+    </div>
+
+    <div class="form-group">
+      <label for="llm-profile">模型配置管理</label>
       <div class="profile-toolbar">
         <select id="llm-profile"></select>
         <input id="llm-profile-name" maxlength="64" aria-label="配置名称">
@@ -332,11 +338,9 @@
     </div>
 
     <div class="form-group">
-      <label>模型</label>
-      <select id="model">
-        <!-- 动态填充 -->
-      </select>
-      <div class="model-presets" id="model-hint"></div>
+      <label for="model">模型名称</label>
+      <input type="text" id="model" placeholder="输入服务端实际配置的模型名称">
+      <div class="model-presets" id="model-hint">请填写服务端提供的准确模型名称</div>
     </div>
 
     <div class="form-group conditional" id="group-ollama">
@@ -348,11 +352,6 @@
       <label>OPENAI 协议 BASE URL</label>
       <input type="text" id="custom-base-url" placeholder="https://api.example.com/v1">
       <div class="hint">请求时会自动追加 /chat/completions</div>
-    </div>
-
-    <div class="form-group conditional" id="group-custom-model">
-      <label>自定义模型名</label>
-      <input type="text" id="custom-model" placeholder="model-name">
     </div>
 
     <div class="message-container">

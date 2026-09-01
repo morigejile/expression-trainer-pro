@@ -243,6 +243,10 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   });
   await waitForPage(settingsWindow, 'settings.html');
 
+  const originalLlmSettings = await settingsWindow.webContents.executeJavaScript(
+    'window.api.getLlmProviderSettings()'
+  );
+
   const llmSettingsNotification = await settingsWindow.webContents.executeJavaScript(`(async () => {
     let notifications = 0;
     const unsubscribe = window.api.onLlmProviderSettingsChanged(() => { notifications += 1; });
@@ -253,6 +257,22 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     return {saved, notifications};
   })()`);
   assert.deepEqual(llmSettingsNotification, {saved: {success: true}, notifications: 1});
+
+  const smokeProfileSave = await settingsWindow.webContents.executeJavaScript(`window.api.saveLlmProviderSettings({
+    schemaVersion: 2,
+    activeProfileId: 'smoke-profile',
+    profiles: [{
+      id: 'smoke-profile',
+      name: 'Smoke',
+      provider: 'deepseek',
+      apiKey: 'smoke-key',
+      model: 'fake-model',
+      ollamaUrl: '',
+      baseUrl: '',
+      customModel: ''
+    }]
+  })`);
+  assert.deepEqual(smokeProfileSave, {success: true});
 
   const llmProfileIpcState = await mainWindow.webContents.executeJavaScript(`(async () => {
     const initial = await window.api.getLlmProfileSummaries();
@@ -659,18 +679,6 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.equal(require.cache[require.resolve('../lib/asr')], undefined);
   assert.equal(require.cache[require.resolve('sherpa-onnx-node')], undefined);
 
-  const originalLlmSettings = await settingsWindow.webContents.executeJavaScript(
-    'window.api.getLlmProviderSettings()'
-  );
-  const fakeModelSave = await settingsWindow.webContents.executeJavaScript(`(async () => {
-    const settings = await window.api.getLlmProviderSettings();
-    const profiles = settings.profiles.map(profile => profile.id === settings.activeProfileId
-      ? {...profile, model: 'fake-model'}
-      : profile);
-    return window.api.saveLlmProviderSettings({...settings, profiles});
-  })()`);
-  assert.deepEqual(fakeModelSave, {success: true});
-
   await mainWindow.webContents.executeJavaScript(`(() => {
     const replacementBody = document.body.cloneNode(true);
     document.body.replaceWith(replacementBody);
@@ -783,10 +791,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       const provider = document.getElementById('provider');
       const model = document.getElementById('model');
       const cards = document.querySelectorAll('.asr-model-card');
-      if (!provider || !model || model.options.length === 0 || cards.length !== 3) return null;
+      if (!provider || !model || cards.length !== 3) return null;
       return {
         title: document.title,
-        provider: provider.value,
         hasGetLlmProviderSettings: typeof window.api?.getLlmProviderSettings === 'function',
         theme: document.documentElement.dataset.theme,
         layout: document.documentElement.dataset.layout,
@@ -799,7 +806,6 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   });
   assert.deepEqual(settingsState, {
     title: '设置',
-    provider: 'deepseek',
     hasGetLlmProviderSettings: true,
     theme: 'graphite',
     layout: 'coach-rail',
