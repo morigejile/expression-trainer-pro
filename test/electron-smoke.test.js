@@ -6,6 +6,7 @@ const os = require('node:os');
 const path = require('node:path');
 
 const SUCCESS_MARKER = 'ELECTRON_SMOKE_OK';
+const RESULT_MARKER = 'ELECTRON_SMOKE_RESULT ';
 const PROCESS_TIMEOUT_MS = 30_000;
 const HEADLESS_SWITCHES = ['--headless', '--disable-gpu', '--no-sandbox'];
 
@@ -81,6 +82,16 @@ test('real Electron covers core flows and offline 16/44.1/48 kHz buffer graph ad
     assert.equal(timedOut, false, `Electron smoke exceeded ${PROCESS_TIMEOUT_MS}ms\n${details}`);
     assert.equal(code, 0, `Electron smoke exited unsuccessfully\n${details}`);
     assert.match(stdout, new RegExp(`^${SUCCESS_MARKER}\\r?$`, 'm'), `Missing success marker\n${details}`);
+    const resultLine = stdout.split(/\r?\n/).find(line => line.startsWith(RESULT_MARKER));
+    assert.ok(resultLine, `Missing smoke result\n${details}`);
+    assert.deepEqual(JSON.parse(resultLine.slice(RESULT_MARKER.length)), {
+      policyShownBeforeRecording: true,
+      playbackVisibleAfterStop: true,
+      recordOptionCount: 1,
+      modelLabels: ['fake-model'],
+      analysisStatus: '分析完成',
+      audioType: 'audio/wav'
+    });
   } finally {
     clearTimeout(timeout);
     stopProcessTree(child);

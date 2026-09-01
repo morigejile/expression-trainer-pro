@@ -1,13 +1,13 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，三款 streaming ASR、模型管理和内部包内默认资格已实现；公开模型分发仍受外部门禁约束
-> 基线日期：2026-08-31
+> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，录音回放、结构化同步分析、三款 streaming ASR、模型管理和内部包内默认资格已实现；公开模型分发仍受外部门禁约束
+> 基线日期：2026-09-01
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
 > 描述对象：当前集成分支的产品运行时、开发工具边界与已验证的内部安装基线
 
 ## 1. 证据边界
 
-当前事实来自源码、依赖清单和 Git 状态，并由 Node 测试、Electron smoke、packaged native-load、真实 Paraformer 首次安装及升级 smoke 支持。已验证 Main/Preload/Renderer、utility-process IPC、执行单元退出与重建、Fake LLM、粘贴分析，以及 Electron AudioWorklet 对 16/44.1/48 kHz fixture 的适配。真实可配置麦克风、真实外部 LLM、接近资格线硬件及非 Windows x64 制品仍未形成证据。
+当前事实来自源码、依赖清单和 Git 状态，并由 Node 测试、Electron smoke、packaged native-load、真实 Paraformer 首次安装及升级 smoke 支持。已验证 Main/Preload/Renderer、utility-process IPC、执行单元退出与重建、Fake LLM、粘贴分析、首次录音告知、运行期 WAV 回放与结构化片段分析，以及 Electron AudioWorklet 对 16/44.1/48 kHz fixture 的适配。真实可配置麦克风、真实外部 LLM、接近资格线硬件及非 Windows x64 制品仍未形成证据。
 
 | 标记 | 含义 |
 |---|---|
@@ -21,6 +21,8 @@
 main.js                         Electron Main、窗口、设置、IPC、ASR/分析/LLM 调度
 preload.js                      contextBridge API
 src/index.html / app.js         主 UI、录音、训练状态和展示
+src/pcm-wav.js                  Renderer 内 Float32→Int16、20 分钟有界累积和 WAV Blob
+src/training-records.js         Renderer 内五条记录队列、Blob URL 释放和片段定位
 src/safe-rendering.js           安全高亮 token、DOM 渲染、报告允许列表和 HTML 转义
 src/settings.html / settings.js 外观与 LLM 设置
 src/appearance.js               Renderer 根节点主题/布局应用与广播订阅
@@ -43,9 +45,11 @@ src/audio-worklet.mjs           AudioWorklet port/epoch 适配层
 src/audio-feed-queue.js         10-block 串行队列、drain、overrun 与指标
 lib/lexicon.js                  本地确定性文本分析
 lib/ai-feedback.js              多 LLM 后端 fetch
-lib/prompts.js                  实时反馈/报告 prompt
+lib/playback-analysis.js        结构化回放分析响应的严格校验
+lib/prompts.js                  实时反馈/报告/回放分析 prompt
 lib/llm-provider-config.js      LLM provider 默认值、解析和 schema 迁移纯函数
 lib/llm-provider-store.js       LLM provider 文件选择、单向迁移和 future-schema 保存保护
+lib/recording-policy-store.js   首次录音策略确认布尔值的原子存储
 lib/appearance-config.js        四主题/双布局外观 schema 规范化
 lib/appearance-store.js         appearance.json 读取、原子保存和 future-schema 保护
 lib/window-bounds.js            主显示器逻辑工作区初始尺寸计算
@@ -76,9 +80,11 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 麦克风 → 本地 ASR ┐
                   ├→ 词库分析 → 可选 LLM 实时反馈/报告 → UI/Markdown
 粘贴逐字稿 ───────┘
+   └→ Renderer-only Int16/WAV（最多五条）→ 本地回放
+ASR 最终片段 + 时间 → 结构化 LLM 回放分析 → 随播放进度显示
 ```
 
-应用支持训练开始/暂停/继续/结束、partial/final 字幕、填充词/犹豫词/笼统词/表达密度统计、精准词建议、自定义训练规则、LLM 反馈、原文/报告复制和 Markdown 保存。
+应用支持训练开始/暂停/继续/结束、运行期最近五条录音回放、片段级同步建议、多组 LLM profile、partial/final 字幕、填充词/犹豫词/笼统词/表达密度统计、精准词建议、自定义训练规则、LLM 反馈、原文/报告复制和 Markdown 保存。
 
 它没有大型前端框架、独立后端、数据库或微服务。音频、ASR、模型、配置和交付边界已从原型职责中拆开；Renderer 的训练编排仍集中在 `ExpressionTrainer`。
 
@@ -89,14 +95,14 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 | 应用 | `expression-trainer` / product `宇宙无敌表达训练` / `1.0.1` | `package.json#version` 是应用与制品唯一版本源；CHANGELOG 和最小 release checklist 已建立 |
 | 桌面运行时 | Electron `43.4.1`（精确版本） | 当前 lock 与 `node_modules` 一致；Windows x64 实测内置 Node 24.18.1、Chromium 150.0.7871.224、modules ABI 148、N-API 10 |
 | UI | 原生 HTML/CSS/JavaScript | 无 bundler/前端框架 |
-| 音频 | 独立 AudioCapture：`getUserMedia` + `AudioContext({sampleRate:16000,latencyHint:'interactive'})` | Renderer 只编排 session/UI；请求/context/可用 track rate 可诊断 |
+| 音频 | 独立 AudioCapture：`getUserMedia` + `AudioContext({sampleRate:16000,latencyHint:'interactive'})` | Float32 继续送本地 ASR，同时在 Renderer 转为有界 Int16；完成后只保留 WAV Blob URL；请求/context/可用 track rate 可诊断 |
 | 音频节点 | AudioWorklet + 320 帧 mono Float32 collector | capture epoch 隔离暂停前旧块；正常 stop flush tail；固定 Electron fixture 覆盖 16/44.1/48 kHz |
 | 权限桥接 | Preload `contextBridge` + `ipcRenderer.invoke` | `contextIsolation:true`、`nodeIntegration:false` |
 | ASR 引擎 | `sherpa-onnx-node` `1.13.3`（精确版本） | 仅由 utility process 内的 Paraformer Provider 延迟加载，Main 不 require；packaged native-load smoke 已通过 |
 | ASR 模型 | Paraformer、Zipformer Small、Zipformer Large | schema-v2 Catalog 固定 archive/runtime；模型安装到 `appData/expression-trainer-pro-models`，权重不纳入 Git；当前 Catalog 默认是 Zipformer Large，但公开分发仍受许可约束 |
 | 本地分析 | `lib/lexicon.js` + `data/emotion-lexicon.json` + `shared/expression-rules.js` | 146 个情绪词；16 个填充词、14 个犹豫词、20 组笼统词映射由 Renderer/Main 共用；未启用数据不放入活跃 `data/` 目录 |
-| LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接/实时/报告分别为 10/15/60 秒超时，并支持 AbortSignal、按 Renderer 取消和异常响应验证 |
-| 设置 | `userData/appearance.json`、`userData/asr-selection.json`、`userData/llm-provider-settings.json`、legacy `userData/settings.json`、`userData/custom-prompt.json` | Appearance、ASR 选择与 LLM provider 各自持久化且互不覆盖；小文件以同盘临时文件/fsync/rename 原子发布；API Key 明文 |
+| LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接/实时/报告/回放分析有独立超时，支持 AbortSignal、按 Renderer 取消和严格结构化响应验证；回放请求不含音频 |
+| 设置 | `userData/appearance.json`、`userData/asr-selection.json`、`userData/llm-provider-settings.json`、`userData/recording-policy.json`、legacy `userData/settings.json`、`userData/custom-prompt.json` | Appearance、ASR 选择、多 LLM profile 与录音策略确认各自持久化且互不覆盖；只持久化确认布尔值，不保存录音内容；小文件原子发布；API Key 明文 |
 | 输出 | Clipboard + Electron Save Dialog + Markdown | 原文与报告 |
 | 构建/测试 | Node test + Electron smoke + Electron Forge 7.5/Squirrel | `package`/`make` 固定 Windows x64；packaged smoke 覆盖 Fake 产品流、utility-only Sherpa native load、完整 DLL unpack 和外部模型目录；尚无 CI |
 
@@ -127,10 +133,10 @@ flowchart LR
   Mic[系统麦克风]
   LLM[OpenAI / DeepSeek / Ollama / Custom]
   Model[(appData/expression-trainer-pro-models\n版本目录 + active pointer)]
-  UserData[(userData/llm-provider-settings.json\nlegacy settings.json\ncustom-prompt.json)]
+  UserData[(userData/llm-provider-settings.json\nrecording-policy.json\nappearance/asr-selection/custom-prompt JSON\nlegacy settings.json)]
 
   subgraph Electron[Expression Trainer / Electron]
-    R[Renderer\nUI + Web Audio + 训练状态\nsrc/app.js]
+    R[Renderer\nUI + Web Audio + 训练状态\n运行期 WAV/五条记录\nsrc/app.js]
     P[Preload\nwindow.api\npreload.js]
     M[Main Process\n窗口 + 文件 + IPC Router\nmain.js]
     C[ASR Controller\n请求关联 + 退出/重建]
@@ -150,6 +156,7 @@ flowchart LR
   M -->|安全 envelope + 规范事件| P
   P --> R
   R -->|逐句 invoke| P
+  R -->|profile ID + 片段文本/时间\n不含音频| P
   M --> X
   X --> M
   M --> F
@@ -166,9 +173,12 @@ Main 负责 Electron 控制面、词库分析、小型 userData JSON 原子文�
 - 持有 `ExpressionTrainer` 的录音、暂停、计时、完整文本、句子和统计状态。
 - 开始时创建 UUID `sessionId`，调用 `startASR({sessionId,sampleRateHz:16000})`，成功后再请求麦克风；初始化或麦克风失败显示字幕错误并使当前 ASR session 失效。
 - 通过 `AudioCapture` 接收带 session/sequence/rate/channels/format/frames 的 320 帧或 final-tail chunk；暂停/恢复使用递增 capture epoch，旧 epoch 消息不消耗序列。
+- 同一 Float32 chunk 在 Renderer 转为 Int16 并进入单条最多 19,200,000 帧的有界录音缓冲；WAV 建立后释放 PCM 分块，只在内存中保留 Blob URL。最多保存五条已完成记录，第六条和删除/退出都会撤销对应 URL。
 - 每块以 `feedAudio({sessionId,sequence,samples})` invoke 进入单发送者队列；总深度最多 10 块（200 ms），记录 peak/rejected/discarded/overrun，溢出以 `audio-overrun` 失败关闭而不静默丢音频。正常 stop 先 flush capture tail，再关闭入口并只调用一次 drain。
 - 只接受当前 `sessionId` 且 event `sequence` 严格递增的 `ready/partial/final/error/stopped`；旧 session、重复/倒序、未知或 malformed 事件不产生 UI 副作用，`stopped` 使 session 失效。
 - final 文本追加到 `fullText`，逐句做本地分析；每新增约 30 字触发一次 LLM 实时反馈。
+- final 文本同时形成单调、不重叠的片段时间轴。原生播放器按片段 ID 边界切换字幕高亮和最近一次成功建议；播放与拖动不触发模型推理，空格快捷键会排除表单控件、音频控件、弹窗和重复按键。
+- 首次录音在麦克风权限前等待用户确认运行期保留政策。完成记录后自动用当前 profile 分析一次；切换 profile 只更新选择，用户点击“重新分析”才发起请求，失败或迟到响应不覆盖旧结果。
 - 展示 partial 临时字幕；final 与粘贴字幕通过 text node 和受控 `span` token 高亮词语，不解析输入中的 HTML。
 - 支持粘贴逐字稿、生成报告、复制/保存原文和报告、清空当前内存状态。
 - LLM 报告只渲染标题、加粗、行内代码、引用、普通行和换行等严格允许列表；LLM/HTTP 错误作为纯文本显示。
@@ -180,12 +190,13 @@ R-02 已建立 ASR session/event 状态，R-03/R-04 已把采集生命周期和 
 
 ### 5.2 Preload / `preload.js`
 
-使用 `contextBridge.exposeInMainWorld('api', ...)` 暴露 Appearance、设置、Prompt、ASR、分析、LLM 和文件保存共 22 个能力方法。BrowserWindow 均设置 `contextIsolation:true`、`nodeIntegration:false`。
+使用 `contextBridge.exposeInMainWorld('api', ...)` 暴露 Appearance、设置、Prompt、ASR、分析、LLM、录音策略和文件保存等显式能力。BrowserWindow 均设置 `contextIsolation:true`、`nodeIntegration:false`。
 
 关键事实：
 
 - ASR 公开能力名为 `startASR`、`feedAudio`、`stopASR`、`cancelASR`；`feedAudio` 保留 command 元数据并把 samples 规范为 `Float32Array`，再逐块 `ipcRenderer.invoke('feed-audio', ...)`。
-- LLM API 暴露反馈、报告、连接测试和显式取消；取消只作用于当前 Renderer 的 pending LLM 请求。
+- LLM API 暴露反馈、报告、结构化回放分析、脱敏 profile 摘要/选择、连接测试和显式取消；主训练窗口不能读取 Key 或完整 endpoint，取消只作用于当前 Renderer 的 pending LLM 请求。
+- 录音策略 API 只读取和确认一个布尔值；音频 Blob、PCM、时间轴和分析结果均不经过该设置边界。
 - Appearance API 暴露读取、显式保存和带精确 listener 清理的变更订阅；Renderer 只接收规范化的 `{schemaVersion,theme,layout}`。
 - ASR Router 对四类 command 做精确字段、非空 session、16 kHz、sequence、有限 Float32 样本等校验；文本分析、实时反馈、最终报告和 Markdown 保存另有轻量类型、大小、统计字段和文件名边界。settings/custom-prompt 继续由各自配置模块规范化，尚无外层 payload 大小上限。
 
@@ -200,7 +211,7 @@ R-02 已建立 ASR session/event 状态，R-03/R-04 已把采集生命周期和 
 - 仅在显式 `--smoke-test` 参数下让 utility process 组合最小 Fake ASR，并在 Main 组合 Fake LLM、临时 `userData` 和自动驱动；正常启动向 utility process 传入 `userData`、app version、受信任模型选择及可选包内默认归档，由 managed provider 和 Factory 创建 Catalog 对应的 streaming Provider。
 - `start-asr`、`feed-audio`、`stop-asr`、`cancel-asr` 通过 ASR Router 与 Controller 返回安全 envelope；Main 不加载 `lib/asr.js` 或 Sherpa。执行单元退出会拒绝 pending 命令，下一次 start 重新创建；应用退出最多等待 5 秒 dispose 后强杀。
 - `analyze-text` 在 Main 中执行本地分析。
-- `get-realtime-feedback`、`get-final-report` 和连接测试在 Main 中发起受超时约束的 fetch；同一 Renderer 的同类新请求会取消旧请求，显式取消可终止该 Renderer 的全部 LLM 请求。
+- `get-realtime-feedback`、`get-final-report`、`analyze-playback` 和连接测试在 Main 中发起受超时约束的 fetch；回放分析只接受受限 profile ID 与经过大小、数量、唯一 ID 和时间范围校验的文本片段。同一 Renderer 的同类新请求会取消旧请求，显式取消可终止该 Renderer 的全部 LLM 请求。
 - `save-file` 通过系统对话框把 Markdown 写到用户选择的位置。
 
 设置和 Prompt 文件仍使用同步 API，但数据量很小，写入通过同目录临时文件、fsync 与 rename 防止中断留下半文件；只有实测 Main 卡顿时才改异步 store。
@@ -230,7 +241,7 @@ UI 的 `src/safe-rendering.js` 与 Main 的 `lib/lexicon.js` 共用唯一运行�
 
 - Provider：OpenAI、DeepSeek、Ollama、自定义 OpenAI-compatible。
 - OpenAI/DeepSeek endpoint 固定；Ollama 默认 localhost；自定义 base URL 自动追加 `/chat/completions`。
-- 实时反馈 max_tokens 150；最终报告 8192；temperature 0.7。
+- 实时反馈 max_tokens 150；最终报告 8192；回放分析 4096；回放分析使用较低 temperature 并要求精确 JSON 结构。
 - 自定义训练目标/规则/风格/口癖被附加到 prompt。
 
 T-06 后的请求边界具有以下事实：
@@ -238,6 +249,7 @@ T-06 后的请求边界具有以下事实：
 - 连接测试、实时反馈、最终报告的超时分别为 10、15、60 秒，并把 AbortSignal 传给原生 `fetch`；
 - 同一 Renderer 的同类新请求会取消旧请求，会话边界可显式取消全部 pending LLM 请求；Main 协调层抑制不配合 AbortSignal 的迟到结果，Renderer 代际校验继续抑制取消前已完成 IPC 返回的旧结果；
 - 无 Key、429、其他 HTTP 错误、超时、取消、坏 JSON，以及缺失 `choices[0].message.content` 均返回稳定错误；
+- 回放分析结果只接受请求中存在且不重复的 segment ID、精确字段和有界建议文本；Main 返回实际使用的 profile ID/name/provider/model 摘要。请求只含文本与时间，不含 PCM、WAV、Blob URL 或路径；
 - 不读取或透传 HTTP 错误正文，未知 fetch 异常被泛化，避免错误信息泄露 API Key、Authorization 或完整敏感响应；
 - 没有自动重试。设置页的“保存设置”和“测试连接”是独立动作：保存只校验并持久化当前草稿，测试只验证当前草稿且不保存；两者分别显示忙碌状态和安全错误原因。
 
@@ -246,15 +258,14 @@ T-06 后的请求边界具有以下事实：
 `llm-provider-settings.json` 位于 Electron `userData`，当前 schema 是：
 
 ```text
-schemaVersion: 1
-provider
-providers.openai     { apiKey, model }
-providers.deepseek   { apiKey, model }
-providers.ollama     { ollamaUrl, model }
-providers.custom     { apiKey, baseUrl, model, customModel }
+schemaVersion: 2
+activeProfileId
+profiles[] { id, name, provider, apiKey, model, ollamaUrl, baseUrl, customModel }
 ```
 
-旧版扁平字段、缺失 provider 字段和旧文件名 `settings.json` 在读取时迁移为 schema version 1；canonical 文件优先，迁移后不删除 legacy 文件，也不按时间戳合并。损坏 JSON 使用默认配置运行并保留原文件，未知 provider 配置块不会在规范化时被删除。canonical 或 legacy future schema 可读取已知子集，显式保存则返回稳定错误且不写文件。LLM provider 与 custom-prompt 都使用同盘原子写，发布失败保留旧文件并清理临时文件。API Key 仍为明文；当前内部阶段不为此增加 native keychain 依赖，发布前再按平台成本评估。`custom-prompt.json` 保存 versioned goals、customRules、styleRef、customWords。训练文本、统计和报告仅在 Renderer 内存中，除非用户手动复制/保存。
+旧 schema-v1 provider 配置和旧文件名 `settings.json` 在读取时单向迁移为一个或多个具名 profile；canonical 文件优先，迁移后不删除 legacy 文件，也不按时间戳合并。设置页可新建、复制、重命名、选择、测试、保存和删除 profile，并始终保留至少一个。损坏 JSON 使用默认配置运行并保留原文件；canonical 或 legacy future schema 可读取已知子集，显式保存则返回稳定错误且不写文件。LLM profile 与 custom-prompt 都使用同盘原子写，发布失败保留旧文件并清理临时文件。API Key 仍为明文；当前内部阶段不为此增加 native keychain 依赖，发布前再按平台成本评估。`custom-prompt.json` 保存 versioned goals、customRules、styleRef、customWords。
+
+`recording-policy.json` 只保存 `{schemaVersion:1,acknowledged:true}`。录音、逐字稿片段时间轴、本地统计和回放分析只存在于 Renderer 内存；关闭窗口释放全部五条记录和 Blob URL，不形成跨重启训练历史。用户主动复制或保存的原文/报告仍沿用现有明确操作边界。
 
 `appearance.json` 只保存四个主题和两个布局标识；缺失、损坏或未知值回退 Graphite/coach-rail，future schema 可读取已知值但拒绝显式保存。`asr-selection.json` 只保存 `selectedModelId`；缺失或稳定损坏在默认模型成功后原子恢复，瞬时初始化失败不改写选择。外观和模型操作都独立于 LLM 保存/连接测试。
 
@@ -275,7 +286,7 @@ getUserMedia({audio:true})
 → AudioWorkletNode('expression-trainer-audio-collector')
 → Chromium graph 将输入适配到 16 kHz
 → 可变量子多声道平均为 mono，汇集 320 帧 Float32 chunk / stop tail
-→ feedAudio({sessionId,sequence,samples})
+├→ feedAudio({sessionId,sequence,samples})
 → Preload 规范为 Float32Array
 → ipcRenderer.invoke('feed-audio')
 → Main ASR command 校验
@@ -284,6 +295,7 @@ getUserMedia({audio:true})
 → synchronous decode/getResult/isEndpoint
 → {ok:true,events:[partial/final]}
 → Renderer session/sequence 过滤后更新 UI
+└→ Renderer Float32→Int16 → 当前有界 PCM 录音缓冲（不经 IPC）
 ```
 
 AudioCapture 返回并保留请求值、`audioContext.sampleRate` 与可用的 track rate；实际 context 不是 16000 时在创建 worklet 前失败关闭。固定 Electron fixture 已证明 16/44.1/48 kHz 确定性缓冲进入 16 kHz graph 后的总帧数、平台均值与时间过渡；真实麦克风/驱动仍为 Runtime-TBD。
@@ -298,7 +310,10 @@ Renderer 请求 AudioCapture flush，关闭队列入口并 drain 已接受 chunk
 → stream.inputFinished + decode
 → utility process 返回可选 final + stopped 事件
 → Renderer 过滤当前 session/sequence，并经 mergeFinalText 去重 final
-→ 非空新文本进入字幕、统计、分析和报告
+→ 非空新文本进入字幕、统计、片段时间轴、分析和报告
+→ Renderer 组装 16-bit mono WAV Blob，释放 PCM 分块
+→ 加入最近五条内存队列；第六条撤销最老 Blob URL
+→ 原生播放器显示当前记录；应用退出撤销全部 URL
 ```
 
 ### 6.3 分析与 LLM
@@ -311,9 +326,16 @@ endpoint/final sentence
 
 停止/粘贴完成后用户点击生成报告
 → fullText + stats → Main fetch → Renderer 受控 Markdown token/DOM 渲染 → 可保存 Markdown
+
+录音正常结束后自动分析，或用户选择 profile 后点击“重新分析”
+→ Renderer 提交 {profileId, segments:[{id,text,startMs,endMs}]}，不提交音频
+→ Preload / Main 校验输入并从设置读取完整 profile 快照
+→ Main 结构化 LLM fetch → 严格校验 segment ID/JSON/长度
+→ Renderer 仅在请求代际和当前记录仍匹配时整体替换上次成功结果
+→ 播放/拖动跨越片段边界时更新当前字幕与建议，不再次推理
 ```
 
-LLM 失败只返回安全的 `{success:false,error}`，不会修改本地词库结果；粘贴模式在请求 LLM 前完成本地分析，实时模式的分析 IPC 与 LLM IPC 也彼此独立。
+LLM 失败只返回安全的 `{success:false,error}`，不会修改本地词库结果或覆盖上一份成功的回放分析；粘贴模式在请求 LLM 前完成本地分析，实时模式的分析 IPC 与 LLM IPC 也彼此独立。
 
 Phase 0 已把 README 的反馈触发口径改为源码实际的约 30 字，并明确本地 ASR/词库与可选联网 LLM 的边界。
 
@@ -324,6 +346,10 @@ Settings/Prompt Renderer
 → Preload invoke
 → Main 同步读取、同盘原子写入 userData JSON
 → LLM 请求前重新读取
+
+首次录音
+→ Renderer 读取 recording-policy.json 的确认布尔值
+→ 未确认时先显示阻塞说明，确认后才启动 ASR/申请麦克风
 ```
 
 ## 7. 部署与安装现状

@@ -4,6 +4,7 @@
 
 ## Unreleased
 
+- 增加运行期最近五条录音的 WAV 回放、片段级同步分析、20 分钟单条上限、首次保留策略告知和多组 LLM 配置切换/重新分析；音频不发送给云端 LLM，也不跨应用重启保留。本条仅记录内部功能变化，不构成公开发布资格声明。
 - 增加独立 Appearance 配置、四套主题、coach-rail/focus-hud 双布局、跨窗口同步和响应式窗口尺寸；布局切换保留训练 DOM、状态与滚动位置。
 - 增加三款 streaming ASR 的受信任 Catalog/Factory、独立选择存储、启动恢复、单 controller 切换与失败回退。
 - 增加独立模型安装 utility、受限设置窗口 IPC 和模型管理界面；安装支持进度、取消与重试，Renderer 只提交受信任模型 ID。

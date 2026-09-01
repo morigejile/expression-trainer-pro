@@ -1,8 +1,11 @@
 const assert = require('node:assert/strict');
+const fs = require('node:fs');
 const path = require('node:path');
 const { createFakeAsrProvider } = require('../lib/fake-asr-provider');
+const { getRecordingPolicyPath } = require('../lib/recording-policy-store');
 
 const SUCCESS_MARKER = 'ELECTRON_SMOKE_OK';
+const RESULT_MARKER = 'ELECTRON_SMOKE_RESULT ';
 const STEP_TIMEOUT_MS = 10_000;
 const SMOKE_SESSION_ID = '123e4567-e89b-42d3-a456-426614174000';
 const SMOKE_EXIT_SESSION_ID = '123e4567-e89b-42d3-a456-426614174002';
@@ -23,7 +26,13 @@ const fakeAsrProvider = createFakeAsrProvider({
 const fakeFeed = fakeAsrProvider.feed;
 fakeAsrProvider.feed = command => {
   assert.ok(command.samples instanceof Float32Array, 'ASR fake expected Float32Array samples');
-  assert.equal(command.samples.length, 3, 'ASR fake expected the smoke audio fixture');
+  assert.ok(
+    command.samples.length === 3 || command.samples.length === 160,
+    'ASR fake expected the direct or recording smoke audio fixture'
+  );
+  assert.deepEqual(Array.from(command.samples.slice(0, 3)), [
+    Math.fround(0.1), Math.fround(0.2), Math.fround(0.3)
+  ]);
   return fakeFeed(command);
 };
 
@@ -92,7 +101,7 @@ const fakeLlm = {
   },
 
   async sendPlaybackAnalysis() {
-    return [];
+    return [{segmentId: 'segment-1', advice: 'SMOKE_PLAYBACK_ADVICE'}];
   },
 
   async testConnection() {
@@ -253,7 +262,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     return {success, missing};
   })()`);
   assert.equal(playbackAnalysisIpcState.success.success, true);
-  assert.deepEqual(playbackAnalysisIpcState.success.analysis.items, []);
+  assert.deepEqual(playbackAnalysisIpcState.success.analysis.items, [
+    {segmentId: 'segment-1', advice: 'SMOKE_PLAYBACK_ADVICE'}
+  ]);
   assert.deepEqual(playbackAnalysisIpcState.missing, {
     success: false,
     error: '所选模型配置不存在',
@@ -265,17 +276,10 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   );
   assert.doesNotMatch(JSON.stringify(playbackAnalysisIpcState.success.analysis.profile), /apiKey|baseUrl|ollamaUrl|customModel/);
 
-  const recordingPolicyIpcState = await mainWindow.webContents.executeJavaScript(`(async () => {
-    const initial = await window.api.getRecordingPolicy();
-    const acknowledged = await window.api.acknowledgeRecordingPolicy();
-    const persisted = await window.api.getRecordingPolicy();
-    return {initial, acknowledged, persisted};
-  })()`);
-  assert.deepEqual(recordingPolicyIpcState, {
-    initial: {acknowledged: false},
-    acknowledged: {success: true, acknowledged: true},
-    persisted: {acknowledged: true}
-  });
+  const initialRecordingPolicy = await mainWindow.webContents.executeJavaScript(
+    'window.api.getRecordingPolicy()'
+  );
+  assert.deepEqual(initialRecordingPolicy, {acknowledged: false});
 
   const helpState = await mainWindow.webContents.executeJavaScript(`(() => {
     const helpButton = document.getElementById('btn-help');
@@ -634,6 +638,111 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.equal(asrProvider.snapshot().restartCount, 1);
   assert.equal(require.cache[require.resolve('../lib/asr')], undefined);
   assert.equal(require.cache[require.resolve('sherpa-onnx-node')], undefined);
+
+  const originalLlmSettings = await mainWindow.webContents.executeJavaScript(
+    'window.api.getLlmProviderSettings()'
+  );
+  const fakeModelSave = await mainWindow.webContents.executeJavaScript(`(async () => {
+    const settings = await window.api.getLlmProviderSettings();
+    const profiles = settings.profiles.map(profile => profile.id === settings.activeProfileId
+      ? {...profile, model: 'fake-model'}
+      : profile);
+    return window.api.saveLlmProviderSettings({...settings, profiles});
+  })()`);
+  assert.deepEqual(fakeModelSave, {success: true});
+
+  await mainWindow.webContents.executeJavaScript(`(() => {
+    const replacementBody = document.body.cloneNode(true);
+    document.body.replaceWith(replacementBody);
+    const fixture = new Float32Array(160);
+    fixture.set([0.1, 0.2, 0.3]);
+    const trainer = new ExpressionTrainer({
+      audioCaptureFactory: () => {
+        let startOptions = null;
+        let emitted = false;
+        return {
+          async start(options) {
+            startOptions = options;
+            return {
+              requestedSampleRateHz: 16000,
+              contextSampleRateHz: 16000,
+              trackSampleRateHz: 16000
+            };
+          },
+          setEnabled(enabled) {
+            if (!enabled || emitted || !startOptions) return;
+            emitted = true;
+            Promise.resolve(startOptions.onChunk({
+              sessionId: startOptions.sessionId,
+              sequence: 0,
+              sampleRateHz: 16000,
+              channels: 1,
+              format: 'f32',
+              frames: fixture.length,
+              samples: fixture
+            })).catch(startOptions.onError);
+          },
+          async stop() {}
+        };
+      }
+    });
+    window.__recordingSmokeTrainer = trainer;
+    document.getElementById('btn-start').click();
+  })()`);
+
+  const policyShownBeforeRecording = await waitUntil('recording policy before microphone start', async () => {
+    return mainWindow.webContents.executeJavaScript(`(() => {
+      const modal = document.getElementById('recording-policy-modal');
+      return !modal.classList.contains('hidden')
+        && window.__recordingSmokeTrainer.isRecording === false
+        && document.getElementById('btn-stop').classList.contains('hidden');
+    })()`);
+  });
+  await mainWindow.webContents.executeJavaScript(
+    `document.getElementById('btn-recording-policy-confirm').click()`
+  );
+  await waitUntil('fake recording fixture delivery', async () => {
+    return mainWindow.webContents.executeJavaScript(`(() => {
+      const trainer = window.__recordingSmokeTrainer;
+      return trainer.isRecording
+        && trainer.audioFeedTracker?.queue.snapshot().completed === 1;
+    })()`);
+  });
+  await mainWindow.webContents.executeJavaScript(`document.getElementById('btn-stop').click()`);
+
+  const playbackSmokeState = await waitUntil('completed recording playback analysis', async () => {
+    return mainWindow.webContents.executeJavaScript(`(async () => {
+      const trainer = window.__recordingSmokeTrainer;
+      const record = trainer.trainingRecords?.selected();
+      if (!record?.playbackAnalysis
+          || document.getElementById('playback-controls').classList.contains('hidden')
+          || !document.getElementById('feedback-content').textContent.includes('SMOKE_PLAYBACK_ADVICE')) {
+        return null;
+      }
+      const audioBlob = await fetch(record.audioUrl).then(response => response.blob());
+      return {
+        playbackVisibleAfterStop: true,
+        recordOptionCount: document.getElementById('training-record-select').options.length,
+        modelLabels: Array.from(document.getElementById('playback-model').options, option => option.textContent),
+        analysisStatus: '分析完成',
+        analysisProfileModel: record.playbackAnalysis.profile.model,
+        analysisSegmentIds: record.playbackAnalysis.items.map(item => item.segmentId),
+        audioType: audioBlob.type
+      };
+    })()`);
+  });
+  assert.equal(playbackSmokeState.analysisProfileModel, 'fake-model');
+  assert.deepEqual(playbackSmokeState.analysisSegmentIds, ['segment-1']);
+  assert.deepEqual(await mainWindow.webContents.executeJavaScript('window.api.getRecordingPolicy()'), {
+    acknowledged: true
+  });
+
+  const restoredLlmSettings = await mainWindow.webContents.executeJavaScript(
+    `window.api.saveLlmProviderSettings(${JSON.stringify(originalLlmSettings)})`
+  );
+  assert.deepEqual(restoredLlmSettings, {success: true});
+  fs.rmSync(getRecordingPolicyPath(app.getPath('userData')), {force: true});
+
   await mainWindow.webContents.executeJavaScript(
     `document.getElementById('btn-settings').click()`
   );
@@ -879,6 +988,14 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   });
   assert.equal(calls.llmFeedback, 1);
 
+  console.log(`${RESULT_MARKER}${JSON.stringify({
+    policyShownBeforeRecording: Boolean(policyShownBeforeRecording),
+    playbackVisibleAfterStop: playbackSmokeState.playbackVisibleAfterStop,
+    recordOptionCount: playbackSmokeState.recordOptionCount,
+    modelLabels: playbackSmokeState.modelLabels,
+    analysisStatus: playbackSmokeState.analysisStatus,
+    audioType: playbackSmokeState.audioType
+  })}`);
   console.log(SUCCESS_MARKER);
   for (const window of BrowserWindow.getAllWindows()) {
     if (!window.isDestroyed()) window.destroy();
