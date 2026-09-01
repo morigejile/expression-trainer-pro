@@ -38,3 +38,31 @@ test('record store replaces immutably, selects records, clears, and formats labe
   assert.equal(store.selected(), null);
 });
 
+test('duplicate audio URLs are revoked exactly once across eviction and clear', () => {
+  const revoked = [];
+  const store = createTrainingRecordStore({ maxRecords: 1, revokeObjectURL: url => revoked.push(url) });
+  store.add(record(1, 'blob:shared'));
+  store.add(record(2, 'blob:shared'));
+  store.clear();
+  assert.deepEqual(revoked, ['blob:shared']);
+});
+
+test('segment lookup returns null before the first segment and inside gaps', () => {
+  const segments = [{ id: 'a', startMs: 100, endMs: 200 }, { id: 'b', startMs: 300, endMs: 400 }];
+  assert.equal(findSegmentAtTime(segments, 99), null);
+  assert.equal(findSegmentAtTime(segments, 250), null);
+});
+
+test('segment lookup uses logarithmic segment access on ordered timelines', () => {
+  let accesses = 0;
+  const segments = Array.from({ length: 4096 }, (_, index) => new Proxy({
+    id: index,
+    startMs: index * 10,
+    endMs: index * 10 + 10
+  }, { get(target, property, receiver) {
+    accesses += 1;
+    return Reflect.get(target, property, receiver);
+  } }));
+  assert.equal(findSegmentAtTime(segments, 30_000).id, 3000);
+  assert.ok(accesses < 100, `expected logarithmic access count, got ${accesses}`);
+});

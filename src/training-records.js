@@ -7,15 +7,19 @@
 
   function findSegmentAtTime(segments, currentMs) {
     if (!Array.isArray(segments) || !Number.isFinite(currentMs)) return null;
-    for (let i = 0; i < segments.length; i += 1) {
-      const segment = segments[i];
-      if (currentMs >= segment.startMs && currentMs < segment.endMs) return segment;
+    let low = 0;
+    let high = segments.length - 1;
+    let candidate = -1;
+    while (low <= high) {
+      const middle = low + Math.floor((high - low) / 2);
+      if (currentMs < segments[middle].startMs) high = middle - 1;
+      else { candidate = middle; low = middle + 1; }
     }
-    if (segments.length > 0) {
-      const final = segments[segments.length - 1];
-      if (currentMs === final.endMs) return final;
-    }
-    return null;
+    if (candidate < 0) return null;
+    const segment = segments[candidate];
+    if (currentMs < segment.endMs) return segment;
+    const final = segments[segments.length - 1];
+    return candidate === segments.length - 1 && currentMs === final.endMs ? final : null;
   }
 
   function createTrainingRecordStore({ maxRecords = 5, revokeObjectURL = () => {} } = {}) {
@@ -23,9 +27,13 @@
     if (typeof revokeObjectURL !== 'function') throw new TypeError('revokeObjectURL must be a function');
     const records = [];
     let selectedId = null;
+    const revokedUrls = new Set();
 
     function release(record) {
-      if (record && typeof record.audioUrl === 'string' && record.audioUrl !== '') revokeObjectURL(record.audioUrl);
+      if (record && typeof record.audioUrl === 'string' && record.audioUrl !== '' && !revokedUrls.has(record.audioUrl)) {
+        revokedUrls.add(record.audioUrl);
+        revokeObjectURL(record.audioUrl);
+      }
     }
     function add(record) {
       if (!record || typeof record !== 'object') throw new TypeError('record must be an object');
