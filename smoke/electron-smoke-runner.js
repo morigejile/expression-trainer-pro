@@ -91,6 +91,10 @@ const fakeLlm = {
     return 'SMOKE_LLM_REPORT';
   },
 
+  async sendPlaybackAnalysis() {
+    return [];
+  },
+
   async testConnection() {
     calls.llmConnection += 1;
     return { success: true };
@@ -148,7 +152,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       'getRecordingPolicy', 'acknowledgeRecordingPolicy',
       'openPromptEditor', 'getCustomPrompt', 'saveCustomPrompt', 'closeWindow',
       'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText',
-      'getRealtimeFeedback', 'getFinalReport', 'testLLMConnection',
+      'getRealtimeFeedback', 'getFinalReport', 'analyzePlayback', 'testLLMConnection',
       'cancelLLMRequests', 'saveFile', 'exportDiagnostics', 'openSupportLink'
     ];
     return {
@@ -235,6 +239,27 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   for (const summary of [llmProfileIpcState.initial, llmProfileIpcState.selected.summary]) {
     assert.doesNotMatch(JSON.stringify(summary), /apiKey|baseUrl|ollamaUrl/);
   }
+
+  const playbackAnalysisIpcState = await mainWindow.webContents.executeJavaScript(`(async () => {
+    const {activeProfileId} = await window.api.getLlmProfileSummaries();
+    const success = await window.api.analyzePlayback({
+      profileId: activeProfileId,
+      segments: [{id: 'segment-1', text: '我觉得这个方案很好。', startMs: 0, endMs: 1000}]
+    });
+    const missing = await window.api.analyzePlayback({
+      profileId: 'missing-profile',
+      segments: []
+    });
+    return {success, missing};
+  })()`);
+  assert.equal(playbackAnalysisIpcState.success.success, true);
+  assert.deepEqual(playbackAnalysisIpcState.success.analysis.items, []);
+  assert.deepEqual(playbackAnalysisIpcState.missing, {
+    success: false,
+    error: '所选模型配置不存在',
+    errorCode: 'invalid-profile-id'
+  });
+  assert.doesNotMatch(JSON.stringify(playbackAnalysisIpcState.success.analysis.profile), /apiKey|baseUrl|ollamaUrl|customModel/);
 
   const recordingPolicyIpcState = await mainWindow.webContents.executeJavaScript(`(async () => {
     const initial = await window.api.getRecordingPolicy();

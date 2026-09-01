@@ -56,6 +56,7 @@ contextBridge.exposeInMainWorld('api', {
   // AI反馈
   getRealtimeFeedback: (text) => ipcRenderer.invoke('get-realtime-feedback', text),
   getFinalReport: (data) => ipcRenderer.invoke('get-final-report', data),
+  analyzePlayback: (payload) => ipcRenderer.invoke('analyze-playback', payload),
   testLLMConnection: (settings) => ipcRenderer.invoke('test-llm-connection', settings),
   cancelLLMRequests: () => ipcRenderer.invoke('cancel-llm-requests'),
 

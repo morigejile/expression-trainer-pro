@@ -15,6 +15,7 @@ const {isAllowedSupportUrl} = require('./shared/support-links');
 const { loadLexicon, analyzeText } = require('./lib/lexicon');
 const {
   getSelectedLlmProviderSettings,
+  getLlmProfile,
   summarizeLlmProfiles,
   selectActiveLlmProfile
 } = require('./lib/llm-provider-config');
@@ -46,6 +47,7 @@ const {runManagedModelSmoke} = require('./lib/managed-model-smoke');
 const {
   requireBoundedText,
   validateFinalReportPayload,
+  validatePlaybackAnalysisPayload,
   validateMarkdownSaveRequest
 } = require('./lib/ipc-input');
 const modelRegistry = require('./models/registry.json');
@@ -68,6 +70,7 @@ const {
   createRequestCoordinator,
   runCoordinatedRequest,
   sendFeedback,
+  sendPlaybackAnalysis,
   sendReport,
   testConnection
 } = isSmokeTest
@@ -783,4 +786,27 @@ ipcMain.handle('get-final-report', async (event, payload) => {
       { signal }
     )
   );
+});
+
+ipcMain.handle('analyze-playback', async (event, payload) => {
+  const requestPayload = validatePlaybackAnalysisPayload(payload);
+  const settings = loadLlmProviderSettings(app.getPath('userData'));
+  const profile = getLlmProfile(settings, requestPayload.profileId);
+  if (!profile) return {success: false, error: '所选模型配置不存在', errorCode: 'invalid-profile-id'};
+  const customPrompt = loadCustomPrompt();
+  const result = await runCoordinatedRequest(
+    llmRequests,
+    event.sender.id,
+    'playback',
+    'analysis',
+    signal => sendPlaybackAnalysis(requestPayload.segments, profile, customPrompt, {signal})
+  );
+  if (!result.success) return result;
+  return {
+    success: true,
+    analysis: {
+      items: result.analysis,
+      profile: {id: profile.id, name: profile.name, provider: profile.provider, model: profile.model}
+    }
+  };
 });

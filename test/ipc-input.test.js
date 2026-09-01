@@ -8,6 +8,7 @@ const {
   MAX_TEXT_LENGTH,
   requireBoundedText,
   validateFinalReportPayload,
+  validatePlaybackAnalysisPayload,
   validateMarkdownSaveRequest
 } = require('../lib/ipc-input');
 
@@ -43,6 +44,47 @@ test('final report payload has exact text and finite non-negative statistics', (
     () => validateFinalReportPayload({...payload, stats: {...payload.stats, duration: -1}}),
     error => error.code === 'invalid-ipc-input' && error.message === 'stats.duration must be a non-negative finite number'
   );
+});
+
+test('playback payload accepts ordered segments with bounded profile and transcript text', () => {
+  const payload = {
+    profileId: 'profile-1',
+    segments: [
+      {id: 's1', text: '第一段', startMs: 0, endMs: 1000},
+      {id: 's2', text: '第二段', startMs: 1000, endMs: 2200}
+    ]
+  };
+
+  assert.deepEqual(validatePlaybackAnalysisPayload(payload), payload);
+});
+
+test('playback payload rejects overlaps, duplicate IDs, and excessive text', () => {
+  assert.throws(() => validatePlaybackAnalysisPayload({
+    profileId: 'p1',
+    segments: [
+      {id: 'a', text: '一', startMs: 0, endMs: 1000},
+      {id: 'a', text: '二', startMs: 900, endMs: 1200}
+    ]
+  }), error => error.code === 'invalid-ipc-input');
+
+  assert.throws(() => validatePlaybackAnalysisPayload({
+    profileId: 'p1',
+    segments: [{id: 'a', text: 'x'.repeat(30_001), startMs: 0, endMs: 1000}]
+  }), error => error.code === 'invalid-ipc-input');
+});
+
+test('playback payload rejects unexpected fields and invalid millisecond ranges', () => {
+  for (const payload of [
+    {profileId: 'p1', segments: [], extra: true},
+    {profileId: 'p1', segments: [{id: 'a', text: '一', startMs: -1, endMs: 1}]},
+    {profileId: 'p1', segments: [{id: 'a', text: '一', startMs: 2, endMs: 1}]},
+    {profileId: 'p1', segments: [{id: 'a', text: '一', startMs: 0, endMs: 1, extra: true}]}
+  ]) {
+    assert.throws(
+      () => validatePlaybackAnalysisPayload(payload),
+      error => error.code === 'invalid-ipc-input'
+    );
+  }
 });
 
 test('Markdown save request is bounded and uses a plain Markdown filename', () => {
