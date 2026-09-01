@@ -3,7 +3,7 @@
 > 状态：Existing / Partial / Planned
 > 基线日期：2026-08-31
 > 适用范围：内部开发/测试中的当前实现（Existing/Partial）与下一阶段工程化目标（Planned）
-> 源码基线：当前集成分支，已包含 R-01～R-09、PKG-01～PKG-04、UI-01/UI-02 与 ASR-M01～M03
+> 源码基线：当前集成分支，包含三款 streaming ASR、模型管理、双布局和内部包内默认资格
 
 ## 1. 文档目的
 
@@ -73,8 +73,7 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 | FR-P10 | Existing | 本地训练在 LLM 不可用时仍应工作。 | 离线、无 API Key 或 LLM 请求失败时，录音、本地 ASR 和基础词库分析仍可完成。 |
 | FR-P11 | Existing | LLM Provider 配置应具有独立且可识别的持久化边界。 | 使用明确的配置与接口名称；旧设置单向迁移；不与外观或 ASR 选择共享完整快照。 |
 | FR-P12 | Existing | 用户应能选择四个内置主题和 coach-rail/focus-hud 两种响应式布局。 | 外观使用独立 `appearance.json`；主题与布局可即时切换、跨窗口同步和重启恢复；训练中切换只更新根属性，保留节点、控件、计时、状态、内容和滚动位置；代表性最小、标准和宽屏尺寸下字幕与反馈不遮挡。 |
-| FR-P13 | Existing | 用户应能安装、选择和切换受信任 Catalog 中的 streaming ASR 模型。 | ASR-M01～M03 已完成三模型 Catalog/Factory、独立 `asr-selection.json`、启动恢复、严格 `--asr-model=<modelId>` 覆盖、单 controller 切换/失败回退、独立安装 utility、受限 IPC 与设置页即时操作；Renderer 只提交精确模型 ID，不接收路径、URL、hash 或 provider type。ASR-M04a 已验证显式内部包可离线导入 Catalog 默认 Zipformer Large，公开包内分发仍受许可门禁。 |
-| FR-P14 | Planned | 产品可在 streaming 轨道稳定后支持明确列出的 utterance ASR 模型。 | 第二批只含 SenseVoiceSmall 和 FireRedASR2；停止后解码、无 partial、5 分钟有界 PCM、cancel、失败和 session 隔离通过；不得阻塞第一批 streaming 交付或为其他候选预建适配器。 |
+| FR-P13 | Existing | 用户应能安装、选择和切换受信任 Catalog 中的 streaming ASR 模型。 | 设置页只接受 Catalog 模型 ID；安装支持进度、取消和重试；空闲时可切换模型，启动恢复上次选择，初始化失败回退到上一可用模型。普通公开制品不得携带未获再分发批准的模型。 |
 
 ## 5. 非功能需求（NFR）
 
@@ -143,4 +142,3 @@ Expression Trainer 是一款桌面表达训练工具。核心闭环为：
 - 当前实现：[Current Architecture](../architecture/current.md)
 - 决策记录：[ADR Index](../architecture/adr/README.md)
 - 交付顺序：[Roadmap](../roadmap.md)
-- 部分实现的多模型设计（ASR-M01～M03、ASR-M04a 已完成，完整 ASR-M04 仍受外部门槛约束）：[Multi-ASR Productization](../superpowers/specs/2026-08-30-multi-asr-models-design.md)

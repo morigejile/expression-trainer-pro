@@ -8,17 +8,17 @@ const path = require('node:path');
 
 const {createDiagnosticSnapshot} = require('../lib/diagnostics');
 
-function userDataFixture(t, pointer) {
+function modelRootFixture(t, pointer, modelId = 'paraformer-bilingual-zh-en') {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'expression-trainer-diagnostics-'));
   t.after(() => fs.rmSync(root, {recursive: true, force: true}));
-  const active = path.join(root, 'models', 'active');
+  const active = path.join(root, 'active');
   fs.mkdirSync(active, {recursive: true});
-  fs.writeFileSync(path.join(active, 'paraformer-bilingual-zh-en.json'), JSON.stringify(pointer));
+  fs.writeFileSync(path.join(active, `${modelId}.json`), JSON.stringify(pointer));
   return root;
 }
 
 test('diagnostic snapshot exports only the bounded support baseline', (t) => {
-  const userDataPath = userDataFixture(t, {
+  const modelRoot = modelRootFixture(t, {
     schemaVersion: 1,
     modelId: 'paraformer-bilingual-zh-en',
     version: '2024-03-10',
@@ -27,7 +27,8 @@ test('diagnostic snapshot exports only the bounded support baseline', (t) => {
   });
   const snapshot = createDiagnosticSnapshot({
     appVersion: '1.0.1',
-    userDataPath,
+    modelRoot,
+    modelId: 'paraformer-bilingual-zh-en',
     platform: 'win32',
     arch: 'x64',
     osRelease: '10.0.26200',
@@ -55,14 +56,25 @@ test('diagnostic snapshot exports only the bounded support baseline', (t) => {
       lastErrorCategory: null
     }
   });
-  assert.doesNotMatch(JSON.stringify(snapshot), new RegExp(userDataPath.replaceAll('\\', '\\\\')));
+  assert.doesNotMatch(JSON.stringify(snapshot), new RegExp(modelRoot.replaceAll('\\', '\\\\')));
+});
+
+test('diagnostic snapshot reports the effective Zipformer model from the external model root', (t) => {
+  const modelId = 'zipformer-large-ctc-zh-int8-2025-06-30';
+  const modelRoot = modelRootFixture(t, {schemaVersion: 1, modelId, version: '2025-06-30'}, modelId);
+  const snapshot = createDiagnosticSnapshot({
+    appVersion: '1.0.1', modelRoot, modelId, platform: 'win32', arch: 'x64',
+    osRelease: 'fixture', generatedAt: '2026-08-31T12:00:00.000Z'
+  });
+  assert.deepEqual(snapshot.asr.model, {id: modelId, version: '2025-06-30', status: 'active'});
 });
 
 test('diagnostic snapshot contains corrupt model state without paths or raw errors', (t) => {
-  const userDataPath = userDataFixture(t, {schemaVersion: 99, path: 'C:\\secret\\model'});
+  const modelRoot = modelRootFixture(t, {schemaVersion: 99, path: 'C:\\secret\\model'});
   const snapshot = createDiagnosticSnapshot({
     appVersion: '1.0.1',
-    userDataPath,
+    modelRoot,
+    modelId: 'paraformer-bilingual-zh-en',
     platform: 'win32',
     arch: 'x64',
     osRelease: 'fixture',
@@ -78,19 +90,21 @@ test('diagnostic snapshot contains corrupt model state without paths or raw erro
 });
 
 test('diagnostic snapshot rejects renderer-controlled extra fields and unsafe error categories', (t) => {
-  const userDataPath = userDataFixture(t, {
+  const modelRoot = modelRootFixture(t, {
     schemaVersion: 1,
     modelId: 'paraformer-bilingual-zh-en',
     version: '2024-03-10'
   });
   assert.throws(() => createDiagnosticSnapshot({
     appVersion: '1.0.1',
-    userDataPath,
+    modelRoot,
+    modelId: 'paraformer-bilingual-zh-en',
     audioRates: {requestedSampleRateHz: 16000, transcript: 'private'}
   }), /diagnostic/i);
   assert.throws(() => createDiagnosticSnapshot({
     appVersion: '1.0.1',
-    userDataPath,
+    modelRoot,
+    modelId: 'paraformer-bilingual-zh-en',
     asr: {initializationElapsedMs: 1, lastErrorCategory: 'C:\\private\\stack'}
   }), /invalid/i);
 });

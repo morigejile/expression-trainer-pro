@@ -143,6 +143,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   const apiContract = await mainWindow.webContents.executeJavaScript(`(() => {
     const expected = [
       'getLlmProviderSettings', 'saveLlmProviderSettings', 'openSettings',
+      'onLlmProviderSettingsChanged',
       'getAppearance', 'saveAppearance', 'onAppearanceChanged',
       'openPromptEditor', 'getCustomPrompt', 'saveCustomPrompt', 'closeWindow',
       'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText',
@@ -153,7 +154,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       title: document.title,
       missing: expected.filter(name => typeof window.api?.[name] !== 'function'),
       missingUi: [
-        'user-message', 'user-message-text', 'user-message-action',
+        'user-message', 'user-message-text', 'user-message-action', 'user-message-close',
         'training-status', 'feedback-status'
       ].filter(id => !document.getElementById(id)),
       initialUi: {
@@ -181,6 +182,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     hedgeClass: 'stat-value stat-orange',
     densityHelp: '有效词数（排除填充词和犹豫词）占总词数的比例'
   });
+  if (process.platform !== 'darwin') {
+    assert.equal(mainWindow.isMenuBarVisible(), false, 'main window must not render a second menu header');
+  }
 
   const appearanceIpcState = await mainWindow.webContents.executeJavaScript(`(async () => {
     const received = [];
@@ -204,6 +208,17 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       appearance: {schemaVersion: 1, theme: 'graphite', layout: 'coach-rail'}
     }
   });
+
+  const llmSettingsNotification = await mainWindow.webContents.executeJavaScript(`(async () => {
+    let notifications = 0;
+    const unsubscribe = window.api.onLlmProviderSettingsChanged(() => { notifications += 1; });
+    const settings = await window.api.getLlmProviderSettings();
+    const saved = await window.api.saveLlmProviderSettings(settings);
+    await new Promise(resolve => setTimeout(resolve, 25));
+    unsubscribe();
+    return {saved, notifications};
+  })()`);
+  assert.deepEqual(llmSettingsNotification, {saved: {success: true}, notifications: 1});
 
   const helpState = await mainWindow.webContents.executeJavaScript(`(() => {
     const helpButton = document.getElementById('btn-help');
@@ -241,12 +256,14 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       message: document.getElementById('user-message-text').textContent.trim(),
       settingsActionHidden: document.getElementById('user-message-action').classList.contains('hidden')
     };
+    document.getElementById('user-message-close').click();
     document.getElementById('btn-close-paste').click();
-    return state;
+    return {...state, dismissed: document.getElementById('user-message').classList.contains('hidden')};
   })()`);
   assert.deepEqual(blankPasteState, {
     message: '请先粘贴需要分析的逐字稿',
-    settingsActionHidden: true
+    settingsActionHidden: true,
+    dismissed: true
   });
 
   assert.deepEqual(mainWindow.getMinimumSize(), [960, 640]);
@@ -569,6 +586,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     });
   });
   await waitForPage(settingsWindow, 'settings.html');
+  if (process.platform !== 'darwin') {
+    assert.equal(settingsWindow.isMenuBarVisible(), false, 'settings window must not render a second menu header');
+  }
   const settingsState = await waitUntil('settings page initialization', async () => {
     return settingsWindow.webContents.executeJavaScript(`(() => {
       const provider = document.getElementById('provider');
@@ -713,6 +733,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     });
   });
   await waitForPage(promptEditorWindow, 'prompt-editor.html');
+  if (process.platform !== 'darwin') {
+    assert.equal(promptEditorWindow.isMenuBarVisible(), false, 'prompt editor must not render a second menu header');
+  }
   assert.equal(
     promptEditorWindow.webContents.listenerCount('will-prevent-unload') > 0,
     true,

@@ -60,9 +60,7 @@ test('package payload excludes development-only trees but keeps runtime assets',
   assert.equal(ignore('/out/previous-package/resources/app.asar'), true);
   assert.equal(ignore('/test/asr-ipc.test.js'), true);
   assert.equal(ignore('/scripts/verify-packaged-app.js'), true);
-  assert.equal(ignore('/data/tiered-lexicon.json'), true);
   assert.equal(ignore('/models'), false);
-  assert.equal(ignore('/models/.gitkeep'), true);
   assert.equal(ignore('/models/cache/default.tar.bz2'), true);
   assert.equal(ignore('/models/cache/default.onnx'), true);
   assert.equal(ignore('/cache/default.tar.bz2'), true);

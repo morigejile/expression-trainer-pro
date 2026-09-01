@@ -30,5 +30,3 @@ Registry 是机器可校验的数据源。本页不复制 URL、字节数、SHA-
 ## Evidence boundary
 
 准备阶段验证过完整 archive、路径安全、runtime file hash 和 Sherpa-ONNX native 初始化；原始 archive、日志、模型和绝对路径均保留在 Git 外。技术验证不等于公开再分发获批，所有公开制品仍以 product registry 的 redistribution 状态和 release checklist 为准。
-
-当前产品运行时仍使用 Paraformer。ADR-0009 选择 Zipformer Large 作为 Planned 产品化的技术默认，并不表示多模型切换、包内默认模型或公开分发已经实现。
