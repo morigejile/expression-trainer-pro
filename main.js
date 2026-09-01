@@ -14,13 +14,19 @@ const {createDiagnosticSnapshot} = require('./lib/diagnostics');
 const {isAllowedSupportUrl} = require('./shared/support-links');
 const { loadLexicon, analyzeText } = require('./lib/lexicon');
 const {
-  getSelectedLlmProviderSettings
+  getSelectedLlmProviderSettings,
+  summarizeLlmProfiles,
+  selectActiveLlmProfile
 } = require('./lib/llm-provider-config');
 const {
   loadLlmProviderSettings,
   saveLlmProviderSettings
 } = require('./lib/llm-provider-store');
 const {loadAppearance, saveAppearance} = require('./lib/appearance-store');
+const {
+  loadRecordingPolicy,
+  acknowledgeRecordingPolicy
+} = require('./lib/recording-policy-store');
 const {calculateInitialWindowSize} = require('./lib/window-bounds');
 const { createAsrIpcRouter } = require('./lib/asr-ipc');
 const { createAsrProcessController } = require('./lib/asr-process-controller');
@@ -345,6 +351,14 @@ function broadcastAppearance(appearance) {
   }
 }
 
+function broadcastLlmProviderSettingsChanged() {
+  for (const window of [mainWindow, settingsWindow, promptEditorWindow]) {
+    if (window && !window.isDestroyed()) {
+      window.webContents.send('llm-provider-settings-changed');
+    }
+  }
+}
+
 function createPromptEditorWindow() {
   if (promptEditorWindow) {
     promptEditorWindow.focus();
@@ -535,13 +549,55 @@ ipcMain.handle('get-llm-provider-settings', () => {
 ipcMain.handle('save-llm-provider-settings', (event, settings) => {
   try {
     saveLlmProviderSettings(app.getPath('userData'), settings);
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.send('llm-provider-settings-changed');
-    }
+    broadcastLlmProviderSettingsChanged();
     return { success: true };
   } catch (error) {
     if (error.code === 'unsupported-schema-version') {
       return { success: false, error: '当前版本无法保存更高版本的 LLM Provider 配置' };
+    }
+    throw error;
+  }
+});
+
+ipcMain.handle('get-llm-profile-summaries', () => {
+  return summarizeLlmProfiles(loadLlmProviderSettings(app.getPath('userData')));
+});
+
+ipcMain.handle('select-llm-profile', (event, profileId) => {
+  if (typeof profileId !== 'string' || !profileId.trim() || profileId.length > 128) {
+    return {success: false, error: 'Invalid LLM profile ID'};
+  }
+
+  try {
+    const selected = selectActiveLlmProfile(
+      loadLlmProviderSettings(app.getPath('userData')),
+      profileId
+    );
+    const saved = saveLlmProviderSettings(app.getPath('userData'), selected);
+    broadcastLlmProviderSettingsChanged();
+    return {success: true, summary: summarizeLlmProfiles(saved)};
+  } catch (error) {
+    if (error.code === 'unsupported-schema-version') {
+      return {success: false, error: '当前版本无法保存更高版本的 LLM Provider 配置'};
+    }
+    if (error.code === 'invalid-profile-id') {
+      return {success: false, error: 'Unknown LLM profile ID'};
+    }
+    throw error;
+  }
+});
+
+ipcMain.handle('get-recording-policy', () => {
+  return {acknowledged: loadRecordingPolicy(app.getPath('userData')).acknowledged};
+});
+
+ipcMain.handle('acknowledge-recording-policy', () => {
+  try {
+    acknowledgeRecordingPolicy(app.getPath('userData'));
+    return {success: true, acknowledged: true};
+  } catch (error) {
+    if (error.code === 'unsupported-schema-version') {
+      return {success: false, error: '当前版本无法保存更高版本的录音政策配置'};
     }
     throw error;
   }

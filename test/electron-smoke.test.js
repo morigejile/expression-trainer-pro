@@ -84,6 +84,10 @@ test('real Electron covers core flows and offline 16/44.1/48 kHz buffer graph ad
   } finally {
     clearTimeout(timeout);
     stopProcessTree(child);
-    fs.rmSync(userDataPath, { recursive: true, force: true });
+    try {
+      fs.rmSync(userDataPath, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    } catch (error) {
+      if (process.platform !== 'win32' || error.code !== 'EPERM') throw error;
+    }
   }
 });

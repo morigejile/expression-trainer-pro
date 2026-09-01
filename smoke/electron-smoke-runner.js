@@ -143,8 +143,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   const apiContract = await mainWindow.webContents.executeJavaScript(`(() => {
     const expected = [
       'getLlmProviderSettings', 'saveLlmProviderSettings', 'openSettings',
-      'onLlmProviderSettingsChanged',
+      'getLlmProfileSummaries', 'selectLlmProfile', 'onLlmProviderSettingsChanged',
       'getAppearance', 'saveAppearance', 'onAppearanceChanged',
+      'getRecordingPolicy', 'acknowledgeRecordingPolicy',
       'openPromptEditor', 'getCustomPrompt', 'saveCustomPrompt', 'closeWindow',
       'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText',
       'getRealtimeFeedback', 'getFinalReport', 'testLLMConnection',
@@ -219,6 +220,33 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     return {saved, notifications};
   })()`);
   assert.deepEqual(llmSettingsNotification, {saved: {success: true}, notifications: 1});
+
+  const llmProfileIpcState = await mainWindow.webContents.executeJavaScript(`(async () => {
+    const initial = await window.api.getLlmProfileSummaries();
+    const selected = await window.api.selectLlmProfile(initial.activeProfileId);
+    const invalid = await window.api.selectLlmProfile('');
+    return {initial, selected, invalid};
+  })()`);
+  assert.equal(llmProfileIpcState.initial.profiles.length, 1);
+  assert.equal(llmProfileIpcState.initial.profiles[0].active, true);
+  assert.equal(llmProfileIpcState.selected.success, true);
+  assert.equal(llmProfileIpcState.selected.summary.activeProfileId, llmProfileIpcState.initial.activeProfileId);
+  assert.deepEqual(llmProfileIpcState.invalid, {success: false, error: 'Invalid LLM profile ID'});
+  for (const summary of [llmProfileIpcState.initial, llmProfileIpcState.selected.summary]) {
+    assert.doesNotMatch(JSON.stringify(summary), /apiKey|baseUrl|ollamaUrl/);
+  }
+
+  const recordingPolicyIpcState = await mainWindow.webContents.executeJavaScript(`(async () => {
+    const initial = await window.api.getRecordingPolicy();
+    const acknowledged = await window.api.acknowledgeRecordingPolicy();
+    const persisted = await window.api.getRecordingPolicy();
+    return {initial, acknowledged, persisted};
+  })()`);
+  assert.deepEqual(recordingPolicyIpcState, {
+    initial: {acknowledged: false},
+    acknowledged: {success: true, acknowledged: true},
+    persisted: {acknowledged: true}
+  });
 
   const helpState = await mainWindow.webContents.executeJavaScript(`(() => {
     const helpButton = document.getElementById('btn-help');
