@@ -18,6 +18,9 @@ function createPage() {
   const page = Object.create(SettingsPage.prototype);
   page.root = { dataset: { theme: 'graphite', layout: 'coach-rail' } };
   page.providerSelect = { value: 'deepseek' };
+  page.profileSelect = { value: '', replaceChildren(...children) { this.children = children; }, children: [] };
+  page.profileNameInput = { value: '' };
+  page.btnProfileDelete = { disabled: false };
   page.apikeyInput = { value: 'test-key' };
   page.modelSelect = { value: 'deepseek-chat' };
   page.ollamaUrlInput = { value: 'http://localhost:11434' };
@@ -37,18 +40,69 @@ function createPage() {
     { dataset: { appearanceField: 'layout' }, value: 'focus-hud', checked: false, disabled: false }
   ];
   page.appearance = { schemaVersion: 1, theme: 'graphite', layout: 'coach-rail' };
-  page.settings = {
-    schemaVersion: 1,
-    provider: 'deepseek',
-    providers: {
-      openai: { apiKey: '', model: 'gpt-4o-mini' },
-      deepseek: { apiKey: '', model: 'deepseek-chat' },
-      ollama: { ollamaUrl: 'http://localhost:11434', model: 'qwen2.5:7b' },
-      custom: { apiKey: '', baseUrl: '', model: '', customModel: '' }
-    }
-  };
+  page.settings = createSettingsWithProfiles([profile('p1')], 'p1');
   return page;
 }
+
+function profile(id, overrides = {}) {
+  return {
+    id,
+    name: id,
+    provider: 'deepseek',
+    apiKey: '',
+    model: 'deepseek-chat',
+    ollamaUrl: 'http://localhost:11434',
+    baseUrl: '',
+    customModel: '',
+    ...overrides
+  };
+}
+
+function createSettingsWithProfiles(profiles, activeProfileId) {
+  return { schemaVersion: 2, activeProfileId, profiles };
+}
+
+function createSettingsPageWithProfiles(profiles, activeProfileId) {
+  const page = createPage();
+  page.settings = createSettingsWithProfiles(profiles, activeProfileId);
+  page.loadSelectedProfile();
+  return page;
+}
+
+test('selecting a profile loads only that profile and save preserves its siblings', () => {
+  const page = createSettingsPageWithProfiles([
+    profile('p1', {name: 'First', apiKey: 'a'}),
+    profile('p2', {name: 'Second', provider: 'openai', model: 'gpt-4o', apiKey: 'b'})
+  ], 'p1');
+
+  page.selectProfile('p2');
+  page.apikeyInput.value = 'updated';
+  const draft = page.buildDraftSettings();
+
+  assert.equal(draft.activeProfileId, 'p2');
+  assert.equal(draft.profiles.find(candidate => candidate.id === 'p2').apiKey, 'updated');
+  assert.equal(draft.profiles.find(candidate => candidate.id === 'p1').apiKey, 'a');
+  assert.equal(page.settings.profiles.find(candidate => candidate.id === 'p2').apiKey, 'updated');
+});
+
+test('profile CRUD maintains an active profile and never deletes the last profile', () => {
+  const page = createSettingsPageWithProfiles([profile('p1'), profile('p2')], 'p2');
+  page.idFactory = () => 'p3';
+
+  page.renameProfile('Renamed');
+  assert.equal(page.settings.profiles.find(candidate => candidate.id === 'p2').name, 'Renamed');
+  page.duplicateProfile();
+  assert.deepEqual(page.settings.profiles.map(candidate => candidate.id), ['p1', 'p2', 'p3']);
+  assert.equal(page.settings.activeProfileId, 'p3');
+  page.deleteProfile();
+  assert.equal(page.settings.activeProfileId, 'p1');
+  page.selectProfile('p2');
+  page.deleteProfile();
+  assert.deepEqual(page.settings.profiles.map(candidate => candidate.id), ['p1']);
+  assert.equal(page.btnProfileDelete.disabled, true);
+  page.createProfile();
+  assert.equal(page.settings.profiles.length, 2);
+});
 
 function createDeferred() {
   let resolve;
@@ -127,7 +181,7 @@ test('settings actions stay disabled until loading completes', async (t) => {
 
   assert.equal(page.btnSave.disabled, true);
   assert.equal(page.btnTestConnection.disabled, true);
-  settings.resolve({ provider: 'deepseek', providers: {} });
+  settings.resolve(createSettingsWithProfiles([profile('p1')], 'p1'));
   await loading;
   assert.equal(page.btnSave.disabled, false);
   assert.equal(page.btnTestConnection.disabled, false);
@@ -162,7 +216,7 @@ test('saving persists the draft without performing a connection test', async (t)
 
   assert.equal(calls.length, 1);
   assert.equal(calls[0][0], 'save');
-  assert.equal(calls[0][1].providers.deepseek.apiKey, 'test-key');
+  assert.equal(calls[0][1].profiles[0].apiKey, 'test-key');
   assert.equal(page.saveSuccess.classList.contains('show'), true);
   assert.equal(page.btnSave.disabled, false);
 });
@@ -182,7 +236,7 @@ test('testing connection checks the draft without saving it', async (t) => {
 
   assert.equal(calls.length, 1);
   assert.equal(calls[0][0], 'test');
-  assert.equal(calls[0][1].providers.deepseek.apiKey, 'test-key');
+  assert.equal(calls[0][1].profiles[0].apiKey, 'test-key');
   assert.equal(page.connectionError.textContent, '✓ 连接成功');
   assert.equal(page.connectionError.classList.contains('success'), true);
   assert.equal(page.btnTestConnection.disabled, false);
