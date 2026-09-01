@@ -16,7 +16,7 @@
 
 ## 功能
 
-- 🎤 **实时语音识别**：基于 Sherpa-ONNX，完全离线，中文优化
+- 🎤 **实时语音识别**：基于 Sherpa-ONNX，模型安装后可完全离线识别，中文优化
 - 📦 **模型管理**：在设置中安装、取消、重试和切换三款受信任的 streaming ASR 模型
 - 🎨 **外观与布局**：四套主题及 coach-rail/focus-hud 两种响应式布局
 - 📝 **全屏字幕显示**：黑底大字，实时显示你说的每一句话
@@ -108,12 +108,7 @@ Main 不加载 Sherpa native addon，也不执行同步识别；音频采集在 
 
 ## 词库说明
 
-运行时数据由两个明确的真相源组成：
-
-- `data/emotion-lexicon.json`：146 个情绪词，包含分类、强度和极性；
-- `shared/expression-rules.js`：16 个填充词、14 个犹豫词和 20 组笼统词替代映射，Renderer 高亮与 Main 分析共同使用。
-
-未接入运行时的数据不放在活跃 `data/` 目录，避免被误认为产品能力或进入发布包。
+情绪词数据位于 `data/emotion-lexicon.json`，填充词、犹豫词和笼统词规则位于 `shared/expression-rules.js`，Renderer 高亮与 Main 分析共用同一规则源。
 
 ## 开发
 
@@ -123,42 +118,17 @@ npm run dev
 
 # 测试
 npm test
-
-# 目录结构
-├── main.js              # Electron主进程
-├── preload.js           # preload脚本
-├── src/
-│   ├── index.html       # 主界面
-│   ├── settings.html    # 设置页
-│   ├── styles.css       # 样式
-│   ├── app.js           # 前端逻辑
-│   └── settings.js      # 设置逻辑
-├── lib/
-│   ├── asr.js           # Paraformer adapter
-│   ├── asr-provider.js  # ASR provider 契约
-│   ├── asr-process-controller.js # Main 到 utility process 的控制边界
-│   ├── asr-utility-process.js    # 独立 ASR 执行入口
-│   ├── model-manager.js # 模型下载、校验、激活与回退
-│   ├── lexicon.js       # 词库匹配
-│   ├── ai-feedback.js   # AI反馈
-│   └── prompts.js       # Prompt模板
-├── shared/              # Renderer/Main 共用的确定性规则
-├── data/                # 运行时情绪词数据
-├── models/registry.json # 产品模型清单（权重位于 userData）
-├── smoke/               # 发布包内使用的最小 Electron smoke 驱动
-├── test/                # 不进入发布包的自动测试
-├── benchmark/           # 不进入发布包的独立模型评测工具
-└── docs/                # 需求、当前架构、ADR、路线图与开发说明
 ```
 
-## 系统要求
+运行时代码位于 `main.js`、`preload.js`、`src/`、`lib/`、`shared/`、`data/` 和 `models/`；`test/`、`benchmark/`、`scripts/` 与 `docs/` 不进入普通发布包。完整命令、版本和验证规则见[开发与可复现安装](docs/development.md)。
 
-- 已验证开发基线：Windows 11 25H2 build 26200 x64
-- Node.js 24.20.x（Active LTS）、npm 11.19.x（该 Node LTS 官方捆绑版本）
-- 麦克风权限
-- （可选）网络连接（用于AI反馈，词库分析可离线）
+## 运行要求
 
-首个 Tier 1 目标为 Windows 11 25H2+ x64；当前未签名内部 Squirrel 制品已通过 packaged smoke、静默安装、真实模型首次准备、离线二次启动和 1.0.0→1.0.1 升级/卸载数据保留验证。公开支持仍需签名、真实设备及对应环境待办。Windows ARM64、macOS 和 Linux 为 Experimental，详见[平台与硬件支持矩阵](docs/support-matrix.md)。
+- 当前 Tier 1 目标：Windows 11 25H2+ x64；
+- 可被 Chromium 访问的麦克风权限；
+- 首次安装模型需要网络；LLM 联网需求取决于所选后端，本地词库分析可离线。
+
+具体已验证范围和 Experimental 平台见[平台与硬件支持矩阵](docs/support-matrix.md)。
 
 ## License
 
