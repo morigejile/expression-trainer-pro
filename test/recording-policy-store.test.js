@@ -51,6 +51,23 @@ test('invalid recording policy JSON falls back without overwriting the original'
   assert.deepEqual(writes, []);
 });
 
+test('acknowledging malformed recording policy JSON preserves the source and does not write', () => {
+  const filePath = path.join('C:\\user-data', 'recording-policy.json');
+  const original = '{"acknowledged":';
+  const files = {[filePath]: original};
+  const writes = [];
+
+  assert.throws(
+    () => acknowledgeRecordingPolicy('C:\\user-data', {
+      fsImpl: fakeFs(files),
+      atomicWrite: (...args) => writes.push(args)
+    }),
+    error => error.code === 'invalid-recording-policy-json'
+  );
+  assert.equal(files[filePath], original);
+  assert.deepEqual(writes, []);
+});
+
 test('acknowledging refuses to overwrite a future recording policy schema', () => {
   const filePath = path.join('C:\\user-data', 'recording-policy.json');
 
