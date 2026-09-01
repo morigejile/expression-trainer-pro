@@ -35,6 +35,10 @@ const AudioFeedQueue = typeof module !== 'undefined' && module.exports
   ? require('./audio-feed-queue')
   : window.AudioFeedQueue;
 const { createAudioFeedQueue } = AudioFeedQueue;
+const RecordingShortcut = typeof module !== 'undefined' && module.exports
+  ? require('./recording-shortcut')
+  : window.RecordingShortcut;
+const {resolveRecordingShortcutAction} = RecordingShortcut;
 const SupportLinks = typeof module !== 'undefined' && module.exports
   ? require('../shared/support-links')
   : window.SupportLinks;
@@ -68,6 +72,8 @@ class ExpressionTrainer {
     this.stats = { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 0, duration: 0 };
     this.lastFeedbackText = '';
     this.lastReport = '';
+    this.currentHistoryEntryId = null;
+    this.currentHistorySource = null;
     this.reportRequestPending = false;
     this.pasteAnalysisPending = false;
     this.pasteAnalysisGeneration = 0;
@@ -95,6 +101,7 @@ class ExpressionTrainer {
     this.btnSettings = document.getElementById('btn-settings');
     this.btnHelp = document.getElementById('btn-help');
     this.btnDiagnostics = document.getElementById('btn-diagnostics');
+    this.btnHistory = document.getElementById('btn-history');
     this.btnCloseReport = document.getElementById('btn-close-report');
     this.btnClosePaste = document.getElementById('btn-close-paste');
     this.btnAnalyzePaste = document.getElementById('btn-analyze-paste');
@@ -110,6 +117,9 @@ class ExpressionTrainer {
     this.feedbackContent = document.getElementById('feedback-content');
     this.reportModal = document.getElementById('report-modal');
     this.reportBody = document.getElementById('report-body');
+    this.historyModal = document.getElementById('history-modal');
+    this.historyList = document.getElementById('history-list');
+    this.btnCloseHistory = document.getElementById('btn-close-history');
     this.userMessage = document.getElementById('user-message');
     this.userMessageText = document.getElementById('user-message-text');
     this.userMessageAction = document.getElementById('user-message-action');
@@ -140,6 +150,8 @@ class ExpressionTrainer {
     window.api.onLlmProviderSettingsChanged?.(() => this.handleLlmProviderSettingsChanged());
     this.btnHelp.addEventListener('click', () => this.openHelpModal());
     this.btnDiagnostics.addEventListener('click', () => this.exportDiagnostics());
+    this.btnHistory.addEventListener('click', () => this.openHistory());
+    this.btnCloseHistory.addEventListener('click', () => this.closeModal(this.historyModal));
     this.btnCloseHelp.addEventListener('click', () => this.closeModal(this.helpModal));
     this.btnHelpDiagnostics.addEventListener('click', () => this.exportDiagnostics(this.btnHelpDiagnostics));
     this.btnOpenFeedbackDocument.addEventListener('click', () => this.openFeedbackDocument());
@@ -157,7 +169,34 @@ class ExpressionTrainer {
     this.btnCopyText.addEventListener('click', () => this.copyOriginalText());
     this.btnSaveText.addEventListener('click', () => this.saveOriginalText());
     this.btnClear.addEventListener('click', () => this.clearAll());
-    document.addEventListener('keydown', event => this.handleModalKeydown(event));
+    document.addEventListener('keydown', event => {
+      this.handleModalKeydown(event);
+      this.handleRecordingShortcut(event);
+    });
+  }
+
+  handleRecordingShortcut(event) {
+    const action = resolveRecordingShortcutAction({
+      key: event.key,
+      repeat: event.repeat,
+      targetTagName: event.target?.tagName,
+      editable: Boolean(event.target?.isContentEditable),
+      blocked: Boolean(
+        this.activeModal
+        || this.asrStartAttempt
+        || this.recordingStopOperation
+        || this.pasteAnalysisPending
+        || this.reportRequestPending
+      ),
+      isRecording: this.isRecording,
+      isPaused: this.isPaused
+    });
+    if (!action) return false;
+    event.preventDefault();
+    if (action === 'start') void this.startRecording();
+    else if (action === 'pause') this.pauseRecording();
+    else this.resumeRecording();
+    return true;
   }
 
   async exportDiagnostics(triggerButton = this.btnDiagnostics) {
@@ -323,6 +362,8 @@ class ExpressionTrainer {
     this.fullText = '';
     this.sentences = [];
     this.lastFeedbackText = '';
+    this.currentHistoryEntryId = null;
+    this.currentHistorySource = 'recording';
     this.resetStats();
     this.subtitleContainer.replaceChildren();
 
@@ -549,6 +590,7 @@ class ExpressionTrainer {
           this.btnCopyText.classList.remove('hidden');
           this.btnSaveText.classList.remove('hidden');
           this.btnClear.classList.remove('hidden');
+          await this.persistCurrentHistory('recording');
         }
       }
     }
@@ -807,6 +849,7 @@ class ExpressionTrainer {
       if (generation !== this.llmGeneration) return;
       if (result.success) {
         this.lastReport = result.report;
+        await this.persistCurrentReport();
         this.renderReport(result.report);
       } else if (result.errorCode !== 'cancelled') {
         const message = `生成报告失败：${result.error || '未知错误'}`;
@@ -872,6 +915,109 @@ class ExpressionTrainer {
       }
     } catch (e) {
       this.showUserMessage(`保存报告失败：${e.message || '请重试'}`);
+    }
+  }
+
+  async persistCurrentHistory(source = this.currentHistorySource) {
+    if (!this.fullText.trim() || this.currentHistoryEntryId) return this.currentHistoryEntryId;
+    try {
+      const result = await window.api.createHistoryEntry({
+        source,
+        transcript: this.fullText,
+        stats: {...this.stats}
+      });
+      if (!result?.success || !result.entry?.id) throw new Error(result?.error || '保存失败');
+      this.currentHistoryEntryId = result.entry.id;
+      this.currentHistorySource = source;
+      return this.currentHistoryEntryId;
+    } catch {
+      this.showUserMessage('历史记录保存失败，本次内容仍可手动导出');
+      return null;
+    }
+  }
+
+  async persistCurrentReport() {
+    if (!this.lastReport) return false;
+    const id = this.currentHistoryEntryId || await this.persistCurrentHistory();
+    if (!id) return false;
+    try {
+      const result = await window.api.updateHistoryReport({id, report: this.lastReport});
+      if (!result?.success) throw new Error(result?.error || '保存失败');
+      return true;
+    } catch {
+      this.showUserMessage('报告已生成，但写入历史记录失败');
+      return false;
+    }
+  }
+
+  async openHistory() {
+    this.historyList.replaceChildren();
+    this.openModal(this.historyModal, this.btnCloseHistory);
+    try {
+      const result = await window.api.listHistoryEntries();
+      const entries = result?.success && Array.isArray(result.entries) ? result.entries : [];
+      if (entries.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'history-empty';
+        empty.textContent = '还没有训练记录';
+        this.historyList.appendChild(empty);
+        return;
+      }
+      for (const entry of entries) {
+        const button = document.createElement('button');
+        button.className = 'history-item';
+        const meta = document.createElement('span');
+        meta.className = 'history-item-meta';
+        const date = new Date(entry.createdAt).toLocaleString('zh-CN', {hour12: false});
+        meta.textContent = `${date} · ${entry.source === 'paste' ? '粘贴逐字稿' : '录音'} · ${entry.stats.totalWords}字${entry.hasReport ? ' · 含报告' : ''}`;
+        const preview = document.createElement('span');
+        preview.className = 'history-item-preview';
+        preview.textContent = entry.preview || '（空白逐字稿）';
+        button.append(meta, preview);
+        button.addEventListener('click', () => this.restoreHistoryEntry(entry.id));
+        this.historyList.appendChild(button);
+      }
+    } catch {
+      const error = document.createElement('p');
+      error.className = 'history-empty';
+      error.textContent = '历史记录加载失败，请重试';
+      this.historyList.appendChild(error);
+    }
+  }
+
+  async restoreHistoryEntry(id) {
+    try {
+      const result = await window.api.getHistoryEntry(id);
+      if (!result?.success || !result.entry) throw new Error(result?.error || '记录不存在');
+      const entry = result.entry;
+      this.advanceLLMGeneration();
+      this.fullText = entry.transcript;
+      this.sentences = entry.transcript.split(/(?<=[。！？\n])/g).filter(sentence => sentence.trim());
+      this.stats = {...entry.stats};
+      this.lastReport = entry.report || '';
+      this.currentHistoryEntryId = entry.id;
+      this.currentHistorySource = entry.source;
+      this.subtitleContainer.replaceChildren();
+      for (const sentence of this.sentences) {
+        const line = document.createElement('div');
+        line.className = 'subtitle-line';
+        renderHighlightedText(line, sentence.trim());
+        this.subtitleContainer.appendChild(line);
+      }
+      this.updateStatsDisplay();
+      this.timer.textContent = `${Math.floor(entry.stats.duration / 60).toString().padStart(2, '0')}:${Math.floor(entry.stats.duration % 60).toString().padStart(2, '0')}`;
+      this.btnReport.classList.remove('hidden');
+      this.btnCopyText.classList.remove('hidden');
+      this.btnSaveText.classList.remove('hidden');
+      this.btnClear.classList.remove('hidden');
+      this.trainingStatus.textContent = '已载入历史训练';
+      this.closeModal(this.historyModal);
+      if (this.lastReport) {
+        this.renderReport(this.lastReport);
+        this.openModal(this.reportModal, this.btnCloseReport);
+      }
+    } catch {
+      this.showUserMessage('历史记录载入失败，请重试');
     }
   }
 
@@ -1038,6 +1184,8 @@ class ExpressionTrainer {
     this.sentences = [];
     this.lastFeedbackText = '';
     this.lastReport = '';
+    this.currentHistoryEntryId = null;
+    this.currentHistorySource = null;
     const hint = document.createElement('div');
     hint.className = 'subtitle-line hint';
     hint.textContent = '点击下方按钮开始说话';
@@ -1111,6 +1259,8 @@ class ExpressionTrainer {
       // 把文本显示到字幕区（高亮标记）
       this.subtitleContainer.replaceChildren();
       this.fullText = text;
+      this.currentHistoryEntryId = null;
+      this.currentHistorySource = 'paste';
       this.lastFeedbackText = '';
       this.resetStats();
 
@@ -1143,6 +1293,7 @@ class ExpressionTrainer {
       this.btnCopyText.classList.remove('hidden');
       this.btnSaveText.classList.remove('hidden');
       this.btnClear.classList.remove('hidden');
+      await this.persistCurrentHistory('paste');
 
       // 请求AI语境化反馈
       this.requestRealtimeFeedback();

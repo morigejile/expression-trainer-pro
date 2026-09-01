@@ -1198,6 +1198,62 @@ test('stop rejection after clear does not display a stale error', async (t) => {
   assert.equal(shownErrors.some(message => message.includes('old stop failed')), false);
 });
 
+test('Space shortcut routes idle, recording, and paused states without firing from an editor', () => {
+  const trainer = createTrainer();
+  const calls = [];
+  trainer.startRecording = () => calls.push('start');
+  trainer.pauseRecording = () => calls.push('pause');
+  trainer.resumeRecording = () => calls.push('resume');
+  const event = (target = {tagName: 'BODY', isContentEditable: false}) => ({
+    key: ' ',
+    repeat: false,
+    target,
+    preventDefault() { calls.push('prevent'); }
+  });
+
+  trainer.isRecording = false;
+  trainer.handleRecordingShortcut(event());
+  trainer.isRecording = true;
+  trainer.isPaused = false;
+  trainer.handleRecordingShortcut(event());
+  trainer.isPaused = true;
+  trainer.handleRecordingShortcut(event());
+  trainer.handleRecordingShortcut(event({tagName: 'TEXTAREA', isContentEditable: false}));
+
+  assert.deepEqual(calls, ['prevent', 'start', 'prevent', 'pause', 'prevent', 'resume']);
+});
+
+test('current transcript creates one history entry and attaches its generated report', async (t) => {
+  const calls = [];
+  global.window = {
+    api: {
+      async createHistoryEntry(payload) {
+        calls.push(['create', payload]);
+        return {success: true, entry: {id: 'history-1'}};
+      },
+      async updateHistoryReport(payload) {
+        calls.push(['report', payload]);
+        return {success: true};
+      }
+    }
+  };
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  trainer.currentHistoryEntryId = null;
+  trainer.lastReport = '个性化彩蛋\n\n## 总评\n很清楚。';
+
+  await trainer.persistCurrentHistory('paste');
+  await trainer.persistCurrentHistory('paste');
+  await trainer.persistCurrentReport();
+
+  assert.equal(trainer.currentHistoryEntryId, 'history-1');
+  assert.equal(calls.filter(([name]) => name === 'create').length, 1);
+  assert.deepEqual(calls.at(-1), ['report', {
+    id: 'history-1',
+    report: trainer.lastReport
+  }]);
+});
+
 async function startActiveRecordingHarness(t, { feedAudio, cancelASR } = {}) {
   let sessionId;
   const feedCommands = [];

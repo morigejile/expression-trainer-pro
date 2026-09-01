@@ -139,6 +139,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.equal(require.cache[require.resolve('sherpa-onnx-node')], undefined);
   assert.equal(require.cache[require.resolve('../lib/ai-feedback')], undefined);
   await waitForPage(mainWindow, 'index.html');
+  await waitUntil('background ASR warmup', async () => asrProvider.snapshot().initialized);
 
   const apiContract = await mainWindow.webContents.executeJavaScript(`(() => {
     const expected = [
@@ -146,6 +147,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       'onLlmProviderSettingsChanged',
       'getAppearance', 'saveAppearance', 'onAppearanceChanged',
       'openPromptEditor', 'getCustomPrompt', 'saveCustomPrompt', 'closeWindow',
+      'listHistoryEntries', 'getHistoryEntry', 'createHistoryEntry', 'updateHistoryReport',
       'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText',
       'getRealtimeFeedback', 'getFinalReport', 'testLLMConnection',
       'cancelLLMRequests', 'saveFile', 'exportDiagnostics', 'openSupportLink'
@@ -155,7 +157,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       missing: expected.filter(name => typeof window.api?.[name] !== 'function'),
       missingUi: [
         'user-message', 'user-message-text', 'user-message-action', 'user-message-close',
-        'training-status', 'feedback-status'
+        'training-status', 'feedback-status', 'btn-history', 'history-modal', 'history-list'
       ].filter(id => !document.getElementById(id)),
       initialUi: {
         theme: document.documentElement.dataset.theme,
@@ -821,6 +823,36 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     feedback: 'SMOKE_LLM_FEEDBACK'
   });
   assert.equal(calls.llmFeedback, 1);
+
+  await mainWindow.webContents.executeJavaScript(`document.getElementById('btn-report').click()`);
+  await waitUntil('history report persistence', async () => {
+    return mainWindow.webContents.executeJavaScript(`(async () => {
+      const history = await window.api.listHistoryEntries();
+      return history.entries?.[0]?.hasReport === true
+        && document.getElementById('report-body').textContent.includes('SMOKE_LLM_REPORT');
+    })()`);
+  });
+  const historyState = await mainWindow.webContents.executeJavaScript(`(async () => {
+    document.getElementById('btn-close-report').click();
+    document.getElementById('btn-history').click();
+    await new Promise(resolve => setTimeout(resolve, 30));
+    const item = document.querySelector('.history-item');
+    const state = {
+      open: !document.getElementById('history-modal').classList.contains('hidden'),
+      text: item?.textContent || ''
+    };
+    item?.click();
+    await new Promise(resolve => setTimeout(resolve, 30));
+    return {
+      ...state,
+      restoredTranscript: document.getElementById('subtitle-container').textContent.trim(),
+      restoredReportOpen: !document.getElementById('report-modal').classList.contains('hidden')
+    };
+  })()`);
+  assert.equal(historyState.open, true);
+  assert.match(historyState.text, /粘贴逐字稿.*含报告/);
+  assert.equal(historyState.restoredTranscript, '嗯我觉得这个方案很好。');
+  assert.equal(historyState.restoredReportOpen, true);
 
   console.log(SUCCESS_MARKER);
   for (const window of BrowserWindow.getAllWindows()) {

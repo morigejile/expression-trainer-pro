@@ -22,6 +22,13 @@ const {
 } = require('./lib/llm-provider-store');
 const {loadAppearance, saveAppearance} = require('./lib/appearance-store');
 const {calculateInitialWindowSize} = require('./lib/window-bounds');
+const {scheduleAsrWarmup} = require('./lib/asr-warmup');
+const {
+  createHistoryEntry,
+  getHistoryEntry,
+  listHistoryEntries,
+  updateHistoryReport
+} = require('./lib/history-store');
 const { createAsrIpcRouter } = require('./lib/asr-ipc');
 const { createAsrProcessController } = require('./lib/asr-process-controller');
 const {createAsrSelectionStore} = require('./lib/asr-selection-store');
@@ -327,6 +334,7 @@ function createMainWindow() {
   });
 
   mainWindow.center();
+  scheduleAsrWarmup({webContents: mainWindow.webContents, provider: asrProvider});
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
   mainWindow.setFullScreenable(true);
 
@@ -568,6 +576,36 @@ ipcMain.handle('save-custom-prompt', (event, data) => {
 ipcMain.handle('close-current-window', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (win) win.close();
+});
+
+ipcMain.handle('list-history-entries', () => {
+  return {success: true, entries: listHistoryEntries(app.getPath('userData'))};
+});
+
+ipcMain.handle('get-history-entry', (event, id) => {
+  const entry = getHistoryEntry(app.getPath('userData'), id);
+  return entry
+    ? {success: true, entry}
+    : {success: false, error: '历史记录不存在'};
+});
+
+ipcMain.handle('create-history-entry', (event, payload) => {
+  try {
+    return {success: true, entry: createHistoryEntry(app.getPath('userData'), payload)};
+  } catch {
+    return {success: false, error: '历史记录保存失败'};
+  }
+});
+
+ipcMain.handle('update-history-report', (event, payload) => {
+  try {
+    const entry = updateHistoryReport(app.getPath('userData'), payload);
+    return entry
+      ? {success: true, entry}
+      : {success: false, error: '历史记录不存在'};
+  } catch {
+    return {success: false, error: '历史报告保存失败'};
+  }
 });
 
 // 语音识别相关 - Web Audio方案

@@ -57,6 +57,7 @@
         <span class="app-title">表达训练</span>
         <div class="topbar-right">
           <span id="timer" class="timer">00:00</span>
+          <button id="btn-history" class="btn-icon" title="最近训练" aria-label="查看最近训练"><svg class="icon" aria-hidden="true"><use href="#icon-report"/></svg><span class="btn-icon-label">历史</span></button>
           <button id="btn-help" class="btn-help" title="帮助与反馈">帮助</button>
           <button id="btn-prompt-editor" class="btn-icon" title="训练规则" aria-label="训练规则"><svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg><span class="btn-icon-label">规则</span></button>
           <button id="btn-diagnostics" class="btn-icon" title="导出诊断信息" aria-label="导出诊断信息"><svg class="icon" aria-hidden="true"><use href="#icon-diagnostics"/></svg><span class="btn-icon-label">诊断</span></button>
@@ -97,15 +98,15 @@
       <div class="action-bar">
         <button id="btn-start" class="btn-main btn-start">
           <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-mic"/></svg>
-          <span class="btn-label">开始录制</span>
+          <span class="btn-label">开始录制</span><kbd class="shortcut-hint">Space</kbd>
         </button>
         <button id="btn-pause" class="btn-main btn-pause hidden">
           <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-pause"/></svg>
-          <span class="btn-label">暂停</span>
+          <span class="btn-label">暂停</span><kbd class="shortcut-hint">Space</kbd>
         </button>
         <button id="btn-resume" class="btn-main btn-resume hidden">
           <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-play"/></svg>
-          <span class="btn-label">继续</span>
+          <span class="btn-label">继续</span><kbd class="shortcut-hint">Space</kbd>
         </button>
         <button id="btn-stop" class="btn-main btn-stop hidden">
           <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-stop"/></svg>
@@ -126,6 +127,17 @@
         <!-- 实时反馈内容 -->
       </div>
     </aside>
+  </div>
+
+  <!-- 最近训练历史 -->
+  <div id="history-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="history-modal-title">
+    <div class="modal-content history-modal-content">
+      <div class="modal-header">
+        <h2 id="history-modal-title">最近训练</h2>
+        <button id="btn-close-history" class="btn-close" aria-label="关闭最近训练">×</button>
+      </div>
+      <div id="history-list" class="modal-body history-list"></div>
+    </div>
   </div>
 
   <!-- 粘贴逐字稿弹窗 -->
@@ -169,10 +181,11 @@
         <section class="help-section">
           <h2>快速开始</h2>
           <ol>
-            <li>点击“开始录制”，允许应用使用麦克风。</li>
+            <li>点击“开始录制”，允许应用使用麦克风；也可按空格键开始、暂停或继续。</li>
             <li>讲话时查看中间字幕、左侧统计和右侧实时反馈。</li>
             <li>结束后点击“生成报告”，查看完整表达分析。</li>
             <li>已有文字时，可用“粘贴逐字稿”直接分析。</li>
+            <li>“历史”会保留最近 50 次训练的逐字稿、统计和已生成报告。</li>
           </ol>
           <h3>字幕颜色</h3>
           <div class="help-color-grid">
@@ -204,6 +217,7 @@
   <script src="asr-event-state.js"></script>
   <script src="audio-capture.js"></script>
   <script src="audio-feed-queue.js"></script>
+  <script src="recording-shortcut.js"></script>
   <script src="appearance.js"></script>
   <script>window.Appearance.initializeAppearance();</script>
   <script src="app.js"></script>

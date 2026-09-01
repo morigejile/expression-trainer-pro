@@ -60,6 +60,8 @@ lib/atomic-json-store.js        userData JSON 的同盘原子写
 lib/safe-log.js                 有界错误文本与凭据模式脱敏
 lib/diagnostics.js              固定白名单的 app/OS/model/audio/ASR 诊断快照
 lib/ipc-input.js                非 ASR 文本、报告统计和 Markdown 保存输入边界
+lib/history-store.js            最近 50 条训练逐字稿、统计和报告的原子本地存储
+lib/asr-warmup.js               主页面加载后的 ASR 后台预热调度
 data/emotion-lexicon.json       运行时情绪词数据
 package.json / package-lock.json
 test/electron-smoke.test.js      Node 测试父进程、超时、日志和清理
@@ -78,7 +80,7 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 粘贴逐字稿 ───────┘
 ```
 
-应用支持训练开始/暂停/继续/结束、partial/final 字幕、填充词/犹豫词/笼统词/表达密度统计、精准词建议、自定义训练规则、LLM 反馈、原文/报告复制和 Markdown 保存。
+应用支持训练开始/暂停/继续/结束、空格键录制状态切换、partial/final 字幕、填充词/犹豫词/笼统词/表达密度统计、精准词建议、自定义训练规则、LLM 反馈、最近 50 条训练历史、原文/报告复制和 Markdown 保存。
 
 它没有大型前端框架、独立后端、数据库或微服务。音频、ASR、模型、配置和交付边界已从原型职责中拆开；Renderer 的训练编排仍集中在 `ExpressionTrainer`。
 
@@ -97,7 +99,7 @@ benchmark/lib/*.js               manifest、CER、metrics、environment、result
 | 本地分析 | `lib/lexicon.js` + `data/emotion-lexicon.json` + `shared/expression-rules.js` | 146 个情绪词；16 个填充词、14 个犹豫词、20 组笼统词映射由 Renderer/Main 共用；未启用数据不放入活跃 `data/` 目录 |
 | LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接/实时/报告分别为 10/15/60 秒超时，并支持 AbortSignal、按 Renderer 取消和异常响应验证 |
 | 设置 | `userData/appearance.json`、`userData/asr-selection.json`、`userData/llm-provider-settings.json`、legacy `userData/settings.json`、`userData/custom-prompt.json` | Appearance、ASR 选择与 LLM provider 各自持久化且互不覆盖；小文件以同盘临时文件/fsync/rename 原子发布；API Key 明文 |
-| 输出 | Clipboard + Electron Save Dialog + Markdown | 原文与报告 |
+| 输出 | Clipboard + Electron Save Dialog + Markdown + 原子 JSON 历史 | 原文与报告；本地保留最近 50 条训练 |
 | 构建/测试 | Node test + Electron smoke + Electron Forge 7.5/Squirrel | `package`/`make` 固定 Windows x64；packaged smoke 覆盖 Fake 产品流、utility-only Sherpa native load、完整 DLL unpack 和外部模型目录；尚无 CI |
 
 开发工具基线固定为 Node 24.20.0/npm 11.19.0；npm 版本跟随 Node Active LTS 官方捆绑版本，与 Electron 内置 Node 24.18.1 明确区分。当前只验证 Windows 11 Home 25H2 build 26200 x64；PKG-01 已把 Windows 11 25H2+ x64 选为首个 Tier 1 目标。Windows ARM64、macOS 与 Linux 为 Experimental，仍没有 CI、打包配置或制品测试证明。
@@ -170,7 +172,7 @@ Main 负责 Electron 控制面、词库分析、小型 userData JSON 原子文�
 - 只接受当前 `sessionId` 且 event `sequence` 严格递增的 `ready/partial/final/error/stopped`；旧 session、重复/倒序、未知或 malformed 事件不产生 UI 副作用，`stopped` 使 session 失效。
 - final 文本追加到 `fullText`，逐句做本地分析；每新增约 30 字触发一次 LLM 实时反馈。
 - 展示 partial 临时字幕；final 与粘贴字幕通过 text node 和受控 `span` token 高亮词语，不解析输入中的 HTML。
-- 支持粘贴逐字稿、生成报告、复制/保存原文和报告、清空当前内存状态。
+- 支持粘贴逐字稿、生成报告、复制/保存原文和报告、清空当前状态，并从最近 50 条本地历史中恢复逐字稿、统计和报告。
 - LLM 报告只渲染标题、加粗、行内代码、引用、普通行和换行等严格允许列表；LLM/HTTP 错误作为纯文本显示。
 - `src/appearance.js` 只更新根节点 `data-theme`/`data-layout`；四套主题共用语义 CSS token，广播不会移动或重建训练 DOM。
 - 主页面使用同一套 stage/coach/insights DOM 实现 coach-rail 与 focus-hud；代表性最小、标准和宽屏尺寸已验证控件、计时、训练状态、滚动和字幕区域保持稳定。
@@ -254,7 +256,9 @@ providers.ollama     { ollamaUrl, model }
 providers.custom     { apiKey, baseUrl, model, customModel }
 ```
 
-旧版扁平字段、缺失 provider 字段和旧文件名 `settings.json` 在读取时迁移为 schema version 1；canonical 文件优先，迁移后不删除 legacy 文件，也不按时间戳合并。损坏 JSON 使用默认配置运行并保留原文件，未知 provider 配置块不会在规范化时被删除。canonical 或 legacy future schema 可读取已知子集，显式保存则返回稳定错误且不写文件。LLM provider 与 custom-prompt 都使用同盘原子写，发布失败保留旧文件并清理临时文件。API Key 仍为明文；当前内部阶段不为此增加 native keychain 依赖，发布前再按平台成本评估。`custom-prompt.json` 保存 versioned goals、customRules、styleRef、customWords。训练文本、统计和报告仅在 Renderer 内存中，除非用户手动复制/保存。
+旧版扁平字段、缺失 provider 字段和旧文件名 `settings.json` 在读取时迁移为 schema version 1；canonical 文件优先，迁移后不删除 legacy 文件，也不按时间戳合并。损坏 JSON 使用默认配置运行并保留原文件，未知 provider 配置块不会在规范化时被删除。canonical 或 legacy future schema 可读取已知子集，显式保存则返回稳定错误且不写文件。LLM provider 与 custom-prompt 都使用同盘原子写，发布失败保留旧文件并清理临时文件。API Key 仍为明文；当前内部阶段不为此增加 native keychain 依赖，发布前再按平台成本评估。`custom-prompt.json` 保存 versioned goals、customRules、styleRef、customWords。训练完成后，逐字稿、统计和已生成报告原子写入 `training-history.json`，只保留最近 50 条；不保存音频、API Key 或实时请求内容，损坏历史文件不会被自动覆盖。
+
+主页面完成加载后调度当前 ASR provider 的后台初始化。首次录制调用复用 provider 内部同一个 initialize promise；后台失败只记录安全提示，用户实际开始录制时仍会重试并按原错误路径反馈。模型切换本身完成新 controller 初始化，因此无需另起第二套预热状态机。
 
 `appearance.json` 只保存四个主题和两个布局标识；缺失、损坏或未知值回退 Graphite/coach-rail，future schema 可读取已知值但拒绝显式保存。`asr-selection.json` 只保存 `selectedModelId`；缺失或稳定损坏在默认模型成功后原子恢复，瞬时初始化失败不改写选择。外观和模型操作都独立于 LLM 保存/连接测试。
 
