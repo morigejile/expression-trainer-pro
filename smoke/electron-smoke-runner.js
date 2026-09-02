@@ -160,7 +160,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       'getAppearance', 'saveAppearance', 'onAppearanceChanged',
       'getRecordingPolicy', 'acknowledgeRecordingPolicy',
       'openPromptEditor', 'getCustomPrompt', 'saveCustomPrompt', 'closeWindow',
-      'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText',
+      'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText', 'analyzeTexts',
       'getRealtimeFeedback', 'getFinalReport', 'analyzePlayback', 'testLLMConnection',
       'cancelLLMRequests', 'saveFile', 'exportDiagnostics', 'openSupportLink'
     ];

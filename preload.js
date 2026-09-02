@@ -52,6 +52,7 @@ contextBridge.exposeInMainWorld('api', {
 
   // 词库分析
   analyzeText: (text) => ipcRenderer.invoke('analyze-text', text),
+  analyzeTexts: (texts) => ipcRenderer.invoke('analyze-texts', texts),
 
   // AI反馈
   getRealtimeFeedback: (text) => ipcRenderer.invoke('get-realtime-feedback', text),

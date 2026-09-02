@@ -41,6 +41,7 @@ const {createModelInstallController} = require('./lib/model-install-controller')
 const {runManagedModelSmoke} = require('./lib/managed-model-smoke');
 const {
   requireBoundedText,
+  requireBoundedTextBatch,
   validateFinalReportPayload,
   validatePlaybackAnalysisPayload,
   validateMarkdownSaveRequest
@@ -684,9 +685,17 @@ ipcMain.handle('cancel-llm-requests', (event) => {
 
 // 词库分析
 ipcMain.handle('analyze-text', (event, text) => {
-  const customPrompt = loadCustomPrompt();
   const normalizedText = requireBoundedText(text, {label: 'text'});
+  const customPrompt = loadCustomPrompt();
   return analyzeText(normalizedText, {extraFillers: customWordsToFillers(customPrompt.customWords)});
+});
+
+// 粘贴逐字稿一次提交整批句子：逐句 invoke 会按句数线性放大 IPC 往返
+ipcMain.handle('analyze-texts', (event, texts) => {
+  const normalizedTexts = requireBoundedTextBatch(texts, {label: 'texts'});
+  const customPrompt = loadCustomPrompt();
+  const extraFillers = customWordsToFillers(customPrompt.customWords);
+  return normalizedTexts.map(text => analyzeText(text, {extraFillers}));
 });
 
 // 文件保存

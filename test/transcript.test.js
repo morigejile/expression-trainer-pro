@@ -1665,11 +1665,11 @@ test('pasted analysis is single-flight while the first draft is pending', async 
   global.window = {
     api: {
       cancelLLMRequests: async () => ({ success: true }),
-      analyzeText: async () => { analysisCalls += 1; return analysis.promise; }
+      analyzeTexts: async () => { analysisCalls += 1; return analysis.promise; }
     }
   };
   t.after(() => {
-    analysis.resolve({ totalWords: 2, fillers: [], hedges: [], vagueWords: [] });
+    analysis.resolve([{ totalWords: 2, fillers: [], hedges: [], vagueWords: [] }]);
     delete global.document;
     delete global.window;
   });
@@ -1687,7 +1687,7 @@ test('pasted analysis is single-flight while the first draft is pending', async 
 
   assert.equal(analysisCalls, 1);
   assert.equal(trainer.fullText, '第一份。');
-  analysis.resolve({ totalWords: 2, fillers: [], hedges: [], vagueWords: [] });
+  analysis.resolve([{ totalWords: 2, fillers: [], hedges: [], vagueWords: [] }]);
   await first;
 });
 
@@ -1707,11 +1707,11 @@ test('clear invalidates ownership of an older pasted analysis', async (t) => {
     confirm: () => true,
     api: {
       cancelLLMRequests: async () => ({ success: true }),
-      analyzeText: async () => analysis.promise
+      analyzeTexts: async () => analysis.promise
     }
   };
   t.after(() => {
-    analysis.resolve({ totalWords: 99, fillers: [], hedges: [], vagueWords: [] });
+    analysis.resolve([{ totalWords: 99, fillers: [], hedges: [], vagueWords: [] }]);
     delete global.document;
     delete global.window;
   });
@@ -1724,12 +1724,86 @@ test('clear invalidates ownership of an older pasted analysis', async (t) => {
   await new Promise(resolve => setImmediate(resolve));
 
   trainer.clearAll();
-  analysis.resolve({ totalWords: 99, fillers: [], hedges: [], vagueWords: [] });
+  analysis.resolve([{ totalWords: 99, fillers: [], hedges: [], vagueWords: [] }]);
   await pending;
 
   assert.equal(trainer.fullText, '');
   assert.equal(trainer.stats.totalWords, 0);
   assert.equal(trainer.btnReport.classList.contains('hidden'), true);
+});
+
+function pasteDocument() {
+  const testDocument = {
+    activeElement: null,
+    createTextNode: text => ({ textContent: text }),
+    createElement(tagName) {
+      const element = createElement(tagName);
+      element.ownerDocument = testDocument;
+      return element;
+    }
+  };
+  return testDocument;
+}
+
+test('pasted transcript analysis submits every sentence in a single batch', async (t) => {
+  const batches = [];
+  global.document = pasteDocument();
+  global.window = {
+    api: {
+      cancelLLMRequests: async () => ({ success: true }),
+      analyzeTexts: async texts => {
+        batches.push(texts);
+        return texts.map(() => ({
+          totalWords: 3, fillers: [{ word: '那个' }], hedges: [], vagueWords: []
+        }));
+      },
+      analyzeText: async () => assert.fail('pasted analysis must not fall back to per-sentence IPC')
+    }
+  };
+  t.after(() => { delete global.document; delete global.window; });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.fullText = '';
+  trainer.pasteTextarea.value = '第一句。第二句！第三句？';
+  trainer.requestRealtimeFeedback = () => {};
+
+  await trainer.analyzePastedText();
+
+  assert.equal(batches.length, 1);
+  assert.deepEqual(batches[0], ['第一句。', '第二句！', '第三句？']);
+  assert.equal(trainer.subtitleContainer.children.length, 3);
+  assert.equal(trainer.stats.totalWords, 9);
+  assert.equal(trainer.stats.fillers, 3);
+  assert.equal(trainer.stats.duration, 0);
+});
+
+test('a rejected transcript batch reports safely and reopens the paste flow', async (t) => {
+  const messages = [];
+  global.document = pasteDocument();
+  global.window = {
+    api: {
+      cancelLLMRequests: async () => ({ success: true }),
+      analyzeTexts: async () => {
+        const error = new TypeError('texts exceeds 200000 characters');
+        error.code = 'invalid-ipc-input';
+        throw error;
+      }
+    }
+  };
+  t.after(() => { delete global.document; delete global.window; });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.fullText = '';
+  trainer.pasteTextarea.value = '第一句。第二句。';
+  trainer.showUserMessage = message => messages.push(message);
+  trainer.requestRealtimeFeedback = () => assert.fail('a failed batch must not request feedback');
+
+  await trainer.analyzePastedText();
+
+  assert.deepEqual(messages, ['逐字稿分析失败，请重试']);
+  assert.equal(trainer.pasteAnalysisPending, false);
+  assert.equal(trainer.btnAnalyzePaste.disabled, false);
+  assert.equal(trainer.stats.totalWords, 0);
 });
 
 test('all main modals share focus restore, Escape, and Tab trapping', () => {

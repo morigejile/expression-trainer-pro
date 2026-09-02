@@ -1739,8 +1739,6 @@ class ExpressionTrainer {
       this.btnReanalyze.disabled = false;
       this.refreshPlaybackControls();
 
-      // 把文本显示到字幕区（高亮标记）
-      this.subtitleContainer.replaceChildren();
       this.fullText = text;
       this.lastFeedbackText = '';
       this.resetStats();
@@ -1749,21 +1747,29 @@ class ExpressionTrainer {
       const sentences = text.split(/(?<=[。！？\n])/g).filter(s => s.trim());
       this.sentences = sentences;
 
-      for (const sentence of sentences) {
+      // 把文本显示到字幕区（高亮标记）
+      this.subtitleContainer.replaceChildren(...sentences.map(sentence => {
         const line = document.createElement('div');
         line.className = 'subtitle-line';
         renderHighlightedText(line, sentence.trim());
-        this.subtitleContainer.appendChild(line);
+        return line;
+      }));
 
-        // 词库分析
-        const analysis = await window.api.analyzeText(sentence);
-        if (!ownsAnalysis()) return;
-        if (analysis) {
-          this.stats.fillers += analysis.fillers.length;
-          this.stats.hedges += analysis.hedges.length;
-          this.stats.vagueWords += analysis.vagueWords.length;
-          this.stats.totalWords += analysis.totalWords;
-        }
+      // 词库分析：逐句 invoke 会按句数线性放大 IPC 往返，这里一次提交整批
+      let analyses;
+      try {
+        analyses = await window.api.analyzeTexts(sentences);
+      } catch {
+        if (ownsAnalysis()) this.showUserMessage('逐字稿分析失败，请重试');
+        return;
+      }
+      if (!ownsAnalysis()) return;
+      for (const analysis of analyses ?? []) {
+        if (!analysis) continue;
+        this.stats.fillers += analysis.fillers.length;
+        this.stats.hedges += analysis.hedges.length;
+        this.stats.vagueWords += analysis.vagueWords.length;
+        this.stats.totalWords += analysis.totalWords;
       }
 
       this.stats.duration = 0; // 粘贴模式没有时长
