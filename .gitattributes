@@ -1,1 +1,9 @@
+# 仓库内统一以 LF 存储文本，检出时按各平台的 core.eol/autocrlf 还原，
+# 避免不同机器的本地配置造成整文件行尾 diff。后面的规则覆盖前面的。
+* text=auto
+
+# 二进制 fixture 不做任何行尾转换
+*.wav binary
+
+# 数据集清单需要确定性的 LF，检出后也保持 LF
 benchmark/datasets/**/*.json text eol=lf
