@@ -2,13 +2,8 @@ const { app, BrowserWindow, dialog, ipcMain, Menu, screen, shell, utilityProcess
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const {atomicWriteJsonSync} = require('./lib/atomic-json-store');
-const {
-  createDefaultCustomPrompt,
-  customWordsToFillers,
-  normalizeCustomPrompt,
-  parseCustomPromptJson
-} = require('./lib/custom-prompt-config');
+const {customWordsToFillers} = require('./lib/custom-prompt-config');
+const {createCustomPromptStore} = require('./lib/custom-prompt-store');
 const {formatSafeError} = require('./lib/safe-log');
 const {createDiagnosticSnapshot} = require('./lib/diagnostics');
 const {isAllowedSupportUrl} = require('./shared/support-links');
@@ -295,27 +290,15 @@ function runNativeAddonSmoke() {
   });
 }
 
-// Custom prompt 文件路径
-function getCustomPromptPath() {
-  return path.join(app.getPath('userData'), 'custom-prompt.json');
-}
+// Custom prompt（训练规则）
+const customPromptStore = createCustomPromptStore();
 
 function loadCustomPrompt() {
-  const p = getCustomPromptPath();
-  if (fs.existsSync(p)) {
-    const parsed = parseCustomPromptJson(fs.readFileSync(p, 'utf-8'));
-    if (parsed.error) {
-      console.warn('[规则] custom-prompt.json 无法解析，使用默认规则并保留原文件');
-      return parsed.prompt;
-    }
-    if (parsed.shouldPersist) saveCustomPrompt(parsed.prompt);
-    return parsed.prompt;
-  }
-  return createDefaultCustomPrompt();
+  return customPromptStore.load(app.getPath('userData'));
 }
 
 function saveCustomPrompt(data) {
-  atomicWriteJsonSync(getCustomPromptPath(), normalizeCustomPrompt(data));
+  return customPromptStore.save(app.getPath('userData'), data);
 }
 
 function createMainWindow() {
