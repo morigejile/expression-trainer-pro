@@ -124,7 +124,7 @@ Main 负责 Electron 控制面、词库分析、小型 userData JSON 原子文�
 - `ExpressionTrainer` 编排录音、暂停、逐字稿、本地分析和 LLM 状态；`AudioCapture`/AudioWorklet 独立管理 16 kHz 采集、epoch 与 tail flush。
 - 音频以最多 10 块的串行队列送入 ASR，overrun 失败关闭；Renderer 只接受当前 session 且 sequence 递增的规范事件。
 - 同一 Float32 chunk 在 Renderer 转为有界 Int16。正常结束后组装 WAV，最多保留五条内存记录并在淘汰、删除或退出时撤销 Blob URL。
-- final 文本进入逐字稿、本地统计和单调片段时间轴；播放只根据片段边界切换已完成建议，不触发推理。
+- final 文本进入逐字稿、本地统计和单调片段时间轴；片段边界统一规范为严格递增的整毫秒，因此不足一整块的录音尾块不会让回放分析输入校验整体失败。播放只根据片段边界切换已完成建议，不触发推理。
 - 首次录音在申请麦克风前等待用户确认；回放分析的失败、取消或迟到响应不覆盖上一份成功结果。
 - 字幕与报告通过 text node、受控 `span` 和 Markdown 允许列表渲染；外观切换只改根节点属性，不重建训练 DOM。
 
@@ -158,7 +158,7 @@ Main 只持有 `AsrProcessController`；实际 session wrapper、managed provide
 
 ### 5.5 Lexicon / `lib/lexicon.js`
 
-`lib/lexicon.js` 读取情绪词并输出填充词、犹豫词、笼统词、情绪词、密度和建议。Renderer 高亮与 Main 统计共用 `shared/expression-rules.js`；自定义词经去重、长度和 64 项上限后参与本地分析与 prompt。未接入运行时的词库不放在活跃 `data/` 目录。
+`lib/lexicon.js` 读取情绪词并输出填充词、犹豫词、笼统词、情绪词、密度和建议；实时模式逐句调用，粘贴模式经 `analyze-texts` 一次提交整批句子，两者共用同一分析函数。Renderer 高亮与 Main 统计共用 `shared/expression-rules.js`；自定义词经去重、长度和 64 项上限后参与本地分析与 prompt。未接入运行时的词库不放在活跃 `data/` 目录。
 
 ### 5.6 LLM / `lib/ai-feedback.js`、`lib/prompts.js`
 
@@ -172,6 +172,8 @@ Main 只持有 `AsrProcessController`；实际 session wrapper、managed provide
 `llm-provider-settings.json` 使用 schema-v2 `activeProfileId + profiles[]`；旧 schema/file 单向迁移，canonical 文件优先，不删除或双向同步 legacy 文件。损坏 JSON 保留原文，future schema 拒绝降级保存。API Key 当前仍明文保存。
 
 `recording-policy.json` 只保存 `{schemaVersion:1,acknowledged:true}`。录音、逐字稿片段时间轴、本地统计和回放分析只存在于 Renderer 内存；关闭窗口释放全部五条记录和 Blob URL，不形成跨重启训练历史。用户主动复制或保存的原文/报告仍沿用现有明确操作边界。
+
+`custom-prompt.json` 由 `lib/custom-prompt-store.js` 读写，与其余 store 同形；解析结果按 mtime+size 缓存、保存时失效，避免逐句分析反复同步读盘。
 
 `appearance.json` 只保存四个主题和两个布局标识；缺失、损坏或未知值回退 Graphite/coach-rail，future schema 可读取已知值但拒绝显式保存。`asr-selection.json` 只保存 `selectedModelId`；缺失或稳定损坏在默认模型成功后原子恢复，瞬时初始化失败不改写选择。外观和模型操作都独立于 LLM 保存/连接测试。
 
@@ -216,6 +218,12 @@ endpoint/final sentence
 → analyze-text invoke → Main lexicon → stats/建议
 → 累计文本较上次反馈增加 >=30 字
 → get-realtime-feedback invoke → Main 受控 fetch → 成功时更新右侧反馈
+
+粘贴逐字稿
+→ Renderer 分句后一次 analyze-texts invoke（有界数组，最多 5000 句、
+  合计不超过与 report/realtime 相同的文本上限）
+→ Main 取一次训练规则和 extraFillers，逐句复用同一 lexicon 分析
+→ 整批返回后累计 stats；批量被拒时给固定文案并复位粘贴流程
 
 停止/粘贴完成后用户点击生成报告
 → fullText + stats → Main fetch → Renderer 受控 Markdown token/DOM 渲染 → 可保存 Markdown
