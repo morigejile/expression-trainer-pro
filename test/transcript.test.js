@@ -2,12 +2,13 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 global.document = { addEventListener() {} };
-const { mergeFinalText, ExpressionTrainer } = require('../src/app');
+const { mergeFinalText, toSegmentEndMs, ExpressionTrainer } = require('../src/app');
 const { beginAsrSession, createAsrEventState, filterAsrEvent } = require('../src/asr-event-state');
 const { createAudioCapture } = require('../src/audio-capture');
 const { createPcmWavRecorder } = require('../src/pcm-wav');
 const { createTrainingRecordStore } = require('../src/training-records');
 delete global.document;
+const { validatePlaybackAnalysisPayload } = require('../lib/ipc-input');
 
 function createClassList() {
   const classes = new Set();
@@ -87,6 +88,8 @@ function createElement(tagName = 'div') {
       this.parentNode.removeChild(this);
     },
     scrollIntoView(options) { this.scrollIntoViewOptions = options; },
+    removeAttribute(name) { this[name] = ''; },
+    load() { this.loadCalls = (this.loadCalls ?? 0) + 1; },
     focus() {},
     addEventListener(type, listener) { listeners.set(type, listener); },
     dispatchEvent(event) { return listeners.get(event.type)?.(event); }
@@ -1891,6 +1894,85 @@ test('a delayed final uses the producing queue item audio end instead of later c
   ]);
 });
 
+function playbackTimelineTrainer(t, { createObjectURL = () => 'blob:timeline' } = {}) {
+  global.document = { createElement };
+  global.window = {
+    URL: { createObjectURL, revokeObjectURL: () => {} },
+    api: { analyzeText: async () => null, cancelLLMRequests: async () => ({ success: true }) }
+  };
+  t.after(() => {
+    delete global.document;
+    delete global.window;
+  });
+  const trainer = createTrainer();
+  trainer.fullText = '';
+  trainer.sentences = [];
+  trainer.trainingRecords = createTrainingRecordStore();
+  trainer.beginRecordingBuffer('session-timeline');
+  activateAsrSession(trainer);
+  return trainer;
+}
+
+function timedSegments(record) {
+  return record.segments.map(({ id, text, startMs, endMs }) => ({ id, text, startMs, endMs }));
+}
+
+test('segment end times are whole milliseconds and strictly increasing', () => {
+  assert.equal(toSegmentEndMs(100, 108.5625), 109);
+  assert.equal(toSegmentEndMs(100, 100), 101);
+  assert.equal(toSegmentEndMs(100, 40), 101);
+  assert.equal(toSegmentEndMs(0, Number.NaN), 1);
+  assert.equal(toSegmentEndMs(0, 1000), 1000);
+});
+
+test('a fractional flush tail still yields segments the playback IPC validator accepts', async (t) => {
+  const trainer = playbackTimelineTrainer(t);
+
+  // AudioWorklet 停止时 flush 出的尾块几乎不会是 16 帧的整数倍
+  for (let index = 0; index < 5; index += 1) {
+    trainer.recordingPcm.append(new Float32Array(320));
+  }
+  await trainer.handleASRResult({ text: '第一句话', isFinal: true });
+  trainer.recordingPcm.append(new Float32Array(137));
+  await trainer.handleASRResult({ text: '第二句话', isFinal: true });
+
+  assert.equal(trainer.recordingPcm.durationMs, 108.5625);
+  const record = trainer.finalizeTrainingRecord();
+
+  assert.deepEqual(timedSegments(record), [
+    { id: 'segment-1', text: '第一句话', startMs: 0, endMs: 100 },
+    { id: 'segment-2', text: '第二句话', startMs: 100, endMs: 109 }
+  ]);
+  validatePlaybackAnalysisPayload({ profileId: 'profile-1', segments: timedSegments(record) });
+});
+
+test('two finals at one audio position keep the timeline non-degenerate', async (t) => {
+  const trainer = playbackTimelineTrainer(t);
+
+  trainer.recordingPcm.append(new Float32Array(1600));
+  await trainer.handleASRResult({ text: '第一句', isFinal: true });
+  await trainer.handleASRResult({ text: '第二句', isFinal: true });
+  const record = trainer.finalizeTrainingRecord();
+
+  assert.deepEqual(timedSegments(record), [
+    { id: 'segment-1', text: '第一句', startMs: 0, endMs: 100 },
+    { id: 'segment-2', text: '第二句', startMs: 100, endMs: 101 }
+  ]);
+  validatePlaybackAnalysisPayload({ profileId: 'profile-1', segments: timedSegments(record) });
+});
+
+test('resetting stats returns the density readout to its placeholder', () => {
+  const trainer = createTrainer();
+  trainer.stats = { fillers: 2, hedges: 1, vagueWords: 0, totalWords: 20, duration: 0 };
+  trainer.updateStatsDisplay();
+  assert.equal(trainer.statDensity.textContent, '85%');
+
+  trainer.resetStats();
+
+  assert.equal(trainer.statDensity.textContent, '--');
+  assert.equal(trainer.statFillers.textContent, 0);
+});
+
 test('a chunk reaching the configured frame limit triggers one owned normal stop', async () => {
   const trainer = createTrainer();
   activateAsrSession(trainer);
@@ -2122,7 +2204,9 @@ function fakeAudio({paused = true} = {}) {
     playCalls: 0,
     pauseCalls: 0,
     play() { this.playCalls += 1; this.paused = false; return Promise.resolve(); },
-    pause() { this.pauseCalls += 1; this.paused = true; }
+    pause() { this.pauseCalls += 1; this.paused = true; },
+    removeAttribute(name) { this[name] = ''; },
+    load() { this.loadCalls = (this.loadCalls ?? 0) + 1; }
   };
 }
 

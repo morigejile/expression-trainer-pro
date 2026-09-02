@@ -14,6 +14,13 @@ function mergeFinalText(fullText, finalText) {
   };
 }
 
+// 片段时间轴必须是严格递增的整毫秒区间：录音尾块通常不足一整块，
+// durationMs 会带小数，直接用会被 analyze-playback 的输入校验整体拒绝。
+function toSegmentEndMs(previousEndMs, candidateMs) {
+  const candidate = Number.isFinite(candidateMs) ? Math.round(candidateMs) : previousEndMs;
+  return Math.max(previousEndMs + 1, candidate);
+}
+
 const SafeRendering = typeof module !== 'undefined' && module.exports
   ? require('./safe-rendering')
   : window.SafeRendering;
@@ -850,7 +857,7 @@ class ExpressionTrainer {
       let ownedSegments = null;
       if (this.recordingPcm && Array.isArray(this.pendingSegments)) {
         const previousEndMs = this.pendingSegments.at(-1)?.endMs ?? 0;
-        const endMs = Math.max(previousEndMs, Math.min(atMs, this.recordingPcm.durationMs));
+        const endMs = toSegmentEndMs(previousEndMs, Math.min(atMs, this.recordingPcm.durationMs));
         segment = {
           id: `segment-${this.pendingSegments.length + 1}`,
           text,
@@ -950,6 +957,8 @@ class ExpressionTrainer {
     if (this.stats.totalWords > 0) {
       const density = ((this.stats.totalWords - this.stats.fillers - this.stats.hedges) / this.stats.totalWords * 100).toFixed(0);
       this.statDensity.textContent = density + '%';
+    } else {
+      this.statDensity.textContent = '--';
     }
   }
 
@@ -1237,7 +1246,9 @@ class ExpressionTrainer {
     const durationMs = recorder.durationMs;
     const segments = this.pendingSegments;
     const finalSegment = segments.at(-1);
-    if (finalSegment) finalSegment.endMs = Math.max(finalSegment.endMs, durationMs);
+    if (finalSegment) {
+      finalSegment.endMs = toSegmentEndMs(finalSegment.startMs, Math.max(finalSegment.endMs, durationMs));
+    }
     let audioUrl = null;
     let record;
     try {
@@ -1305,7 +1316,11 @@ class ExpressionTrainer {
     if (!record || record.id !== this.viewingTrainingRecordId) {
       this.playbackSegmentId = null;
       this.playbackControls?.classList.add('hidden');
-      if (this.audioPlayer) this.audioPlayer.src = '';
+      if (this.audioPlayer) {
+        // src='' 会被解析成页面自身的 URL，媒体元素会去加载 index.html 并报错
+        this.audioPlayer.removeAttribute('src');
+        this.audioPlayer.load?.();
+      }
       return null;
     }
 
@@ -1769,7 +1784,7 @@ class ExpressionTrainer {
 }
 
 if (typeof module !== 'undefined' && module.exports) {
-  module.exports = { mergeFinalText, ExpressionTrainer };
+  module.exports = { mergeFinalText, toSegmentEndMs, ExpressionTrainer };
 }
 
 if (typeof document !== 'undefined') {
