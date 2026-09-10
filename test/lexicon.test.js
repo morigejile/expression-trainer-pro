@@ -16,7 +16,7 @@ test('empty input produces no analysis', () => {
 test('recognized phrases are classified at token positions', () => {
   const result = analyzeText('嗯我觉得这个方案很好');
 
-  assert.equal(result.totalWords, 6);
+  assert.equal(result.totalWords, 10);
   assert.deepEqual(result.fillers, [
     { word: '嗯', position: 0 },
     { word: '这个', position: 2 }
@@ -48,11 +48,11 @@ test('emotion words include deterministic lexicon metadata', () => {
   ]);
 });
 
-test('density reflects filler and hedge token ratios', () => {
+test('density uses character counts for both the numerator and denominator', () => {
   const cases = [
     { input: '今天天气晴', totalWords: 5, density: 100 },
-    { input: '嗯我觉得这个方案很好', totalWords: 6, density: 50 },
-    { input: '嗯然后就是', totalWords: 3, density: 0 }
+    { input: '嗯我觉得这个方案很好', totalWords: 10, density: 40 },
+    { input: '嗯然后就是', totalWords: 5, density: 0 }
   ];
 
   for (const { input, totalWords, density } of cases) {
@@ -60,6 +60,28 @@ test('density reflects filler and hedge token ratios', () => {
     assert.equal(result.totalWords, totalWords, input);
     assert.equal(result.density, density, input);
   }
+});
+
+test('punctuation and whitespace do not inflate character counts or density', () => {
+  for (const input of ['嗯我觉得这个方案很好', '嗯，我觉得这个方案很好。 \n\t', '嗯！我觉得，这个方案很好……']) {
+    const result = analyzeText(input);
+    assert.equal(result.totalWords, 10);
+    assert.equal(result.density, 40);
+    assert.equal(result.fillers.length, 2);
+    assert.equal(result.hedges.length, 1);
+  }
+  assert.equal(analyzeText(' A1，中文𠮷！ \n\t').totalWords, 5);
+  const punctuationOnly = analyzeText('，。！？ \n');
+  assert.equal(punctuationOnly.totalWords, 0);
+  assert.equal(punctuationOnly.density, null);
+});
+
+test('custom fillers overlapping hedge words exclude each character only once', () => {
+  const result = analyzeText('我觉得好', {extraFillers: ['我觉得']});
+  assert.equal(result.fillers.length, 1);
+  assert.equal(result.hedges.length, 1);
+  assert.equal(result.totalWords, 4);
+  assert.equal(result.density, 25);
 });
 
 test('suggestions follow vague-word and repetition thresholds', () => {

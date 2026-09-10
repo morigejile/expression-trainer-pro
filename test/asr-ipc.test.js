@@ -44,6 +44,23 @@ function createProvider(overrides = {}) {
   };
 }
 
+test('preparation reports initialization failures without starting a recording', async () => {
+  const {createAsrIpcRouter} = require('../lib/asr-ipc');
+  let attempts = 0;
+  const router = createAsrIpcRouter({provider: createProvider({
+    async initialize() {
+      attempts += 1;
+      throw new Error('Missing D:\\private\\model.onnx');
+    },
+    start() { assert.fail('preparing the model must not create a session'); }
+  })});
+  assert.equal(typeof router.prepare, 'function');
+  assert.deepEqual(await router.prepare(), failure({
+    code: 'asr-initialization-failed', message: 'ASR initialization failed'
+  }));
+  assert.equal(attempts, 1);
+});
+
 test('start validates the exact command and routes initialize before start', async () => {
   const { createAsrIpcRouter } = require('../lib/asr-ipc');
   const calls = [];

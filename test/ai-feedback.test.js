@@ -481,13 +481,50 @@ test('custom endpoint appends the chat path before query parameters', async () =
   );
 });
 
+for (const {duration, durationLabel, speechRate, fillerRate} of [
+  {duration: 0, durationLabel: '不适用（无有效录音时长）', speechRate: '不适用', fillerRate: '不适用'},
+  {duration: 30, durationLabel: '30秒', speechRate: '20字/分钟', fillerRate: '4次/分钟'},
+  {duration: 0.5, durationLabel: '0.5秒', speechRate: '1200字/分钟', fillerRate: '240次/分钟'}
+]) {
+  test(`report statistics are computed locally with duration ${duration}`, async () => {
+    let request;
+    const stats = {
+      duration, totalWords: 10, fillers: 2, hedges: 1, vagueWords: 1,
+      excludedCharacters: 6, hedgeCharacters: 3
+    };
+    const report = await sendReport('嗯，我觉得这个方案很好。', stats, OPENAI_SETTINGS, null, {
+      fetchImpl: async (_url, options) => {
+        request = JSON.parse(options.body);
+        return jsonResponse({choices: [{message: {content: '## 总评\n80分，表达清楚。'}}]});
+      }
+    });
+
+    assert.ok(report.includes(`| 时长 | ${durationLabel} |`));
+    assert.ok(report.includes('| 总字数 | 10字 |'));
+    assert.ok(report.includes(`| 语速 | ${speechRate} |`));
+    assert.ok(report.includes(`| 填充词频率 | ${fillerRate} |`));
+    assert.ok(report.includes('| 表达密度（字符占比） | 40% |'));
+    assert.ok(report.includes('| 犹豫词占比（字符） | 30% |'));
+    assert.ok(report.includes('总分为 AI 主观评价，仅供参考，不代表客观测评结果或训练进步。'));
+    assert.ok(request.messages[1].content.includes('| 总字数 | 10字 |'));
+    if (duration === 0) {
+      assert.ok(request.messages[0].content.includes('没有有效录音时长，禁止推测时长、语速或每分钟频率'));
+      assert.equal(request.messages[0].content.includes('X次/分钟'), false);
+      assert.equal(report.includes('NaN'), false);
+      assert.equal(report.includes('Infinity'), false);
+    }
+  });
+}
+
 test('report failures do not mutate local analysis input', async () => {
   const stats = {
     duration: 12,
     totalWords: 8,
     fillers: 1,
     hedges: 1,
-    vagueWords: 2
+    vagueWords: 2,
+    excludedCharacters: 4,
+    hedgeCharacters: 3
   };
   const snapshot = structuredClone(stats);
 

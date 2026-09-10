@@ -54,6 +54,58 @@ function harness({selection, overrideModelId, active = {}, controllerOptions = {
   return {service, events, saves, controllerArgs};
 }
 
+for (const selectedModelId of [null, SMALL]) {
+  test(`startup preparation loads ${selectedModelId || 'the default'} once and reuses it for recordings`, async () => {
+    let release;
+    const gate = new Promise(resolve => { release = resolve; });
+    const expected = selectedModelId || LARGE;
+    const {service, events, saves} = harness({
+      selection: selectedModelId ? {selectedModelId, status: 'valid', canPersist: true} : undefined,
+      controllerOptions: {[expected]: {initializeGate: gate}}
+    });
+    const router = require('../lib/asr-ipc').createAsrIpcRouter({provider: service});
+    assert.equal(typeof router.prepare, 'function', 'model preparation must be available before recording');
+    const first = router.prepare();
+    const repeated = router.prepare();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(service.snapshot().status, 'initializing');
+    assert.equal(service.snapshot().activeSession, false);
+    assert.deepEqual(events.filter(([name]) => name === 'initialize'), [['initialize', expected]]);
+    assert.deepEqual(saves, []);
+
+    release();
+    assert.deepEqual(await first, {ok: true, events: []});
+    assert.deepEqual(await repeated, {ok: true, events: []});
+    assert.equal(service.snapshot().effectiveModelId, expected);
+    await router.start({sessionId: 'first', sampleRateHz: 16000});
+    await router.stop({sessionId: 'first'});
+    await router.start({sessionId: 'second', sampleRateHz: 16000});
+    await router.stop({sessionId: 'second'});
+    assert.deepEqual(events.filter(([name]) => name === 'initialize'), [['initialize', expected]]);
+    assert.deepEqual(saves, selectedModelId ? [] : [LARGE]);
+    await service.dispose();
+  });
+}
+
+test('closing during startup preparation disposes the loading controller before waiting for initialization', async () => {
+  let release;
+  const gate = new Promise(resolve => { release = resolve; });
+  const {service, events, saves} = harness({controllerOptions: {[LARGE]: {initializeGate: gate}}});
+  const router = require('../lib/asr-ipc').createAsrIpcRouter({provider: service});
+  const preparation = router.prepare();
+  await new Promise(resolve => setImmediate(resolve));
+  const closing = service.dispose();
+  try {
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(events.filter(([name]) => name === 'dispose'), [['dispose', LARGE]]);
+  } finally {
+    release();
+    await Promise.all([preparation, closing]);
+  }
+  assert.equal(service.snapshot().status, 'disposed');
+  assert.deepEqual(saves, [], 'closing must not activate or persist a late preparation');
+});
+
 test('missing selection starts the Catalog default and persists it only after initialization', async () => {
   const {service, events, saves, controllerArgs} = harness();
   await service.initialize();

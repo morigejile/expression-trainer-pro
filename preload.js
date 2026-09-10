@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('api', {
   closeWindow: () => ipcRenderer.invoke('close-current-window'),
 
   // 语音识别 - 使用 Web Audio 方案
+  prepareASR: () => ipcRenderer.invoke('prepare-asr'),
   startASR: (options) => ipcRenderer.invoke('start-asr', options),
   feedAudio: (chunk) => ipcRenderer.invoke('feed-audio', {
     ...chunk,

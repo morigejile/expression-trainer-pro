@@ -33,7 +33,7 @@ test('bounded IPC text accepts product text and rejects invalid or oversized val
 test('final report payload has exact text and finite non-negative statistics', () => {
   const payload = {
     fullText: '一段训练内容',
-    stats: {fillers: 1, hedges: 2, vagueWords: 3, totalWords: 20, duration: 15}
+    stats: {fillers: 1, hedges: 2, vagueWords: 3, totalWords: 20, duration: 15, excludedCharacters: 7, hedgeCharacters: 6}
   };
 
   assert.deepEqual(validateFinalReportPayload(payload), payload);
@@ -46,6 +46,12 @@ test('final report payload has exact text and finite non-negative statistics', (
     () => validateFinalReportPayload({...payload, stats: {...payload.stats, duration: -1}}),
     error => error.code === 'invalid-ipc-input' && error.message === 'stats.duration must be a non-negative finite number'
   );
+  for (const field of ['excludedCharacters', 'hedgeCharacters']) {
+    assert.throws(
+      () => validateFinalReportPayload({...payload, stats: {...payload.stats, [field]: NaN}}),
+      error => error.code === 'invalid-ipc-input' && error.message === `stats.${field} must be a non-negative finite number`
+    );
+  }
 });
 
 test('playback payload accepts ordered segments with bounded profile and transcript text', () => {

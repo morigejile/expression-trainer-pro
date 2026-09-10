@@ -54,6 +54,10 @@ const SupportLinks = typeof module !== 'undefined' && module.exports
   ? require('../shared/support-links')
   : window.SupportLinks;
 const { FEEDBACK_DOCUMENT_URL } = SupportLinks;
+const TextStatistics = typeof module !== 'undefined' && module.exports
+  ? require('../shared/text-statistics')
+  : window.TextStatistics;
+const { analysisCharacterCounts, densityPercent, hasDuration, formatDuration } = TextStatistics;
 const CONFIG_ERROR_CODES = new Set([
   'missing-api-key',
   'missing-endpoint',
@@ -62,6 +66,7 @@ const CONFIG_ERROR_CODES = new Set([
   'invalid-provider',
   'unauthorized'
 ]);
+const ASR_LOADING_MESSAGE = '语音模型加载中，预计数秒至数分钟（首次安装可能更久）；本次启动只需加载一次。';
 
 class ExpressionTrainer {
   constructor({ audioCaptureFactory = createAudioCapture } = {}) {
@@ -80,7 +85,7 @@ class ExpressionTrainer {
     this.timerInterval = null;
     this.fullText = '';
     this.sentences = [];
-    this.stats = { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 0, duration: 0 };
+    this.stats = { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 0, duration: 0, excludedCharacters: 0, hedgeCharacters: 0 };
     this.lastFeedbackText = '';
     this.lastReport = '';
     this.reportRequestPending = false;
@@ -90,8 +95,12 @@ class ExpressionTrainer {
     this.userMessageRequiresSettings = false;
     this.activeModal = null;
     this.modalOpener = null;
+    this.firstRunHelpOpen = false;
+    this.firstRunRecordingPolicyPending = true;
+    this.firstRunRecordingPolicyRunning = false;
     this.asrEventState = createAsrEventState();
     this.asrStartAttempt = null;
+    this.asrPreparationState = 'idle';
     this.asrGeneration = 0;
     this.recordingPolicyAcknowledged = false;
     this.recordingPolicyDecision = null;
@@ -110,6 +119,8 @@ class ExpressionTrainer {
 
     this.initElements();
     this.bindEvents();
+    if (!this.showFirstRunHelp()) void this.showFirstRunRecordingPolicy();
+    void this.prepareSpeechModel();
     void this.refreshLlmProfileOptions();
   }
 
@@ -152,6 +163,7 @@ class ExpressionTrainer {
     this.btnOpenFeedbackDocument = document.getElementById('btn-open-feedback-document');
     this.feedbackLinkError = document.getElementById('feedback-link-error');
     this.recordingPolicyModal = document.getElementById('recording-policy-modal');
+    this.btnCloseRecordingPolicy = document.getElementById('btn-close-recording-policy');
     this.btnRecordingPolicyConfirm = document.getElementById('btn-recording-policy-confirm');
     this.btnRecordingPolicyCancel = document.getElementById('btn-recording-policy-cancel');
     this.trainingRecordSelect = document.getElementById('training-record-select');
@@ -197,7 +209,8 @@ class ExpressionTrainer {
     this.btnClear.addEventListener('click', () => this.clearAll());
     this.btnRecordingPolicyConfirm.addEventListener('click', () => this.resolveRecordingPolicyDecision(true));
     this.btnRecordingPolicyCancel.addEventListener('click', () => this.resolveRecordingPolicyDecision(false));
-    this.trainingRecordSelect.addEventListener('change', event => this.selectTrainingRecord(event.target.value));
+    this.btnCloseRecordingPolicy.addEventListener('click', () => this.resolveRecordingPolicyDecision(false));
+    this.trainingRecordSelect.addEventListener('change', event => this.selectTrainingRecord(event.target.value, { fromPicker: true }));
     this.audioPlayer.addEventListener('timeupdate', () => this.handlePlaybackTimeUpdate());
     this.playbackModel.addEventListener('change', event => { void this.selectPlaybackProfile(event.target.value); });
     this.btnReanalyze.addEventListener('click', () => { void this.analyzeSelectedRecording(); });
@@ -216,6 +229,15 @@ class ExpressionTrainer {
     } catch (error) {
       alert(`导出诊断失败: ${error.message}`);
     }
+  }
+
+  showFirstRunHelp() {
+    try {
+      if (window.localStorage.getItem('expression-trainer.help-seen') === '1') return false;
+    } catch {}
+    this.firstRunHelpOpen = true;
+    this.openHelpModal();
+    return true;
   }
 
   openHelpModal() {
@@ -237,12 +259,57 @@ class ExpressionTrainer {
 
   // ===== 录制控制 =====
 
-  async ensureRecordingPolicyAcknowledged() {
-    if (this.recordingPolicyAcknowledged) return true;
-    if (typeof window.api.getRecordingPolicy !== 'function') {
-      throw new Error('录音保留策略不可用');
+  async prepareSpeechModel() {
+    if (this.asrPreparationState === 'loading' || this.asrPreparationState === 'ready') return;
+    this.asrPreparationState = 'loading';
+    this.finishTrainingPreparation();
+    try {
+      const result = await window.api.prepareASR();
+      this.asrPreparationState = result?.ok ? 'ready' : 'failed';
+    } catch {
+      this.asrPreparationState = 'failed';
     }
-    const policy = await window.api.getRecordingPolicy();
+    this.btnStart.disabled = false;
+    this.btnStartLabel.textContent = this.asrPreparationState === 'failed' ? '重试加载' : '开始录制';
+    if (!this.fullText.trim() && !this.isRecording && !this.asrStartAttempt && !this.pasteAnalysisPending) {
+      this.finishTrainingPreparation();
+    }
+  }
+
+  async showFirstRunRecordingPolicy() {
+    if (!this.firstRunRecordingPolicyPending || this.firstRunRecordingPolicyRunning || this.activeModal) return;
+    try {
+      if (window.localStorage.getItem('expression-trainer.recording-policy-seen') === '1') {
+        this.firstRunRecordingPolicyPending = false;
+        return;
+      }
+    } catch {}
+    this.firstRunRecordingPolicyRunning = true;
+    try {
+      const policy = await window.api.getRecordingPolicy();
+      // 读取期间用户可能重新打开帮助页；等该弹窗关闭后再继续。
+      if (this.activeModal) return;
+      this.firstRunRecordingPolicyPending = false;
+      await this.ensureRecordingPolicyAcknowledged(policy);
+      try {
+        window.localStorage.setItem('expression-trainer.recording-policy-seen', '1');
+      } catch {}
+    } catch (error) {
+      this.firstRunRecordingPolicyPending = false;
+      this.showUserMessage(`录音保存说明未完成：${error.message}`);
+    } finally {
+      this.firstRunRecordingPolicyRunning = false;
+    }
+  }
+
+  async ensureRecordingPolicyAcknowledged(policy) {
+    if (this.recordingPolicyAcknowledged) return true;
+    if (policy === undefined) {
+      if (typeof window.api.getRecordingPolicy !== 'function') {
+        throw new Error('录音保留策略不可用');
+      }
+      policy = await window.api.getRecordingPolicy();
+    }
     if (policy?.acknowledged) {
       this.recordingPolicyAcknowledged = true;
       return true;
@@ -278,6 +345,11 @@ class ExpressionTrainer {
   }
 
   async startRecording() {
+    if (this.asrPreparationState !== 'ready') {
+      if (this.asrPreparationState !== 'loading') await this.prepareSpeechModel();
+      return;
+    }
+    if (this.firstRunHelpOpen || this.firstRunRecordingPolicyPending || this.firstRunRecordingPolicyRunning) return;
     if (this.asrStartAttempt) {
       this.showUserMessage('录制正在启动，请稍候');
       return;
@@ -288,7 +360,7 @@ class ExpressionTrainer {
     }
     this.playbackAnalysisGeneration += 1;
     this.btnReanalyze.disabled = false;
-    this.trainingStatus.textContent = '正在准备语音识别，首次运行可能需要数分钟';
+    this.trainingStatus.textContent = '正在启动录制…';
     this.btnStart.disabled = true;
     this.btnPaste.disabled = true;
     const startAttempt = {};
@@ -494,7 +566,7 @@ class ExpressionTrainer {
     this.btnPause.classList.add('hidden');
     this.btnResume.classList.add('hidden');
     this.btnStart.classList.remove('hidden');
-    this.btnStart.disabled = false;
+    this.btnStart.disabled = this.asrPreparationState === 'loading';
     this.btnPaste.disabled = false;
     this.btnReport.classList.add('hidden');
     this.btnCopyText.classList.add('hidden');
@@ -738,11 +810,7 @@ class ExpressionTrainer {
         this.isPaused = false;
 
         clearInterval(this.timerInterval);
-        let totalPaused = this.pausedTime;
-        if (this.pauseStart) totalPaused += Date.now() - this.pauseStart;
-        this.stats.duration = durationMs > 0
-          ? Math.floor(durationMs / 1000)
-          : Math.floor((Date.now() - this.startTime - totalPaused) / 1000);
+        this.stats.duration = hasDuration(durationMs) ? durationMs / 1000 : 0;
         if (tailSucceeded && this.recordingSessionId === sessionId) {
           this.finalizeTrainingRecord();
         } else if (this.recordingSessionId === sessionId) {
@@ -928,6 +996,9 @@ class ExpressionTrainer {
       this.stats.hedges += analysis.hedges.length;
       this.stats.vagueWords += analysis.vagueWords.length;
       this.stats.totalWords += analysis.totalWords;
+      const {excludedCharacters, hedgeCharacters} = analysisCharacterCounts(analysis);
+      this.stats.excludedCharacters += excludedCharacters;
+      this.stats.hedgeCharacters += hedgeCharacters;
       this.updateStatsDisplay();
       // 碰到笼统词 → 立刻在反馈栏弹出替换建议
       if (analysis.vagueWords && analysis.vagueWords.length > 0) {
@@ -954,12 +1025,8 @@ class ExpressionTrainer {
     this.statFillers.textContent = this.stats.fillers;
     this.statHedges.textContent = this.stats.hedges;
     this.statVague.textContent = this.stats.vagueWords;
-    if (this.stats.totalWords > 0) {
-      const density = ((this.stats.totalWords - this.stats.fillers - this.stats.hedges) / this.stats.totalWords * 100).toFixed(0);
-      this.statDensity.textContent = density + '%';
-    } else {
-      this.statDensity.textContent = '--';
-    }
+    const density = densityPercent(this.stats.totalWords, this.stats.excludedCharacters);
+    this.statDensity.textContent = density === null ? '--' : `${density}%`;
   }
 
   // ===== 实时反馈 =====
@@ -975,7 +1042,9 @@ class ExpressionTrainer {
       result = { success: false, error: '实时反馈请求失败，请重试', errorCode: 'generic' };
     }
     if (generation !== this.llmGeneration) return;
-    if (result.success && result.feedback) {
+    if (result.success && result.feedback === '') {
+      this.feedbackStatus.textContent = '内容为空：暂无建议';
+    } else if (result.success && result.feedback) {
       this.feedbackStatus.textContent = '本地分析正常，AI 建议已更新';
       const lines = result.feedback.split('\n').filter(l => l.trim());
       lines.forEach(line => {
@@ -1108,7 +1177,7 @@ class ExpressionTrainer {
     const now = new Date();
     const dateStr = now.toISOString().slice(0, 10);
     const timeStr = now.toTimeString().slice(0, 5).replace(':', '');
-    const markdown = `# 表达训练报告\n\n**日期**: ${dateStr}  \n**时长**: ${this.stats.duration}秒  \n**总字数**: ${this.stats.totalWords}  \n\n---\n\n## 完整原文\n\n${this.fullText}\n\n---\n\n${this.lastReport}`;
+    const markdown = `# 表达训练报告\n\n**日期**: ${dateStr}  \n**时长**: ${formatDuration(this.stats.duration)}  \n**总字数**: ${this.stats.totalWords}  \n\n---\n\n## 完整原文\n\n${this.fullText}\n\n---\n\n${this.lastReport}`;
     const filename = `表达训练-${dateStr}-${timeStr}.md`;
 
     try {
@@ -1138,7 +1207,7 @@ class ExpressionTrainer {
   }
 
   resetStats() {
-    this.stats = { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 0, duration: 0 };
+    this.stats = { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 0, duration: 0, excludedCharacters: 0, hedgeCharacters: 0 };
     this.updateStatsDisplay();
     this.feedbackContent.replaceChildren();
     this.feedbackStatus.textContent = '本地分析可用；AI 建议约每新增 30 字生成';
@@ -1189,6 +1258,7 @@ class ExpressionTrainer {
     this.btnAnalyzePaste.disabled = pending;
     this.btnAnalyzePaste.textContent = pending ? '分析中...' : '开始分析';
     this.btnReport.disabled = pending || this.reportRequestPending;
+    this.trainingRecordSelect.disabled = pending;
   }
 
   openModal(modal, initialFocus) {
@@ -1204,6 +1274,13 @@ class ExpressionTrainer {
     const opener = this.modalOpener;
     this.modalOpener = null;
     opener?.focus();
+    if (modal === this.helpModal && this.firstRunHelpOpen) {
+      this.firstRunHelpOpen = false;
+      try {
+        window.localStorage.setItem('expression-trainer.help-seen', '1');
+      } catch {}
+    }
+    if (!this.firstRunHelpOpen) void this.showFirstRunRecordingPolicy();
   }
 
   handleModalKeydown(event) {
@@ -1235,8 +1312,10 @@ class ExpressionTrainer {
   }
 
   finishTrainingPreparation() {
-    this.trainingStatus.textContent = '准备就绪';
-    this.btnStart.disabled = false;
+    const loading = this.asrPreparationState === 'loading';
+    this.trainingStatus.textContent = loading ? ASR_LOADING_MESSAGE
+      : this.asrPreparationState === 'failed' ? '语音模型加载失败，请重试加载或检查设置' : '准备就绪';
+    this.btnStart.disabled = loading;
     this.btnPaste.disabled = false;
   }
 
@@ -1294,20 +1373,37 @@ class ExpressionTrainer {
       option.textContent = formatRecordLabel(record);
       return option;
     });
+    if (records.length > 0 && !this.viewingTrainingRecordId) {
+      const placeholder = document.createElement('option');
+      placeholder.value = '';
+      placeholder.textContent = '选择录音记录';
+      placeholder.disabled = true;
+      options.unshift(placeholder);
+    }
     this.trainingRecordSelect.replaceChildren(...options);
     this.trainingRecordSelect.value = this.viewingTrainingRecordId || '';
-    this.trainingRecordSelect.classList.toggle('hidden', records.length === 0 || !this.viewingTrainingRecordId);
+    this.trainingRecordSelect.classList.toggle('hidden', records.length === 0);
   }
 
-  selectTrainingRecord(recordId) {
+  selectTrainingRecord(recordId, { fromPicker = false } = {}) {
+    if (fromPicker) {
+      const busy = this.isRecording || this.asrStartAttempt || this.recordingStopOperation || this.pasteAnalysisPending;
+      if (busy || (!this.viewingTrainingRecordId && this.fullText.trim()
+          && !window.confirm('切换录音将替换当前文字内容，是否继续？'))) {
+        this.trainingRecordSelect.value = this.viewingTrainingRecordId || '';
+        return null;
+      }
+    }
     const record = this.getTrainingRecordStore().select(recordId);
     if (!record) return null;
     if (this.viewingTrainingRecordId !== record.id) {
       this.playbackAnalysisGeneration += 1;
       this.btnReanalyze.disabled = false;
+      if (fromPicker) this.advanceLLMGeneration();
     }
     this.viewingTrainingRecordId = record.id;
     this.refreshPlaybackControls();
+    if (fromPicker) this.trainingStatus.textContent = '本次训练已结束';
     return record;
   }
 
@@ -1734,7 +1830,7 @@ class ExpressionTrainer {
       this.closeModal(this.pasteModal);
       this.pasteTextarea.value = '';
       this.viewingTrainingRecordId = null;
-      this.trainingRecordSelect?.classList.add('hidden');
+      this.refreshTrainingRecordSelect();
       this.playbackAnalysisGeneration += 1;
       this.btnReanalyze.disabled = false;
       this.refreshPlaybackControls();
@@ -1742,6 +1838,9 @@ class ExpressionTrainer {
       this.fullText = text;
       this.lastFeedbackText = '';
       this.resetStats();
+      this.timer.textContent = '--:--';
+      this.timer.classList.remove('active');
+      this.trainingStatus.textContent = '文字分析 · 无录音时长';
 
       // 按句号/问号/感叹号/换行分句
       const sentences = text.split(/(?<=[。！？\n])/g).filter(s => s.trim());
@@ -1770,6 +1869,9 @@ class ExpressionTrainer {
         this.stats.hedges += analysis.hedges.length;
         this.stats.vagueWords += analysis.vagueWords.length;
         this.stats.totalWords += analysis.totalWords;
+        const {excludedCharacters, hedgeCharacters} = analysisCharacterCounts(analysis);
+        this.stats.excludedCharacters += excludedCharacters;
+        this.stats.hedgeCharacters += hedgeCharacters;
       }
 
       this.stats.duration = 0; // 粘贴模式没有时长

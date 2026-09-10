@@ -45,7 +45,7 @@
         <span id="stat-hedges" class="stat-value stat-orange">0</span>
       </div>
       <div class="stat-row">
-        <span id="stat-density-label" class="stat-label" title="有效词数（排除填充词和犹豫词）占总词数的比例">表达密度 <span class="stat-help" aria-hidden="true">?</span></span>
+        <span id="stat-density-label" class="stat-label" title="字数只计文字和数字，不含标点、空白。表达密度为排除填充词和犹豫词字符后的字数占比，同一字符只扣除一次。">表达密度 <span class="stat-help" aria-hidden="true">?</span></span>
         <span id="stat-density" class="stat-value stat-green" aria-describedby="stat-density-label">--</span>
       </div>
     </aside>
@@ -103,11 +103,11 @@
         <button id="btn-reanalyze" type="button">重新分析</button>
       </div>
 
-      <div id="training-status" class="operation-status" role="status" aria-live="polite">准备就绪</div>
+      <div id="training-status" class="operation-status" role="status" aria-live="polite">语音模型加载中，预计数秒至数分钟（首次安装可能更久）；本次启动只需加载一次。</div>
 
       <!-- 底部按钮（只保留核心操作） -->
       <div class="action-bar">
-        <button id="btn-start" class="btn-main btn-start">
+        <button id="btn-start" class="btn-main btn-start" disabled>
           <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-mic"/></svg>
           <span class="btn-label">开始录制</span>
         </button>
@@ -145,6 +145,7 @@
     <div class="modal-content recording-policy-modal-content">
       <div class="modal-header">
         <h2 id="recording-policy-modal-title">录音保留与分析说明</h2>
+        <button id="btn-close-recording-policy" class="btn-close" aria-label="关闭录音保存说明">×</button>
       </div>
       <div class="modal-body recording-policy-body">
         <p>开始录音前，请了解以下说明：</p>
@@ -245,6 +246,7 @@
   </div>
 
   <script src="../shared/expression-rules.js"></script>
+  <script src="../shared/text-statistics.js"></script>
   <script src="../shared/support-links.js"></script>
   <script src="safe-rendering.js"></script>
   <script src="asr-event-state.js"></script>

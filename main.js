@@ -627,6 +627,8 @@ ipcMain.handle('close-current-window', (event) => {
 });
 
 // 语音识别相关 - Web Audio方案
+ipcMain.handle('prepare-asr', () => trackAsrResult(asrIpc.prepare()));
+
 ipcMain.handle('start-asr', async (event, command) => {
   const result = await trackAsrResult(asrIpc.start(command));
   if (isSmokeTest && result?.ok) fallbackManagementState.activeSession = true;

@@ -113,11 +113,12 @@ function createTrainer() {
   trainer.timerInterval = null;
   trainer.fullText = '已经确认';
   trainer.sentences = ['已经确认'];
-  trainer.stats = { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 4, duration: 0 };
+  trainer.stats = { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 4, duration: 0, excludedCharacters: 0, hedgeCharacters: 0 };
   trainer.lastFeedbackText = '';
   trainer.llmGeneration = 0;
   trainer.asrEventState = createAsrEventState();
   trainer.asrStartAttempt = null;
+  trainer.asrPreparationState = 'ready';
   trainer.asrGeneration = 0;
   trainer.recordingPolicyAcknowledged = true;
   trainer.trainingRecords = null;
@@ -152,6 +153,7 @@ function createTrainer() {
   trainer.trainingStatus = createElement();
   trainer.feedbackStatus = createElement();
   trainer.recordingPolicyModal = createElement();
+  trainer.btnCloseRecordingPolicy = createElement('button');
   trainer.btnRecordingPolicyConfirm = createElement('button');
   trainer.btnRecordingPolicyCancel = createElement('button');
   trainer.trainingRecordSelect = createElement('select');
@@ -205,6 +207,278 @@ function flushMicrotasks() {
 function flushTimers() {
   return new Promise(resolve => setTimeout(resolve, 0));
 }
+
+function startupTrainer(t, prepare, {
+  storage = new Map(),
+  getRecordingPolicy = async () => ({acknowledged: true}),
+  acknowledgeRecordingPolicy = async () => ({success: true, acknowledged: true})
+} = {}) {
+  const elements = new Map();
+  const html = require('node:fs').readFileSync(require.resolve('../src/index.html'), 'utf8');
+  global.document = {
+    addEventListener() {},
+    createElement,
+    getElementById(id) {
+      if (!elements.has(id)) {
+        const opening = new RegExp(`<([\\w-]+)[^>]*\\bid="${id}"[^>]*>`).exec(html);
+        if (!opening) return null;
+        const element = createElement(opening[1]);
+        const classes = /class="([^"]*)"/.exec(opening[0])?.[1].split(/\s+/) || [];
+        element.classList.add(...classes);
+        element.textContent = html.slice(opening.index + opening[0].length).split('<')[0].trim();
+        element.focus = () => { document.activeElement = element; };
+        if (id === 'btn-start' || id === 'btn-stop') {
+          const label = createElement('span');
+          element.querySelector = () => label;
+        }
+        if (id === 'recording-player') element.pause = () => {};
+        elements.set(id, element);
+      }
+      return elements.get(id);
+    }
+  };
+  // Exercise the actual Preload bridge; only Electron transport is replaced.
+  const ipc = {
+    on() {},
+    removeListener() {},
+    invoke(channel) {
+      if (channel === 'prepare-asr') return prepare();
+      if (channel === 'get-llm-profile-summaries') return Promise.resolve({activeProfileId: null, profiles: []});
+      if (channel === 'cancel-llm-requests') return Promise.resolve({success: true});
+      if (channel === 'get-recording-policy') return getRecordingPolicy();
+      if (channel === 'acknowledge-recording-policy') return acknowledgeRecordingPolicy();
+      throw new Error(`Unexpected startup operation: ${channel}`);
+    }
+  };
+  global.window = {localStorage: {
+    getItem: key => storage.get(key) ?? null,
+    setItem: (key, value) => { storage.set(key, value); }
+  }};
+  require('node:vm').runInNewContext(
+    require('node:fs').readFileSync(require.resolve('../preload'), 'utf8'),
+    {require: () => ({ipcRenderer: ipc, contextBridge: {exposeInMainWorld: (name, api) => { window[name] = api; }}})}
+  );
+  t.after(() => { delete global.document; delete global.window; });
+  return new ExpressionTrainer({audioCaptureFactory: () => {
+    assert.fail('preparing a model must not open the microphone');
+  }});
+}
+
+for (const closeWith of ['cross', 'Escape']) {
+  test(`first launch opens help and ${closeWith} dismisses it without repeating on restart`, async (t) => {
+    const storage = new Map();
+    const loading = createDeferred();
+    const trainer = startupTrainer(t, () => loading.promise, {storage});
+    t.after(() => { loading.resolve({ok: true, events: []}); });
+
+    assert.equal(trainer.activeModal, trainer.helpModal);
+    assert.equal(trainer.helpModal.classList.contains('hidden'), false);
+    assert.equal(document.activeElement, trainer.btnCloseHelp);
+    assert.equal(trainer.btnCloseHelp.textContent, '×');
+    assert.equal(trainer.btnStart.disabled, true, 'help must not block automatic model preparation');
+    if (closeWith === 'cross') trainer.btnCloseHelp.dispatchEvent({type: 'click'});
+    else trainer.handleModalKeydown({key: 'Escape', preventDefault() {}});
+    assert.equal(trainer.helpModal.classList.contains('hidden'), true);
+
+    const reopened = startupTrainer(t, async () => ({ok: true, events: []}), {storage});
+    assert.notEqual(reopened.activeModal, reopened.helpModal);
+    assert.equal(reopened.helpModal.classList.contains('hidden'), true);
+    reopened.btnHelp.dispatchEvent({type: 'click'});
+    assert.equal(reopened.activeModal, reopened.helpModal, 'help remains available from the help button');
+    reopened.btnCloseHelp.dispatchEvent({type: 'click'});
+    assert.equal(reopened.helpModal.classList.contains('hidden'), true);
+    loading.resolve({ok: true, events: []});
+    await flushMicrotasks();
+  });
+}
+
+test('unavailable first-launch storage does not block help dismissal or model preparation', async (t) => {
+  const trainer = startupTrainer(t, async () => ({ok: true, events: []}), {storage: {
+    get() { throw new Error('storage unavailable'); },
+    set() { throw new Error('storage unavailable'); }
+  }});
+  assert.equal(trainer.activeModal, trainer.helpModal);
+  assert.doesNotThrow(() => trainer.btnCloseHelp.dispatchEvent({type: 'click'}));
+  assert.equal(trainer.helpModal.classList.contains('hidden'), true);
+  await flushMicrotasks();
+  assert.equal(trainer.btnStart.disabled, false);
+  assert.equal(trainer.trainingStatus.textContent, '准备就绪');
+});
+
+for (const closeWith of ['cross', 'Escape']) {
+  test(`first-launch recording policy follows help and ${closeWith} dismisses without acknowledgement`, async (t) => {
+    const storage = new Map();
+    let acknowledgements = 0;
+    const options = {
+      storage,
+      getRecordingPolicy: async () => ({acknowledged: false}),
+      acknowledgeRecordingPolicy: async () => { acknowledgements += 1; return {success: true, acknowledged: true}; }
+    };
+    const trainer = startupTrainer(t, async () => ({ok: true, events: []}), options);
+    await flushMicrotasks();
+    assert.equal(trainer.activeModal, trainer.helpModal);
+    assert.equal(trainer.recordingPolicyModal.classList.contains('hidden'), true);
+    trainer.btnCloseHelp.dispatchEvent({type: 'click'});
+    await flushMicrotasks();
+
+    assert.equal(trainer.helpModal.classList.contains('hidden'), true);
+    assert.equal(trainer.activeModal, trainer.recordingPolicyModal);
+    assert.equal(trainer.recordingPolicyModal.classList.contains('hidden'), false);
+    assert.equal(trainer.btnCloseRecordingPolicy.textContent, '×');
+    if (closeWith === 'cross') trainer.btnCloseRecordingPolicy.dispatchEvent({type: 'click'});
+    else trainer.handleModalKeydown({key: 'Escape', preventDefault() {}});
+    await flushMicrotasks();
+    assert.equal(trainer.recordingPolicyModal.classList.contains('hidden'), true);
+    assert.equal(trainer.recordingPolicyAcknowledged, false);
+    assert.equal(acknowledgements, 0);
+    assert.equal(trainer.isRecording, false);
+
+    const reopened = startupTrainer(t, async () => ({ok: true, events: []}), options);
+    await flushMicrotasks();
+    assert.equal(reopened.activeModal, null, 'dismissed first-launch notices must not reappear on every launch');
+    const starting = reopened.startRecording();
+    await flushMicrotasks();
+    assert.equal(reopened.activeModal, reopened.recordingPolicyModal, 'dismissal must retain the existing pre-recording acknowledgement');
+    reopened.btnCloseRecordingPolicy.dispatchEvent({type: 'click'});
+    await starting;
+    assert.equal(reopened.isRecording, false);
+    assert.equal(acknowledgements, 0);
+  });
+}
+
+test('first-launch policy confirmation is persisted without starting a recording', async (t) => {
+  let acknowledged = false;
+  let acknowledgements = 0;
+  const storage = new Map();
+  const options = {
+    storage,
+    getRecordingPolicy: async () => ({acknowledged}),
+    acknowledgeRecordingPolicy: async () => {
+      acknowledgements += 1;
+      acknowledged = true;
+      return {success: true, acknowledged: true};
+    }
+  };
+  const trainer = startupTrainer(t, async () => ({ok: true, events: []}), options);
+  trainer.btnCloseHelp.dispatchEvent({type: 'click'});
+  await flushMicrotasks();
+  assert.equal(trainer.activeModal, trainer.recordingPolicyModal);
+  trainer.btnRecordingPolicyConfirm.dispatchEvent({type: 'click'});
+  await flushMicrotasks();
+  assert.equal(acknowledgements, 1);
+  assert.equal(trainer.recordingPolicyAcknowledged, true);
+  assert.equal(trainer.activeModal, null);
+  assert.equal(trainer.isRecording, false);
+
+  const reopened = startupTrainer(t, async () => ({ok: true, events: []}), options);
+  await flushMicrotasks();
+  assert.equal(reopened.activeModal, null);
+  assert.equal(await reopened.ensureRecordingPolicyAcknowledged(), true);
+  assert.equal(acknowledgements, 1);
+});
+
+test('first-launch policy waits when help is reopened during a pending policy read', async (t) => {
+  const policy = createDeferred();
+  const storage = new Map([['expression-trainer.help-seen', '1']]);
+  const trainer = startupTrainer(t, async () => ({ok: true, events: []}), {
+    storage, getRecordingPolicy: () => policy.promise
+  });
+  trainer.btnHelp.dispatchEvent({type: 'click'});
+  policy.resolve({acknowledged: false});
+  await flushMicrotasks();
+  assert.equal(trainer.activeModal, trainer.helpModal);
+  assert.equal(trainer.recordingPolicyModal.classList.contains('hidden'), true);
+  trainer.btnCloseHelp.dispatchEvent({type: 'click'});
+  await flushMicrotasks();
+  assert.equal(trainer.activeModal, trainer.recordingPolicyModal);
+  trainer.btnCloseRecordingPolicy.dispatchEvent({type: 'click'});
+  await flushMicrotasks();
+});
+
+test('first-launch policy errors stay visible without acknowledging or starting recording', async (t) => {
+  const storage = new Map();
+  const trainer = startupTrainer(t, async () => ({ok: true, events: []}), {
+    storage,
+    getRecordingPolicy: async () => ({acknowledged: false}),
+    acknowledgeRecordingPolicy: async () => ({success: false, error: '无法保存录音策略确认'})
+  });
+  trainer.btnCloseHelp.dispatchEvent({type: 'click'});
+  await flushMicrotasks();
+  assert.equal(trainer.activeModal, trainer.recordingPolicyModal);
+  trainer.btnRecordingPolicyConfirm.dispatchEvent({type: 'click'});
+  await flushMicrotasks();
+  assert.match(trainer.userMessageText.textContent, /无法保存录音策略确认/);
+  assert.equal(trainer.recordingPolicyAcknowledged, false);
+  assert.equal(trainer.activeModal, null);
+  assert.equal(trainer.isRecording, false);
+});
+
+test('startup automatically prepares speech before enabling recording or reporting ready', async (t) => {
+  const loading = createDeferred();
+  let preparations = 0;
+  const trainer = startupTrainer(t, () => { preparations += 1; return loading.promise; });
+  t.after(() => { loading.resolve({ok: true, events: []}); });
+
+  assert.equal(preparations, 1, 'opening the page must initiate model preparation');
+  assert.equal(trainer.btnStart.disabled, true);
+  assert.match(trainer.trainingStatus.textContent, /语音模型.*加载|加载.*语音模型/);
+  assert.match(trainer.trainingStatus.textContent, /预计/);
+  assert.match(trainer.trainingStatus.textContent, /本次启动.*一次/);
+  assert.equal(trainer.btnPaste.disabled, false);
+  assert.equal(trainer.isRecording, false);
+
+  await trainer.startRecording();
+  trainer.clearAll();
+  assert.equal(trainer.btnStart.disabled, true, 'clear must not pretend the pending model is ready');
+  assert.doesNotMatch(trainer.trainingStatus.textContent, /准备就绪/);
+  assert.equal(preparations, 1);
+
+  loading.resolve({ok: true, events: []});
+  await flushMicrotasks();
+  assert.equal(trainer.trainingStatus.textContent, '准备就绪');
+  assert.equal(trainer.btnStart.disabled, false);
+  assert.equal(trainer.btnStartLabel.textContent, '开始录制');
+  assert.equal(trainer.isRecording, false);
+});
+
+for (const rejection of [false, true]) {
+  test(`startup preparation failure remains actionable and retry does not record (rejection=${rejection})`, async (t) => {
+    let preparations = 0;
+    const trainer = startupTrainer(t, async () => {
+      preparations += 1;
+      if (preparations > 1) return {ok: true, events: []};
+      if (rejection) throw new Error('IPC unavailable');
+      return {ok: false, error: {code: 'asr-initialization-failed', message: 'ASR initialization failed'}};
+    });
+    await flushMicrotasks();
+
+    assert.equal(preparations, 1);
+    assert.match(trainer.trainingStatus.textContent, /语音模型加载失败/);
+    assert.equal(trainer.btnStart.disabled, false);
+    assert.equal(trainer.btnStartLabel.textContent, '重试加载');
+    await trainer.btnStart.dispatchEvent({type: 'click'});
+    assert.equal(preparations, 2);
+    assert.equal(trainer.trainingStatus.textContent, '准备就绪');
+    assert.equal(trainer.btnStartLabel.textContent, '开始录制');
+    assert.equal(trainer.isRecording, false);
+  });
+}
+
+test('startup preparation completion preserves a text view opened while loading', async (t) => {
+  const loading = createDeferred();
+  const trainer = startupTrainer(t, () => loading.promise);
+  t.after(() => { loading.resolve({ok: true, events: []}); });
+  assert.equal(trainer.btnStart.disabled, true);
+  trainer.fullText = '已粘贴内容';
+  trainer.trainingStatus.textContent = '文字分析 · 无录音时长';
+
+  loading.resolve({ok: true, events: []});
+  await flushMicrotasks();
+
+  assert.equal(trainer.fullText, '已粘贴内容');
+  assert.equal(trainer.trainingStatus.textContent, '文字分析 · 无录音时长');
+  assert.equal(trainer.btnStart.disabled, false);
+});
 
 async function startAudioCaptureHarness(t, {
   captureStop,
@@ -389,6 +663,50 @@ test('stop final text reaches transcript, analysis, and the next report', async 
   assert.equal(reportPayload.stats.totalWords, 8);
 });
 
+test('successful empty realtime feedback shows no advice without errors or retries', async (t) => {
+  let requestCount = 0;
+  global.window = {
+    api: {
+      getRealtimeFeedback: async () => {
+        requestCount += 1;
+        return { success: true, feedback: '' };
+      }
+    }
+  };
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  trainer.userMessage.classList.add('hidden');
+
+  await trainer.requestRealtimeFeedback();
+
+  assert.equal(trainer.feedbackStatus.textContent, '内容为空：暂无建议');
+  assert.equal(trainer.userMessage.classList.contains('hidden'), true);
+  assert.equal(trainer.userMessageText.textContent, '');
+  assert.equal(trainer.feedbackContent.children.length, 0);
+  assert.equal(requestCount, 1);
+});
+
+test('realtime timeout failures retain their error message', async (t) => {
+  global.window = {
+    api: {
+      getRealtimeFeedback: async () => ({
+        success: false,
+        error: '大模型请求超时，请稍后重试',
+        errorCode: 'timeout'
+      })
+    }
+  };
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+
+  await trainer.requestRealtimeFeedback();
+
+  assert.equal(trainer.feedbackStatus.textContent, '本地分析正常，AI 建议暂不可用');
+  assert.equal(trainer.userMessageText.textContent, '实时反馈失败：大模型请求超时，请稍后重试');
+  assert.equal(trainer.userMessage.classList.contains('hidden'), false);
+  assert.equal(trainer.userMessageAction.classList.contains('hidden'), true);
+});
+
 test('realtime configuration failures show their reason with a settings action', async (t) => {
   const messages = [];
   global.window = {
@@ -440,7 +758,7 @@ test('saved LLM settings dismiss only a configuration-related message', async (t
   assert.equal(trainer.userMessageText.textContent, '复制失败，请重试');
 });
 
-test('starting recognition immediately exposes preparation state and locks conflicting actions', async (t) => {
+test('starting recording after model preparation exposes session startup and locks conflicting actions', async (t) => {
   const cancellation = createDeferred();
   global.document = { createElement };
   global.window = {
@@ -462,7 +780,7 @@ test('starting recognition immediately exposes preparation state and locks confl
 
   start = trainer.startRecording();
 
-  assert.equal(trainer.trainingStatus.textContent, '正在准备语音识别，首次运行可能需要数分钟');
+  assert.equal(trainer.trainingStatus.textContent, '正在启动录制…');
   assert.equal(trainer.btnStart.disabled, true);
   assert.equal(trainer.btnPaste.disabled, true);
 
@@ -560,6 +878,7 @@ test('realtime AI work exposes pending and updated status without hiding local a
   await pending;
 
   assert.equal(trainer.feedbackStatus.textContent, '本地分析正常，AI 建议已更新');
+  assert.deepEqual(trainer.feedbackContent.children.map(item => item.textContent), ['表达清楚']);
 });
 
 test('feedback items follow the transcript reading direction from oldest to newest', () => {
@@ -1745,6 +2064,206 @@ function pasteDocument() {
   return testDocument;
 }
 
+function recordingTextSwitchHarness(t, api = {}) {
+  global.document = pasteDocument();
+  global.window = {
+    confirm: () => true,
+    api: {
+      cancelLLMRequests: async () => ({ success: true }),
+      analyzeTexts: async () => [{ totalWords: 7, fillers: [], hedges: [], vagueWords: [] }],
+      getRealtimeFeedback: async () => ({ success: true, feedback: '' }),
+      ...api
+    }
+  };
+  t.after(() => { delete global.document; delete global.window; });
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  const record = installPlaybackRecord(trainer, playbackRecord({
+    durationMs: 83000,
+    stats: { fillers: 1, hedges: 0, vagueWords: 0, totalWords: 6, duration: 83 }
+  }));
+  trainer.refreshPlaybackControls();
+  trainer.trainingStatus.textContent = '本次训练已结束';
+  trainer.pasteTextarea.value = '这是一段文字。';
+  return { trainer, record };
+}
+
+test('recording to text keeps the sole recording accessible from an unselected picker', async (t) => {
+  const { trainer, record } = recordingTextSwitchHarness(t);
+
+  await trainer.analyzePastedText();
+
+  assert.equal(trainer.trainingRecordSelect.classList.contains('hidden'), false);
+  assert.equal(trainer.trainingRecordSelect.value, '');
+  assert.deepEqual(trainer.trainingRecordSelect.children.map(option => option.value), ['', record.id]);
+  assert.equal(trainer.trainingRecordSelect.children[0].textContent, '选择录音记录');
+  assert.equal(trainer.trainingRecordSelect.children[0].disabled, true);
+  assert.deepEqual(trainer.trainingRecords.list(), [record]);
+  assert.equal(trainer.viewingTrainingRecordId, null);
+  assert.equal(trainer.playbackControls.classList.contains('hidden'), true);
+  assert.equal(trainer.audioPlayer.src, '');
+});
+
+test('recording to text clears the old timer and identifies the missing audio duration', async (t) => {
+  const { trainer } = recordingTextSwitchHarness(t);
+  assert.equal(trainer.timer.textContent, '01:23');
+
+  await trainer.analyzePastedText();
+
+  assert.equal(trainer.timer.textContent, '--:--');
+  assert.equal(trainer.timer.classList.contains('active'), false);
+  assert.equal(trainer.trainingStatus.textContent, '文字分析 · 无录音时长');
+  assert.equal(trainer.stats.duration, 0);
+});
+
+test('text to recording confirms replacement and restores each selected recording', async (t) => {
+  const { trainer, record } = recordingTextSwitchHarness(t);
+  const secondRecord = playbackRecord({
+    id: 'record-second', audioUrl: 'blob:second', fullText: '第二条录音',
+    segments: [{ id: 'second-segment', text: '第二条录音', startMs: 0, endMs: 4000 }],
+    durationMs: 4000,
+    stats: { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 5, duration: 4 }
+  });
+  trainer.trainingRecords.add(secondRecord);
+  trainer.selectTrainingRecord(record.id);
+  await trainer.analyzePastedText();
+  const confirmations = [];
+  window.confirm = message => { confirmations.push(message); return true; };
+
+  trainer.selectTrainingRecord(record.id, { fromPicker: true });
+
+  assert.deepEqual(confirmations, ['切换录音将替换当前文字内容，是否继续？']);
+  assert.equal(trainer.trainingRecordSelect.value, record.id);
+  assert.equal(trainer.fullText, record.fullText);
+  assert.deepEqual(trainer.stats, record.stats);
+  assert.deepEqual(trainer.subtitleContainer.children.map(line => line.dataset.segmentId), ['segment-1', 'segment-2']);
+  assert.equal(trainer.audioPlayer.src, record.audioUrl);
+  assert.equal(trainer.playbackControls.classList.contains('hidden'), false);
+  assert.equal(trainer.timer.textContent, '01:23');
+  assert.equal(trainer.trainingStatus.textContent, '本次训练已结束');
+
+  trainer.selectTrainingRecord(secondRecord.id, { fromPicker: true });
+
+  assert.equal(confirmations.length, 1);
+  assert.equal(trainer.trainingRecordSelect.value, secondRecord.id);
+  assert.equal(trainer.fullText, secondRecord.fullText);
+  assert.deepEqual(trainer.stats, secondRecord.stats);
+  assert.deepEqual(trainer.subtitleContainer.children.map(line => line.dataset.segmentId), ['second-segment']);
+  assert.equal(trainer.audioPlayer.src, secondRecord.audioUrl);
+  assert.equal(trainer.timer.textContent, '00:04');
+});
+
+test('declining text to recording replacement preserves the text view and picker', async (t) => {
+  const { trainer, record } = recordingTextSwitchHarness(t);
+  await trainer.analyzePastedText();
+  window.confirm = () => false;
+  trainer.trainingRecordSelect.value = record.id;
+
+  assert.equal(trainer.selectTrainingRecord(record.id, { fromPicker: true }), null);
+
+  assert.equal(trainer.fullText, '这是一段文字。');
+  assert.equal(trainer.stats.totalWords, 7);
+  assert.equal(trainer.stats.duration, 0);
+  assert.equal(trainer.viewingTrainingRecordId, null);
+  assert.equal(trainer.trainingRecordSelect.value, '');
+  assert.equal(trainer.playbackControls.classList.contains('hidden'), true);
+  assert.equal(trainer.audioPlayer.src, '');
+  assert.equal(trainer.timer.textContent, '--:--');
+});
+
+test('text to recording stays blocked until pasted statistics finish', async (t) => {
+  const analysis = createDeferred();
+  const { trainer, record } = recordingTextSwitchHarness(t, { analyzeTexts: () => analysis.promise });
+  const pending = trainer.analyzePastedText();
+  try {
+    await flushMicrotasks();
+    assert.equal(trainer.trainingRecordSelect.disabled, true);
+    trainer.trainingRecordSelect.value = record.id;
+    assert.equal(trainer.selectTrainingRecord(record.id, { fromPicker: true }), null);
+    assert.equal(trainer.trainingRecordSelect.value, '');
+    assert.equal(trainer.fullText, '这是一段文字。');
+  } finally {
+    analysis.resolve([{ totalWords: 7, fillers: [], hedges: [], vagueWords: [] }]);
+    await pending;
+  }
+
+  assert.equal(trainer.trainingRecordSelect.disabled, false);
+  assert.equal(trainer.stats.totalWords, 7);
+  assert.equal(trainer.viewingTrainingRecordId, null);
+});
+
+test('text to recording ignores late AI feedback from the pasted text', async (t) => {
+  const feedback = createDeferred();
+  const { trainer, record } = recordingTextSwitchHarness(t, { getRealtimeFeedback: () => feedback.promise });
+  await trainer.analyzePastedText();
+  trainer.selectTrainingRecord(record.id, { fromPicker: true });
+  const recordingFeedbackStatus = trainer.feedbackStatus.textContent;
+
+  feedback.resolve({ success: true, feedback: '旧文字的建议' });
+  await flushMicrotasks();
+
+  assert.equal(trainer.feedbackStatus.textContent, recordingFeedbackStatus);
+  assert.equal(trainer.feedbackContent.children.length, 0);
+  assert.equal(trainer.fullText, record.fullText);
+});
+
+test('recording pasted text and reports share character statistics and unavailable duration', async (t) => {
+  const lexicon = require('../lib/lexicon');
+  const {validateFinalReportPayload} = require('../lib/ipc-input');
+  const {sendReport} = require('../lib/ai-feedback');
+  lexicon.loadLexicon();
+  const payloads = [];
+  let savedMarkdown;
+  global.document = pasteDocument();
+  global.window = {
+    confirm: () => true,
+    api: {
+      analyzeText: async text => lexicon.analyzeText(text),
+      analyzeTexts: async texts => texts.map(text => lexicon.analyzeText(text)),
+      cancelLLMRequests: async () => ({success: true}),
+      getRealtimeFeedback: async () => ({success: true, feedback: ''}),
+      getFinalReport: async payload => {
+        validateFinalReportPayload(payload);
+        payloads.push(structuredClone(payload));
+        const report = await sendReport(payload.fullText, payload.stats,
+          {provider: 'openai', apiKey: 'fixture-key', model: 'fixture-model'}, null, {
+            fetchImpl: async () => ({ok: true, json: async () => ({choices: [{message: {content: '## 总评\n80分'}}]})})
+          });
+        return {success: true, report};
+      },
+      saveFile: async content => { savedMarkdown = content; return {success: false, error: '取消保存'}; }
+    }
+  };
+  t.after(() => { delete global.document; delete global.window; });
+  const trainer = createTrainer();
+  trainer.fullText = '';
+  trainer.resetStats();
+  await trainer.handleASRResult({text: '嗯我觉得', isFinal: true});
+  await trainer.handleASRResult({text: '这个方案很好', isFinal: true});
+  trainer.isRecording = false;
+  trainer.stats.duration = 30;
+
+  assert.equal(trainer.stats.totalWords, 10);
+  assert.equal(trainer.statDensity.textContent, '40%');
+  await trainer.generateReport();
+  assert.equal(payloads[0].stats.totalWords, 10);
+  assert.ok(trainer.lastReport.includes('| 语速 | 20字/分钟 |'));
+
+  trainer.pasteTextarea.value = '嗯，我觉得这个方案很好。 \n';
+  await trainer.analyzePastedText();
+  assert.equal(trainer.stats.totalWords, 10);
+  assert.equal(trainer.statDensity.textContent, '40%');
+  await trainer.generateReport();
+  assert.equal(payloads[1].stats.totalWords, 10);
+  assert.equal(payloads[1].stats.excludedCharacters, 6);
+  assert.equal(payloads[1].stats.hedgeCharacters, 3);
+  assert.ok(trainer.lastReport.includes('| 语速 | 不适用 |'));
+  await trainer.saveReport();
+  assert.ok(savedMarkdown.includes('**时长**: 不适用（无有效录音时长）'));
+  assert.ok(savedMarkdown.includes('**总字数**: 10'));
+  assert.ok(savedMarkdown.includes('| 总字数 | 10字 |'));
+});
+
 test('pasted transcript analysis submits every sentence in a single batch', async (t) => {
   const batches = [];
   global.document = pasteDocument();
@@ -1775,6 +2294,7 @@ test('pasted transcript analysis submits every sentence in a single batch', asyn
   assert.equal(trainer.stats.totalWords, 9);
   assert.equal(trainer.stats.fillers, 3);
   assert.equal(trainer.stats.duration, 0);
+  assert.equal(trainer.trainingRecordSelect.classList.contains('hidden'), true);
 });
 
 test('a rejected transcript batch reports safely and reopens the paste flow', async (t) => {
@@ -2037,9 +2557,9 @@ test('two finals at one audio position keep the timeline non-degenerate', async 
 
 test('resetting stats returns the density readout to its placeholder', () => {
   const trainer = createTrainer();
-  trainer.stats = { fillers: 2, hedges: 1, vagueWords: 0, totalWords: 20, duration: 0 };
+  trainer.stats = { fillers: 2, hedges: 1, vagueWords: 0, totalWords: 20, duration: 0, excludedCharacters: 6, hedgeCharacters: 3 };
   trainer.updateStatsDisplay();
-  assert.equal(trainer.statDensity.textContent, '85%');
+  assert.equal(trainer.statDensity.textContent, '70%');
 
   trainer.resetStats();
 
@@ -2115,6 +2635,8 @@ test('normal stop creates and selects a complete WAV training record', async (t)
   assert.equal(createdUrls.length, 1);
   assert.equal(record.audioUrl, 'blob:1');
   assert.equal(record.durationMs, 1500);
+  assert.equal(record.stats.duration, 1.5);
+  assert.equal(trainer.stats.duration, 1.5);
   assert.equal(record.fullText, '完成文本');
   assert.equal(record.playbackAnalysis, null);
   assert.equal(record.segments[0].endMs, 1500);
@@ -2123,6 +2645,17 @@ test('normal stop creates and selects a complete WAV training record', async (t)
   await flushMicrotasks();
   assert.equal(playbackPayloads.length, 1);
   assert.equal(playbackPayloads[0].profileId, 'profile-1');
+});
+
+test('stopping without captured audio duration does not substitute wall clock time', async (t) => {
+  global.window = {api: {cancelLLMRequests: async () => ({success: true})}};
+  t.after(() => { delete global.window; });
+  const trainer = createTrainer();
+  trainer.startTime = Date.now() - 60000;
+
+  await trainer.finishOwnedAsrStopAndUi(null);
+
+  assert.equal(trainer.stats.duration, 0);
 });
 
 test('failed record insertion revokes its newly-created URL exactly once', (t) => {
