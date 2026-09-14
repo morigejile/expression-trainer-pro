@@ -1,0 +1,352 @@
+{
+  "recordedAt": "2026-09-14T09:41:43.957Z",
+  "runtime": {
+    "node": "22.23.0",
+    "modules": "127",
+    "platform": "win32",
+    "arch": "x64",
+    "sherpaVersion": "1.13.3",
+    "sherpaPackage": "1.13.3"
+  },
+  "input": {
+    "wav": "reference-real-speech-16k.wav",
+    "sampleRate": 16000,
+    "audioSeconds": 10.053,
+    "chunkMs": 100,
+    "chunks": 101
+  },
+  "model": {
+    "family": "zipformer-ctc",
+    "directory": "sherpa-onnx-streaming-zipformer-small-ctc-zh-int8-2025-04-01",
+    "configKeys": [
+      "featConfig",
+      "decodingMethod",
+      "maxActivePaths",
+      "enableEndpoint",
+      "rule1MinTrailingSilence",
+      "rule2MinTrailingSilence",
+      "rule3MinUtteranceLength",
+      "modelConfig"
+    ]
+  },
+  "resultKeysObserved": [
+    "context_scores",
+    "is_eof",
+    "is_final",
+    "lm_probs",
+    "segment",
+    "start_time",
+    "text",
+    "timestamps",
+    "tokens",
+    "words",
+    "ys_probs"
+  ],
+  "referenceSpeechWindows": [
+    {
+      "startSeconds": 0.64,
+      "endSeconds": 1.56
+    },
+    {
+      "startSeconds": 1.6,
+      "endSeconds": 2.3
+    },
+    {
+      "startSeconds": 3.8,
+      "endSeconds": 4.38
+    },
+    {
+      "startSeconds": 4.46,
+      "endSeconds": 4.92
+    },
+    {
+      "startSeconds": 5.22,
+      "endSeconds": 5.94
+    },
+    {
+      "startSeconds": 6.5,
+      "endSeconds": 7.06
+    },
+    {
+      "startSeconds": 7.08,
+      "endSeconds": 7.7
+    },
+    {
+      "startSeconds": 7.72,
+      "endSeconds": 8.3
+    },
+    {
+      "startSeconds": 8.7,
+      "endSeconds": 9.9
+    }
+  ],
+  "alignmentAgainstSpeechWindows": {
+    "scored": 21,
+    "insideSpeech": 21,
+    "insideSpeechRatio": 1,
+    "meanDistanceSeconds": 0,
+    "maxDistanceSeconds": 0
+  },
+  "segments": [
+    {
+      "audioOffsetSeconds": 0,
+      "audioEndSeconds": 4,
+      "keys": [
+        "text",
+        "tokens",
+        "timestamps",
+        "ys_probs",
+        "lm_probs",
+        "context_scores",
+        "segment",
+        "words",
+        "start_time",
+        "is_final",
+        "is_eof"
+      ],
+      "text": "昨天是妈的",
+      "tokensCount": 5,
+      "timestampsCount": 5,
+      "tokensSample": [
+        "▁ƍĻŎ",
+        "▁ƌŊŏ",
+        "▁ƍĻŕ",
+        "▁ƌŌĩ",
+        "▁ƎĽĥ"
+      ],
+      "timestampsSample": [
+        0.72,
+        0.88,
+        1.28,
+        1.92,
+        2.08
+      ],
+      "words": [],
+      "start_time": 0,
+      "is_final": false,
+      "hasTimestampsField": true,
+      "hasAnyNonZeroTimestamp": true,
+      "pair": [
+        {
+          "index": 0,
+          "token": "▁ƍĻŎ",
+          "startSeconds": 0.72,
+          "endSeconds": 0.88,
+          "absoluteStartSeconds": 0.72
+        },
+        {
+          "index": 1,
+          "token": "▁ƌŊŏ",
+          "startSeconds": 0.88,
+          "endSeconds": 1.28,
+          "absoluteStartSeconds": 0.88
+        },
+        {
+          "index": 2,
+          "token": "▁ƍĻŕ",
+          "startSeconds": 1.28,
+          "endSeconds": 1.92,
+          "absoluteStartSeconds": 1.28
+        },
+        {
+          "index": 3,
+          "token": "▁ƌŌĩ",
+          "startSeconds": 1.92,
+          "endSeconds": 2.08,
+          "absoluteStartSeconds": 1.92
+        },
+        {
+          "index": 4,
+          "token": "▁ƎĽĥ",
+          "startSeconds": 2.08,
+          "endSeconds": null,
+          "absoluteStartSeconds": 2.08
+        }
+      ]
+    }
+  ],
+  "lastFinal": {
+    "keys": [
+      "text",
+      "tokens",
+      "timestamps",
+      "ys_probs",
+      "lm_probs",
+      "context_scores",
+      "segment",
+      "words",
+      "start_time",
+      "is_final",
+      "is_eof"
+    ],
+    "text": "礼拜二<unk><unk> <unk> <unk> 是星期",
+    "tokensCount": 16,
+    "timestampsCount": 16,
+    "tokensSample": [
+      "▁ƎŊŢ",
+      "▁ƍ",
+      "Ĭ",
+      "Ł",
+      "▁ƋŠĭ",
+      "▁",
+      "▁",
+      "<unk>",
+      "<unk>",
+      "▁",
+      "<unk>",
+      "▁"
+    ],
+    "timestampsSample": [
+      1.44,
+      1.52,
+      1.6,
+      1.64,
+      1.92,
+      2.72,
+      3.28,
+      3.44,
+      3.52,
+      3.84,
+      3.96,
+      4.08
+    ],
+    "words": [],
+    "start_time": 3.84,
+    "is_final": false,
+    "hasTimestampsField": true,
+    "hasAnyNonZeroTimestamp": true
+  },
+  "tokenTimeline": [
+    {
+      "index": 0,
+      "token": "▁ƎŊŢ",
+      "startSeconds": 1.44,
+      "endSeconds": 1.52,
+      "absoluteStartSeconds": 5.44
+    },
+    {
+      "index": 1,
+      "token": "▁ƍ",
+      "startSeconds": 1.52,
+      "endSeconds": 1.6,
+      "absoluteStartSeconds": 5.52
+    },
+    {
+      "index": 2,
+      "token": "Ĭ",
+      "startSeconds": 1.6,
+      "endSeconds": 1.64,
+      "absoluteStartSeconds": 5.6
+    },
+    {
+      "index": 3,
+      "token": "Ł",
+      "startSeconds": 1.64,
+      "endSeconds": 1.92,
+      "absoluteStartSeconds": 5.64
+    },
+    {
+      "index": 4,
+      "token": "▁ƋŠĭ",
+      "startSeconds": 1.92,
+      "endSeconds": 2.72,
+      "absoluteStartSeconds": 5.92
+    },
+    {
+      "index": 5,
+      "token": "▁",
+      "startSeconds": 2.72,
+      "endSeconds": 3.28,
+      "absoluteStartSeconds": 6.72
+    },
+    {
+      "index": 6,
+      "token": "▁",
+      "startSeconds": 3.28,
+      "endSeconds": 3.44,
+      "absoluteStartSeconds": 7.28
+    },
+    {
+      "index": 7,
+      "token": "<unk>",
+      "startSeconds": 3.44,
+      "endSeconds": 3.52,
+      "absoluteStartSeconds": 7.44
+    },
+    {
+      "index": 8,
+      "token": "<unk>",
+      "startSeconds": 3.52,
+      "endSeconds": 3.84,
+      "absoluteStartSeconds": 7.52
+    },
+    {
+      "index": 9,
+      "token": "▁",
+      "startSeconds": 3.84,
+      "endSeconds": 3.96,
+      "absoluteStartSeconds": 7.84
+    },
+    {
+      "index": 10,
+      "token": "<unk>",
+      "startSeconds": 3.96,
+      "endSeconds": 4.08,
+      "absoluteStartSeconds": 7.96
+    },
+    {
+      "index": 11,
+      "token": "▁",
+      "startSeconds": 4.08,
+      "endSeconds": 4.2,
+      "absoluteStartSeconds": 8.08
+    },
+    {
+      "index": 12,
+      "token": "<unk>",
+      "startSeconds": 4.2,
+      "endSeconds": 5.12,
+      "absoluteStartSeconds": 8.2
+    },
+    {
+      "index": 13,
+      "token": "▁ƍĻŕ",
+      "startSeconds": 5.12,
+      "endSeconds": 5.36,
+      "absoluteStartSeconds": 9.12
+    },
+    {
+      "index": 14,
+      "token": "▁ƍĻń",
+      "startSeconds": 5.36,
+      "endSeconds": 5.52,
+      "absoluteStartSeconds": 9.36
+    },
+    {
+      "index": 15,
+      "token": "▁ƍŁń",
+      "startSeconds": 5.52,
+      "endSeconds": null,
+      "absoluteStartSeconds": 9.52
+    }
+  ],
+  "verdict": {
+    "tokensAcrossSegments": 21,
+    "hasTokens": true,
+    "hasTimestampsArray": true,
+    "timestampCountMatchesTokens": true,
+    "anyNonZeroTimestamp": true,
+    "absoluteMonotonic": true,
+    "absoluteWithinAudio": true,
+    "segmentLocalMonotonicNonDecreasing": false,
+    "segmentCount": 2,
+    "resetHappened": true,
+    "alignmentAgainstSpeechWindows": {
+      "scored": 21,
+      "insideSpeech": 21,
+      "insideSpeechRatio": 1,
+      "meanDistanceSeconds": 0,
+      "maxDistanceSeconds": 0
+    }
+  }
+}

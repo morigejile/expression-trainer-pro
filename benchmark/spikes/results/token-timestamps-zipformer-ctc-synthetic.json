@@ -1,0 +1,354 @@
+{
+  "recordedAt": "2026-09-14T09:43:01.955Z",
+  "runtime": {
+    "node": "22.23.0",
+    "modules": "127",
+    "platform": "win32",
+    "arch": "x64",
+    "sherpaVersion": "1.13.3",
+    "sherpaPackage": "1.13.3"
+  },
+  "input": {
+    "wav": "token-timestamp-zh-segmented-16k.wav",
+    "sampleRate": 16000,
+    "audioSeconds": 15.25,
+    "chunkMs": 100,
+    "chunks": 153
+  },
+  "model": {
+    "family": "zipformer-ctc",
+    "directory": "2025-06-30",
+    "configKeys": [
+      "featConfig",
+      "decodingMethod",
+      "maxActivePaths",
+      "enableEndpoint",
+      "rule1MinTrailingSilence",
+      "rule2MinTrailingSilence",
+      "rule3MinUtteranceLength",
+      "modelConfig"
+    ]
+  },
+  "resultKeysObserved": [
+    "context_scores",
+    "is_eof",
+    "is_final",
+    "lm_probs",
+    "segment",
+    "start_time",
+    "text",
+    "timestamps",
+    "tokens",
+    "words",
+    "ys_probs"
+  ],
+  "referenceSpeechWindows": [
+    {
+      "startSeconds": 0.14,
+      "endSeconds": 0.46
+    },
+    {
+      "startSeconds": 0.48,
+      "endSeconds": 0.92
+    },
+    {
+      "startSeconds": 4.8,
+      "endSeconds": 6.28
+    },
+    {
+      "startSeconds": 10.18,
+      "endSeconds": 11.46
+    }
+  ],
+  "alignmentAgainstSpeechWindows": {
+    "scored": 16,
+    "insideSpeech": 11,
+    "insideSpeechRatio": 0.688,
+    "meanDistanceSeconds": 0.067,
+    "maxDistanceSeconds": 0.4
+  },
+  "segments": [
+    {
+      "audioOffsetSeconds": 0,
+      "audioEndSeconds": 2.8,
+      "keys": [
+        "text",
+        "tokens",
+        "timestamps",
+        "ys_probs",
+        "lm_probs",
+        "context_scores",
+        "segment",
+        "words",
+        "start_time",
+        "is_final",
+        "is_eof"
+      ],
+      "text": " 第一段话",
+      "tokensCount": 4,
+      "timestampsCount": 4,
+      "tokensSample": [
+        " 第",
+        "一",
+        "段",
+        "话"
+      ],
+      "timestampsSample": [
+        0.32,
+        0.48,
+        0.76,
+        1.08
+      ],
+      "words": [],
+      "start_time": 0,
+      "is_final": false,
+      "hasTimestampsField": true,
+      "hasAnyNonZeroTimestamp": true,
+      "pair": [
+        {
+          "index": 0,
+          "token": " 第",
+          "startSeconds": 0.32,
+          "endSeconds": 0.48,
+          "absoluteStartSeconds": 0.32
+        },
+        {
+          "index": 1,
+          "token": "一",
+          "startSeconds": 0.48,
+          "endSeconds": 0.76,
+          "absoluteStartSeconds": 0.48
+        },
+        {
+          "index": 2,
+          "token": "段",
+          "startSeconds": 0.76,
+          "endSeconds": 1.08,
+          "absoluteStartSeconds": 0.76
+        },
+        {
+          "index": 3,
+          "token": "话",
+          "startSeconds": 1.08,
+          "endSeconds": null,
+          "absoluteStartSeconds": 1.08
+        }
+      ]
+    },
+    {
+      "audioOffsetSeconds": 2.8,
+      "audioEndSeconds": 8.2,
+      "keys": [
+        "text",
+        "tokens",
+        "timestamps",
+        "ys_probs",
+        "lm_probs",
+        "context_scores",
+        "segment",
+        "words",
+        "start_time",
+        "is_final",
+        "is_eof"
+      ],
+      "text": " 今天天气很好",
+      "tokensCount": 6,
+      "timestampsCount": 6,
+      "tokensSample": [
+        " 今",
+        "天",
+        "天",
+        "气",
+        "很",
+        "好"
+      ],
+      "timestampsSample": [
+        2.24,
+        2.68,
+        3,
+        3.28,
+        3.56,
+        3.88
+      ],
+      "words": [],
+      "start_time": 2.56,
+      "is_final": false,
+      "hasTimestampsField": true,
+      "hasAnyNonZeroTimestamp": true,
+      "pair": [
+        {
+          "index": 0,
+          "token": " 今",
+          "startSeconds": 2.24,
+          "endSeconds": 2.68,
+          "absoluteStartSeconds": 5.04
+        },
+        {
+          "index": 1,
+          "token": "天",
+          "startSeconds": 2.68,
+          "endSeconds": 3,
+          "absoluteStartSeconds": 5.48
+        },
+        {
+          "index": 2,
+          "token": "天",
+          "startSeconds": 3,
+          "endSeconds": 3.28,
+          "absoluteStartSeconds": 5.8
+        },
+        {
+          "index": 3,
+          "token": "气",
+          "startSeconds": 3.28,
+          "endSeconds": 3.56,
+          "absoluteStartSeconds": 6.08
+        },
+        {
+          "index": 4,
+          "token": "很",
+          "startSeconds": 3.56,
+          "endSeconds": 3.88,
+          "absoluteStartSeconds": 6.36
+        },
+        {
+          "index": 5,
+          "token": "好",
+          "startSeconds": 3.88,
+          "endSeconds": null,
+          "absoluteStartSeconds": 6.68
+        }
+      ]
+    },
+    {
+      "audioOffsetSeconds": 8.2,
+      "audioEndSeconds": 13.3,
+      "keys": [
+        "text",
+        "tokens",
+        "timestamps",
+        "ys_probs",
+        "lm_probs",
+        "context_scores",
+        "segment",
+        "words",
+        "start_time",
+        "is_final",
+        "is_eof"
+      ],
+      "text": " 我们明天再见",
+      "tokensCount": 6,
+      "timestampsCount": 6,
+      "tokensSample": [
+        " 我",
+        "们",
+        "明",
+        "天",
+        "再",
+        "见"
+      ],
+      "timestampsSample": [
+        2.24,
+        2.6,
+        2.88,
+        3.08,
+        3.32,
+        3.64
+      ],
+      "words": [],
+      "start_time": 8,
+      "is_final": false,
+      "hasTimestampsField": true,
+      "hasAnyNonZeroTimestamp": true,
+      "pair": [
+        {
+          "index": 0,
+          "token": " 我",
+          "startSeconds": 2.24,
+          "endSeconds": 2.6,
+          "absoluteStartSeconds": 10.44
+        },
+        {
+          "index": 1,
+          "token": "们",
+          "startSeconds": 2.6,
+          "endSeconds": 2.88,
+          "absoluteStartSeconds": 10.8
+        },
+        {
+          "index": 2,
+          "token": "明",
+          "startSeconds": 2.88,
+          "endSeconds": 3.08,
+          "absoluteStartSeconds": 11.08
+        },
+        {
+          "index": 3,
+          "token": "天",
+          "startSeconds": 3.08,
+          "endSeconds": 3.32,
+          "absoluteStartSeconds": 11.28
+        },
+        {
+          "index": 4,
+          "token": "再",
+          "startSeconds": 3.32,
+          "endSeconds": 3.64,
+          "absoluteStartSeconds": 11.52
+        },
+        {
+          "index": 5,
+          "token": "见",
+          "startSeconds": 3.64,
+          "endSeconds": null,
+          "absoluteStartSeconds": 11.84
+        }
+      ]
+    }
+  ],
+  "lastFinal": {
+    "keys": [
+      "text",
+      "tokens",
+      "timestamps",
+      "ys_probs",
+      "lm_probs",
+      "context_scores",
+      "segment",
+      "words",
+      "start_time",
+      "is_final",
+      "is_eof"
+    ],
+    "text": "",
+    "tokensCount": 0,
+    "timestampsCount": 0,
+    "tokensSample": [],
+    "timestampsSample": [],
+    "words": [],
+    "start_time": 13.12,
+    "is_final": false,
+    "hasTimestampsField": true,
+    "hasAnyNonZeroTimestamp": false
+  },
+  "tokenTimeline": [],
+  "verdict": {
+    "tokensAcrossSegments": 16,
+    "hasTokens": true,
+    "hasTimestampsArray": true,
+    "timestampCountMatchesTokens": true,
+    "anyNonZeroTimestamp": true,
+    "absoluteMonotonic": true,
+    "absoluteWithinAudio": true,
+    "segmentLocalMonotonicNonDecreasing": false,
+    "segmentCount": 3,
+    "resetHappened": true,
+    "alignmentAgainstSpeechWindows": {
+      "scored": 16,
+      "insideSpeech": 11,
+      "insideSpeechRatio": 0.688,
+      "meanDistanceSeconds": 0.067,
+      "maxDistanceSeconds": 0.4
+    }
+  }
+}
