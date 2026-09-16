@@ -1,7 +1,5 @@
 # 🚀 宇宙无敌表达训练系统 - 本地桌面版
 
-> 👉 **在线版已上线：[exprtrain.online](https://exprtrain.online)**，无需安装，打开浏览器即用。支持中英双语。
-
 ## 项目文档
 
 - [需求基线](docs/requirements/requirements.md)

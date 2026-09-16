@@ -1,0 +1,62 @@
+{
+  "schema_version": 1,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "一次录音训练的端到端流程",
+    "output": "workflow.html",
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "main-path", "label": "主流程", "focus": ["start", "capture", "decode", "analyze", "ui", "end", "record", "report"], "note": "从点击开始到报告产出的唯一主路径。" },
+      { "id": "local-loop", "label": "逐块闭环", "focus": ["capture", "decode", "analyze", "ui", "realtime"], "note": "每 320 帧音频走一次采集 → 解码 → 分析 → 字幕的闭环。" },
+      { "id": "failure", "label": "失败关闭", "focus": ["capture", "closed"], "note": "送块队列超限即关闭会话并丢弃本次记录。" }
+    ]
+  },
+  "lanes": [
+    { "id": "user", "label": "用户" },
+    { "id": "feed", "label": "Renderer · 采集" },
+    { "id": "asr", "label": "ASR Utility Process" },
+    { "id": "main", "label": "Main · 本地分析" },
+    { "id": "view", "label": "Renderer · 记录与产出" },
+    { "id": "llm", "label": "可选 LLM 后端" },
+    { "id": "exceptions", "label": "失败与关闭", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "trigger", "label": "触发", "fromCol": 0, "toCol": 0 },
+    { "id": "loop", "label": "录音与识别", "fromCol": 1, "toCol": 2, "variant": "emphasis" },
+    { "id": "close", "label": "收尾", "fromCol": 3, "toCol": 3 },
+    { "id": "produce", "label": "产出", "fromCol": 4, "toCol": 5, "variant": "dashed" }
+  ],
+  "groups": [
+    { "id": "memory", "label": "只存在于内存", "lane": "view", "fromCol": 3, "toCol": 5, "variant": "dashed" }
+  ],
+  "mainPath": ["start", "capture", "decode", "analyze", "ui", "end", "record", "report"],
+  "nodes": [
+    { "id": "start", "lane": "user", "col": 0, "type": "external", "label": "开始录制", "sublabel": "主控区按钮" },
+    { "id": "capture", "lane": "feed", "col": 1, "type": "frontend", "label": "音频采集", "sublabel": "16 kHz · 320 帧" },
+    { "id": "decode", "lane": "asr", "col": 1, "type": "backend", "label": "同步解码", "sublabel": "final 事件" },
+    { "id": "analyze", "lane": "main", "col": 2, "type": "backend", "label": "词库分析", "sublabel": "analyze-text" },
+    { "id": "ui", "lane": "view", "col": 2, "type": "frontend", "label": "字幕与统计", "sublabel": "stats + 高亮" },
+    { "id": "realtime", "lane": "llm", "col": 1, "type": "external", "label": "实时反馈", "sublabel": "≥30 字" },
+    { "id": "end", "lane": "view", "col": 3, "type": "frontend", "label": "结束收尾", "sublabel": "flush + drain", "tag": "single-flight" },
+    { "id": "record", "lane": "view", "col": 5, "type": "frontend", "label": "记录与产出", "sublabel": "WAV · 最多 5 条" },
+    { "id": "report", "lane": "llm", "col": 5, "type": "external", "label": "报告与回放", "sublabel": "严格 JSON" },
+    { "id": "closed", "lane": "exceptions", "col": 0, "type": "security", "label": "失败关闭", "sublabel": "丢弃本次记录" }
+  ],
+  "edges": [
+    { "id": "start-click", "from": "start", "to": "capture", "label": "点击开始", "variant": "emphasis", "route": "drop", "fromSide": "bottom", "toSide": "top" },
+    { "id": "chunks-in", "from": "capture", "to": "decode", "route": "drop", "fromSide": "bottom", "toSide": "top" },
+    { "id": "final-text", "from": "decode", "to": "analyze", "label": "final 文本", "variant": "emphasis", "route": "drop", "fromSide": "bottom", "toSide": "top" },
+    { "id": "local-stats", "from": "analyze", "to": "ui", "label": "stats + 建议", "route": "drop", "fromSide": "bottom", "toSide": "top" },
+    { "id": "realtime-trigger", "from": "analyze", "to": "realtime", "label": "≥30 字", "variant": "dashed", "fromSide": "left", "toSide": "top", "via": [[220, 491]] },
+    { "id": "stop-click", "from": "ui", "to": "end", "label": "说完后点击结束", "variant": "emphasis", "route": "bottom-channel", "fromSide": "bottom", "toSide": "bottom" },
+    { "id": "record-build", "from": "end", "to": "record", "label": "尾部 final → WAV", "route": "straight", "fromSide": "right", "toSide": "left" },
+    { "id": "report-request", "from": "record", "to": "report", "label": "生成报告 / 重新分析", "variant": "dashed", "route": "drop", "fromSide": "bottom", "toSide": "top" },
+    { "id": "report-render", "from": "report", "to": "record", "label": "Markdown + 片段建议", "variant": "dashed", "route": "outside-right", "fromSide": "right", "toSide": "right" },
+    { "id": "queue-overrun", "from": "capture", "to": "closed", "label": "队列超限", "variant": "security", "role": "error", "fromSide": "left", "toSide": "top", "via": [[88, 243]] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "主路径", "items": ["点击开始 → 逐块送入 → 本地分析 → 字幕", "说完后点击结束，一次收尾完成 flush 与尾部 final", "产物是本次运行内的 WAV 记录，最多五条"] },
+    { "dot": "rose", "title": "失败关闭", "items": ["送块队列超过 10 块即失败关闭会话", "尾部失败丢弃本次 PCM，不污染上一条记录", "失败不改写已完成的本地分析结果"] },
+    { "dot": "emerald", "title": "本地优先", "items": ["词库分析与字幕高亮完全离线", "实时反馈与报告是可选云端增强", "录音与逐字稿只在内存，关闭窗口即释放"] }
+  ]
+}

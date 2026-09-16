@@ -1,0 +1,51 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "系统总览：运行时、外部依赖与信任边界",
+    "output": "system-overview.html",
+    "quality_profile": "showcase",
+    "viewBox": [1550, 654],
+    "views": [
+      { "id": "speech-path", "label": "语音主路径", "focus": ["user", "renderer", "preload", "main", "asr-utility"], "note": "从麦克风到识别结果的一条主路径，其余为支撑分支。" },
+      { "id": "local-data", "label": "本地数据归属", "focus": ["main", "userdata", "catalog", "modelstore", "install-utility"], "note": "配置、白名单与模型文件都在本机，且各自独立。" },
+      { "id": "toolchain", "label": "工具链与外部依赖", "focus": ["toolchain", "llm", "asr-utility"], "note": "仿真验证不出制品；只有下载与可选推理需要网络。" }
+    ]
+  },
+  "components": [
+    { "id": "user", "type": "external", "label": "用户与麦克风", "sublabel": "16 kHz 语音输入", "pos": [50, 110], "size": [150, 76] },
+    { "id": "llm", "type": "external", "label": "云端 LLM", "sublabel": "OpenAI / DeepSeek / Ollama", "pos": [720, 110], "size": [170, 76] },
+    { "id": "toolchain", "type": "backend", "label": "验证与评测工具", "sublabel": "test / smoke / benchmark", "tag": "不进制品", "pos": [1320, 110], "size": [190, 76] },
+    { "id": "renderer", "type": "frontend", "label": "Renderer", "sublabel": "src/app.js + Web Audio", "tag": "训练编排", "pos": [40, 310], "size": [170, 76] },
+    { "id": "preload", "type": "security", "label": "Preload", "sublabel": "preload.js · window.api", "tag": "能力白名单", "pos": [320, 310], "size": [170, 76] },
+    { "id": "main", "type": "backend", "label": "Main Process", "sublabel": "main.js + IPC Router", "tag": "不加载 Sherpa", "pos": [720, 310], "size": [170, 76] },
+    { "id": "asr-utility", "type": "backend", "label": "ASR Utility Process", "sublabel": "sherpa-onnx-node", "tag": "单一识别会话", "pos": [1020, 310], "size": [190, 76] },
+    { "id": "userdata", "type": "database", "label": "userData 配置", "sublabel": "asr-selection / llm-profile / policy", "pos": [320, 510], "size": [180, 76] },
+    { "id": "catalog", "type": "database", "label": "Model Catalog", "sublabel": "models/registry.json", "tag": "唯一白名单", "pos": [720, 510], "size": [170, 76] },
+    { "id": "modelstore", "type": "database", "label": "模型存储", "sublabel": "appData 版本目录", "tag": "不可变", "pos": [1320, 510], "size": [190, 76] },
+    { "id": "install-utility", "type": "backend", "label": "Model Install Utility", "sublabel": "短生命周期任务", "tag": "下载 + 校验 + 激活", "pos": [1020, 510], "size": [190, 76] }
+  ],
+  "boundaries": [
+    { "kind": "region", "label": "本机桌面运行时（Windows x64）", "wraps": ["renderer", "preload", "main", "asr-utility", "userdata", "catalog", "modelstore", "install-utility"] },
+    { "kind": "region", "label": "非发布工具链", "wraps": ["toolchain"], "pad": 26 },
+    { "kind": "security-group", "label": "contextIsolation:true / nodeIntegration:false", "wraps": ["renderer", "preload"], "pad": 26 }
+  ],
+  "connections": [
+    { "id": "user-to-renderer", "from": "user", "to": "renderer", "label": "语音输入", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "labelDy": 58 },
+    { "id": "renderer-to-preload", "from": "renderer", "to": "preload", "label": "受控 API" },
+    { "id": "preload-to-main", "from": "preload", "to": "main", "label": "IPC invoke", "variant": "security" },
+    { "id": "main-to-asr", "from": "main", "to": "asr-utility", "label": "会话命令" },
+    { "id": "main-to-install", "from": "main", "to": "install-utility", "label": "fork 任务", "fromSide": "bottom", "toSide": "top", "via": [[805, 448], [1115, 448]] },
+    { "id": "install-to-store", "from": "install-utility", "to": "modelstore", "label": "原子激活" },
+    { "id": "store-to-asr", "from": "modelstore", "to": "asr-utility", "label": "active 版本", "variant": "emphasis", "fromSide": "top", "toSide": "right", "via": [[1415, 348]] },
+    { "id": "main-to-catalog", "from": "main", "to": "catalog", "label": "只读白名单", "fromSide": "bottom", "toSide": "top", "labelDy": 24, "labelDx": -50 },
+    { "id": "main-to-userdata", "from": "main", "to": "userdata", "label": "原子读写" },
+    { "id": "main-to-llm", "from": "main", "to": "llm", "label": "可选推理", "variant": "dashed" },
+    { "id": "toolchain-to-asr", "from": "toolchain", "to": "asr-utility", "label": "回归与冒烟", "variant": "dashed", "fromSide": "bottom", "toSide": "top", "via": [[1415, 250], [1115, 250]] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "运行时边界", "items": ["单一 Electron 桌面应用，没有服务端与数据库", "三进程 + 两个 utility，识别与安装互不占用", "模型归档来自 GitHub releases，必须匹配 Catalog 的字节数与 SHA-256"] },
+    { "dot": "emerald", "title": "信任边界", "items": ["沙箱内只有 Renderer 与 Preload", "Catalog 是唯一白名单，路径与 hash 不由 Renderer 提供", "IPC 输入有界校验，云端只接收文本与时间"] },
+    { "dot": "rose", "title": "工具链不进制品", "items": ["test / benchmark / scripts / docs 不进入安装包", "smoke 只在显式参数与隔离 userData 下运行", "普通启动不会进入 Fake 模式"] }
+  ]
+}

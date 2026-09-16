@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "ASR 模型服务状态机（As-Is）",
+    "output": "asr-model-state-machine.html",
+    "viewBox": [1200, 655],
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "happy-path", "label": "正常轨迹", "focus": ["idle", "initializing", "ready", "switching", "switched"], "note": "从服务未初始化到新模型生效的主轨迹。" },
+      { "id": "rollback", "label": "回滚与重试", "focus": ["switching", "ready", "unavailable", "initializing"], "note": "目标模型失败时重建原模型；双双失败才进入 unavailable，可重试。" },
+      { "id": "terminal", "label": "终态", "focus": ["ready", "switched", "disposed", "unavailable"], "note": "disposed 只在应用退出时到达，是被显式释放的终态。" }
+    ]
+  },
+  "lanes": [
+    { "id": "main", "label": "模型服务 status" },
+    { "id": "terminal", "label": "终态" }
+  ],
+  "states": [
+    { "id": "idle", "type": "start", "label": "idle", "sublabel": "服务未初始化", "tag": "启动时", "lane": "main", "col": 0 },
+    { "id": "initializing", "type": "active", "label": "initializing", "sublabel": "解析选择 + 建 controller", "tag": "可能回退默认", "lane": "main", "col": 1 },
+    { "id": "ready", "type": "success", "label": "ready", "sublabel": "当前模型可用", "tag": "唯一 controller", "lane": "main", "col": 2 },
+    { "id": "switching", "type": "active", "label": "switching", "sublabel": "先销毁旧的再建新的", "tag": "禁止活动中切换", "lane": "main", "col": 3 },
+    { "id": "switched", "type": "success", "label": "ready（新模型）", "sublabel": "目标生效并持久化", "tag": "已切换", "lane": "main", "col": 4 },
+    { "id": "unavailable", "type": "failure", "label": "unavailable", "sublabel": "没有可用 controller", "tag": "可重试", "lane": "terminal", "col": 0 },
+    { "id": "disposed", "type": "neutral", "label": "disposed", "sublabel": "显式释放", "tag": "终态", "lane": "terminal", "col": 1 }
+  ],
+  "transitions": [
+    { "id": "init", "from": "idle", "to": "initializing", "label": "initialize()", "variant": "emphasis", "route": "straight", "labelDy": -25 },
+    { "id": "ready", "from": "initializing", "to": "ready", "label": "provider 就绪", "variant": "emphasis", "route": "straight", "labelDy": -25 },
+    { "id": "init-fail", "from": "initializing", "to": "unavailable", "label": "初始化失败", "variant": "security", "fromSide": "bottom", "toSide": "left", "via": [[248, 479]] },
+    { "id": "switch", "from": "ready", "to": "switching", "label": "switchModel(target)", "variant": "emphasis", "route": "straight", "labelDy": -25 },
+    { "id": "switch-ok", "from": "switching", "to": "switched", "label": "目标验证通过", "variant": "emphasis", "route": "straight", "labelDy": -25 },
+    { "id": "switch-rollback", "from": "switching", "to": "ready", "label": "目标失败 → 重建原模型", "variant": "security", "fromSide": "top", "toSide": "top", "via": [[556, 80], [402, 80]] },
+    { "id": "switch-fail", "from": "switching", "to": "unavailable", "label": "切换与回滚双双失败", "variant": "security", "fromSide": "bottom", "toSide": "top", "via": [[556, 400], [402, 400]] },
+    { "id": "retry", "from": "unavailable", "to": "initializing", "label": "重试 initialize()", "variant": "security", "fromSide": "bottom", "toSide": "top", "via": [[402, 523], [20, 523], [20, 60], [248, 60]] },
+    { "id": "dispose", "from": "switched", "to": "disposed", "label": "退出时 dispose()", "fromSide": "bottom", "toSide": "right", "via": [[710, 479]] }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "五态一个 controller", "items": ["idle → initializing → ready → switching → 新模型生效", "任何时刻只持有一个 controller", "切换要求无活动会话，且拒绝进行中的第二次切换"] },
+    { "dot": "rose", "title": "失败都要能回来", "items": ["目标不可用 → 回滚原模型并保持 ready", "切换与回滚双双失败才进入 unavailable", "unavailable 可以重新 initialize()"] },
+    { "dot": "amber", "title": "终态与拒绝", "items": ["disposed 在应用退出时到达并释放 controller", "override、未安装、不在 Catalog 等拒绝路径不改状态", "初始化失败会释放初始化中的 controller"] }
+  ]
+}

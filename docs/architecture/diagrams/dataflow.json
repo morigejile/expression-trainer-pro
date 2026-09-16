@@ -1,0 +1,54 @@
+{
+  "schema_version": 1,
+  "diagram_type": "dataflow",
+  "meta": {
+    "title": "从音频到报告的数据流",
+    "output": "dataflow.html",
+    "viewBox": [1140, 610],
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "audio-path", "label": "音频到文本", "focus": ["mic", "worklet", "asr", "transcript"], "note": "麦克风音频经 16 kHz 分块进入 ASR，产出带毫秒时间轴的文本。" },
+      { "id": "local-analysis", "label": "本地分析", "focus": ["transcript", "lexicon", "sentences", "paste"], "note": "实时逐句与粘贴批量共用同一套本地词库规则。" },
+      { "id": "memory-custody", "label": "内存留存", "focus": ["worklet", "pcm"], "note": "录音只以有界内存副本存在，不写入磁盘。" },
+      { "id": "cloud-optional", "label": "可选云推理", "focus": ["transcript", "lexicon", "llm", "output"], "note": "云端只接收文本与时间，不接收音频或路径。" }
+    ]
+  },
+  "stages": [
+    { "label": "输入来源" },
+    { "label": "采集" },
+    { "label": "识别与模型" },
+    { "label": "文本与分析" },
+    { "label": "推理与产出" }
+  ],
+  "nodes": [
+    { "id": "mic", "type": "external", "label": "系统麦克风", "sublabel": "用户设备", "stage": 0, "row": 0 },
+    { "id": "paste", "type": "external", "label": "粘贴逐字稿", "sublabel": "纯文本来源", "stage": 0, "row": 3 },
+    { "id": "worklet", "type": "frontend", "label": "AudioWorklet", "sublabel": "320 帧 Float32", "tag": "16 kHz mono", "stage": 1, "row": 0 },
+    { "id": "pcm", "type": "database", "label": "内存录音缓冲", "sublabel": "Int16 → WAV · 5 条", "tag": "不落盘", "stage": 1, "row": 1 },
+    { "id": "asr", "type": "backend", "label": "ASR Utility", "sublabel": "同步 decode", "tag": "单会话", "stage": 2, "row": 0 },
+    { "id": "modelstore", "type": "database", "label": "模型存储", "sublabel": "appData active 版本", "tag": "不可变", "stage": 2, "row": 1 },
+    { "id": "sentences", "type": "frontend", "label": "分句批量", "sublabel": "有界数组 ≤5000 句", "stage": 2, "row": 3 },
+    { "id": "transcript", "type": "frontend", "label": "逐字稿与片段", "sublabel": "final 合并 + 时间轴", "stage": 3, "row": 0 },
+    { "id": "lexicon", "type": "backend", "label": "词库分析", "sublabel": "填充 / 犹豫 / 笼统词", "tag": "离线可用", "stage": 3, "row": 2 },
+    { "id": "llm", "type": "external", "label": "云端 LLM", "sublabel": "OpenAI / DeepSeek / Ollama", "tag": "可选", "stage": 4, "row": 0 },
+    { "id": "output", "type": "frontend", "label": "报告与建议", "sublabel": "Markdown + 片段建议", "tag": "受控渲染", "stage": 4, "row": 2 }
+  ],
+  "flows": [
+    { "id": "mic-pcm", "from": "mic", "to": "worklet", "label": "PCM 16 kHz", "classification": "原始音频", "variant": "emphasis" },
+    { "id": "chunks-to-asr", "from": "worklet", "to": "asr", "label": "Float32 块", "classification": "受控音频块", "variant": "emphasis" },
+    { "id": "int16-copy", "from": "worklet", "to": "pcm", "label": "Int16 副本", "classification": "内存副本", "variant": "dashed" },
+    { "id": "model-roles", "from": "modelstore", "to": "asr", "label": "active role 文件", "classification": "受信模型文件" },
+    { "id": "final-text", "from": "asr", "to": "transcript", "label": "final 文本", "classification": "识别结果", "variant": "emphasis" },
+    { "id": "pasted-text", "from": "paste", "to": "sentences", "label": "整段逐字稿", "classification": "用户粘贴文本" },
+    { "id": "batch-analyze", "from": "sentences", "to": "lexicon", "label": "批量提交", "classification": "有界文本数组" },
+    { "id": "sentence-text", "from": "transcript", "to": "lexicon", "label": "逐句文本", "classification": "实时逐句" },
+    { "id": "playback-input", "from": "transcript", "to": "llm", "label": "片段 + 时间", "classification": "不含音频", "variant": "security" },
+    { "id": "prompt-input", "from": "lexicon", "to": "llm", "label": "统计 + 规则", "classification": "脱敏文本", "variant": "dashed", "fromSide": "bottom", "toSide": "top", "via": [[745, 470], [1080, 470], [1080, 100], [960, 100]] },
+    { "id": "markdown-out", "from": "llm", "to": "output", "label": "报告 + 建议", "classification": "严格校验 JSON", "variant": "dashed" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "主数据路径", "items": ["音频 → 16 kHz 分块 → 同步识别 → 带时间轴文本", "本地分析不依赖云端，云推理是可选第二级", "标签描述数据契约，而不是动作"] },
+    { "dot": "emerald", "title": "两条输入路径", "items": ["实时路径逐句提交，粘贴路径一次提交有界批量", "两条路径复用同一套表达规则与分析函数", "粘贴路径先完成本地分析，再请求云端"] },
+    { "dot": "rose", "title": "留存边界", "items": ["录音只以有界内存副本存在，最多五条", "逐字稿与片段不写入训练历史文件", "云端只接收文本、片段标识与起止时间"] }
+  ]
+}

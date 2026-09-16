@@ -23,6 +23,7 @@ ADR 记录“为什么”，架构文档记录“是什么”。ADR 一旦 Accep
 | [0007](0007-package-with-electron-forge.md) | 使用 Electron Forge 形成发布制品 | Accepted | PKG-03/PKG-04 已闭环安装、首次模型、升级与卸载数据保留；公开发布条件仍待办 |
 | [0008](0008-keep-benchmark-as-isolated-non-shipping-tool.md) | 将 Benchmark 保留为同仓库隔离的非发布开发工具 | Accepted | 核心 harness 保留；已完成的数据制作/review 流程归档；产品运行时不得依赖 `benchmark/` |
 | [0009](0009-productize-multiple-asr-models.md) | 产品化多 ASR 模型并采用 Zipformer Large 默认 | Accepted | 公开内置模型需许可获批；先交付 streaming，再交付 utterance |
+| [0010](0010-persist-training-sessions-with-sqlite-and-files.md) | 使用 SQLite 与受管文件持久化训练 Session | Accepted | M1 需验证 binding 的 packaged 运行、迁移、重启恢复和 Artifact 故障降级 |
 
 ## 编号与模板
 

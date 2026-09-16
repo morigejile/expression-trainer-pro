@@ -1,0 +1,66 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "音频块到识别结果的调用链",
+    "output": "sequence.html",
+    "viewBox": [1900, 1040],
+    "quality_profile": "showcase",
+    "column_fit": "spread",
+    "views": [
+      { "id": "establish", "label": "建立会话", "focus": ["app", "api", "main", "asr"], "note": "一次 initialize + start 建出唯一识别会话，并回传 ready。" },
+      { "id": "chunk-loop", "label": "逐块往返", "focus": ["cap", "app", "api", "main", "asr", "sherpa"], "note": "每个 320 帧音频块都要走完整条 IPC 链并同步解码。" },
+      { "id": "teardown", "label": "收尾", "focus": ["app", "cap", "api", "main", "asr", "sherpa"], "note": "flush 与 stop 之后，尾部文本随 stopped 事件回到 Renderer。" }
+    ]
+  },
+  "participants": [
+    { "id": "cap", "type": "frontend", "label": "AudioCapture", "sublabel": "AudioWorklet 16 kHz" },
+    { "id": "app", "type": "frontend", "label": "Renderer", "sublabel": "src/app.js" },
+    { "id": "api", "type": "security", "label": "Preload", "sublabel": "window.api" },
+    { "id": "main", "type": "backend", "label": "Main", "sublabel": "IPC Router" },
+    { "id": "asr", "type": "backend", "label": "ASR Utility", "sublabel": "AsrSessionProvider" },
+    { "id": "sherpa", "type": "backend", "label": "Sherpa Provider", "sublabel": "sherpa-onnx-node" }
+  ],
+  "segments": [
+    { "from": 150, "to": 375, "label": "建立会话" },
+    { "from": 385, "to": 660, "label": "逐块送入（每 320 帧循环）" },
+    { "from": 670, "to": 962, "label": "收尾" }
+  ],
+  "messages": [
+    { "id": "start-asr", "from": "app", "to": "api", "y": 175, "label": "startASR({sessionId, 16000})", "variant": "emphasis" },
+    { "id": "invoke-start", "from": "api", "to": "main", "y": 211, "label": "invoke('start-asr')", "variant": "security" },
+    { "id": "utility-start", "from": "main", "to": "asr", "y": 247, "label": "postMessage initialize + start（懒加载 sherpa）", "variant": "emphasis" },
+    { "id": "ready-event", "from": "asr", "to": "main", "y": 283, "label": "ready {sessionId, sequence}", "variant": "return" },
+    { "id": "envelope-back", "from": "main", "to": "app", "y": 319, "label": "受控 envelope（Preload 转交）", "variant": "return" },
+    { "id": "capture-start", "from": "app", "to": "cap", "y": 355, "label": "start()：16 kHz graph + Worklet" },
+    { "id": "chunk", "from": "cap", "to": "app", "y": 393, "label": "320 帧 Float32 chunk（sequence 递增）", "variant": "emphasis" },
+    { "id": "feed-audio", "from": "app", "to": "api", "y": 429, "label": "feedAudio({sessionId, sequence, samples})", "variant": "emphasis" },
+    { "id": "invoke-feed", "from": "api", "to": "main", "y": 465, "label": "invoke('feed-audio')", "variant": "security" },
+    { "id": "utility-feed", "from": "main", "to": "asr", "y": 501, "label": "postMessage feed（requestId 关联）" },
+    { "id": "sherpa-decode", "from": "asr", "to": "sherpa", "y": 537, "label": "同步 decode(samples)", "variant": "emphasis" },
+    { "id": "decode-result", "from": "sherpa", "to": "asr", "y": 573, "label": "{text, isFinal}", "variant": "return" },
+    { "id": "partial-final", "from": "asr", "to": "main", "y": 609, "label": "partial / final 事件", "variant": "return" },
+    { "id": "normalized-event", "from": "main", "to": "app", "y": 645, "label": "规范事件（sessionId / sequence 过滤）", "variant": "return" },
+    { "id": "capture-stop", "from": "app", "to": "cap", "y": 683, "label": "stop({flush: true}) + drain" },
+    { "id": "stop-asr", "from": "app", "to": "api", "y": 719, "label": "stopASR({sessionId})", "variant": "emphasis" },
+    { "id": "invoke-stop", "from": "api", "to": "main", "y": 755, "label": "invoke('stop-asr')", "variant": "security" },
+    { "id": "utility-stop", "from": "main", "to": "asr", "y": 791, "label": "postMessage stop（inputFinished）" },
+    { "id": "tail-decode", "from": "asr", "to": "sherpa", "y": 827, "label": "尾部 flush decode" },
+    { "id": "tail-text", "from": "sherpa", "to": "asr", "y": 863, "label": "最后未确认文本", "variant": "return" },
+    { "id": "final-stopped", "from": "asr", "to": "main", "y": 899, "label": "final + stopped 事件", "variant": "return" },
+    { "id": "tail-final", "from": "main", "to": "app", "y": 935, "label": "尾部 final → 组装 WAV", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "app", "from": 170, "to": 960, "type": "frontend" },
+    { "participant": "api", "from": 170, "to": 960, "type": "security" },
+    { "participant": "main", "from": 170, "to": 960, "type": "backend" },
+    { "participant": "asr", "from": 240, "to": 960, "type": "backend" },
+    { "participant": "sherpa", "from": 530, "to": 880, "type": "backend" },
+    { "participant": "cap", "from": 350, "to": 960, "type": "frontend" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "一次往返的代价", "items": ["每个块都要经过 Renderer → Preload → Main → Utility", "decode 在 utility 内同步执行", "Renderer 只接受当前 session 且 sequence 递增的事件"] },
+    { "dot": "emerald", "title": "边界与校验", "items": ["Preload 只暴露 start / feed / stop / cancel", "Main 不加载 Sherpa，native 只在 utility 内 require", "失败只返回稳定错误码，不透传底层正文"] },
+    { "dot": "rose", "title": "收尾语义", "items": ["stop 先 flush 采集并排空队列，再发 inputFinished", "Utility 必然返回 stopped，可选 final 携带尾部文本", "cancel 不 flush 文本，直接结束会话"] }
+  ]
+}
