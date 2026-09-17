@@ -1,7 +1,7 @@
 # Target Architecture
 
 > **Status:** M0 target baseline
-> **Date:** 2026-09-16
+> **Date:** 2026-09-18
 > **Current-state reference:** [current.md](current.md)
 > **Product-flow reference:** [training-flow.md](../product/training-flow.md)
 > **Decision horizon:** enough to execute M1 without deciding M2–M4 implementation details
@@ -91,12 +91,17 @@ M1 does not create a local HTTP server, generic RPC framework, plugin host, or s
 
 Owns presentation state, user intent, navigation, charts, and playback controls. It receives serialisable view models. It does not own credentials, file paths, database handles, PCM persistence, or ASR model objects.
 
+已确认的窗口、Workspace 和状态边界统一见 [Training Flow §13](../product/training-flow.md#13-screen-structure-收敛基线)。Product UI 使用该 Screen Structure，不把报告上下文、Finding 展开态或 comparison 的不同展示入口各自实现成独立产品模型；架构层不复制导航、按钮或信息层级规则。
+
+跨窗口与浮层的产品约束统一见 [Training Flow §12.1](../product/training-flow.md#121-跨-screen-的-ux-约束)。窗口、Panel、Dialog 的显示生命周期不能重置 Application Core 的 Training/Report 业务状态；不在此另建一套 UI 状态规则。
+
 ### 4.2 Application Core
 
 Owns use cases and transaction boundaries:
 
 - create/finalise/list/get/delete a training session;
 - coordinate artifact finalisation with session persistence;
+- 在事实/结果产生并可保存后尽早自动持久化，独立于 UI 导航；已有事实不等待 AI 完成，后续结果单独保存；
 - expose transcript/segment evidence to the UI;
 - trigger and store later metric or AI runs;
 - automatically schedule the default AI diagnosis after required local evidence is ready, or expose a recoverable setup/failed state;
@@ -119,11 +124,13 @@ Owns managed relative paths, staging/finalisation, hashes, open/read/delete oper
 
 Owns mapping between the current AudioWorklet/Utility Process implementation and [Speech Engine Contract](speech-contract.md). M1 persists only the stable results it currently provides; M2 adds absolute timing evidence where supported.
 
+M2 将 SenseVoiceSmall 接入这里作为可选主 ASR，沿用 [ADR-0009](adr/0009-productize-multiple-asr-models.md) 的显式适配器与模型选择边界。被选中的模型产生 Session 的主转写及其来源快照；streaming/utterance 能力必须如实声明，utterance 不伪造 partial。它不是在其他主 ASR 之后额外运行的 Speech Evidence 模型。
+
 ### 4.6 Speech evidence pipeline
 
-Introduced in M2 after durable audio exists. It runs versioned neural VAD and SenseVoiceSmall jobs over a completed audio artifact. Results are independent `SpeechEvidenceRun` records: they may support pause/fluency metrics and AI context, but never replace the primary streaming transcript or its timing provenance. Both jobs are cancellable, resource-bounded, and degradable.
+M2 在持久化音频上运行版本化神经 VAD，生成独立的 `SpeechEvidenceRun`。结果可支持停顿/流畅度指标与 AI 上下文，不覆盖所选主 ASR 的转写或 timing provenance；任务可取消、有资源上限，失败显式降级。
 
-SenseVoiceSmall remains a post-session auxiliary model. It does not delay streaming partials, and its event/emotion labels are observations rather than expression-quality scores.
+SenseVoiceSmall 的主 ASR 职责属于 §4.5；若其识别输出包含事件/情绪标签，标签也只是模型观察，不直接构成表达质量分数。
 
 ### 4.7 Metric engine
 
@@ -184,7 +191,7 @@ M2 separates four result classes:
 | Class | Source | Examples | Trust rule |
 |---|---|---|---|
 | Fact | capture/user input | audio, transcript, timestamps, task | Immutable after completion except explicit revision/repair |
-| Speech evidence | versioned local model | neural VAD intervals, SenseVoiceSmall auxiliary observations | Derived from audio, independently versioned, never replaces primary transcript facts |
+| Speech evidence | versioned local model | neural VAD intervals | Derived from audio, independently versioned, never replaces primary transcript facts |
 | Deterministic metric | versioned pure code | pace, pause duration, filler frequency | Reproducible from declared facts and version |
 | AI interpretation | versioned provider call | organisation diagnosis, suggested rewrite | Validated and evidence-linked; never presented as measured fact |
 
@@ -195,7 +202,7 @@ Product analysis is composed in layers over the trust classes above:
 ```text
 TrainingSession facts
         │
-        ├── Speech Evidence                  neural VAD + SenseVoiceSmall
+        ├── Speech Evidence                  neural VAD
         │
         ├── Common Analysis                    every analyzable session
         │     └── general organisation/structure is valid for Free
@@ -211,9 +218,11 @@ TrainingSession facts
 
 `trainingMode` and `analysisMode` are separate. A Structured session receives Common Analysis plus the analysis for its selected framework. A Free session may receive general structure findings and a framework recommendation, but it is not judged against a framework template unless the user explicitly requests that re-analysis. Recommendations never change the session or select the next training mode on the user's behalf.
 
-Re-analysis creates another versioned derived result over the same immutable transcript/audio evidence. Re-training creates a new `TrainingSession` with a newly selected mode/framework/training-prompt snapshot. The two actions have distinct application commands and user-facing labels.
+Re-analysis creates another versioned derived result over the same immutable transcript/audio evidence. 继续练习/重练从报告带上下文进入同一 Training Workspace；每次 attempt 创建新的 `TrainingSession`，持久化训练上下文及来源 Session/Finding 关系，包括句子或片段的 Free 重练。该关系表达训练原因与轮次联系，不是新训练模式；原始事实和已有结果不被覆盖。逻辑约束由 Data Model §6 管理。The two actions have distinct application commands and user-facing labels.
 
-The report remains one composition rather than one report type per framework. Its first layer answers “how was this attempt, what most needs improvement, and what should be practised next”; detailed Common Analysis, optional Framework Analysis, evidence, and AI Coaching remain available below it. Framework findings reference transcript segments and timing when timing evidence exists.
+报告保持统一 composition。完整分析保留有效 findings，训练呈现层选择优先问题；首次报告与完整报告使用同一分析来源，不形成独立结论副本。展示顺序、数量和导航由 [Training Flow](../product/training-flow.md) 定义；架构只负责 Common Analysis、可选 Framework Analysis、Evidence 和 AI Coaching 的组合与证据引用。
+
+M3 的 comparison 属于 Application Core 的共同用例边界，为历史完整差异视图提供证据与版本兼容判断；M4 的针对性练习反馈复用该能力，在 Report 中投影聚焦目标的结果。两种展示不各自计算一套 comparison，也不因此新增通用比较框架或 M1 服务。数据不变量及 Practice Chain 的实体未决项分别由 [Data Model §10/§12](data-model.md) 维护。
 
 ## 8. Privacy and network boundary
 
@@ -228,7 +237,8 @@ The report remains one composition rather than one report type per framework. It
 | Failure | Required behaviour |
 |---|---|
 | LLM unavailable or invalid schema | Keep facts/local metrics; mark analysis failed or unavailable; allow retry |
-| Neural VAD/SenseVoiceSmall unavailable | Keep primary ASR facts; mark affected speech evidence and dependent metrics degraded; allow retry |
+| Neural VAD unavailable | Keep primary ASR facts; mark affected speech evidence and dependent metrics degraded; allow retry |
+| Selected primary ASR (including SenseVoiceSmall) unavailable or failed | Preserve captured/saved facts; expose unavailable/failed transcription and explicit recovery. Do not claim transcript success or silently switch models; previously saved records remain readable |
 | ASR execution exits | Fail active speech session explicitly; retain prior completed sessions; recreate for next attempt |
 | Audio queue overruns | Record an explicit quality event; do not silently compute trustworthy timing metrics |
 | Artifact missing/corrupt | Keep session/transcript available; mark audio unavailable/corrupt |
@@ -245,15 +255,14 @@ These are intentionally unresolved and must not be inferred from this target:
 | Electron or Tauri | Keep Electron | Measured runtime/packaging/mobile benefit exceeds migration and WebView variance cost |
 | Web Audio or native capture | Keep current Web Audio adapter | Reproducible device/sample-rate failures or acoustic-feature requirements that Web Audio cannot satisfy |
 | UI framework | Keep current renderer for M1 | UI complexity creates measured state/test/maintenance cost that a framework reduces |
-| SQLite library | Not selected in M0 | M1 implementation spike compares maintained options against packaging, migration, and test needs |
-| Post-M1 audio quota/automatic cleanup | M1 keeps audio until explicit session deletion and performs no silent cleanup | Reopen after measuring real storage growth and deletion behaviour |
+| 后续容量提醒实施细节 | 提醒规则已确认，唯一行为定义见 Requirements §9.1；M1 保留音频至明确删除，不自动清理 | Backlog D-01 细化统计/计量、检测与提醒状态并安排实施，不重新打开阈值原则 |
 | Token timing policy by model | Contract defined; mapping not implemented | M2 timing integration and representative-model tests |
 | Neural VAD model, thresholds, and execution budget | Neural VAD is accepted for M2; no model/threshold is selected in M0 | M2 labelled-sample benchmark chooses the versioned model/threshold and validates accuracy, realtime factor, memory, and degradation |
-| SenseVoiceSmall post-session limits and distribution | Accepted for M2 as auxiliary evidence; buffering, duration, resource limits, and public redistribution remain open | M2 spike establishes supported duration, cancellation, packaging, failure isolation, and the licence gate without delaying streaming ASR |
+| SenseVoiceSmall primary-ASR integration | Accepted for M2 as an optional primary ASR; ADR-0009 establishes utterance capability and bounded-buffer baseline | D-08 validates model selection, duration/buffering, cancellation, resources, packaging, failure recovery, and public-distribution permission; detailed waiting/error interaction remains in Interaction / State Design |
 | Radar dimensions/scales | Requirement accepted, definitions open | M2 scoring specification and MECE review |
 | Default AI onboarding/profile availability | Remote auto-analysis requires an explicitly enabled profile under R-A11; the fresh-install provider path is not selected | M2 product design distinguishes local/remote profiles and defines setup, enablement, disablement, and degraded states |
-| Real-time AI feedback | Current runtime has during-speech feedback; target core flow is completed-session diagnosis | M2 evidence decides retain, narrow, or remove based on interruption, context quality, latency, cost, and user value |
-| Report copy/export after homepage cleanup | M1 removes homepage copy/save controls; no future detail/export surface is committed | Reopen after the durable history/detail workflow shows a concrete export or sharing need |
+| Real-time AI retention and feedback implementation | 克制提醒原则已确认；历史实时 AI 是否保留及具体交互未定，三条历史 AI 路径不产生三个目标 Screen | D-10 在对应阶段确定实时 AI 取舍；若保留，再明确本地规则/AI 分工、上下文、延迟、成本和降级。用户任务与 Workspace 归属统一见 Training Flow §4/§13，不按现有调用路径划分 UI |
+| 报告复制/导出/分享与备份 | 已记录为后续待办 D-11；M1 移除首页复制/保存操作，未承诺新的详情出口 | 明确格式、数据范围、分享方式及备份恢复边界后分配里程碑 |
 | AI chat context/retrieval | One selected session is the minimal boundary | M3 product design; cross-session retrieval needs a user-visible use case |
 | Cloud sync/hosted gateway | Not part of local-first baseline | Multi-device, managed-key, account, or organisational requirement is accepted |
 
@@ -281,4 +290,4 @@ The target remains valid while these statements hold:
 7. Re-analysis can add a framework view without changing the session's recorded training mode or evidence.
 8. Adding a framework does not create a new session lifecycle, Common Analysis pipeline, or report architecture.
 9. AI diagnosis is attempted by default for completed analyzable sessions only through a valid profile; remote validity requires disclosed, explicit user enablement, while provider failure remains a recoverable derived-result state.
-10. Neural VAD and SenseVoiceSmall can fail or be rerun without changing the primary transcript or completed Session facts.
+10. Neural VAD can fail or be rerun without changing primary transcript facts. Selecting SenseVoiceSmall makes it the new Session's primary ASR; failure is explicit, and model selection or recovery never overwrites previously completed Session facts.

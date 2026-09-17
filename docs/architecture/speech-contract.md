@@ -1,7 +1,7 @@
 # Speech Engine Contract
 
 > **Status:** M0 target baseline
-> **Date:** 2026-09-16
+> **Date:** 2026-09-18
 > **Applies to:** any Electron, Tauri, native, or test adapter
 > **Does not imply:** a desktop-runtime migration or native-capture implementation
 
@@ -86,7 +86,9 @@ Field names illustrate the stable transport-neutral envelope. Runtime adapters m
 }
 ```
 
-The engine either emits `started` with its capabilities or emits a terminal error. Capabilities include token-timestamp support and any provider-defined confidence support.
+The engine either emits `started` with its capabilities or emits a terminal error. Capabilities include recognition mode (streaming or utterance), partial-result support, token-timestamp support, and any provider-defined confidence support.
+
+SenseVoiceSmall is one selectable primary ASR under this same contract. Its utterance adapter produces the selected Session's primary final transcript; it is not a post-session auxiliary evidence job. An utterance adapter must not fabricate partial events. Buffering/duration follows [ADR-0009](adr/0009-productize-multiple-asr-models.md), with product-integration validation tracked by D-08.
 
 ### 4.2 `feed`
 
@@ -136,7 +138,7 @@ emittedAtMonotonicMs
 |---|---|---|
 | `started` | engine/model identity, capabilities | The engine is ready to accept PCM |
 | `audio-accepted` | `commandSequence`, accepted sample range/cursor | Optional per chunk; required as an aggregate diagnostic at stop |
-| `partial` | text, optional tokens/timing | Replaceable hypothesis; never a durable fact by itself |
+| `partial` | text, optional tokens/timing | Only for an engine declaring partial support; replaceable hypothesis, never a durable fact by itself |
 | `final` | stable result ID, text, optional tokens/timing | Appendable stable recognition result for this session |
 | `quality-event` | code and affected sample range | Example: overrun or unavailable timing |
 | `error` | stable code, retryability, safe message | Explicit failure; no secrets, PCM, transcript, or paths in logs by default |

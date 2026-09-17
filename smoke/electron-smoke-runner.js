@@ -152,6 +152,10 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.equal(require.cache[require.resolve('sherpa-onnx-node')], undefined);
   assert.equal(require.cache[require.resolve('../lib/ai-feedback')], undefined);
   await waitForPage(mainWindow, 'index.html');
+  await waitUntil('speech model prepared before recording', () => mainWindow.webContents.executeJavaScript(
+    `document.getElementById('training-status')?.textContent.trim() === '准备就绪'
+      && !document.getElementById('btn-start')?.disabled`
+  ));
 
   const apiContract = await mainWindow.webContents.executeJavaScript(`(() => {
     const expected = [
@@ -194,7 +198,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     vagueClass: 'stat-value stat-yellow',
     fillerClass: 'stat-value stat-red',
     hedgeClass: 'stat-value stat-orange',
-    densityHelp: '有效词数（排除填充词和犹豫词）占总词数的比例'
+    densityHelp: '字数只计文字和数字，不含标点、空白。表达密度为排除填充词和犹豫词字符后的字数占比，同一字符只扣除一次。'
   });
   if (process.platform !== 'darwin') {
     assert.equal(mainWindow.isMenuBarVisible(), false, 'main window must not render a second menu header');
@@ -400,7 +404,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     { id: 'btn-diagnostics', label: '导出诊断信息', text: '诊断' },
     { id: 'btn-settings', label: '打开设置', text: '设置' }
   ]);
-  assert.match(desktopUsability.densityDescription, /有效词数.*总词数/);
+  assert.match(desktopUsability.densityDescription, /字数.*不含标点.*同一字符只扣除一次/);
   assert.equal(desktopUsability.reducedMotionRule, true);
   assert.equal(desktopUsability.visibleTitle, '表达训练');
   assert.equal(desktopUsability.decorativeMascotPresent, false);
@@ -729,6 +733,12 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   await mainWindow.webContents.executeJavaScript(
     `document.getElementById('btn-recording-policy-confirm').click()`
   );
+  await waitUntil('recording onboarding and model preparation complete', () => mainWindow.webContents.executeJavaScript(`(() => {
+    const trainer = window.__recordingSmokeTrainer;
+    return trainer.asrPreparationState === 'ready'
+      && !trainer.firstRunRecordingPolicyPending && !trainer.firstRunRecordingPolicyRunning;
+  })()`));
+  await mainWindow.webContents.executeJavaScript(`document.getElementById('btn-start').click()`);
   await waitUntil('fake recording fixture delivery', async () => {
     return mainWindow.webContents.executeJavaScript(`(() => {
       const trainer = window.__recordingSmokeTrainer;
@@ -1008,7 +1018,8 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     fillers: '2',
     hedges: '1',
     vague: '1',
-    density: '57%',
+    // Ten characters; 嗯 + 我觉得 + 这个 exclude six distinct characters.
+    density: '40%',
     reportVisible: true,
     copyVisible: true,
     saveVisible: true,

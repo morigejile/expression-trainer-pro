@@ -1,5 +1,7 @@
 # BM-04 七模型 ASR 横向对比（2026-08-30）
 
+> **产品职责说明（2026-09-18）：** 下文保留当时 benchmark 结果与建议，不冻结产品交互。SenseVoiceSmall 的现行职责是可选主 ASR，见 [Requirements R-A10](../requirements/requirements.md)；“VAD 切句后识别”属于当时建议，不是已确认的 Screen/State 方案。当前 utterance 资源基线见 [ADR-0009](../architecture/adr/0009-productize-multiple-asr-models.md)，后续集成验证由 Backlog D-08 跟踪。
+
 ## 结论
 
 本轮 7 个候选均完成 100 条普通话样本，失败数为 0，平均 RTF 均小于 1。综合普通话识别率、实时交互、安装包体积和内存后：

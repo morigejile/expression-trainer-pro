@@ -57,10 +57,12 @@ if (isSquirrelStartup) app.quit();
 
 const isSmokeTest = process.argv.includes('--smoke-test');
 const isNativeAddonSmokeTest = process.argv.includes('--native-addon-smoke-test');
+const trainingPersistenceSmokePhase = process.argv.find(arg => arg.startsWith('--training-persistence-smoke='))?.split('=')[1];
+const isTrainingPersistenceSmokeTest = trainingPersistenceSmokePhase !== undefined;
 const isManagedModelSmokeTest = process.argv.includes('--managed-model-smoke-test');
 const isBundledDefaultSmokeTest = process.argv.includes('--bundled-default-smoke-test');
 const isOfflineModelSmoke = process.env.EXPRESSION_TRAINER_MODEL_SMOKE_OFFLINE === '1';
-if (isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTest) app.disableHardwareAcceleration();
+if (isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTest || isTrainingPersistenceSmokeTest) app.disableHardwareAcceleration();
 const smokeTest = isSmokeTest ? require('./smoke/electron-smoke-runner') : null;
 const {
   createRequestCoordinator,
@@ -76,7 +78,7 @@ const {
 if (smokeTest) {
   smokeTest.configureApp(app);
 }
-if (isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTest) {
+if (isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTest || isTrainingPersistenceSmokeTest) {
   const userDataPath = process.env.EXPRESSION_TRAINER_SMOKE_USER_DATA;
   if (!userDataPath || !path.isAbsolute(userDataPath)) {
     throw new Error('Smoke mode requires an absolute EXPRESSION_TRAINER_SMOKE_USER_DATA path');
@@ -84,7 +86,7 @@ if (isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTe
   app.setPath('userData', userDataPath);
 }
 
-const usesIsolatedModelRoot = isSmokeTest || isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTest;
+const usesIsolatedModelRoot = isSmokeTest || isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTest || isTrainingPersistenceSmokeTest;
 const modelRoot = usesIsolatedModelRoot
   ? path.join(app.getPath('userData'), 'models')
   : resolveProductionModelRoot(app.getPath('appData'));
@@ -422,6 +424,18 @@ function createSettingsWindow() {
 // App lifecycle
 app.whenReady().then(async () => {
   if (isSquirrelStartup) return;
+  if (isTrainingPersistenceSmokeTest) {
+    try {
+      await require('./smoke/training-persistence-smoke').run({
+        root: path.join(app.getPath('userData'), 'training'), phase: trainingPersistenceSmokePhase
+      });
+      app.exit(0);
+    } catch (error) {
+      console.error('[training-persistence-smoke] FAILED', formatSafeError(error));
+      app.exit(1);
+    }
+    return;
+  }
   if (isNativeAddonSmokeTest) {
     try {
       await runNativeAddonSmoke();

@@ -116,4 +116,6 @@ BM-04 已完成七候选验证，ADR-0009 据此选择 Zipformer Large 作为技
 
 ## 诊断导出
 
-主窗口的“🩺”按钮按用户操作导出固定 schema 的 JSON：应用版本、OS/platform/arch、active 模型 ID/版本、请求/context/track 采样率、最近 ASR 初始化耗时和受控错误类别。文件不包含设置、API Key、Authorization、绝对路径、stack、音频、逐字稿或 LLM 内容；不在后台持续写日志，也不自动上传。未开始录音或未安装模型时，对应字段明确为 `null`/`not-installed`。
+目标唯一入口是“帮助 → 问题与反馈 → 导出诊断”，产品归属见 [Training Flow §13.1](product/training-flow.md#131-已确认的-ia-归属)。现有主窗口“🩺”是待移除的旧入口，不属于目标 IA；本次文档更新不代表入口迁移已实现。
+
+诊断按用户操作导出固定 schema 的 JSON：应用版本、OS/platform/arch、active 模型 ID/版本、请求/context/track 采样率、最近 ASR 初始化耗时和受控错误类别。文件不包含设置、API Key、Authorization、绝对路径、stack、音频、逐字稿或 LLM 内容；不在后台持续写日志，也不自动上传。未开始录音或未安装模型时，对应字段明确为 `null`/`not-installed`。

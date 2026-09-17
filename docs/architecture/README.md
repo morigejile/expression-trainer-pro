@@ -8,7 +8,7 @@
 | 系统需要什么能力？ | [需求基线](../requirements/requirements.md) | 区分产品行为、当前状态、优先级与目标里程碑 |
 | 系统准备演进到哪里？ | [目标架构](target.md) | 只记录已确定边界；未决事项必须显式列出 |
 | 训练事实与分析如何保存？ | [训练数据模型](data-model.md) | 区分不可变事实与版本化派生结果 |
-| 用户如何训练、分析和进入下一轮？ | [Training Flow](../product/training-flow.md) | 记录目标交互；与 As-Is 界面状态分开 |
+| 用户如何训练、查看报告与进入下一轮；Screen 如何划分？ | [Training Flow](../product/training-flow.md) | 唯一交互、IA 与 Screen Structure 定义；与 As-Is 界面状态分开，其他文档引用验收或职责边界 |
 | 语音执行层如何与产品解耦？ | [Speech Engine Contract](speech-contract.md) | 保持 Electron/Tauri 与 ASR 模型无关 |
 | 架构和流程如何可视化？ | [架构图集](diagrams/README.md) | JSON 是可编辑规格，HTML 是随源码快照发布的可浏览制品 |
 | 为什么做出关键选择？ | [ADR 索引](adr/README.md) | 决策永久保留；变化时新增或 Supersede ADR |
@@ -24,9 +24,11 @@
 
 - [M0 Gap Analysis](../reviews/m0-gap-analysis-2026-09-16.md)
 - [M0 Consistency Review](../reviews/m0-consistency-review-2026-09-16.md)
-- [Renderer UI State Audit](../reviews/ui-state-audit-2026-09-02.md)
+- [Renderer UI State Audit（已过期，仅历史归档）](../reviews/ui-state-audit-2026-09-02.md)
 - [Business Logic Review](../reviews/business-logic-review-2026-09-11.md)
 - [Roadmap Adjustment Proposal](../reviews/roadmap-adjustment-2026-09-13.md)
+
+旧 UI audit 不再维护为当前状态表或验收基准。目标交互与跨 Screen UX 由 [Training Flow §12–§14](../product/training-flow.md#12-ui-与文案原则) 承接；详细状态设计待 Interaction / State Design 重新讨论。图集中引用该审计的训练流程与界面状态图也仅保留为历史快照。
 
 ## 文档生命周期
 

@@ -102,6 +102,14 @@ async function main() {
       'SHERPA_NATIVE_SMOKE_OK',
       userDataPath
     );
+    for (const phase of ['write', 'read']) {
+      await runSmoke(
+        executable,
+        [...HEADLESS_SWITCHES, `--training-persistence-smoke=${phase}`],
+        `TRAINING_PERSISTENCE_${phase.toUpperCase()}_OK`,
+        userDataPath
+      );
+    }
     assert.equal(
       fs.existsSync(path.join(userDataPath, 'models')),
       false,

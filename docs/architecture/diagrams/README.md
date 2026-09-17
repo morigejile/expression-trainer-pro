@@ -16,14 +16,16 @@ route_rhythm、legend_clearance）。单文件 HTML 内含明暗主题、平移�
 |---|---|---|---|---|---|
 | 当前架构（As-Is） | architecture | `architecture.json` | `architecture.html` | 1530 × 664 | 全部通过 |
 | 系统总览 | architecture | `system-overview.json` | `system-overview.html` | 1550 × 654 | 全部通过 |
-| 一次录音训练流程 | workflow | `workflow.json` | `workflow.html` | 720 × 1024 | **未通过**（见下） |
+| 一次录音训练流程（历史快照，已过期） | workflow | `workflow.json` | `workflow.html` | 720 × 1024 | **未通过**（见下） |
 | 本地交付流程 | workflow | `delivery-workflow.json` | `delivery-workflow.html` | 720 × 776 | **未通过**（见下） |
 | 音频块调用链 | sequence | `sequence.json` | `sequence.html` | 1900 × 1040 | 全部通过 |
-| 训练会话与界面状态 | lifecycle | `lifecycle.json` | `lifecycle.html` | 1100 × 630 | 全部通过 |
+| 训练会话与界面状态（历史快照，已过期） | lifecycle | `lifecycle.json` | `lifecycle.html` | 1100 × 630 | 全部通过 |
 | ASR 模型服务状态机 | lifecycle | `asr-model-state-machine.json` | `asr-model-state-machine.html` | 1200 × 655 | 全部通过 |
 | 从音频到报告的数据流 | dataflow | `dataflow.json` | `dataflow.html` | 1140 × 610 | 全部通过 |
 
 ## 事实来源
+
+**2026-09-18 状态说明：** `workflow.json/html` 与 `lifecycle.json/html` 引用了已过期 UI audit，仅保留为历史快照，不再代表当前 UI 行为、目标 IA 或验收标准。目标交互和跨 Screen 约束由 [Training Flow §12–§14](../../product/training-flow.md#12-ui-与文案原则) 承接；具体状态图待 Interaction / State Design 重新讨论后再生成。本次未重新审计源码或更新图的制品，其他图也不能代替目标 Screen Structure。
 
 | 图 | 主要证据 |
 |---|---|

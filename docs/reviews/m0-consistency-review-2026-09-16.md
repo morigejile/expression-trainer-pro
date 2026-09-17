@@ -1,5 +1,7 @@
 # M0 Consistency Review
 
+> **2026-09-18 更正说明：** 本文保留历史评审记录，不是现行要求。下文将 SenseVoiceSmall 归为辅助/后处理 Speech Evidence 的表述已失效；它是可选主 ASR，被选中时产生 Session 主转写。现行定义见 [Requirements R-A10](../requirements/requirements.md)、[M2](../milestones/m2-speech-evidence-and-ai-diagnosis.md) 与 [Target Architecture §4.5–§4.6](../architecture/target.md#45-speech-adapter)。原评审结论不能作为上述旧表述仍有效的证明。
+
 > **Date:** 2026-09-16
 > **Result:** Pass
 > **Review scope:** P0/P1 requirement → product flow → architecture → data model → milestone traceability, current/target separation, and unsupported overdesign

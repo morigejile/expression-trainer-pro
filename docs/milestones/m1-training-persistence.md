@@ -1,6 +1,6 @@
 # M1 — Training Persistence
 
-> **Status:** Ready for implementation after M0 review
+> **Status:** In progress — storage foundation implemented; product integration pending
 > **Depends on:** M0 Architecture & Requirements Baseline
 > **Primary requirements:** R-P01–R-P09, NFR-01–NFR-03, NFR-08
 
@@ -18,11 +18,12 @@ M1 changes storage, application boundaries, and the target homepage entry surfac
 - The target flow accepts microphone training only; the current paste entry and paste-analysis path are removed rather than persisted.
 - The homepage no longer shows “复制”“保存”“清空”; Session deletion belongs to history/detail and remains explicit.
 - M1 persists the completed transcript and stable segments, not every partial ASR hypothesis.
+- 自动持久化属于既有 M1 保存职责：已有训练事实在可保存后尽早写入，不等待 AI、离开报告或“保存/完成”操作；随后产生的已有结果也自动保存。导航不承担保存职责。
 - M1 persists the supported training context using the target shape: `trainingMode = free`, `framework = null`, and `trainingPrompt = null`. The schema reserves a nullable `TrainingPromptSnapshot` for M4, but M1 adds no topic/scenario input or generation UI. It does not add Structured selection, Guidance, or Framework Analysis.
 - Existing statistics and AI/playback analysis may be persisted as versioned snapshots when present; M1 does not regenerate or reinterpret them.
 - Pre-upgrade in-memory records cannot be migrated because no durable source exists. Persistence begins with sessions completed after M1 is installed.
 
-These defaults close the retention decision for M1 without preventing a later quota or export feature.
+These defaults close the retention decision for M1. 后续容量提醒规则已在 [Requirements §9.1](../requirements/requirements.md#91-已确认的后续容量提醒策略实施待排期) 确认，实施仍由 Backlog D-01 在 M1 后安排；报告复制/导出/分享与备份由 D-11 跟踪，不新增本里程碑验收项。
 
 ## In Scope
 
@@ -57,12 +58,12 @@ These defaults close the retention decision for M1 without preventing a later qu
 
 ### User experience
 
-- History list populated from durable sessions instead of the five-record memory buffer.
+- Training History（界面名称“训练历史”）list populated from durable sessions instead of the five-record memory buffer.
 - Open a session after restart and view transcript, existing statistics, and audio playback when available.
 - Delete a session and its managed artifacts through an explicit user action.
 - Remove the homepage “复制”“保存”“清空” controls; do not replace them with new homepage shortcuts in M1.
 - Update first-recording/help copy to state local persistence, manual deletion, the cloud-audio boundary, and which transcript/metric/instruction data a configured remote AI profile may receive.
-- Visible error/degraded states for failed finalisation, missing audio, corrupt records, and unsupported data versions.
+- Visible error/degraded states for failed finalisation, missing audio, corrupt records, and unsupported data versions. 保存成功尽量弱提示，失败明显提示并提供重试。
 
 ### Focused verification
 
@@ -74,6 +75,8 @@ These defaults close the retention decision for M1 without preventing a later qu
 - Regression checks for the existing ASR and playback flow only where the persistence boundary touches them.
 
 ## Out of Scope
+
+[Core Experience Flow v1](../product/training-flow.md) 已确认目标体验，但不扩大本里程碑。短倒计时、实时提醒改造、主动“给我提示”、静音询问、首次/完整报告重设计、问题详情和重练闭环不作为 M1 新增工作或完成条件；Focus Mode 留在 Backlog，Interaction TBD 保持未决。
 
 - New deterministic metrics or changes to existing scoring rules.
 - Token-timestamp integration, pause/fluency algorithms, VAD, F0, energy, or prosody analysis.
@@ -91,6 +94,8 @@ These defaults close the retention decision for M1 without preventing a later qu
 
 ### AC-M1-01 — completed microphone session survives restart
 
+用户手动结束语音输入后，已有事实自动收尾并持久化，不等待 AI 成功、用户离开结果视图或额外“保存/完成”操作；已有结果随后产生时自动保存。
+
 Given a user completes a microphone training, after a full application restart:
 
 - exactly one completed session appears in history;
@@ -104,7 +109,7 @@ The homepage has no paste entry and no “复制”“保存”“清空” cont
 
 ### AC-M1-03 — finalisation is atomic from the product perspective
 
-If writing the database or audio artifact fails or the process is interrupted, the application never presents the record as a healthy completed session. On next startup, healthy sessions remain readable and the interrupted session is marked incomplete or its unreferenced staging artifact is safely reclaimed.
+If writing the database or audio artifact fails or the process is interrupted, the application never presents the record as a healthy completed session. 写入失败应明显提示并提供重试；成功仅需弱提示。 On next startup, healthy sessions remain readable and the interrupted session is marked incomplete or its unreferenced staging artifact is safely reclaimed.
 
 ### AC-M1-04 — duplicate and late work cannot create or overwrite a session
 
@@ -136,11 +141,15 @@ Start/pause/resume/stop, streaming partial/final display, bounded overrun handli
 
 ## Implementation sequence
 
-This sequence minimises coupled change; it is guidance, not work already completed.
+Steps 1–3 have an implemented storage foundation described in [Training storage](../architecture/training-storage.md).
+The normal microphone flow still uses the in-memory store. Existing-result snapshots, the Application/Preload boundary,
+history UI and product-level acceptance remain pending; the storage smoke is not completion of AC-M1-01–10.
 
-1. Choose the smallest maintained SQLite binding that passes packaging and migration smoke; record the dependency decision.
-2. Implement schema v1 and repository tests against the logical model.
-3. Implement the managed artifact store and recovery protocol.
+This sequence minimises coupled change:
+
+1. **Implemented:** use the runtime's built-in `node:sqlite`; dependency and packaging evidence are documented in Training storage.
+2. **Implemented foundation:** schema v1 for session facts, transcripts/stable segments, and audio metadata; add current-result snapshots with their generation-time provenance during Application integration.
+3. **Implemented:** managed artifact publication, integrity checks, startup recovery and retryable deletion.
 4. Add application services and the narrow Preload API.
 5. Adapt the microphone completion path and remove the paste command/UI path.
 6. Replace the in-memory history source with repository queries and remove homepage “复制”“保存”“清空”.
@@ -165,7 +174,7 @@ M1 is complete only when:
 |---|---|
 | SQLite native packaging mismatch | Select via a focused packaged smoke before broad integration |
 | Database row committed but audio missing | Staging + integrity metadata + final transaction/recovery state |
-| Audio growth | Existing per-record cap, manual deletion, no silent cleanup; measure real use before adding quota policy |
+| Audio growth | Existing per-record cap, manual deletion, no silent cleanup; accepted later reminder policy is tracked by Backlog D-01 and does not expand M1 acceptance |
 | Renderer gains filesystem authority | Return controlled view models/playback handles through Preload API |
 | Old AI result lacks complete provenance | Mark unknown fields explicitly; do not invent versions |
 | Scope expands into analysis redesign | Treat current results as opaque/versioned snapshots; defer schema redesign to M2 |

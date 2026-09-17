@@ -1,43 +1,59 @@
 # Training and Report Flow
 
-> **Status:** M0 target product-flow baseline
-> **Date:** 2026-09-16
-> **Applies to:** M1 voice-only entry cleanup, M2 Speech Evidence/default AI report foundation, and M4 Structured Training extension
-> **Does not describe:** the currently implemented Renderer state; see [Current Architecture](../architecture/current.md). The dated [UI state audit](../reviews/ui-state-audit-2026-09-02.md) is historical review evidence, not a current-state authority.
+> **Status:** Core Experience Flow v1 — 已确认的目标交互基线
+> **Date:** 2026-09-18
+> **Applies to:** 跨里程碑的核心体验；交付顺序仍由 Requirements、M1/M2 milestone 和 Roadmap 定义
+> **Does not describe:** 当前 Renderer 的已实现状态；实现事实见 [Current Architecture](../architecture/current.md)。[旧 UI audit](../reviews/ui-state-audit-2026-09-02.md) 已过期，仅作历史归档，不作为当前交互或验收依据。
 
-## 1. Purpose and authority
+## 1. 文档职责与范围
 
-This document is the canonical interaction definition for choosing how to train, freezing a session, presenting framework guidance, composing the report, and moving from one attempt to the next.
+本文是训练与报告交互、Practice Chain 产品语义、已确认 IA 归属及 Screen Structure 的唯一产品定义。Finding 详情、证据、报告层级和导航在本文维护；Requirements 只引用其验收边界，架构文档不复制 UI 规则。已确认结论与尚待确定的容器细节分开维护，不记录讨论过程。
 
-- Verifiable product outcomes and priority belong in [Requirements](../requirements/requirements.md).
-- Field ownership, immutability, and comparison invariants belong in [Training Data Model](../architecture/data-model.md).
-- Component ownership and analysis boundaries belong in [Target Architecture](../architecture/target.md).
-- This document owns the user-visible flow between those definitions.
+- 可验收的产品行为、优先级和交付里程碑见 [Requirements](../requirements/requirements.md)。
+- 数据所有权、不可变事实与比较约束见 [Training Data Model](../architecture/data-model.md)。
+- 组件职责与分析边界见 [Target Architecture](../architecture/target.md)。
+- 暂缓功能见 [Product Backlog](backlog.md)；具体交互未决项集中在本文 §14。
 
-It is a target baseline, not a claim that PREP, STAR, Pyramid, re-analysis, or the report structure already exists.
+体验已确认不等于全部功能进入 M1 或已经实现。M1 仍只负责持久化和已接受的语音入口收敛；报告/分析、对比、结构化训练沿用 M2/M3/M4 的交付边界。短倒计时、克制实时提醒、主动提示、静音询问和问题重练的页面落地不得仅因本基线而加入 M1。
 
-## 2. Expression mode model
-
-The product has one training flow with two training modes:
+## 2. Core Experience Flow v1
 
 ```text
-Expression Training
-├── Free                              default
-└── Structured
-    ├── PREP
-    ├── STAR
-    └── Pyramid                       displayed as 金字塔 in Chinese UI
+首页：默认开始自由表达；训练模式、场景/题目可选
+  ↓
+Training Workspace：短倒计时 → 自动开始录音
+  ├─ 按所选 ASR 能力反馈：streaming 以实时字幕为主；utterance 不伪造 partial（见 §4）
+  ├─ 卡壳默认不接管；用户可主动「给我提示」
+  └─ 用户手动结束；超长静音只询问是否继续，不自动结束
+  ↓
+结束表达：停止语音输入，自动收尾并保存已有训练数据
+  ↓
+分析中：后台分析，结果产生后自动保存
+  ↓
+Report Workspace（当前 Session；首次/完整报告共用）
+  ├─ 摘要与优先 Finding；更多问题、详细分析按需展开
+  ├─ Finding 原位展开 → 理解问题 → 查看/播放 Evidence
+  └─ 从选定 Finding 继续练习
+       ↓
+     推荐句子 / 片段 / 完整表达范围，用户可调整
+       ↓
+     Training Workspace（带来源 Finding 与练习目标）
+       ↓
+     新 Session 自动保存 → 自动分析并保存结果
+       ↓
+     Report Workspace（新 Session）
+       ├─ 针对性练习结果：当前轮 vs 上一轮；证据/历程原位展开
+       └─ 本次报告：用户从 Finding 选择是否继续、继续练哪个问题
+
+History → 打开一条 Session → Report Workspace
+History → 选择两个 Session → Comparison / Review Workspace（M3）
 ```
 
-Free is the no-configuration default. PREP, STAR, and Pyramid are frameworks inside Structured; they are not independent applications or separate session types.
+自动持久化贯穿全过程：数据产生后尽早保存，图中的结束收尾不是唯一保存时机，也不等待用户离开报告。用户不需要理解 Session 生命周期或执行“完成 Session → 保存”。报告导航与 Finding 动作的层级见 §8.2。
 
-The setup UI may present the choices in one compact selector, but the conceptual grouping must remain visible. Adding frameworks must not turn the page into an ever-growing row of top-level modes.
+## 3. 首页、训练方式与可选题目
 
-## 3. Training setup
-
-### 3.1 Default state
-
-On entry:
+### 3.1 默认状态
 
 ```text
 trainingMode = free
@@ -46,175 +62,266 @@ trainingPrompt = none
 input = microphone
 ```
 
-The primary start action is available in that state. The user does not need to understand a framework or provide a topic before practising. M1 exposes no topic/scenario input and therefore persists `trainingPrompt = null`; user-supplied or generated training prompts begin with the accepted M4 flow.
+首页主操作可直接开始自由表达，无需选择模式、理解框架或填写题目。目标产品没有粘贴文本入口；首页不提供“复制”“保存”“清空”。删除持久化记录属于历史/详情中的明确删除动作。
 
-The target product has no pasted-text entry. The homepage also omits the current “复制”“保存”“清空” controls. Deleting a durable Session is a distinct history/detail action and is never represented by a generic homepage clear button.
+场景/题目在目标体验中可选；M1 不提供 topic/scenario 输入或生成，始终保存 `trainingPrompt = null`，相关能力沿用 R-F02 的 M4 归属。
 
-### 3.2 Training prompt and framework are independent
-
-A training prompt is optional user-visible context, not an LLM instruction and not a prerequisite. It can be:
-
-- absent, which is the default;
-- a user-supplied topic;
-- a user-supplied scenario;
-- an application-generated topic requested by the user;
-- an application-generated scenario requested by the user.
-
-Valid combinations include Free with no training prompt, Free with a generated topic, PREP with no training prompt, PREP with a user topic, and STAR with a generated scenario. Choosing a framework must not silently create or require a training prompt; requesting a training prompt must not silently choose a framework.
-
-Training-prompt generation is an optional action such as “给我一个题目” or “给我一个场景”. If generation is unavailable or fails, the user can still start without it.
-
-### 3.3 Framework suitability is guidance
-
-Framework definitions may explain typical uses:
-
-| Framework | Typical fit |
-|---|---|
-| PREP | viewpoints, judgements, and answers to “why” |
-| STAR | experiences, behaviour, interviews, and retrospectives |
-| Pyramid | reports, proposals, complex information, and layered arguments |
-
-These descriptions guide selection. They are not routing rules: an interview prompt does not force STAR, and the application does not infer a framework and start it without user confirmation.
-
-## 4. Guidance before training
-
-When the user selects Structured, the page may add a lightweight Guidance card. For example, PREP may show `Point → Reason → Example → Point`, and STAR may show `Situation → Task → Action → Result`.
-
-Guidance:
-
-- explains the framework goal and sequence;
-- may offer a short example or preparation cue;
-- does not require the user to fill one input for every framework step;
-- does not generate assessment findings before evidence exists;
-- uses preparation language rather than report language.
-
-A future step-by-step form would be a separately accepted training experience. It must not be introduced by turning the baseline Guidance card into mandatory fields.
-
-## 5. Session state and frozen choices
+### 3.2 一条训练流程，两类训练方式
 
 ```text
-Preparing
-  ├── choose Free or Structured framework
-  ├── add, generate, replace, or remove training prompt
-  └── start recording
-          ↓ snapshots and freezes training context
-Recording (Paused is a substate) → Processing
-          ↓
-Report
+Expression Training
+├── Free                         默认
+└── Structured
+    ├── PREP
+    ├── STAR
+    └── Pyramid                  中文显示「金字塔」
 ```
 
-- Mode, framework, and training prompt can change in Preparing.
-- Microphone training freezes them when recording starts.
-- Recording, Paused, Processing, and the completed Session never mutate those choices.
-- Choosing a different framework after start means stopping/cancelling as currently allowed and creating a new Session; it never relabels the active or completed Session.
+PREP、STAR、Pyramid 属于 Structured frameworks，不是独立应用或独立 Session 类型。选择器可紧凑展示，但应保留概念分组；新增框架不扩张为无穷的顶层模式按钮。
 
-The persisted invariants are defined in [Training Data Model](../architecture/data-model.md).
+题目与框架相互独立。用户可不提供题目、自行填写 topic/scenario，或主动请求应用生成题目/场景；生成失败仍可开始。选择框架不会自动要求或生成题目，生成题目也不会替用户选择框架。
 
-## 6. Analysis layers
+| Framework | 适用场景提示 |
+|---|---|
+| PREP | 观点、判断、解释“为什么” |
+| STAR | 经历、行为、面试、复盘 |
+| Pyramid | 汇报、提案、复杂信息与分层论证 |
 
-How the user trained and how the product analyses the result are separate concepts.
+适用场景只作选择参考，不因面试题目自动强制 STAR，也不自动选择框架并开始训练。
 
-### 6.1 Common Analysis
+### 3.3 训练前 Guidance
 
-Every analyzable Session receives the Common Analysis layer. It answers how well the expression worked on shared dimensions such as fluency/rhythm, clarity/precision, concision/focus, and organisation/coherence, subject to the definitions accepted for M2.
+选择 Structured 后，可显示轻量 Guidance，解释框架目标、顺序、简短示例或准备提示。不得要求用户先逐项填写框架槽位，也不在证据产生前给出评估结论。训练前 Guidance 与训练后 Framework Analysis 的职责和文案分开。
 
-Free can identify a late conclusion, weak support, poor order, repetition, or broken transitions as general organisation problems. It must not mark PREP `E` missing, STAR `R` incomplete, or apply another framework template unless the user explicitly requests that framework re-analysis.
+## 4. 训练页与实时交互
 
-### 6.2 Framework Analysis
+用户从首页开始后进入训练页，经短倒计时自动录音。所选 ASR 支持 streaming 时，实时字幕是主要反馈；录音状态和必要控制保持清晰。
 
-A Structured Session adds the analysis for the framework selected at training time:
+SenseVoiceSmall 是可选主 ASR，选用时由它产生本次 Session 的主转写，不作为另一主 ASR 之后的辅助证据模型。其 utterance 能力不提供实时 partial，不能伪造实时字幕或依赖尚未产生的文本给出实时提醒；应明确显示录音与等待转写状态。默认 streaming 模型不变。既有 utterance 有界缓冲基线见 [ADR-0009](../architecture/adr/0009-productize-multiple-asr-models.md)，实施验证由 Backlog D-08 跟踪；等待、失败与能力差异的详细交互留到 Interaction / State Design，不在本阶段确定新的切句方案。
 
-- PREP checks the presence, order, balance, and support of Point/Reason/Example/Point;
-- STAR checks Situation/Task/Action/Result and whether actions and outcomes are concrete;
-- Pyramid checks conclusion-first organisation, grouping, hierarchy, support, overlap, and omission.
+已确认的克制提醒原则不等于已决定保留实时 AI。现有实时 AI 是否保留、承担哪些反馈及具体交互，留待对应阶段决定，由 Backlog D-10 跟踪；本阶段不冻结其触发方式或展示容器。
 
-Framework Analysis answers how the selected framework was used. It does not replace Common Analysis and does not re-score unrelated speaking problems.
+- 问题提示使用字幕原位轻标记，并在固定区域最多显示一条简短提醒。
+- 限制提醒频率并设置冷却；具体冷却时间待实测，不在本基线填入未经验证的秒数。
+- 不实时展示长解释或整段改写。需要较多上下文的组织、逻辑等问题留到结束后分析。
+- 卡壳时系统默认只记录，不主动接管、补话或替用户完成表达。
+- 用户主动点击“给我提示”时，才提供轻量启发；提示的具体交互形式仍为 Interaction TBD。
 
-### 6.3 AI Coaching
+“给我提示”用于正在进行的表达，与开始前“给我一个题目/场景”是不同动作。提示不替代用户表达，也不绕过既有远程 AI 知情边界。
 
-AI Coaching is part of the default completed-session path. After required local evidence is ready, the application automatically requests a structured AI diagnosis from the active valid profile. A remote profile is valid for automatic use only after the user has enabled it with a disclosure of the provider and transmitted data categories; a local profile must not be described as cloud transmission. AI Coaching explains important evidence, suggests a concrete improvement, may demonstrate a revision, and recommends a next exercise or framework.
+Focus Mode/专注模式仍在 [Backlog B-12](backlog.md#not-now)，不纳入当前核心范围。
 
-If no valid profile exists, or the provider is unavailable, the report shows a visible setup/failed state and a retry path while retaining local facts and Common Analysis. AI Coaching consumes facts and validated analysis results; it does not become a separate unversioned source of measured scores.
+## 5. 结束表达与训练上下文
 
-## 7. One report skeleton
+训练以用户手动结束为主。超长静音只询问用户是否继续，不擅自结束；静音本身不等于暂停或结束，VAD 的语音/静音区间也不直接改变训练生命周期。静音询问阈值后续实测确定。
 
-Free and Structured use the same report composition:
+结束表达表示停止当前语音输入，随后自动收尾、持久化、分析并进入报告，不提供“完成本次练习”按钮。既有录音资源上限和显式错误处理仍有效，不把资源保护与静音结束策略混为一谈。
+
+在 Preparing 阶段，模式、框架、题目可调整；实际开始录音时冻结这些选择。Recording（含用户主动 Paused 子状态）、Processing 和已完成记录不改写训练上下文。需要新主题、新模式或重新开始自由表达时回首页准备新 Session；不在当前结果上改标签。
+
+## 6. 自动持久化与分析状态
+
+- 持久化与用户导航解耦。训练事实、已有结果和后续分析结果在各自产生并可保存后尽早自动持久化；不要求用户点击“保存”或“完成”保证数据保留。
+- 结束录音后不等待 AI 返回才保存已有训练事实；分析结果产生后单独自动保存。分析等待、失败或重试不覆盖已保存的事实与结果。
+- 保存成功尽量无感，可使用弱“已保存”状态，不弹确认窗；保存失败才明显提示并提供重试，不把失败显示为成功。
+- 回到报告、回到首页和继续当前问题只表达导航/训练意图，不承担保存职责；持久化职责不依赖报告是否仍然打开。
+- 分析中应可识别正在处理、不可用或失败的状态。缺少有效 AI profile 时提供配置入口；失败时提供重试，并保留可用的本地事实和确定性分析。等待/失败状态的具体呈现与操作形式见 §14。
+
+M1 对本原则的落实限于已有完成逐字稿、稳定片段、音频和已有结果的自动保存，不新增每个 ASR partial 的持久化、完整事件日志或后续分析算法。崩溃恢复与完整性规则由数据模型和 M1 定义，不承诺录音中断时每个尚未持久化的采样都可恢复。
+
+## 7. 分析层与首次报告
+
+### 7.1 完整分析与训练重点分层
+
+Common Analysis 覆盖共享维度，如流畅/节奏、清晰/精确、简洁/聚焦、组织/衔接，具体定义沿用 M2。Free 可识别结论过晚、支撑不足、顺序混乱、重复或衔接问题；用户未请求框架视角时，不按 PREP/STAR/Pyramid 槽位判错。
+
+Structured 在 Common Analysis 外增加所选框架的 Framework Analysis。专项分析说明框架部分的存在、顺序、比例、支撑或层级关系，不替代 Common Analysis，也不重复给无关表达问题评分。
+
+AI Coaching 在必需的本地证据就绪后，默认通过有效 profile 生成有证据的诊断和建议。远程 profile 只有在披露 Provider/数据类别并由用户明确启用后才可自动使用；本地 profile 不描述为云端传输。AI 解释证据，不成为独立的确定性事实或评分来源。
+
+完整分析负责发现问题；训练呈现层只挑 1～3 个优先改善问题，综合考虑：频率、严重程度、对表达/理解的影响、训练价值/可改善性。这里不冻结排序权重或算法。不为凑数量编造问题，也不因只展示少量重点而丢弃其他有效发现。
+
+### 7.2 Report Workspace 信息层级
+
+普通训练报告、首次报告、完整报告、History 打开的历史详情和针对性练习后的报告，共用一个 Report Workspace。它们是同一容器的上下文或展开层级，不是多个独立 Screen；“查看完整报告/详细指标”表示展开当前报告的内容。
+
+从上到下的结构固定为：
+
+| 区域 | 内容与默认层级 |
+|---|---|
+| Header | 轻量展示报告身份、日期、时长、训练方式与全局导航（§8.2）；不承载分析结论 |
+| 针对性练习结果 | 仅在 Finding-aware 针对性练习的 Session 中出现，具体规则见 §10；普通 Report 不显示 |
+| 本次表现摘要 | 用简短总结先回答“这次整体怎么样”，配少量关键指标；Summary 是答案，Metric 是证据 |
+| 最值得改善 / Finding 列表 | 回答“最值得改什么、下一步练什么”；默认突出 1～3 个优先问题，保留其他有效问题数量及展开入口 |
+| 详细信息 | 逐字稿、音频/时间线、详细指标、分析信息（版本/来源等）；按需展开 |
+
+首屏不堆放完整逐字稿、全部数字和多维图表。采用 progressive disclosure：先结论，再解释与证据，详细数据按需查看。证据不足时如实说明，不为凑出 1～3 项编造问题。“还有 N 个问题可以继续查看/练习”的 N 对应实际未在重点中展示的问题。
+
+### 7.3 完整分析与用户选择
+
+Free 与 Structured 共用 Summary、Common Analysis、按需出现的 Framework Analysis、Evidence 和 AI Coaching；详细层保留全部有效发现，框架映射与较长解释也按需展开。雷达与其他多维展示仍遵循 M2 的定义、证据和缺失态要求，不替代摘要与优先问题。框架结果说明哪部分有效或不足，不只给总分；具体图形未冻结。
+
+系统可给某个 Finding 标“建议优先”，用户自行选择下一轮练哪个 Finding，也可只查看或结束。推荐不是自动选择，不强迫用户练完全部问题。练习入口只按 §8.2 挂在具体 Finding 上。
+
+## 8. Finding 原位展开与证据
+
+### 8.1 Finding Expanded State
+
+Finding 是 Report 内的 Card / Row。点击该行的展开入口后，在原位置展示详情，收起后仍保留问题列表上下文；详情与 Evidence 均不建独立 Screen，也不以 Drawer/Modal 作为默认详情容器。
+
+展开内容保留已确认的顺序：
 
 ```text
-Report
-├── Summary
-├── Common Analysis
-├── Framework Analysis             only when one has been run
-├── Evidence
-├── AI Coaching
-└── Next Training
+原话 / 音频证据 → 简短解释 → 改进示例 → 训练提示 → 针对这个问题继续练习
 ```
 
-The first layer prioritises three answers:
+改进示例是参考，不是标准答案，不要求用户复述。Finding 尽可能定位 transcript segment；有字符/token span 或音频时间区间时，可原位高亮对应逐字稿、定位/播放音频，并解释证据与结论的关系。时间未知或仅为估计时明确标记，仍可查看原文，不伪造精确音频位置。Common 与 Framework findings 使用同一规则。
 
-1. 这次怎么样？
-2. 最需要改什么？
-3. 下一轮练什么？
+“发现问题 → 理解问题 → 看见证据 → 决定针对性练习”尽量在 Report 内完成；只有实际开始下一轮表达才进入 Training Workspace。查看详情不强制重练，不为问题、证据或重练准备额外串联页面。
 
-Detailed metrics, framework maps, transcript, timeline, analyzer/model provenance, and extended AI explanation use progressive disclosure below that layer. Structured mode inserts its framework section; it does not switch to a different report application.
+### 8.2 全局导航、页面内定位与练习动作
 
-A framework section should expose which part worked or failed rather than only a total score. A PREP or STAR sequence map and a Pyramid hierarchy map are valid presentations, but the exact visual form is not frozen here.
-
-## 8. Evidence anchoring
-
-A report finding should link to the strongest available evidence:
-
-```text
-finding
-  └── transcript segment
-        ├── character/token span when available
-        ├── timestamp or audio range when available
-        └── explanation of the finding-to-evidence relationship
-```
-
-Framework findings follow the same rule as Common findings. If precise timing is unavailable, the report links to the transcript segment and labels timing as unavailable or approximate; it never invents precision.
-
-## 9. Recommendation, re-analysis, and re-training
-
-A Free report may recommend a framework when the evidence supports it. The recommendation explains why and waits for the user to choose.
-
-The follow-up actions are distinct:
-
-| Action | Effect |
+| 层级 | 入口与含义 |
 |---|---|
-| “用 PREP 查看分析” | Runs a new PREP Framework Analysis over the existing Session evidence; the Session remains Free |
-| “用 PREP 再练一次” | Opens a new Preparing state with PREP selected; starting creates a new Structured Session |
+| Report 全局导航 | 保留“返回报告列表 / History”和“首页”；报告列表是主要返回路径，首页是较弱的跨任务入口 |
+| 页面内定位 | Finding 展开区可有“回到问题列表”；必要时可补轻量“回到报告顶部”，不与全局导航并为一组 |
+| Finding 行动作 | “继续练习”，对象明确是该行 Finding |
+| Finding 展开后动作 | “针对这个问题继续练习”，与该行入口指向同一练习目标 |
 
-Re-analysis does not edit the original audio, transcript, training prompt, training mode, or framework. Re-training does not reuse or overwrite the original Session identity. The UI must not label both actions as a generic “切换到 PREP”.
+取消 Report-level 通用“继续练习”，包括顶部针对性练习结果区；只保留上述两个 Finding-aware 入口。它们是同一动作的两种呈现，不是要求同时重复显示的两组按钮。结果、证据或历程区不另造通用练习出口。
 
-## 10. Comparison rules
+展开、收起、播放、查看详细指标属于内容交互；“回到问题列表”属于当前页面定位；继续练习属于带目标的核心任务动作。三者不与“首页 / History”混成一排导航按钮。不设置“完成本次练习”，所有导航和动作均不承担保存职责。
 
-| Result | Allowed comparison |
+## 9. 带上下文再次进入 Training Workspace
+
+“继续练习/重练”描述为什么开始本次训练，以及它与上一轮的关系；不是独立训练模式、独立 Workspace 或需要重新讨论的一条训练流程。用户通过 §8.2 的 Finding 入口带着上下文再次进入同一 Training Workspace，复用录音、暂停、继续、结束、ASR 与持久化机制，不新增 Practice Workspace。Training Workspace 轻量显示本轮练习目标与必要提示，让用户知道本轮针对什么问题。
+
+用户选择“重练”后，系统根据当前问题推荐句子、片段或完整表达范围，用户可调整；范围选择器的具体形式仍为 Interaction TBD。
+
+每次继续练习/重练都是新的 attempt，对应新的 `TrainingSession`，自动保存训练数据并自动分析、保存结果，同时持久化与来源 Session 的关系；本流程均由具体 Finding 发起，必须同时保存来源 Finding 的关系。原始表达、原分析和此前 attempts 保留，不复用或覆盖原 Session identity。来源关系是训练意图与前后证据对照的依据，不能只存在于页面跳转参数中；逻辑约束见 [Data Model §6](../architecture/data-model.md#6-analysis-and-retraining-invariants)，具体 schema 留待对应里程碑，M1 不提前建设重练表或完整对比子系统。
+
+重练不是必须选择 Structured 才能使用的概念。框架推荐、重新分析与新主题训练应遵守 §11，不改变当前问题重练的含义。
+
+## 10. 针对性练习结果与 Practice Chain
+
+### 10.1 当前轮反馈
+
+针对性练习结束后打开新 Session 的 Report，在 Header 下增加“针对性练习结果”，不新增重练结果 Screen。该区域展示练习目标、轮次、“相比上一轮”、变化结论和必要指标，先回答“刚才针对的问题有没有改善”，其后按 §7.2 展示本次完整报告。
+
+默认始终比较当前轮 vs 上一轮：A → B → C → D 中，Report D 展示 D vs C，不默认拿 D 与初始 A 比，也不堆放历轮完整报告。轮次包含基准表达：A 是第 1 轮，B 是第 2 轮。
+
+反馈采用“结论 + 关键证据 + 必要指标”，不强行生成统一 improvement score。可使用下列语义状态：明显改善 / 有所改善 / 变化不明显 / 仍需继续练习 / 暂时无法可靠比较。这些状态只描述该练习目标的证据变化，不是用户整体能力评级，也不在此冻结算法阈值。
+
+“查看对比证据”在原位展开上一轮与本轮的原文、时间区间及可用音频播放，支持收起。容器保持一致，证据随 Finding 改变：可以是口头禅频率、结论位置或表达组织顺序，不要求每个问题都有同一种数字指标。范围、版本或证据不足以比较时说明原因，保留可查看的证据，不编造改善；比较约束见 §11。
+
+### 10.2 多轮练习历程
+
+针对同一 Finding / 练习目标连续练习形成 **Practice Chain / 练习链** 产品概念。这里的“同一”指持续练习同一问题目标，不要求不同 Session 的分析复用同一个 Finding ID。
+
+“查看练习历程”在结果区原位展开 A → B → C → … → 当前轮，以轮次、简短变化结论和可用的关键证据/指标呈现整体进展；初始轮标为基准，不假装存在前一轮对比。用户需要深入某轮时，才打开该 Session 的 Report。历程不把多个完整 Report 并排。
+
+继续同一目标沿当前链推进；改选另一个 Finding 开始新的练习链。某 Session 可同时作为上一链的末轮和下一链的基准，例如 A → B → C 练结论位置，从 C 改练口头禅后形成 C → D → E；C 仍是一条 Session，不复制记录或改写旧链的练习目标。
+
+Practice Chain 的产品语义在本文定义；是否成为独立数据实体、如何表达链成员和连续目标关系，留给 [Data Model §12](../architecture/data-model.md#12-open-decisions-carried-forward)，本轮不锁定表、字段或 aggregate。用户从哪条 Finding 开始下一轮仍遵循 §8.2，不恢复旧的“重练结果三个固定出口”。
+
+## 11. 框架推荐、重新分析与比较边界
+
+Free 报告可在证据支持时推荐框架，解释原因并等待用户选择，不自动修改本次训练方式或启动重练。
+
+| 动作 | 语义 |
 |---|---|
-| Facts | When the same fact and evidence definitions are meaningful on both Sessions |
-| Common metrics/findings | Across Free and Structured when definition/analyzer versions are compatible, or after recomputation with one compatible version |
-| Framework-specific results | Only within the same framework and a compatible analyzer version |
+| 用 PREP 查看分析 | 在原 Session 证据上新增 PREP Framework Analysis；Session 仍为 Free |
+| 采用推荐框架开始新训练 | 返回首页准备新的训练，可承接用户明确选定的框架；开始后创建新 Structured Session |
 
-PREP, STAR, and Pyramid totals are not a shared quality scale. A difference between their scores must not be presented as improvement or regression.
+重新分析不修改原音频、逐字稿、题目、mode 或 framework；新训练不覆盖原 Session。两者不能共用含糊的“切换到 PREP”标签；导航和练习入口统一遵循 §8.2。
 
-When versions or evidence are incompatible, the report explains why the result is not comparable instead of forcing a number.
+比较的证据、版本与归一化约束统一由 [Data Model §10](../architecture/data-model.md#10-comparison-invariants) 定义。UI 按实际比较范围显示“可比 / 需归一化 / 暂时无法可靠比较”及原因；不得把缺失证据显示为零、把模型版本变化解释成用户进步，或把不可比结果强行转为数值差异。
 
-## 11. Framework extension contract
+新增 framework 只扩展稳定 ID/版本化定义、选择标签/适用提示、可选 Guidance、Framework Analysis/证据映射、共用报告区段和同框架比较规则。复用既有 Session、Common Analysis、AI Coaching 与报告，不新建独立训练或存储系统。
 
-Adding a framework extends the framework layer with:
+## 12. UI 与文案原则
 
-1. a stable framework ID and versioned definition;
-2. selection label and suitability guidance;
-3. optional training-time Guidance content;
-4. a versioned Framework Analysis contract and evidence mapping;
-5. a section contribution to the shared report;
-6. same-framework comparison compatibility rules.
+- 避免紧迫、催促和“还有待办没完成”的压力；使用“重练”“继续练习”，不用“立即重练”。
+- 查看、理解、重练均保留用户选择权；报告不是必须清空的问题任务清单。
+- 下一步必须说清对象，动作与导航遵循 §8.2；不因处于重练 Report 就恢复通用按钮。
+- 反馈简短、证据明确、详情按需展开；成功保存弱提示，失败才升级提示。
 
-It reuses the existing Preparing/Recording/Processing/Report flow, `TrainingSession`, Common Analysis, AI Coaching, evidence model, and report skeleton. A new framework does not justify a new top-level training mode, independent report architecture, or framework-specific persistence subsystem.
+### 12.1 跨 Screen 的 UX 约束
 
-## 12. Traceability
+本阶段仅确认下列约束，不展开详细交互设计；它们适用于所有 Screen、窗口及其 Panel/Dialog。
 
-- Product requirements: R-P08–R-P09, R-A04, R-A07–R-A11, R-R01/R-R04, and R-F01–R-F08 in [Requirements](../requirements/requirements.md)
-- Fact and derived-data ownership: [Training Data Model](../architecture/data-model.md)
-- Component boundaries: [Target Architecture](../architecture/target.md)
-- Milestone ordering: [Roadmap](../roadmap.md)
+| 维度 | 已确认约束 |
+|---|---|
+| 键盘与焦点 | 保证 Dialog、Panel 的基础键盘操作与焦点恢复正确 |
+| 主题 | 所有窗口保持一致；切换主题不重置业务状态 |
+| 窗口 | Settings 为单实例独立窗口；主窗口承载核心业务 |
+| 状态保护 | 打开或关闭窗口、Panel、Dialog 不影响 Training、Report 等业务状态 |
+| 冲突操作 | 仅局部禁用相互冲突的操作，不锁死整个界面 |
+
+快捷键、焦点细则、窗口尺寸/位置等统一留到 Interaction / State Design 阶段。旧 UI audit 中的全局禁用、状态表或焦点建议不得覆盖本节。
+
+## 13. Screen Structure 收敛基线
+
+Screen 以用户任务与 Workspace 职责划分，不按报告内容层数机械拆页。
+
+现有三条 AI 路径——实时反馈、最终报告、回放分析——属于历史实现能力，不对应三个独立 Screen。这部分目标 IA 按用户任务收敛到 Training Workspace 与统一 Report Workspace：训练中的交互由前者承载，报告、回放与分析证据由后者统一组织。实时 AI 是否保留及具体交互留待对应阶段决定；历史调用路径不构成保留承诺或新增页面的依据。
+
+当前候选收敛如下；它是目标结构，不是已实现路由列表：
+
+| Screen / Workspace 候选 | 职责与边界 |
+|---|---|
+| 首页 / Home | 默认自由表达入口；可选模式/题目与新训练准备 |
+| Training Workspace | §4–§5 的录音交互；按 §9 承接针对性练习上下文 |
+| Report Workspace | §7–§10 的统一报告、Finding 展开态和针对性练习结果；History 打开的单次详情也属于这里 |
+| History / 训练历史 | 找记录、打开记录、明确删除；M3 增加选择记录比较，见 §13.2 |
+| Comparison / Review Workspace | M3 两次 Session 的完整差异视图，见 §13.2；独立工作区不等于新增一级导航 |
+| Settings / 设置 | 已确认的独立设置窗口，见 §13.1 |
+| Help / 帮助 | 长期帮助、数据/隐私说明及“问题与反馈”；窗口或 Panel 容器仍待确定 |
+
+首次报告、完整报告、历史详情、Finding 详情、Evidence、针对性练习结果和练习历程均不再单列为 Screen。Practice Workspace 不在候选中。分析等待/失败仍是处理状态，其具体承载形式见 §14，不因为流程图有一个节点就新增页面。
+
+后续低保真原型只细化未冻结的容器、布局与状态：例如首页与训练准备的容器关系、帮助的窗口/Panel 形式，不重新打开上述合并边界。
+
+### 13.1 已确认的 IA 归属
+
+| 内容 | 已确认归属与边界 |
+|---|---|
+| Settings / 设置 | 单实例独立窗口；设置子页位于该设置窗口内，跨窗口约束见 §12.1 |
+| 自定义规则／分析偏好编辑器 | 设置子页；分析指令不等同于训练题目/场景 |
+| 关于／应用版本 | 暂放设置页底部，不单独建页 |
+| 诊断（运行环境/ASR 故障排查） | 唯一入口为“帮助 → 问题与反馈”，诊断导出也在这里；移除主窗口顶部等其他位置的重复入口。这里不指 Report 中的 AI 表达诊断，也不属于报告导出待办 |
+| History | 用户可见名称为“训练历史”，对象是训练 Session，不是操作历史或聊天历史 |
+| 数据与隐私说明 | 放帮助页并长期可查；首次录音确认和远程 AI 启用仍在对应操作前完成，不以帮助说明替代确认 |
+| 继续练习／重练 | 报告带上下文再次进入 Training Workspace；新 Session 保存来源 Session/Finding 关系，见 §9 |
+
+History 的内容职责与路径由 §13.2 维护，单条历史详情共用 Report Workspace。以上是目标归属，不声明所有调整已实现，也不改变既有里程碑范围。
+
+### 13.2 History 与 Comparison / Review
+
+History 负责找记录、打开记录与选择记录比较，并保留已有的明确删除职责。打开一条 Session 的路径是 **History → Report Workspace**，不再建立另一套历史详情 Screen。
+
+M3 History Comparison 的路径是 **History → 选择两个 Session（明确基线和目标）→ 独立 Comparison / Review Workspace**。独立的双 Session 工作区承载完整比较任务，展示差异视图，不把两份完整 Report 并排复制。
+
+差异视图围绕比较对象与范围、变化结论、改善/持续/新出现的问题、前后原文或音频证据，以及必要指标组织，不以综合评分为核心。比较状态与限制遵循 §11；对需要归一化的指标说明口径，对无法可靠比较的部分说明原因。可打开任一 Session 的 Report 深入证据，不以更多完整报告替代差异视图。
+
+针对性练习的轻量对比留在 Report（§10），历史完整对比进入 Comparison / Review；两者共用底层 comparison 概念、证据引用和可比性规则，展示层不同，不建设两套相互独立的比较系统。Application Core 与数据职责分别见 [Target Architecture §7](../architecture/target.md#7-analysis-architecture) 和 [Data Model §10](../architecture/data-model.md#10-comparison-invariants)。
+
+此前“双入口共享延伸页”不再作为整体待确认方案：History 的双 Session 入口与独立差异工作区已确认。是否再从 Report 提供历史完整对比快捷入口、返回时恢复哪些选择/滚动状态，以及长期趋势和记录关联 AI 对话的具体位置仍待后续 Screen Structure 细化；它们不改变已确认的 Report 原位轻量对比，也不新增一级 Review 首页。本节不提前交付 R-R01～R-R04，不把 M3/M4 能力加入 M1。
+
+## 14. Interaction TBD
+
+下列仅保留未决交互，不重新打开已确认的行为原则：
+
+| 项目 | 已确认边界 | 后续需确定 |
+|---|---|---|
+| 主动“给我提示” | 用户主动触发，轻量启发，不替用户完成表达 | 提示具体形式 |
+| 超长静音 | 只询问是否继续，不自动暂停/结束 | 实测阈值 |
+| 实时提醒 | 字幕轻标记 + 固定区域最多一条短提醒，有频率限制和冷却 | 实测冷却时间 |
+| 重练范围 | 按问题推荐句子/片段/完整表达，用户可调整 | 范围选择器形式 |
+| 分析等待/失败 | 状态明确、本地事实保留、配置/重试可恢复 | 等待及失败状态的具体交互 |
+
+实时 AI 是否保留及具体交互仍待对应阶段决定（D-10），与表内已确认提醒原则的待细化项区分；不能因历史实现存在而直接视为已接受能力。
+
+跨 Screen 的已确认约束见 §12.1；快捷键、焦点细则、窗口尺寸/位置与具体状态转换留到 Interaction / State Design。届时基于当前产品流程与源码重新讨论状态设计；已过期的 UI audit 不再充当设计或验收基准，本次不生成新的 As-Is 审计。
+
+Focus Mode 是 Backlog，不属于本表中的已接受待细化能力。下一会话以本文作为核心体验 source of truth，结合 Requirements 的验收边界和 Roadmap 的里程碑顺序开展 IA/Screen Structure，不从历史对话重新推导已确认结论。

@@ -18,7 +18,7 @@ M1 使用嵌入式 SQLite 保存训练 Session 的身份、状态、逐字稿、
 - 数据库只保存受管相对路径和 Artifact 状态，不把音频 Blob 写入数据库。
 - 设置、外观、自定义规则和模型管理继续使用现有版本化 JSON store，不在 M1 搬迁。
 - Renderer 只通过 Preload/Application API 获取序列化数据和受控播放能力，不直接访问数据库或任意文件路径。
-- SQLite binding 在 M1 通过维护状态、Electron native packaging、迁移和测试需求选定；具体 binding 不属于本 ADR。
+- M1 存储基础选用当前 Node/Electron 运行时内置的 `node:sqlite`，不增加 npm binding 或 native ABI 重建；具体限制与验证见[训练存储实现](../training-storage.md)。
 
 ## Alternatives
 
@@ -40,7 +40,7 @@ M1 使用嵌入式 SQLite 保存训练 Session 的身份、状态、逐字稿、
 
 ### Negative
 
-- 引入一个 SQLite binding，并需要验证 Electron 打包/native ABI 或选择无 ABI 成本的实现。
+- 依赖运行时内置 SQLite API，需要在 Electron 升级时验证打包可用性；若后续运行时不提供兼容 API，再替换 repository 内部 binding，不预建通用适配层。
 - 数据库事务与文件系统操作无法形成一个原子事务，需要 staging、状态和启动恢复协议。
 - 删除和损坏恢复必须同时处理数据库与 Artifact 文件。
 

@@ -9,6 +9,8 @@
 
 当前事实来自源码、依赖清单和 Git 状态，并由 Node 测试、Electron smoke、packaged native-load、真实 Paraformer 首次安装及升级 smoke 支持。已验证 Main/Preload/Renderer、utility-process IPC、执行单元退出与重建、Fake LLM、粘贴分析、首次录音告知、运行期 WAV 回放与结构化片段分析，以及 Electron AudioWorklet 对 16/44.1/48 kHz fixture 的适配。真实可配置麦克风、真实外部 LLM、接近资格线硬件及非 Windows x64 制品仍未形成证据。
 
+2026-09-16 M1 增量：已增加[训练存储基础](training-storage.md)，包含 SQLite schema v1、受管 WAV、事务完成、中断恢复、完整性检查与可重试删除。当前仅由 focused tests 和显式 persistence smoke 使用，尚未接入普通录音/历史 UI；下文的五条内存记录仍准确描述当前产品行为，现有产品流程图暂不改变。
+
 | 标记 | 含义 |
 |---|---|
 | **Source-verified** | 可由当前本地源码、配置或 Git 状态直接确认 |
@@ -161,6 +163,8 @@ Main 只持有 `AsrProcessController`；实际 session wrapper、managed provide
 `lib/lexicon.js` 读取情绪词并输出填充词、犹豫词、笼统词、情绪词、密度和建议；实时模式逐句调用，粘贴模式经 `analyze-texts` 一次提交整批句子，两者共用同一分析函数。Renderer 高亮与 Main 统计共用 `shared/expression-rules.js`；自定义词经去重、长度和 64 项上限后参与本地分析与 prompt。未接入运行时的词库不放在活跃 `data/` 目录。
 
 ### 5.6 LLM / `lib/ai-feedback.js`、`lib/prompts.js`
+
+本节的实时反馈、最终报告和回放分析是三条历史实现路径，不定义三个目标 Screen，也不表示已确认保留实时 AI。目标用户任务与 Workspace 归属以 [Training Flow §13](../product/training-flow.md#13-screen-structure-收敛基线) 为准；实时 AI 的取舍与具体交互仍待对应阶段决定。下文继续记录 As-Is 技术行为。
 
 - 支持 OpenAI、DeepSeek、Ollama 和自定义 OpenAI-compatible；自定义训练规则附加到 prompt。
 - 连接测试、实时反馈、报告和回放分析使用独立超时与 AbortSignal；同类请求互相 supersede，迟到结果由 Main 协调和 Renderer 代际双重抑制。
