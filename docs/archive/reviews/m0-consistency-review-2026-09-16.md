@@ -1,6 +1,8 @@
 # M0 Consistency Review
 
-> **2026-09-18 更正说明：** 本文保留历史评审记录，不是现行要求。下文将 SenseVoiceSmall 归为辅助/后处理 Speech Evidence 的表述已失效；它是可选主 ASR，被选中时产生 Session 主转写。现行定义见 [Requirements R-A10](../requirements/requirements.md)、[M2](../milestones/m2-speech-evidence-and-ai-diagnosis.md) 与 [Target Architecture §4.5–§4.6](../architecture/target.md#45-speech-adapter)。原评审结论不能作为上述旧表述仍有效的证明。
+> **身份：Archived。** 历史源码观察、提案和评审结论均非当前事实或验收依据。现行定义与承接位置见 [职责矩阵](../../README.md)。未被当前 Canonical 接受的建议不因归档而晋升。
+
+> **2026-09-18 更正说明：** 本文保留历史评审记录，不是现行要求。下文将 SenseVoiceSmall 归为辅助/后处理 Speech Evidence 的表述已失效；它是可选主 ASR，被选中时产生 Session 主转写。现行定义见 [Requirements R-A10](../../product/requirements.md)、[M2](../../milestones/m2-speech-evidence-and-ai-diagnosis.md) 与 [Target Architecture §4.5–§4.6](../../architecture/target.md#45-speech-adapter)。原评审结论不能作为上述旧表述仍有效的证明。
 
 > **Date:** 2026-09-16
 > **Result:** Pass
@@ -18,17 +20,17 @@ The voice-only entry, simplified homepage, Free/Structured, optional training pr
 
 | Concern | Canonical document |
 |---|---|
-| Repository truth and current runtime | [Current Architecture](../architecture/current.md) |
+| Repository truth and current runtime | [Current Architecture](../../architecture/current.md) |
 | Gap classification | [M0 Gap Analysis](m0-gap-analysis-2026-09-16.md) |
-| Product behaviour and priority | [Requirements](../requirements/requirements.md) |
-| Training setup, report, and next-attempt flow | [Training Flow](../product/training-flow.md) |
-| Durable facts and derived ownership | [Data Model](../architecture/data-model.md) |
-| Speech lifecycle/timing invariants | [Speech Contract](../architecture/speech-contract.md) |
-| Target components and open decisions | [Target Architecture](../architecture/target.md) |
-| Persistence decision and alternatives | [ADR-0010](../architecture/adr/0010-persist-training-sessions-with-sqlite-and-files.md) |
-| Explicitly deferred work | [Backlog](../product/backlog.md) |
-| Executable next milestone | [M1 Training Persistence](../milestones/m1-training-persistence.md) |
-| Planned M2 boundary and dependency order | [M2 Speech Evidence & AI Diagnosis](../milestones/m2-speech-evidence-and-ai-diagnosis.md) |
+| Product behaviour and priority | [Requirements](../../product/requirements.md) |
+| Training setup, report, and next-attempt flow | [Training Flow](../../product/training-flow.md) |
+| Durable facts and derived ownership | [Data Model](../../architecture/data-model.md) |
+| Speech lifecycle/timing invariants | [Speech Contract](../../architecture/speech-contract.md) |
+| Target components and open decisions | [Target Architecture](../../architecture/target.md) |
+| Persistence decision and alternatives | [ADR-0010](../../architecture/adr/0010-persist-training-sessions-with-sqlite-and-files.md) |
+| Explicitly deferred work | [Backlog](../../product/backlog.md) |
+| Executable next milestone | [M1 Training Persistence](../../milestones/m1-training-persistence.md) |
+| Planned M2 boundary and dependency order | [M2 Speech Evidence & AI Diagnosis](../../milestones/m2-speech-evidence-and-ai-diagnosis.md) |
 
 ## 3. P0/P1 traceability
 
@@ -147,7 +149,7 @@ None.
 
 ### Later open decisions
 
-- Electron/Tauri, Web Audio/native capture, browser/Web edition scope, timing support policy, radar definitions, post-M1 audio quota, AI chat retrieval scope, mobile, cloud sync, and hosted LLM gateway remain governed by [backlog.md](../product/backlog.md).
+- Electron/Tauri, Web Audio/native capture, browser/Web edition scope, timing support policy, radar definitions, post-M1 audio quota, AI chat retrieval scope, mobile, cloud sync, and hosted LLM gateway remain governed by [backlog.md](../../product/backlog.md).
 - Neural-VAD model/threshold/resource choices and SenseVoiceSmall duration/buffering/isolation/licensing remain M2 implementation decisions D-07/D-08, not questions about whether to build the capabilities.
 - Default AI onboarding, the target role of current real-time AI feedback, and any post-M1 report copy/export surface remain explicit product decisions D-09–D-11.
 
@@ -164,4 +166,4 @@ None.
 
 ## 10. M0 completion decision
 
-M0 is complete when the checks above remain green in the final working-tree review. M1 is ready to enter implementation using [m1-training-persistence.md](../milestones/m1-training-persistence.md) as its scope boundary. M2 uses [m2-speech-evidence-and-ai-diagnosis.md](../milestones/m2-speech-evidence-and-ai-diagnosis.md) only after M1 completion; M2–M4 must also follow [training-flow.md](../product/training-flow.md) without pulling later behaviours into M1.
+M0 is complete when the checks above remain green in the final working-tree review. M1 is ready to enter implementation using [m1-training-persistence.md](../../milestones/m1-training-persistence.md) as its scope boundary. M2 uses [m2-speech-evidence-and-ai-diagnosis.md](../../milestones/m2-speech-evidence-and-ai-diagnosis.md) only after M1 completion; M2–M4 must also follow [training-flow.md](../../product/training-flow.md) without pulling later behaviours into M1.

@@ -88,7 +88,7 @@ Field names illustrate the stable transport-neutral envelope. Runtime adapters m
 
 The engine either emits `started` with its capabilities or emits a terminal error. Capabilities include recognition mode (streaming or utterance), partial-result support, token-timestamp support, and any provider-defined confidence support.
 
-SenseVoiceSmall is one selectable primary ASR under this same contract. Its utterance adapter produces the selected Session's primary final transcript; it is not a post-session auxiliary evidence job. An utterance adapter must not fabricate partial events. Buffering/duration follows [ADR-0009](adr/0009-productize-multiple-asr-models.md), with product-integration validation tracked by D-08.
+Selectable model roles follow [R-A10](../product/requirements.md#6-m2表达证据ai-分析与雷达图). An utterance adapter must not fabricate partial events; its buffering baseline follows [ADR-0009](adr/0009-productize-multiple-asr-models.md). D-08 tracks product integration.
 
 ### 4.2 `feed`
 

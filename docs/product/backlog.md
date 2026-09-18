@@ -29,7 +29,7 @@ These are not architecture projects, but they must close before the named milest
 
 | ID | Decision | Needed by | Required evidence/output |
 |---|---|---|---|
-| D-01 | 容量清理提醒：规则已确认，实施待排期 | After M1；未指定里程碑 | 唯一行为定义见 [Requirements §9.1](../requirements/requirements.md#91-已确认的后续容量提醒策略实施待排期)。只待细化统计范围/计量单位、检测时机、清理后档位与提醒状态持久化；不以硬配额或自动删除替代可忽略提醒。 |
+| D-01 | 容量清理提醒：规则已确认，实施待排期 | After M1；未指定里程碑 | 唯一行为定义见 [Requirements §9.1](requirements.md#91-已确认的后续容量提醒策略实施待排期)。只待细化统计范围/计量单位、检测时机、清理后档位与提醒状态持久化；不以硬配额或自动删除替代可忽略提醒。 |
 | D-02 | Transcript correction scope | After M1 | User workflow and revision/provenance semantics |
 | D-03 | Timing-capable model support policy | M2 | Per-model capability matrix and graceful-degradation examples |
 | D-04 | Radar dimensions, scales, and overlap | M2 | Written definitions, MECE review, evidence mapping, and calibration examples |
@@ -48,7 +48,4 @@ These are not architecture projects, but they must close before the named milest
 
 ## Backlog hygiene
 
-- A reopened item needs a requirement ID, acceptance criteria, owner milestone, and an explicit decision record when architecture changes.
-- A spike may gather evidence, but its output does not become product behaviour automatically.
-- Reopened work must state what current component or temporary rule it replaces and when that old path can be removed.
-- Items are not pulled into M1 merely because the new data model could support them.
+重开与回写规则见 [文档治理](../README.md#维护规则)。每项只在其触发条件满足且分配里程碑后离开 Not Now；spike 结果不自动变成产品决定，也不因数据模型可支持而进入 M1。

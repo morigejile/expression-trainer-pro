@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "workflow",
   "meta": {
-    "title": "一次录音训练的端到端流程",
+    "title": "[Archived 历史快照] 一次录音训练的端到端流程",
     "output": "workflow.html",
     "quality_profile": "showcase",
     "views": [

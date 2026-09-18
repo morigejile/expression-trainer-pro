@@ -70,7 +70,7 @@ At the logical boundary, every derived analysis identifies its own `analysisMode
 
 ## 4. M1 logical entities
 
-Field names are illustrative domain names. Exact SQL names and indexes belong to the M1 implementation plan.
+Field names are illustrative domain names. Implemented SQL/storage details are in [Current §10](current.md#10-m1-training-storage-foundation); later entity schemas remain unselected.
 
 ### 4.1 TrainingSession
 
@@ -192,31 +192,25 @@ No SQL columns for these later entities are frozen in M0.
 
 - Every analyzable session has a Common Analysis view. Free sessions may receive general organisation and structure findings without being judged against PREP, STAR, or Pyramid slots.
 - Neural VAD creates independent `SpeechEvidenceRun` records. Its results may support Common metrics or AI context, but never overwrite audio, ASR transcript, or ASR timing provenance.
-- SenseVoiceSmall 是可选主 ASR：被选中时，其稳定识别结果进入该 Session 的主 transcript/segments，并由 ASR 来源快照记录模型、版本和真实 timing 能力；不是额外的 `SpeechEvidenceRun` 或第二份辅助转写。后续切换模型不重写已经保存的 Session 事实。
-- AI diagnosis/coaching is requested by default after required local evidence is ready. Missing configuration or provider failure appends an explicit unavailable/failed result state and permits retry; it does not change session completion.
+- 主 ASR 结果归属该 Session 的 transcript/segments，模型、版本和 timing 能力归属 ASR 来源快照；后续切换模型不重写已保存事实。SenseVoiceSmall 的角色按 [R-A10](../product/requirements.md#6-m2表达证据ai-分析与雷达图)，不另建辅助转写实体。
+- AI result status is independent of session completion: unavailable/failed states do not change completed facts. Scheduling and enablement follow [R-A04/R-A11](../product/requirements.md#6-m2表达证据ai-分析与雷达图).
 - A Structured session automatically requests Framework Analysis for its selected framework in addition to Common Analysis.
 - A user may explicitly request a framework re-analysis of an existing session. That appends a new `FrameworkAnalysis` over the same transcript revision and evidence; it does not change how the session was trained.
 - AI Coaching consumes facts and validated Common/Framework results to explain priorities, suggest improvements, or recommend a framework. It is not an independent source of deterministic facts or scores.
 - 每次继续练习/重练均创建新的 `TrainingSession`，包括句子/片段/完整表达范围的 Free 重练；自动保存新事实与新结果，不复用源 Session identity，不覆盖原表达、原分析或此前 attempts。
 - Finding-aware 重练的新 Session 必须持久化来源 Session 与来源 Finding 的关系。Finding 引用应能定位其所属来源 Session 和分析结果/版本，不能仅靠显示名称或当前页面状态识别。
-- 该关系记录“为什么开始本次训练以及与上一轮的关系”，独立于 `trainingMode`、framework 和训练题目；报告带上下文进入既有 Training Workspace，不产生独立 Session 类型。
+- 来源关系记录训练意图与前后关联，独立于 `trainingMode`、framework 和训练题目，不产生独立 Session 类型；用户导航由 Training Flow §9 定义。
 - 此处冻结逻辑关系和持久化义务，不提前冻结 SQL 字段或新建 M1 重练表。Practice Chain 的产品语义由 [Training Flow §10.2](../product/training-flow.md#102-多轮练习历程) 定义；数据关系需支持恢复目标、轮次与相邻比较双方，不能只按时间邻近或 Finding 显示名推测。是否引入独立实体及其关系表达见 §12。
 - Session identity 不等于链成员 identity；不得用“每个 Session 只能属于一条链”的存储约束排除同一 Session 在不同练习目标下的角色。跨轮 Finding 关联须保留各自分析版本/证据引用，而非要求重用同一 Finding ID。来源记录删除后的引用与历程降级语义仍待细化，不得把持久化关系退回为可选 UI 参数。
 - Training-time Guidance is framework-definition content shown before a session. Post-training Framework Analysis is versioned derived output. They may share a definition but not a storage record or UI responsibility.
 
 ## 7. Persistence boundary
 
-M1 uses:
-
-- **SQLite** for identities, lifecycle state, metadata, transcript/segments, provenance, and queryable history;
-- **application-data files** for audio artifacts;
-- **existing JSON stores** for settings, appearance, model registry/activation, and other non-session configuration.
-
-This split avoids putting large audio blobs in the database while preserving transactions and history queries for session metadata. It also avoids migrating unrelated, already-working configuration stores during M1.
+存储组件划分由 [Target §6](target.md#6-persistence-architecture) 定义，选择理由见 [ADR-0010](adr/0010-persist-training-sessions-with-sqlite-and-files.md)，已实现文件/schema/API 见 [Current §10](current.md#10-m1-training-storage-foundation)。本文件只维护下列数据完整性规则，不维护物理路径副本。
 
 ## 8. Write and recovery protocol
 
-Application 在事实或结果产生并可保存后尽早自动持久化；已可保存的事实不等待 AI 完成，派生结果随后单独保存。持久化生命周期与 UI 导航解耦，离开报告或“完成练习”不是写入前提。以下原子收尾与恢复约束仍适用；不因此要求 M1 持久化每个 ASR partial。
+自动保存要求见 [R-P01/R-P05](../product/requirements.md#5-m1训练记录持久化)，用户反馈见 [Training Flow §6](../product/training-flow.md#6-自动持久化与分析状态)。这里定义写入完整性；不要求持久化每个 ASR partial。
 
 The exact API may change, but these invariants do not:
 
@@ -231,12 +225,12 @@ Implementation must be idempotent for a repeated finalization request with the s
 
 ## 9. Read, delete, and migration semantics
 
-- Training History（用户可见名称“训练历史”）reads order sessions by `createdAt` and use a stable secondary key.
+- History queries order sessions by `createdAt` and use a stable secondary key; user-visible naming/navigation belongs to Training Flow §13.
 - Reading one corrupt record does not prevent healthy records from loading.
 - Deleting a session removes its managed artifact files and database-owned children. Partial failure remains visible and is retryable.
 - Schema migrations are numbered, forward-only, and transactional where supported.
 - A database from a newer unsupported schema is opened read-only or rejected with a clear error; it is never silently downgraded.
-- M1 音频保留至明确删除。后续容量提醒按 [Requirements §9.1](../requirements/requirements.md#91-已确认的后续容量提醒策略实施待排期) 执行，不是硬配额，也不授权自动清理；提醒状态不属于训练事实。报告复制/导出/分享与备份见 Backlog D-11，不扩展 M1 schema。
+- M1 保留策略按 [Requirements §5.1](../product/requirements.md#51-m1-保留与起始边界)；后续容量提醒按 [Requirements §9.1](../product/requirements.md#91-已确认的后续容量提醒策略实施待排期) 执行，不是硬配额，也不授权自动清理；提醒状态不属于训练事实。报告复制/导出/分享与备份见 Backlog D-11，不扩展 M1 schema。
 
 ## 10. Comparison invariants
 

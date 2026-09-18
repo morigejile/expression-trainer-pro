@@ -1,5 +1,7 @@
 # Spike：当前 ASR 是否支持 token 级时间戳
 
+> **身份：Supporting。** 仅证明文中固定日期/环境的测量，不定义当前产品或完成状态；现行 Owner 见 [职责矩阵](../README.md)。旧测量与建议保留原文。
+
 > 状态：已验证（真实模型 + 真实音频，可复现）
 > 分支：`spike/asr-token-timestamps`，基线 commit `c859fd6`
 > 日期：2026-09-14

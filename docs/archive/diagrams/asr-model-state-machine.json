@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "lifecycle",
   "meta": {
-    "title": "ASR 模型服务状态机（As-Is）",
+    "title": "[Archived 历史快照] ASR 模型服务状态机（As-Is）",
     "output": "asr-model-state-machine.html",
     "viewBox": [1200, 655],
     "quality_profile": "showcase",

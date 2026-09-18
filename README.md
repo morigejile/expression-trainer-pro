@@ -2,8 +2,8 @@
 
 ## 项目文档
 
-- [需求基线](docs/requirements/requirements.md)
-- [架构入口](docs/architecture/README.md)
+- [需求基线](docs/product/requirements.md)
+- [文档职责矩阵与治理](docs/README.md)
 - [当前架构（As-Is）](docs/architecture/current.md)
 - [架构决策记录（ADR）](docs/architecture/adr/README.md)
 - [开发路线图](docs/roadmap.md)
@@ -12,7 +12,9 @@
 
 一个帮你训练口语表达精准度的本地桌面应用。实时语音识别与词库分析在本地完成；AI 反馈是可选能力，除 Ollama 外通常需要网络。
 
-## 功能
+## 当前已实现功能
+
+本节是快速上手摘要；完整实现边界以 [Current As-Is](docs/architecture/current.md) 为准，目标产品不由本清单定义。
 
 - 🎤 **实时语音识别**：基于 Sherpa-ONNX，模型安装后可完全离线识别，中文优化
 - 📦 **模型管理**：在设置中安装、取消、重试和切换三款受信任的 streaming ASR 模型
@@ -71,12 +73,7 @@ npm start
 
 ### 录音保留与云端分析说明
 
-- 录音、逐字稿时间轴和回放分析只保存在本次应用运行期间，不写入训练历史文件；关闭应用会释放全部录音资源。
-- 应用最多保留五条已完成录音；第六条完成时按先进先出顺序自动释放最老录音及其 Blob URL。
-- 单条录音最长 20 分钟；达到上限后按正常结束流程整理尾部文字并生成可回放记录。
-- 第一次点击“开始录制”时，应用会在申请麦克风权限前显示上述保留策略；只有确认后才继续。帮助页面会长期保留相同说明。
-- 云端 LLM 只接收逐字稿、片段标识和片段起止时间，不接收 PCM、WAV、Blob URL 或原始录音；本地 ASR 和词库分析不依赖云端 LLM。
-- 回放区模型下拉框只显示模型名。切换配置不会自动请求；点击“重新分析”后才使用所选配置分析当前录音，成功后替换该录音上一份回放分析，失败时保留旧结果。播放过程本身不会触发推理。
+当前普通录音仍仅在运行期间保留最近五条，关闭应用即释放；M1 存储基础尚未接入普通录音。单条录音上限、首次告知、回放与实际 LLM 数据范围见 [Current §5–§6](docs/architecture/current.md#5-模块职责)。目标持久化与隐私验收见 [Requirements](docs/product/requirements.md)，不可当作已实现能力。
 
 ## 字幕颜色含义
 
@@ -89,20 +86,7 @@ npm start
 
 ## 技术架构
 
-```
-Renderer / Web Audio / UI
-        │ 受控 Preload API
-        ▼
-Electron Main（窗口、设置、分析、LLM 路由、ASR 控制器）
-        │ session-aware IPC
-        ▼
-ASR Utility Process（单一当前 Sherpa Provider）
-        │
-        ├── 独立短生命周期 Model Install Utility
-        └── appData/expression-trainer-pro-models 中的版本化 Catalog 模型
-```
-
-Main 不加载 Sherpa native addon，也不执行同步识别；音频采集在 Renderer 的独立 `AudioCapture`/AudioWorklet 中完成，ASR 推理在 utility process 中隔离。完整职责、数据流和已知技术债见[当前架构](docs/architecture/current.md)。
+运行边界与数据流统一见 [Current As-Is](docs/architecture/current.md)，目标组件见 [Target](docs/architecture/target.md)。架构选择理由见 [ADR](docs/architecture/adr/README.md)。
 
 ## 词库说明
 
@@ -131,4 +115,3 @@ npm test
 ## License
 
 MIT
-

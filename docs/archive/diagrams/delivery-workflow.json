@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "workflow",
   "meta": {
-    "title": "本地交付流程：从改动到内测分发",
+    "title": "[Archived 历史快照] 本地交付流程：从改动到内测分发",
     "output": "delivery-workflow.html",
     "animation": "trace",
     "quality_profile": "showcase",

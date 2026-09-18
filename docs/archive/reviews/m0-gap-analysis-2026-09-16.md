@@ -1,6 +1,8 @@
 # M0 Gap Analysis
 
-> **2026-09-18 更正说明：** 本文保留历史评审记录，不是现行要求。下文将 SenseVoiceSmall 归为辅助/后处理 Speech Evidence 的表述已失效；它是可选主 ASR，被选中时产生 Session 主转写。现行定义见 [Requirements R-A10](../requirements/requirements.md)、[M2](../milestones/m2-speech-evidence-and-ai-diagnosis.md) 与 [Target Architecture §4.5–§4.6](../architecture/target.md#45-speech-adapter)。原评审结论不能作为上述旧表述仍有效的证明。
+> **身份：Archived。** 历史源码观察、提案和评审结论均非当前事实或验收依据。现行定义与承接位置见 [职责矩阵](../../README.md)。未被当前 Canonical 接受的建议不因归档而晋升。
+
+> **2026-09-18 更正说明：** 本文保留历史评审记录，不是现行要求。下文将 SenseVoiceSmall 归为辅助/后处理 Speech Evidence 的表述已失效；它是可选主 ASR，被选中时产生 Session 主转写。现行定义见 [Requirements R-A10](../../product/requirements.md)、[M2](../../milestones/m2-speech-evidence-and-ai-diagnosis.md) 与 [Target Architecture §4.5–§4.6](../../architecture/target.md#45-speech-adapter)。原评审结论不能作为上述旧表述仍有效的证明。
 
 **Date:** 2026-09-16
 **Baseline:** branch `spike/asr-token-timestamps`, commit `0b541c1`
@@ -25,7 +27,7 @@ No M1 blocker was found. M1 can keep the current Electron runtime and speech pat
 | ASR session protocol | `start/feed/stop/cancel` lifecycle with an active session and explicit events | `lib/asr-session.js`, `lib/asr-utility-process.js` |
 | Local ASR models | Three local streaming model profiles; the current technical default is Zipformer Large | `models/registry.json`, `docs/architecture/current.md` |
 | Current review loop | At most five completed records are kept in renderer memory with text, segments, summary statistics, a Blob audio URL, and optional playback analysis | `src/training-records.js`, `src/app.js` |
-| Current extra entry/actions | The current homepage includes pasted-text analysis plus copy, save, and clear actions | `src/index.html`, `src/app.js`, `docs/reviews/ui-state-audit-2026-09-02.md` (dated audit only) |
+| Current extra entry/actions | The current homepage includes pasted-text analysis plus copy, save, and clear actions | `src/index.html`, `src/app.js`, [UI state audit](ui-state-audit-2026-09-02.md) (dated audit only) |
 | Playback | Whole-record and segment playback plus a playback analysis request | `src/app.js`, `lib/playback-analysis.js` |
 | LLM providers | OpenAI, DeepSeek, Ollama, and a custom OpenAI-compatible endpoint; requests are made by the main process | `lib/ai-feedback.js`, `lib/llm-provider-config.js`, `lib/prompts.js`, settings code |
 | Durable configuration | Settings, model registry/activation, and related configuration use versioned JSON plus atomic replacement | settings/model-management code and ADRs |

@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "sequence",
   "meta": {
-    "title": "音频块到识别结果的调用链",
+    "title": "[Archived 历史快照] 音频块到识别结果的调用链",
     "output": "sequence.html",
     "viewBox": [1900, 1040],
     "quality_profile": "showcase",

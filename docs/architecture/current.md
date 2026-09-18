@@ -1,15 +1,15 @@
 # 当前架构（As-Is）
 
 > 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，录音回放、结构化同步分析、三款 streaming ASR、模型管理和内部包内默认资格已实现；公开模型分发仍受外部门禁约束
-> 基线日期：2026-09-01
-> 仓库：`https://github.com/morigejile/expression-trainer-pro.git`  
+> 运行时基线日期：2026-09-01；存储增量证据日期：2026-09-16；文档整理：2026-09-18（不表示重新运行验收）
+> 仓库：`https://github.com/morigejile/expression-trainer-pro.git`
 > 描述对象：当前集成分支的产品运行时、开发工具边界与已验证的内部安装基线
 
 ## 1. 证据边界
 
 当前事实来自源码、依赖清单和 Git 状态，并由 Node 测试、Electron smoke、packaged native-load、真实 Paraformer 首次安装及升级 smoke 支持。已验证 Main/Preload/Renderer、utility-process IPC、执行单元退出与重建、Fake LLM、粘贴分析、首次录音告知、运行期 WAV 回放与结构化片段分析，以及 Electron AudioWorklet 对 16/44.1/48 kHz fixture 的适配。真实可配置麦克风、真实外部 LLM、接近资格线硬件及非 Windows x64 制品仍未形成证据。
 
-2026-09-16 M1 增量：已增加[训练存储基础](training-storage.md)，包含 SQLite schema v1、受管 WAV、事务完成、中断恢复、完整性检查与可重试删除。当前仅由 focused tests 和显式 persistence smoke 使用，尚未接入普通录音/历史 UI；下文的五条内存记录仍准确描述当前产品行为，现有产品流程图暂不改变。
+2026-09-16 M1 增量：已增加[训练存储基础](current.md#10-m1-training-storage-foundation)，包含 SQLite schema v1、受管 WAV、事务完成、中断恢复、完整性检查与可重试删除。当前仅由 focused tests 和显式 persistence smoke 使用，尚未接入普通录音/历史 UI；下文的五条内存记录仍准确描述当前产品行为，旧图集已归档，不作为当前实现依据。
 
 | 标记 | 含义 |
 |---|---|
@@ -41,9 +41,9 @@
 ASR 最终片段 + 时间 → 结构化 LLM 回放分析 → 随播放进度显示
 ```
 
-具体产品能力与 Existing/Partial/Planned 状态统一维护在[需求基线](../requirements/requirements.md)；本文只描述这些能力如何在当前源码中运行。
+具体产品能力与 Existing/Partial/Planned 状态统一维护在[需求基线](../product/requirements.md)；本文只描述这些能力如何在当前源码中运行。
 
-它没有大型前端框架、独立后端、数据库或微服务。音频、ASR、模型、配置和交付边界已从原型职责中拆开；Renderer 的训练编排仍集中在 `ExpressionTrainer`。
+普通产品录音仍未接入训练数据库；SQLite 存储基础已实现但只由测试与显式 smoke 使用（§10）。系统没有大型前端框架、独立后端或微服务。音频、ASR、模型、配置和交付边界已从原型职责中拆开；Renderer 的训练编排仍集中在 `ExpressionTrainer`。
 
 ## 3. 当前技术栈与版本
 
@@ -126,8 +126,10 @@ Main 负责 Electron 控制面、词库分析、小型 userData JSON 原子文�
 - `ExpressionTrainer` 编排录音、暂停、逐字稿、本地分析和 LLM 状态；`AudioCapture`/AudioWorklet 独立管理 16 kHz 采集、epoch 与 tail flush。
 - 音频以最多 10 块的串行队列送入 ASR，overrun 失败关闭；Renderer 只接受当前 session 且 sequence 递增的规范事件。
 - 同一 Float32 chunk 在 Renderer 转为有界 Int16。正常结束后组装 WAV，最多保留五条内存记录并在淘汰、删除或退出时撤销 Blob URL。
+- 单条录音最长 20 分钟，达到上限走正常结束/尾部收尾并生成可回放记录。首次录音前告知运行期保留策略，帮助页长期保留该说明。
 - final 文本进入逐字稿、本地统计和单调片段时间轴；片段边界统一规范为严格递增的整毫秒，因此不足一整块的录音尾块不会让回放分析输入校验整体失败。播放只根据片段边界切换已完成建议，不触发推理。
 - 首次录音在申请麦克风前等待用户确认；回放分析的失败、取消或迟到响应不覆盖上一份成功结果。
+- 回放区模型下拉框只显示模型名；切换配置不自动请求，用户点击“重新分析”才用所选配置分析当前录音。
 - 字幕与报告通过 text node、受控 `span` 和 Markdown 允许列表渲染；外观切换只改根节点属性，不重建训练 DOM。
 
 训练编排尚未形成全局显式状态机；当前通过 session 失效、stop single-flight、队列 drain 和请求代际过滤控制组合风险。
@@ -180,6 +182,8 @@ Main 只持有 `AsrProcessController`；实际 session wrapper、managed provide
 `custom-prompt.json` 由 `lib/custom-prompt-store.js` 读写，与其余 store 同形；解析结果按 mtime+size 缓存、保存时失效，避免逐句分析反复同步读盘。
 
 `appearance.json` 只保存四个主题和两个布局标识；缺失、损坏或未知值回退 Graphite/coach-rail，future schema 可读取已知值但拒绝显式保存。`asr-selection.json` 只保存 `selectedModelId`；缺失或稳定损坏在默认模型成功后原子恢复，瞬时初始化失败不改写选择。外观和模型操作都独立于 LLM 保存/连接测试。
+
+Appearance 与 ASR selection 当前均为 schema version 1；二者和 LLM provider 使用独立 config/store、Preload API 与 IPC，不共用配置快照。三种配置的新文件不存在时才从 legacy settings.json 单向迁移，新文件存在后以其为准；损坏来源保留原文，future schema 只读可识别字段且拒绝显式保存。设置“保存”和“测试连接”保持独立。迁移、原子发布失败、新文件优先和 future schema 边界已有对应测试。
 
 ### 5.8 Benchmark dataset boundary (BM-01)
 
@@ -274,7 +278,7 @@ Settings/Prompt Renderer 通过 Preload 调用 Main 中的 userData JSON store�
 
 ### 应保留
 
-- 单一 Electron 桌面应用，无独立服务端和数据库；
+- 单一 Electron 桌面应用，无独立服务端；训练存储基础的集成状态见 §10；
 - 原生 JS/HTML/CSS；
 - 本地 Sherpa-ONNX 路线；
 - 本地确定性分析 + 可选 LLM 的降级结构；
@@ -292,3 +296,116 @@ Settings/Prompt Renderer 通过 Preload 调用 Main 中的 userData JSON store�
 结论：当前内部基线的运行时、评测和交付边界已经收敛。剩余风险只随模型公开交付、utterance 轨道或其他已重开工作渐进处理，不开展脱离当前任务的全面重构。
 
 需要补充的设备、平台和公开发布证据统一维护在[支持矩阵](../support-matrix.md)与[Roadmap](../roadmap.md)，本文件不复制验证待办。
+
+## 10. M1 training storage foundation
+
+Date: 2026-09-16. This implements the storage portion of [M1](../milestones/m1-training-persistence.md).
+It is exercised by tests and an explicit Electron smoke. Normal recording, current-result snapshots,
+Preload APIs, history UI and disclosure copy are not integrated yet.
+
+### Runtime and ownership
+
+Use `node:sqlite` / `DatabaseSync` from the fixed runtime. There is no new npm dependency, ORM,
+download or additional native addon. The [Node API documentation](https://nodejs.org/download/release/latest-v24.x/docs/api/sqlite.html)
+still classifies this API as a release candidate, so Electron upgrades must rerun the persistence smoke.
+Only `lib/training-session-repository.js` imports the binding; change that module if a future runtime
+requires a replacement. No generic database adapter is needed now.
+
+The Application layer will own one `openTrainingSessionStore({root})` instance per data root,
+under `userData/training`. Opening a store runs recovery and must happen before accepting commands.
+Concurrent owners of the same root are not supported: Application integration must enforce single ownership,
+including across desktop instances, before enabling normal recording persistence.
+`close()` rejects while a write/delete is in progress and otherwise releases the database.
+
+### Files and schema
+
+```text
+training/
+  sessions.sqlite
+  audio/<session-id>.wav
+  staging/<session-id>.part
+```
+
+Schema version is SQLite `user_version`. Migration 0 → 1 creates these tables transactionally:
+
+| Table | Stored content |
+|---|---|
+| `sessions` | Stable generated UUID, recording/finalizing/completed/incomplete/corrupt status, UTC dates, duration, immutable Free/microphone source snapshot, quality flags, deletion-pending flag |
+| `transcripts` | One canonical text per session and JSON stable segments with their order and declared timing source; revision 1 |
+| `artifacts` | One WAV per session, managed relative filename, byte length, SHA-256 and integrity state |
+
+Transcript and artifact rows reference their session with `ON DELETE CASCADE`. History sorts by
+creation time descending and UUID descending; limit/offset paginate without deleting old sessions.
+The store accepts only `microphone`, `free`, null framework and null training prompt. ASR/app source
+fields are explicitly projected, excluding settings, endpoints and credentials. M1 does not promote
+estimated segment milliseconds into exact sample offsets.
+
+Existing databases are inspected read-only before any journal/recovery/schema write. A schema newer
+than version 1 returns `UNSUPPORTED_SCHEMA` without modifying its bytes. There is no older durable
+product format to import. Future numbered migrations must retain this refusal boundary.
+
+### Writes, reads and deletion
+
+- `create(input)` freezes source/context and returns a generated ID in `recording` state.
+- `finalize(id, input)` accepts the completed transcript, stable segments and the current recorder's
+  bounded mono 16 kHz PCM WAV bytes. It validates before changing state, records `finalizing` plus an
+  artifact intent, writes staging exclusively, flushes/closes, hashes, and renames inside the same root.
+  Transcript, artifact integrity and completion then commit in one SQLite transaction.
+- Concurrent finalizations of one ID share the first operation. A completed ID cannot be rewritten.
+  An absent/deleted ID cannot be recreated by late finalization. Write failure yields `incomplete`
+  plus `FINALIZATION_FAILED`; retry needs the original recording still held by the caller.
+- Startup changes interrupted recording/finalizing rows to incomplete and checks artifact integrity.
+  Interrupted records stay visible. Referenced staging files remain associated with their record for
+  retry/deletion. Only unreferenced regular `.part` files older than 24 hours are reclaimed; fresh,
+  unrelated and symlink entries are left alone. Completed audio has no automatic retention cleanup.
+- `get(id)` checks audio; missing or altered WAV disables `readAudio(id)` while preserving text.
+  Malformed record JSON produces `corrupt`, including in history, without blocking other rows.
+  `readAudio` verifies the actual returned bytes and rechecks lifecycle after asynchronous I/O.
+  No view model exposes an absolute path or a stored playback URL.
+- `delete(id)` first marks deletion pending, then unlinks only generated, managed audio/staging names,
+  and finally deletes the database row and children. A partial failure returns `DELETION_FAILED`, keeps
+  the retryable tombstone, and disables playback. Repeating a successful deletion is harmless.
+
+File I/O is asynchronous. Metadata transactions are short synchronous operations; audio bytes are never
+stored in SQLite. Leaf symlinks are not read as audio, managed directories cannot be symlink redirects,
+and modified database paths do not grant arbitrary read/delete access.
+
+### Verification and remaining integration
+
+Focused tests cover six-record restart retention, immutable/duplicate completion, invalid inputs,
+failed rename, transaction rollback, crash-state recovery, conservative staging reclamation,
+missing/changed audio, partial deletion, deletion/read races, record corruption, unsafe paths and future schemas.
+The Electron smoke uses the existing PCM WAV encoder, writes in one complete process, reads and deletes in
+a second process, then confirms future-schema refusal. It does not use a real microphone or LLM.
+
+```powershell
+node --test test/training-session-store.test.js test/training-persistence-electron.test.js test/pcm-wav.test.js
+npm run package
+npm run smoke:package
+```
+
+The ordinary packaged smoke includes both persistence phases as well as the existing renderer and native-load checks.
+Its persistence switch requires an absolute isolated `EXPRESSION_TRAINER_SMOKE_USER_DATA`; ordinary startup
+does not open a training database yet. The explicit smoke path can be removed once equivalent production
+restart coverage replaces it.
+
+Verification on 2026-09-16: 27 focused tests passed across the session store, Electron persistence,
+PCM encoder, package configuration and existing Electron product-flow suites. Windows x64 Forge packaging
+exited successfully; `node scripts/verify-packaged-app.js` returned `PACKAGED_APP_SMOKE_OK`, including both
+persistence process launches. The existing product smoke was corrected to await model preparation,
+explicitly start after onboarding, and assert the current character-based density definition.
+
+The local execution host used Node 24.19.0 (the bundled tool runtime), rather than the documented development
+floor 24.20.0, and had no `npm` command. Packaging therefore used the installed Forge CLI directly.
+This is scoped runtime/packaging evidence, not a new reproducible-install baseline. Electron was 43.4.1
+with embedded Node 24.18.1 and SQLite 3.53.1.
+
+Next: add narrow Application/Preload commands and safe playback access; capture existing metric/AI result
+snapshots and their generation-time provenance; integrate microphone completion, durable history, explicit
+deletion and disclosure copy; remove the paste/copy/save/clear paths; finish M1 acceptance and full regression.
+
+## 11. 诊断导出现状
+
+现有主窗口“🩺”与 Help 仍有入口；目标归属仅见 [Training Flow §13.1](../product/training-flow.md#131-已确认的-ia-归属)，本次不改 UI。
+
+诊断按用户操作导出固定 schema 的 JSON：应用版本、OS/platform/arch、active 模型 ID/版本、请求/context/track 采样率、最近 ASR 初始化耗时和受控错误类别。文件不包含设置、API Key、Authorization、绝对路径、stack、音频、逐字稿或 LLM 内容；不在后台持续写日志，也不自动上传。未开始录音或未安装模型时，对应字段明确为 `null`/`not-installed`。

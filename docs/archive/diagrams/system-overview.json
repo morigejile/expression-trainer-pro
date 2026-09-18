@@ -2,7 +2,7 @@
   "schema_version": 1,
   "diagram_type": "architecture",
   "meta": {
-    "title": "系统总览：运行时、外部依赖与信任边界",
+    "title": "[Archived 历史快照] 系统总览：运行时、外部依赖与信任边界",
     "output": "system-overview.html",
     "quality_profile": "showcase",
     "viewBox": [1550, 654],

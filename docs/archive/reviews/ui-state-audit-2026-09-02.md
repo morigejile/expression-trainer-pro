@@ -1,7 +1,9 @@
 # Renderer 界面状态（已过期的 As-Is 审计）
 
+> **身份：Archived。** 历史源码观察、提案和评审结论均非当前事实或验收依据。现行定义与承接位置见 [职责矩阵](../../README.md)。未被当前 Canonical 接受的建议不因归档而晋升。
+
 > **状态：已过期，仅作历史归档（2026-09-18 确认）。** 本文不再是当前 UI 审计、目标交互设计、实施或验收基准；下文行号、状态表、候选缺陷及用户选择仅保留原始记录，不自动成为现行要求。
-> **替代入口：** 当前实现以 [current.md](../architecture/current.md) 和源码为准；目标交互、跨 Screen UX 与 IA 以 [Training Flow §12–§14](../product/training-flow.md#12-ui-与文案原则) 为准。具体状态、快捷键、焦点与窗口细节需在 Interaction / State Design 阶段重新讨论，本次未生成新的 As-Is 审计。
+> **替代入口：** 当前实现以 [current.md](../../architecture/current.md) 和源码为准；目标交互、跨 Screen UX 与 IA 以 [Training Flow §12–§14](../../product/training-flow.md#12-ui-与文案原则) 为准。具体状态、快捷键、焦点与窗口细节需在 Interaction / State Design 阶段重新讨论，本次未生成新的 As-Is 审计。
 > 原始基线：Source-verified from `src/app.js` @ 7252005；当时未经产品审阅，只记录当时观察，不代表当前或期望行为
 > 基线日期：2026-09-02
 > 描述对象：`src/index.html` 主窗口的控件可见性与可用性，以及驱动它们的 Renderer 状态字段

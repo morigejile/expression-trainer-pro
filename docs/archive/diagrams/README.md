@@ -1,4 +1,6 @@
-# 架构图集（Archify 交付）
+# 历史架构图集（Archived）
+
+> **全部为历史快照。** 本目录 8 对 JSON/HTML 不代表当前架构、目标 IA 或验收；当前实现见 [Current](../../architecture/current.md)，交互见 [Training Flow](../../product/training-flow.md)，治理见 [文档入口](../../README.md)。只添加历史提示，未重生成图或复验既有画布检查。
 
 本目录由 [archify](https://github.com/tt-a1i/archify) 技能生成，规格（JSON）与制品（HTML）成对保存。
 每张图都按 `--quality showcase` 校验通过 9/9 项制品检查（single_svg、finite_svg、orthogonal_arrows、
@@ -8,9 +10,9 @@ route_rhythm、legend_clearance）。单文件 HTML 内含明暗主题、平移�
 ## 源文件与再生成策略
 
 - `*.json` 是可编辑规格，`*.html` 是提交到仓库的可浏览发布制品；保留 HTML 使阅读者不必安装生成工具。
-- 修改图时，以同名 JSON 作为输入，通过 Archify 技能重新生成并覆盖 HTML，然后执行其制品检查和桌面尺寸 visual check。
+- 本目录不再随当前实现更新。若未来确需新图，先依据 Canonical 决定范围并重新生成/验证，不覆盖历史快照来伪装当前。
 - `*.visual-check.*` 截图、回执和联系表只用于本地验收，属于可再生成的临时输出，已由 `.gitignore` 排除，不进入文档源树。
-- As-Is 图必须在源码边界变化后重新生成或在本页明确标为历史快照；不能仅修改文字说明而继续把旧图称为当前架构。
+- 以下表格的“当前”、源码位置及检查结果均指生成时快照，历史状态以本页首部为准。
 
 | 图 | 类型 | 规格 | 制品 | 画布 | 首屏包含性（1440/1600/1920/2048） |
 |---|---|---|---|---|---|
@@ -31,10 +33,10 @@ route_rhythm、legend_clearance）。单文件 HTML 内含明暗主题、平移�
 |---|---|
 | 当前架构 | `main.js`、`preload.js`、`lib/asr-*.js`、`lib/model-*.js`、`docs/architecture/current.md` |
 | 系统总览 | `main.js`、`preload.js`、`models/registry.json`、`docs/architecture/current.md` §3、`docs/development.md` |
-| 一次录音训练流程 | `src/app.js` 的 `startRecording` / `completeRecordingStop` / `generateReport`、`docs/reviews/ui-state-audit-2026-09-02.md`（历史审计） |
+| 一次录音训练流程 | `src/app.js` 的 `startRecording` / `completeRecordingStop` / `generateReport`、[历史 UI 审计](../reviews/ui-state-audit-2026-09-02.md) |
 | 本地交付流程 | `package.json` scripts、`forge.config.js`、`scripts/verify-*.js`、`docs/development.md`、`docs/roadmap.md`（OPS-01 / PKG-05） |
 | 音频块调用链 | `lib/asr-ipc.js`、`lib/asr-process-controller.js`、`lib/asr-session.js`、`lib/asr-utility-process.js`、`preload.js` |
-| 训练会话与界面状态 | `docs/reviews/ui-state-audit-2026-09-02.md`（历史审计中的 S0–S5 与失败回退）、`src/app.js` |
+| 训练会话与界面状态 | [历史 UI 审计](../reviews/ui-state-audit-2026-09-02.md)中的 S0–S5 与失败回退、`src/app.js` |
 | ASR 模型服务状态机 | `lib/asr-model-service.js`（idle / initializing / ready / switching / unavailable / disposed 与回滚路径） |
 | 从音频到报告的数据流 | `docs/architecture/current.md` §6、`lib/lexicon.js`、`lib/ai-feedback.js`、`models/registry.json` |
 

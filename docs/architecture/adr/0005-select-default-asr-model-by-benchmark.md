@@ -4,6 +4,8 @@
 - Date: 2026-08-19
 - Accepted: 2026-08-27
 
+> 编号说明：本文 `D-02` 是旧 Roadmap 的默认 ASR 模型选择任务，非当前 Backlog 同号事项；见[历史任务编号](README.md#历史任务编号)。
+
 ## Context
 
 当前生产实现使用 Sherpa-ONNX streaming Paraformer。2026-08-27 已在冻结数据集 `expression-zh-fleurs/v1` 上完成 Paraformer、small Zipformer 与 SenseVoiceSmall 各 100 条的简单比较。该比较用于当前候选选择，不覆盖生产 Audio/IPC/UI、真实时间流式 UX 或模型再分发许可。

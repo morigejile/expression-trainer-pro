@@ -13,7 +13,7 @@ This milestone freezes delivery order and acceptance boundaries. It does not pre
 ## Required delivery order
 
 1. **Timing foundation:** make the Speech Engine adapter produce declared timing capabilities, absolute sample positions, quality events, and explicit degradation required by R-A06.
-2. **主 ASR 选择与 Speech Evidence：** 验证并接入神经 VAD 独立语音证据，同时将 SenseVoiceSmall 接入模型选择与 Speech adapter，作为可选主 ASR。所选主 ASR 产生 Session 的主转写；VAD 不覆盖它，也不成为事实持久化的前提。选用其他 ASR 时不额外运行 SenseVoiceSmall。
+2. **主 ASR 选择与 Speech Evidence：** 依 R-A09/R-A10 接入神经 VAD 与 SenseVoiceSmall，分别落实 Target §4.5–§4.6 的组件边界；完成 D-07/D-08 验证。
 3. **Deterministic analysis:** define and calibrate versioned pace, pause, filler, organisation, and other accepted Common Analysis metrics with evidence references and unknown/degraded states.
 4. **Structured AI:** validate a versioned response schema and make completed-session diagnosis the default recoverable path. Remote automatic calls require the disclosure and explicit profile enablement defined by R-A11.
 5. **Report and radar:** compose one report from facts, Speech Evidence, deterministic results, and AI Coaching; render only radar dimensions with accepted definitions, scales, versions, and evidence.
@@ -40,42 +40,22 @@ Each step may run a focused spike before implementation. A spike closes its name
 
 ## Decisions that must close during M2
 
-- D-03 timing-capable model support policy.
-- D-04 radar dimensions, scales, overlap, and calibration.
-- D-07 neural-VAD model, thresholds, and resource budget.
-- D-08 SenseVoiceSmall 主 ASR 集成验证：沿用 ADR-0009 的 utterance/有界缓冲基线，验证时长、资源、取消、选择/恢复、打包与公开分发许可。
-- D-09 default AI onboarding and initial profile availability.
-- D-10 在对应阶段决定历史实时 AI 是否保留及具体交互；若保留，再明确本地规则/AI 分工、上下文、延迟、成本和降级边界。关闭该决策项不等于必须保留实时 AI，克制提醒原则继续有效。
-
-D-11 报告复制/导出/分享与备份已列为后续待办；除非具体报告/详情流程需要并明确纳入里程碑，否则不是 M2 完成依赖。
+需关闭 [Backlog D-03、D-04、D-07～D-10](../product/backlog.md#deferred-product-choices-required-by-planned-milestones)，具体问题、证据和未决状态只在该 Owner 维护。D-10 的关闭不代表必须保留实时 AI。D-11 未被纳入本阶段，不是 M2 完成依赖。
 
 ## Acceptance Criteria
 
-### AC-M2-01 — timing evidence is explicit
+AC 编号用于交付切片，验收规则引用唯一 Owner：
 
-Time-based findings declare their source and quality. Missing timing, endpoint resets, queue overrun, or unsupported model capability produces an unavailable/degraded result rather than fabricated exact values.
+| AC | 权威要求 / 规则 | 本阶段集成验证 |
+|---|---|---|
+| AC-M2-01 | R-A06/NFR-05；Speech Contract §6–§8 | timing 缺失、endpoint reset、overrun 和不支持能力的降级 |
+| AC-M2-02 | R-A09/R-A10；Data Model §5–§6 | VAD 与所选主 ASR 分别验证来源、取消/失败、本地事实保护和模型切换 |
+| AC-M2-03 | R-C04、R-A01–R-A03/R-A07；Data Model §3 | 保留既有本地统计、无 LLM 可用及指标含义说明；同事实和定义版本可重算，Finding 可定位证据并支持未知态 |
+| AC-M2-04 | R-A04/R-A11 | 本地/远程 profile、首次启用、无配置、无效 schema、超时及重试 |
+| AC-M2-05 | R-A05/R-A08；Training Flow §7–§8 | 统一 Report、渐进披露与雷达证据/版本/缺失态；不拉入 M4 重练执行 |
+| AC-M2-06 | NFR-01；R-A09/R-A10；Target §9 | 离线及模型失败时已保存记录可读；新训练明确恢复/改选路径，无静默换模型或伪成功 |
 
-### AC-M2-02 — primary ASR and derived speech evidence have distinct roles
-
-- 神经 VAD 产生独立、版本化的 `SpeechEvidenceRun`；失败、取消或重跑不改变已保存的 Session、音频或主转写。
-- 用户可选择 SenseVoiceSmall 作为本次训练的主 ASR；其 final 结果是主转写，保存模型/版本和实际 timing 能力，不伪造 partial。未选中它时不额外生成辅助识别任务。
-- 所选 ASR 失败或取消时，保留已经取得的本地事实并显示准确的转写状态与恢复路径；不能把失败当成一次成功转写，也不覆盖其他已完成 Session 的事实。
-
-### AC-M2-03 — deterministic results are reproducible
-
-The same fact revision and analyzer definition version produce the same metric result. Each finding identifies its evidence and supports an explicit unknown/degraded state.
-
-### AC-M2-04 — default AI respects the data boundary
-
-A local valid profile or a disclosed, explicitly enabled remote profile may automatically analyse a completed eligible Session. Missing configuration, invalid schema, timeout, or Provider failure remains visible and retryable without losing local facts or deterministic results.
-
-### AC-M2-05 — report and radar do not invent evidence
-
-按 R-A08 与 [Training Flow §7–§8](../product/training-flow.md#7-分析层与首次报告) 验收统一 Report 的信息层级、Finding 原位展开、证据定位和渐进披露；默认摘要与完整详细层使用同一分析来源，不创建多份报告或虚构缺失证据。M4 的 Finding 练习执行入口不成为 M2 完成条件。 Radar dimensions have accepted names, ranges, definitions, versions, and missing-value behaviour; arbitrary free-form LLM scores cannot populate the chart.
-
-### AC-M2-06 — offline and failure paths remain usable
-
-网络、远程凭据、神经 VAD 或 ASR 模型暂不可用，不影响打开已经保存的 Session、主转写、健康音频及本地结果；缺失内容如实降级。新训练依赖所选主 ASR 可用：缺模型或初始化失败时提供安装/恢复或明确改选模型的路径，不静默切换，也不把缺转写当作完成。未选择 SenseVoiceSmall 时无需它参与训练；AI/VAD 失败不阻塞已有事实保存。
+编号引用 [Requirements](../product/requirements.md)；协议见 [Speech Contract](../architecture/speech-contract.md)，数据规则见 [Data Model](../architecture/data-model.md)，交互见 [Training Flow](../product/training-flow.md)，组件故障职责见 [Target](../architecture/target.md)。
 
 ## Completion Conditions
 
@@ -89,7 +69,7 @@ M2 is complete only when:
 
 ## Traceability
 
-- [Requirements](../requirements/requirements.md)
+- [Requirements](../product/requirements.md)
 - [Training Flow](../product/training-flow.md)
 - [Target Architecture](../architecture/target.md)
 - [Training Data Model](../architecture/data-model.md)

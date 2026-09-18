@@ -1,6 +1,8 @@
 # BM-04 七模型 ASR 横向对比（2026-08-30）
 
-> **产品职责说明（2026-09-18）：** 下文保留当时 benchmark 结果与建议，不冻结产品交互。SenseVoiceSmall 的现行职责是可选主 ASR，见 [Requirements R-A10](../requirements/requirements.md)；“VAD 切句后识别”属于当时建议，不是已确认的 Screen/State 方案。当前 utterance 资源基线见 [ADR-0009](../architecture/adr/0009-productize-multiple-asr-models.md)，后续集成验证由 Backlog D-08 跟踪。
+> **身份：Supporting。** 仅证明文中固定日期/环境的测量，不定义当前产品或完成状态；现行 Owner 见 [职责矩阵](../README.md)。旧测量与建议保留原文。
+
+> **产品职责说明（2026-09-18）：** 下文保留当时 benchmark 结果与建议，不冻结产品交互。SenseVoiceSmall 的现行职责是可选主 ASR，见 [Requirements R-A10](../product/requirements.md)；“VAD 切句后识别”属于当时建议，不是已确认的 Screen/State 方案。当前 utterance 资源基线见 [ADR-0009](../architecture/adr/0009-productize-multiple-asr-models.md)，后续集成验证由 Backlog D-08 跟踪。
 
 ## 结论
 

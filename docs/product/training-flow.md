@@ -2,14 +2,14 @@
 
 > **Status:** Core Experience Flow v1 — 已确认的目标交互基线
 > **Date:** 2026-09-18
-> **Applies to:** 跨里程碑的核心体验；交付顺序仍由 Requirements、M1/M2 milestone 和 Roadmap 定义
-> **Does not describe:** 当前 Renderer 的已实现状态；实现事实见 [Current Architecture](../architecture/current.md)。[旧 UI audit](../reviews/ui-state-audit-2026-09-02.md) 已过期，仅作历史归档，不作为当前交互或验收依据。
+> **Applies to:** 跨里程碑的核心体验；交付顺序见 Roadmap；验收见 Requirements；阶段切片见 M1/M2 milestone
+> **Does not describe:** 当前 Renderer 的已实现状态；实现事实见 [Current Architecture](../architecture/current.md)。[旧 UI audit](../archive/reviews/ui-state-audit-2026-09-02.md) 已过期，仅作历史归档，不作为当前交互或验收依据。
 
 ## 1. 文档职责与范围
 
 本文是训练与报告交互、Practice Chain 产品语义、已确认 IA 归属及 Screen Structure 的唯一产品定义。Finding 详情、证据、报告层级和导航在本文维护；Requirements 只引用其验收边界，架构文档不复制 UI 规则。已确认结论与尚待确定的容器细节分开维护，不记录讨论过程。
 
-- 可验收的产品行为、优先级和交付里程碑见 [Requirements](../requirements/requirements.md)。
+- 可验收的产品行为、优先级和交付里程碑见 [Requirements](requirements.md)。
 - 数据所有权、不可变事实与比较约束见 [Training Data Model](../architecture/data-model.md)。
 - 组件职责与分析边界见 [Target Architecture](../architecture/target.md)。
 - 暂缓功能见 [Product Backlog](backlog.md)；具体交互未决项集中在本文 §14。
@@ -62,7 +62,7 @@ trainingPrompt = none
 input = microphone
 ```
 
-首页主操作可直接开始自由表达，无需选择模式、理解框架或填写题目。目标产品没有粘贴文本入口；首页不提供“复制”“保存”“清空”。删除持久化记录属于历史/详情中的明确删除动作。
+首页主操作可直接开始自由表达，无需选择模式、理解框架或填写题目。目标产品没有粘贴文本入口；首页不提供“复制”“保存”“清空”。删除持久化记录属于历史/详情中的明确删除动作。M1 不以新的首页快捷入口替代这些被移除的操作。
 
 场景/题目在目标体验中可选；M1 不提供 topic/scenario 输入或生成，始终保存 `trainingPrompt = null`，相关能力沿用 R-F02 的 M4 归属。
 
@@ -97,7 +97,7 @@ PREP、STAR、Pyramid 属于 Structured frameworks，不是独立应用或独立
 
 用户从首页开始后进入训练页，经短倒计时自动录音。所选 ASR 支持 streaming 时，实时字幕是主要反馈；录音状态和必要控制保持清晰。
 
-SenseVoiceSmall 是可选主 ASR，选用时由它产生本次 Session 的主转写，不作为另一主 ASR 之后的辅助证据模型。其 utterance 能力不提供实时 partial，不能伪造实时字幕或依赖尚未产生的文本给出实时提醒；应明确显示录音与等待转写状态。默认 streaming 模型不变。既有 utterance 有界缓冲基线见 [ADR-0009](../architecture/adr/0009-productize-multiple-asr-models.md)，实施验证由 Backlog D-08 跟踪；等待、失败与能力差异的详细交互留到 Interaction / State Design，不在本阶段确定新的切句方案。
+所选主 ASR 的产品角色按 [R-A10](requirements.md#6-m2表达证据ai-分析与雷达图)；SenseVoiceSmall 的 utterance 交互边界如下。Utterance 能力不提供实时 partial，不能伪造实时字幕或依赖尚未产生的文本给出实时提醒；应明确显示录音与等待转写状态。既有 utterance 有界缓冲基线见 [ADR-0009](../architecture/adr/0009-productize-multiple-asr-models.md)，实施验证由 Backlog D-08 跟踪；等待、失败与能力差异的详细交互留到 Interaction / State Design，不在本阶段确定新的切句方案。
 
 已确认的克制提醒原则不等于已决定保留实时 AI。现有实时 AI 是否保留、承担哪些反馈及具体交互，留待对应阶段决定，由 Backlog D-10 跟踪；本阶段不冻结其触发方式或展示容器。
 
@@ -137,7 +137,7 @@ Common Analysis 覆盖共享维度，如流畅/节奏、清晰/精确、简洁/�
 
 Structured 在 Common Analysis 外增加所选框架的 Framework Analysis。专项分析说明框架部分的存在、顺序、比例、支撑或层级关系，不替代 Common Analysis，也不重复给无关表达问题评分。
 
-AI Coaching 在必需的本地证据就绪后，默认通过有效 profile 生成有证据的诊断和建议。远程 profile 只有在披露 Provider/数据类别并由用户明确启用后才可自动使用；本地 profile 不描述为云端传输。AI 解释证据，不成为独立的确定性事实或评分来源。
+AI Coaching 的默认诊断与启用边界按 [R-A04/R-A11](requirements.md#6-m2表达证据ai-分析与雷达图)，事实与解释的区分按 [Data Model §3](../architecture/data-model.md#3-fact-and-derived-data-rules)。报告展示分析状态与证据，不把未配置或失败误写成没有问题。
 
 完整分析负责发现问题；训练呈现层只挑 1～3 个优先改善问题，综合考虑：频率、严重程度、对表达/理解的影响、训练价值/可改善性。这里不冻结排序权重或算法。不为凑数量编造问题，也不因只展示少量重点而丢弃其他有效发现。
 
@@ -198,7 +198,7 @@ Finding 是 Report 内的 Card / Row。点击该行的展开入口后，在原�
 
 用户选择“重练”后，系统根据当前问题推荐句子、片段或完整表达范围，用户可调整；范围选择器的具体形式仍为 Interaction TBD。
 
-每次继续练习/重练都是新的 attempt，对应新的 `TrainingSession`，自动保存训练数据并自动分析、保存结果，同时持久化与来源 Session 的关系；本流程均由具体 Finding 发起，必须同时保存来源 Finding 的关系。原始表达、原分析和此前 attempts 保留，不复用或覆盖原 Session identity。来源关系是训练意图与前后证据对照的依据，不能只存在于页面跳转参数中；逻辑约束见 [Data Model §6](../architecture/data-model.md#6-analysis-and-retraining-invariants)，具体 schema 留待对应里程碑，M1 不提前建设重练表或完整对比子系统。
+每次继续练习都开始新的 Session；来源 Session/Finding 的持久化关系与原记录保护遵循 [Data Model §6](../architecture/data-model.md#6-analysis-and-retraining-invariants)。新一轮复用 §6 的自动保存/分析反馈，不要求用户另做保存动作；本流程不提前建设 M1 重练表或比较子系统。
 
 重练不是必须选择 Structured 才能使用的概念。框架推荐、重新分析与新主题训练应遵守 §11，不改变当前问题重练的含义。
 
@@ -292,7 +292,7 @@ Screen 以用户任务与 Workspace 职责划分，不按报告内容层数机�
 | 诊断（运行环境/ASR 故障排查） | 唯一入口为“帮助 → 问题与反馈”，诊断导出也在这里；移除主窗口顶部等其他位置的重复入口。这里不指 Report 中的 AI 表达诊断，也不属于报告导出待办 |
 | History | 用户可见名称为“训练历史”，对象是训练 Session，不是操作历史或聊天历史 |
 | 数据与隐私说明 | 放帮助页并长期可查；首次录音确认和远程 AI 启用仍在对应操作前完成，不以帮助说明替代确认 |
-| 继续练习／重练 | 报告带上下文再次进入 Training Workspace；新 Session 保存来源 Session/Finding 关系，见 §9 |
+| 继续练习／重练 | 复用 Training Workspace，用户路径见 §9；数据关系见 Data Model §6 |
 
 History 的内容职责与路径由 §13.2 维护，单条历史详情共用 Report Workspace。以上是目标归属，不声明所有调整已实现，也不改变既有里程碑范围。
 

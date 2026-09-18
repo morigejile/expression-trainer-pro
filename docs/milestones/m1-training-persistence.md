@@ -12,18 +12,9 @@ M1 changes storage, application boundaries, and the target homepage entry surfac
 
 ## Product decisions frozen for M1
 
-- Completed microphone sessions retain their audio with the session until the user deletes the session.
-- M1 performs no silent age-based or count-based deletion.
-- The existing per-record recording limit remains in force; disk/write failures are explicit.
-- The target flow accepts microphone training only; the current paste entry and paste-analysis path are removed rather than persisted.
-- The homepage no longer shows “复制”“保存”“清空”; Session deletion belongs to history/detail and remains explicit.
-- M1 persists the completed transcript and stable segments, not every partial ASR hypothesis.
-- 自动持久化属于既有 M1 保存职责：已有训练事实在可保存后尽早写入，不等待 AI、离开报告或“保存/完成”操作；随后产生的已有结果也自动保存。导航不承担保存职责。
-- M1 persists the supported training context using the target shape: `trainingMode = free`, `framework = null`, and `trainingPrompt = null`. The schema reserves a nullable `TrainingPromptSnapshot` for M4, but M1 adds no topic/scenario input or generation UI. It does not add Structured selection, Guidance, or Framework Analysis.
-- Existing statistics and AI/playback analysis may be persisted as versioned snapshots when present; M1 does not regenerate or reinterpret them.
-- Pre-upgrade in-memory records cannot be migrated because no durable source exists. Persistence begins with sessions completed after M1 is installed.
+产品保存、保留和入口规则只由 [Requirements §5、§5.1、NFR-08](../product/requirements.md#5-m1训练记录持久化) 定义；事实、来源快照及写入恢复由 [Data Model §3–§9](../architecture/data-model.md) 定义。本阶段只实现这些既有规则，既有结果不重新解释。
 
-These defaults close the retention decision for M1. 后续容量提醒规则已在 [Requirements §9.1](../requirements/requirements.md#91-已确认的后续容量提醒策略实施待排期) 确认，实施仍由 Backlog D-01 在 M1 后安排；报告复制/导出/分享与备份由 D-11 跟踪，不新增本里程碑验收项。
+后续容量提醒和报告导出/分享/备份分别由 Backlog D-01、D-11 跟踪，不加入 M1。
 
 ## In Scope
 
@@ -61,7 +52,7 @@ These defaults close the retention decision for M1. 后续容量提醒规则已�
 - Training History（界面名称“训练历史”）list populated from durable sessions instead of the five-record memory buffer.
 - Open a session after restart and view transcript, existing statistics, and audio playback when available.
 - Delete a session and its managed artifacts through an explicit user action.
-- Remove the homepage “复制”“保存”“清空” controls; do not replace them with new homepage shortcuts in M1.
+- 按 R-P09 落实 [Training Flow §3.1](../product/training-flow.md#31-默认状态) 的首页动作收敛。
 - Update first-recording/help copy to state local persistence, manual deletion, the cloud-audio boundary, and which transcript/metric/instruction data a configured remote AI profile may receive.
 - Visible error/degraded states for failed finalisation, missing audio, corrupt records, and unsupported data versions. 保存成功尽量弱提示，失败明显提示并提供重试。
 
@@ -71,7 +62,7 @@ These defaults close the retention decision for M1. 后续容量提醒规则已�
 - Application-service tests for finalisation, duplicate requests, list/get, and deletion.
 - Interrupted-write/orphan-staging recovery tests.
 - Missing/corrupt artifact tests.
-- Restart-level desktop smoke for microphone sessions plus checks that removed homepage/paste actions are unavailable.
+- Restart-level desktop smoke for microphone sessions plus R-P08/R-P09 entry checks.
 - Regression checks for the existing ASR and playback flow only where the persistence boundary touches them.
 
 ## Out of Scope
@@ -92,56 +83,26 @@ These defaults close the retention decision for M1. 后续容量提醒规则已�
 
 ## Acceptance Criteria
 
-### AC-M1-01 — completed microphone session survives restart
+下列 AC 保留稳定编号，用作本阶段验收映射；规则正文由对应 Owner 维护，不在此再定义一遍。必须验证完整产品接入，存储层 smoke 不等于通过全部 AC。
 
-用户手动结束语音输入后，已有事实自动收尾并持久化，不等待 AI 成功、用户离开结果视图或额外“保存/完成”操作；已有结果随后产生时自动保存。
+| AC | 权威要求 / 规则 | 本阶段集成验证 |
+|---|---|---|
+| AC-M1-01 | R-P01–R-P03、R-P06；Data Model §4/§8 | 完成麦克风训练后完整重启，核对单条记录、逐字稿/片段、可用音频、上下文与来源；已有结果随后产生也写入 |
+| AC-M1-02 | R-P08/R-P09 | 同时核对首页入口及 Application API，不允许仅隐藏按钮保留目标粘贴路径 |
+| AC-M1-03 | R-P05/NFR-02；Data Model §8 | 注入数据库/音频写入失败及中断，重启后核对健康记录与异常状态、重试 |
+| AC-M1-04 | R-P01；Data Model §8 幂等性；Target §5 请求身份 | 重复完成和迟到回调不产生重复记录或覆盖新结果 |
+| AC-M1-05 | R-P04；Data Model §9 | 删除及部分失败重试覆盖元数据、子项和受管文件 |
+| AC-M1-06 | R-P03/R-P05；Data Model §9 | 缺失/损坏音频只影响对应播放能力，健康记录可读 |
+| AC-M1-07 | NFR-02；Data Model §9 | 受支持旧 schema 前向迁移，未知未来 schema 不被改写 |
+| AC-M1-08 | R-P07/NFR-03；Data Model §4.5 | 核对实际持久化/诊断/LLM payload 和首次录音/Help 告知，不仅检查界面文案 |
+| AC-M1-09 | NFR-01 | 无网络和 LLM 凭据下完成、重启、打开、播放健康音频、删除 |
+| AC-M1-10 | R-C01/R-C03/R-C06/NFR-08 | 保持已有 ASR/暂停/恢复/收尾/过载/单条上限路径的 focused tests 与 smoke |
 
-Given a user completes a microphone training, after a full application restart:
-
-- exactly one completed session appears in history;
-- its transcript and stable segment order match the completed training;
-- its captured audio is playable when the artifact passes integrity checks;
-- its creation time, duration, Free training context with `trainingPrompt = null`, ASR identity, and existing result provenance are readable.
-
-### AC-M1-02 — target entry points are voice-only and simplified
-
-The homepage has no paste entry and no “复制”“保存”“清空” controls. No `pasted-text` Session can be created through the target Application API. Session deletion remains available from history/detail through an explicit action.
-
-### AC-M1-03 — finalisation is atomic from the product perspective
-
-If writing the database or audio artifact fails or the process is interrupted, the application never presents the record as a healthy completed session. 写入失败应明显提示并提供重试；成功仅需弱提示。 On next startup, healthy sessions remain readable and the interrupted session is marked incomplete or its unreferenced staging artifact is safely reclaimed.
-
-### AC-M1-04 — duplicate and late work cannot create or overwrite a session
-
-Repeating finalisation with the same session ID is idempotent. A result associated with an old session/request cannot replace a newer session’s transcript, result, or state.
-
-### AC-M1-05 — deletion is complete and retryable
-
-Deleting a session makes its metadata and managed user-content artifacts unavailable through the application. If part of deletion fails, the user sees a retryable degraded state; the failure is not reported as success.
-
-### AC-M1-06 — missing or corrupt audio degrades locally
-
-When an audio file is missing, changed, or unreadable, the session and transcript remain accessible, playback is disabled with a clear state, and other sessions continue loading.
-
-### AC-M1-07 — schema versions are handled safely
-
-A supported old schema migrates forward without losing healthy sessions. A newer unsupported schema is not silently rewritten or downgraded and produces an actionable error.
-
-### AC-M1-08 — privacy boundary is preserved
-
-No API key, Authorization value, raw PCM, absolute user path, or complete settings snapshot is written to session metadata or diagnostics. Existing LLM calls continue to exclude audio. First-recording/help copy distinguishes local data from the transcript, timing/metric summaries, and analysis instructions that an enabled remote profile may receive.
-
-### AC-M1-09 — local loop works without LLM
-
-With network unavailable and no LLM credentials, users can complete, restart, open, play where applicable, and delete local sessions.
-
-### AC-M1-10 — current speech behaviour remains intact
-
-Start/pause/resume/stop, streaming partial/final display, bounded overrun handling, ASR execution recovery, and current recording limit continue to satisfy their existing tests and focused smoke checks.
+需求编号均指向 [Requirements](../product/requirements.md)；数据章节均指向 [Data Model](../architecture/data-model.md)。
 
 ## Implementation sequence
 
-Steps 1–3 have an implemented storage foundation described in [Training storage](../architecture/training-storage.md).
+Steps 1–3 have an implemented storage foundation described in [Training storage](../architecture/current.md#10-m1-training-storage-foundation).
 The normal microphone flow still uses the in-memory store. Existing-result snapshots, the Application/Preload boundary,
 history UI and product-level acceptance remain pending; the storage smoke is not completion of AC-M1-01–10.
 
@@ -152,7 +113,7 @@ This sequence minimises coupled change:
 3. **Implemented:** managed artifact publication, integrity checks, startup recovery and retryable deletion.
 4. Add application services and the narrow Preload API.
 5. Adapt the microphone completion path and remove the paste command/UI path.
-6. Replace the in-memory history source with repository queries and remove homepage “复制”“保存”“清空”.
+6. Replace the in-memory history source with repository queries and apply the R-P09 homepage changes.
 7. Add deletion, degraded states, and updated consent/help copy.
 8. Run focused tests and packaged restart smoke.
 
@@ -181,7 +142,7 @@ M1 is complete only when:
 
 ## Traceability
 
-- Requirements: [requirements.md](../requirements/requirements.md)
+- Requirements: [requirements.md](../product/requirements.md)
 - Data model: [data-model.md](../architecture/data-model.md)
 - Target architecture: [target.md](../architecture/target.md)
 - Target training/report flow: [training-flow.md](../product/training-flow.md)

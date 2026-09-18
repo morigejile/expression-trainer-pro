@@ -1,7 +1,7 @@
 # Expression Trainer Roadmap
 
 > 状态：Active
-> 更新日期：2026-09-17
+> 更新日期：2026-09-18
 > 当前模式：内部开发/测试；公开模型分发、签名和扩展平台支持仍受外部条件约束。
 
 ## 1. 排序原则
@@ -45,7 +45,7 @@ M0/M1 是当前产品关键路径。M2 接入 SenseVoiceSmall 作为可选主 AS
 | Phase 5 | Windows x64 Forge/Squirrel 制品、真实模型首次安装、离线二次启动、升级和卸载数据保留 | [支持矩阵](support-matrix.md)、[ADR-0007](architecture/adr/0007-package-with-electron-forge.md) |
 | CONV-01～03 | 文档职责收敛、benchmark writer 竞态修复、LLM provider 配置迁移 | [CHANGELOG](../CHANGELOG.md)、Git 历史 |
 | UI-01～02 | 四套主题、双布局、窗口同步和响应式尺寸 | [当前架构](architecture/current.md) |
-| ASR-M01～M04a | 三模型 Catalog/Factory、选择恢复、安装切换与内部包内默认资格 | [当前架构](architecture/current.md)、[ADR-0009](architecture/adr/0009-productize-multiple-asr-models.md) |
+| ASR-M01～M03、ASR-M04a | 三模型 Catalog/Factory、选择恢复、安装切换与内部包内默认资格 | [当前架构](architecture/current.md)、[ADR-0009](architecture/adr/0009-productize-multiple-asr-models.md) |
 
 ## 4. 当前执行轨道
 
@@ -53,29 +53,29 @@ M0/M1 是当前产品关键路径。M2 接入 SenseVoiceSmall 作为可选主 AS
 
 | ID | P | 状态 | 任务 | 完成标准 |
 |---|---|---|---|---|
-| M0 | P0 | Complete | 冻结需求、目标架构、训练数据模型、训练/报告流程、Speech Engine 契约、Backlog 和 M1 范围 | M0 一致性审查通过；M1 无需重议产品目标、数据模型和主要架构边界即可开发 |
+| M0 | P0 | Complete | 冻结需求、目标架构、训练数据模型、训练/报告流程、Speech Engine 契约、Backlog 和 M1 范围 | 于 2026-09-16 完成基线一致性审查；M1 无需重议产品目标、数据模型和主要架构边界即可开发 |
 | M1 | P0 | In progress | Training Persistence：SQLite/音频存储基础已实现，待接入 Application API、录音完成与历史界面 | 满足 [M1 milestone](milestones/m1-training-persistence.md) 的 AC-M1-01～10 |
 
-[Core Experience Flow v1](product/training-flow.md) 是已确认的交互与 Screen Structure 基线，当前 Workspace 清单及状态合并边界统一见该文档 §13，Report 交互见 §7–§10，History Comparison 见 §13.2。下一阶段低保真原型细化尚未冻结的布局与容器；本次收敛不改变 M1 存储接入状态或交付范围，短倒计时、提示和静音询问不自动加入 M1。Focus Mode 仍为 [Backlog B-12](product/backlog.md#not-now)，五项 Interaction TBD 仅在 Training Flow 维护。Practice Chain 实体未决项见 Data Model §12，由 Backlog D-12 跟踪；M3 比较与 M4 重练边界不变。容量提醒实施由 D-01 在 M1 后排期；报告复制/导出/分享与备份为 D-11 后续待办。
+M0 的 Complete 记录上述历史完成事件；[当时的审查](archive/reviews/m0-consistency-review-2026-09-16.md)已归档，不证明后续修订仍通过审查。后续修订按[文档维护规则](README.md#维护规则)验证。
 
-跨 Screen UX 约束统一见 Training Flow §12.1，快捷键、焦点细则和窗口尺寸/位置留到 Interaction / State Design；运行诊断唯一入口按 §13.1 收敛到“帮助 → 问题与反馈”。旧 UI audit 已过期，不作为目标设计或实施验收依据；本次仅更新文档，具体 UI 迁移仍需交付，不据此扩大 M1。
+目标交互与 Screen Structure 统一见 [Training Flow](product/training-flow.md)，阶段切片见 M1/M2 milestone。后续原型只细化既有未决项，不把 M2–M4、Focus Mode 或交互细节自动加入 M1；暂缓/待决项及重开条件见 [Backlog](product/backlog.md)。
 
 ### 4.2 Streaming ASR public delivery
 
 | ID | P | 状态 | 任务 | 完成标准 |
 |---|---|---|---|---|
-| ASR-M04 | P1 | External gate | Zipformer Large 包内默认、升级保留和真实模型资格验证 | 获得再分发批准；离线首次导入、native 初始化、二次启动和升级保留通过 |
+| ASR-M04 | P1 | External gate | Zipformer Large 公开包内默认资格（内部资格 ASR-M04a 已完成） | 剩余：获得再分发批准；公开候选制品通过离线首次导入、native 初始化、二次启动和升级保留验证；公开发布条件见 §4.4 |
 
 ### 4.3 M2 speech evidence and default AI diagnosis
 
 | ID | P | 状态 | 任务 | 完成标准 |
 |---|---|---|---|---|
-| TIME-M201 | P0 | Planned / M2 | 契约化绝对时间与质量事件 | Speech adapter 输出声明的 timing capability、绝对采样位置和质量事件；不支持、端点重置或 overrun 时显式降级 |
-| SP-A01 | P0 | Planned / M2 | 神经 VAD 语音活动与静音区间 | 版本化模型/阈值；标注样本、实时系数、内存、失败降级通过；不覆盖 ASR 时间戳 |
-| ASR-U01 | P1 | Planned / M2 | SenseVoiceSmall 可选主 ASR | 通过模型选择产生本次 Session 主转写；如实声明 utterance/timing 能力，不伪造 partial；按 R-A10、D-08 验证等待/恢复、取消、时长/资源与来源记录；默认 streaming 模型不变，公开分发前单独通过许可门禁 |
-| METRIC-M201 | P0 | Planned / M2 | 时间度量与 Common Analysis | 使用声明的 timing source 和 quality event；确定性指标带定义版本、证据和降级状态；维度完成 MECE 与校准复核 |
-| AI-M201 | P0 | Planned / M2 | 默认结构化 AI 诊断与建议 | 远程 profile 经数据类别披露并由用户启用后才可自动运行；本地 profile 单独标识；输出 schema 校验；缺配置/失败有引导和重试；本地事实不丢失 |
-| REPORT-M201 | P1 | Planned / M2 | 统一报告与证据驱动雷达图 | 按 R-A08 交付统一 Report Workspace 的摘要、Finding 原位展开与完整详细层；结论可定位证据；雷达维度有定义、范围、版本和缺失态；不使用无依据的 LLM 自由评分 |
+| TIME-M201 | P0 | Planned / M2 | 契约化绝对时间与质量事件 | 按 [M2 AC-M2-01](milestones/m2-speech-evidence-and-ai-diagnosis.md#acceptance-criteria) 验收 |
+| SP-A01 | P0 | Planned / M2 | 神经 VAD 语音活动与静音区间 | 按 [R-A09](product/requirements.md#6-m2表达证据ai-分析与雷达图)、M2 AC-M2-02 验收；关闭 D-07 |
+| ASR-U01 | P1 | Planned / M2 | SenseVoiceSmall 可选主 ASR | 按 [R-A10](product/requirements.md#6-m2表达证据ai-分析与雷达图)、M2 AC-M2-02/06 验收；关闭 D-08 |
+| METRIC-M201 | P0 | Planned / M2 | 时间度量与 Common Analysis | 按 M2 AC-M2-03 验收；关闭 D-03/D-04 的对应定义 |
+| AI-M201 | P0 | Planned / M2 | 默认结构化 AI 诊断与建议 | 按 M2 AC-M2-04 验收；关闭 D-09/D-10 |
+| REPORT-M201 | P1 | Planned / M2 | 统一报告与证据驱动雷达图 | 按 M2 AC-M2-05 验收；重练执行仍归 M4 |
 | ASR-U02 | P2 | Deferred | FireRedASR2 多来源安装和 utterance UX | SenseVoiceSmall 实施完成后，产品证据表明第二个 utterance 模型能改变用户结果 |
 
 ### 4.4 Delivery and maintenance
@@ -94,20 +94,16 @@ M0/M1 是当前产品关键路径。M2 接入 SenseVoiceSmall 作为可选主 AS
 | 里程碑 | 状态 | 包含 | 结果 |
 |---|---|---|---|
 | M0 Architecture & Requirements Baseline | Complete | Gap、Requirements、Data Model、Training Flow、Speech Contract、Target、Backlog、M1、Consistency Review | M1 有稳定、可追踪的实施边界 |
-| M1 Training Persistence | In progress | R-P01～R-P09 | Session、逐字稿、已有结果和音频自动持久化，与导航解耦，可跨重启恢复与删除；目标首页收敛为纯语音入口并移除复制/保存/清空 |
+| M1 Training Persistence | In progress | R-P01～R-P09 | 按 [M1 milestone](milestones/m1-training-persistence.md) 交付持久化闭环与入口收敛 |
 | M2 Speech Evidence & AI Diagnosis | Planned | R-A01～R-A11 | 按 [M2 milestone](milestones/m2-speech-evidence-and-ai-diagnosis.md) 依次交付时间/语音证据、确定性度量、Common Analysis、具有远程知情边界的默认结构化 AI 诊断、统一报告和证据驱动雷达图 |
 | M3 Comparison & Review | Planned | R-R01～R-R04 | 以简短前后证据为主的对比、复盘、趋势和 Session 关联 AI 对话 |
 | M4 Structured Training | Planned | R-F01～R-F08 | Free/Structured 选择、PREP/STAR/Pyramid、Framework Analysis 与问题重练闭环（复用 M3 比较能力；重练不强制选择框架） |
-| Streaming ASR public delivery | In progress | ASR-M01～M04 | Catalog/Factory、选择、单 controller 切换、安装设置入口及内部包内默认资格已完成；公开资格仍受外部门槛约束；这是并行交付轨道，不占用产品里程碑编号 |
+| Streaming ASR public delivery | In progress | ASR-M01～M04（含 M04a 内部资格） | 已完成部分见 §3；剩余公开交付任务及门槛见 §4.2；这是并行交付轨道，不占用产品里程碑编号 |
 | Public desktop delivery | External gate | PKG-05、PKG-06 | 签名、许可和目标平台证据满足公开发布；这是外部门禁，不是 M4 的后续产品里程碑 |
 
 ## 6. 明确不做
 
-- M1 不重写为 Tauri、WASM、React/Vue 或独立后端。
-- 不为每个 Structured framework 新建训练流程、Session 模型或报告架构。
-- 除已进入 M2 的 SenseVoiceSmall 外，不为尚未进入产品批次的模型预建 adapter、下载器或 UI。
-- 不把内部七候选结果包装为公开权威 benchmark。
-- 除 M1 训练记录所需的最小 SQLite 元数据存储外，不增加通用数据库框架；不在没有当前风险时增加审批、审计、遥测、插件或通用状态框架。
+当前阶段排除项见 [M1 Out of Scope](milestones/m1-training-persistence.md#out-of-scope) 与 [M2 Out of Scope](milestones/m2-speech-evidence-and-ai-diagnosis.md#out-of-scope)；长期暂缓事项与重开条件只由 [Backlog](product/backlog.md#not-now) 维护。不得因排期或文档整理新增产品/技术范围。
 
 ## 7. 外部跟进
 
@@ -117,7 +113,4 @@ M0/M1 是当前产品关键路径。M2 接入 SenseVoiceSmall 作为可选主 AS
 
 ## 8. 维护规则
 
-- Roadmap 只保留未完成工作、依赖、外部门禁和一页已完成基线，不保存逐任务日志。
-- 已完成任务移入“已完成基线”摘要；具体提交、命令和临时结论由 Git 历史承担。
-- 当前实现事实写入[当前架构](architecture/current.md)，产品行为写入[需求基线](requirements/requirements.md)，决策理由写入 [ADR](architecture/adr/README.md)。
-- 新增计划文件只用于尚未开始且需要跨步骤协调的工作；实施完成并吸收最终事实后删除。
+遵循 [唯一文档治理入口](README.md#维护规则)。本文件只保留未完成工作、依赖、外部门禁和已完成基线摘要；逐任务日志由 Git 历史承担。

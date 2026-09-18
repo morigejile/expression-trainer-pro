@@ -1,7 +1,7 @@
 # 开发与验证
 
 > 当前开发基线：Windows 11 25H2 build 26200 x64、Node.js 24.20.0、npm 11.19.0、Electron 43.4.1、sherpa-onnx-node 1.13.3
-> 更新日期：2026-08-31
+> 更新日期：2026-09-18（文档整理；不表示重新执行历史验证）
 > 当前用途：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞跟进，除非它们使当前技术实验无法运行或结论失效。
 
 ## 环境与安装
@@ -48,16 +48,6 @@ npm run smoke:package
 - `smoke:first-install` 和 `smoke:upgrade` 只在依赖、Forge/Squirrel、native bundle、Model Manager、首次安装或升级/卸载边界变化时运行，不进入每次内测构建。
 - 当跨机获取最新安装器成为反复痛点时，再实施 Roadmap `OPS-01`：仅增加手工触发的 Windows 构建、packaged smoke 和短期 workflow artifact，不创建 tag/GitHub Release，不引入 Forge Publisher、签名或自动更新。若跨机取包需求消失，则移除该临时 workflow。
 
-## 提交说明约定
-
-每个项目提交使用简洁的英文主题，并在提交正文中附上简短的中文说明。推荐命令格式：
-
-```powershell
-git commit -m "<English subject>" -m "中文：<简短说明>"
-```
-
-该约定适用于未来提交，不要求改写已有历史。
-
 ## 版本与发布清单
 
 `package.json#version` 是应用、Electron `app.getVersion()` 和 Forge/Squirrel 制品版本的唯一 canonical 来源；`package-lock.json` 根包版本必须与之相同。源码注释、README 标题和产品代际名称不定义 SemVer。模型使用 registry 中独立的 `id/version`，应用升级不隐式切换模型。
@@ -73,11 +63,7 @@ git commit -m "<English subject>" -m "中文：<简短说明>"
 
 ## 配置文件边界
 
-当前产品分别把 Appearance、ASR 选择和 LLM provider 配置保存到 `userData/appearance.json`、`userData/asr-selection.json` 与 `userData/llm-provider-settings.json`。三者使用独立 config/store、Preload API 和 IPC，只共用设置页面，不共用配置快照。
-
-新文件不存在时从 legacy `settings.json` 单向迁移，不删除旧文件，也不做跨版本双向同步；新文件存在后以新文件为准。canonical 或 legacy 来源的 schema 高于当前支持版本时，读取可识别字段但拒绝所有显式保存。测试覆盖旧文件迁移、原子发布失败、新文件优先、future schema 拒绝保存，以及设置页“保存”和“测试连接”保持独立。
-
-Appearance schema version 1 只保存四主题和两个布局标识；缺失、损坏或未知值回退 Graphite/coach-rail，future schema 拒绝显式保存。ASR selection schema version 1 只保存 `selectedModelId`；稳定损坏在默认模型成功后恢复，瞬时初始化失败保留选择。两者均不得合并进 LLM provider 配置快照。
+配置 store、legacy 迁移、future schema 与凭据的实际边界统一见 [Current §5.7](architecture/current.md#57-设置与数据)；模型安装/选择见 [Current §3.2](architecture/current.md#32-model-manager-与生产模型)。更改这些实现时按本文件的触发规则运行对应 focused tests。
 
 ## ASR 模型
 
@@ -103,7 +89,7 @@ npm run smoke:bundled-default
 
 - [数据集契约](../benchmark/datasets/README.md)
 - [Harness](benchmark/harness.md)
-- [候选证据索引](benchmark/model-inventory.md)
+- [候选证据索引](benchmark/harness.md#模型与结果证据索引)
 - [七候选最终比较](benchmark/bm04-seven-model-comparison-2026-08-30.md)
 
 BM-01 已完成的数据采集、人工 review 和 freeze 工具已归档到 Git 历史，不再作为当前维护入口。若引入新语料，必须先明确重开该工作并重新评估所需工具，不能把现有冻结结果当作通用数据治理平台。
@@ -116,6 +102,8 @@ BM-04 已完成七候选验证，ADR-0009 据此选择 Zipformer Large 作为技
 
 ## 诊断导出
 
-目标唯一入口是“帮助 → 问题与反馈 → 导出诊断”，产品归属见 [Training Flow §13.1](product/training-flow.md#131-已确认的-ia-归属)。现有主窗口“🩺”是待移除的旧入口，不属于目标 IA；本次文档更新不代表入口迁移已实现。
+操作前核对 [Current 的诊断实现](architecture/current.md#11-诊断导出现状)；目标入口归属见 [Training Flow §13.1](product/training-flow.md#131-已确认的-ia-归属)。仅修改文档不表示 UI 入口迁移已实现。
 
-诊断按用户操作导出固定 schema 的 JSON：应用版本、OS/platform/arch、active 模型 ID/版本、请求/context/track 采样率、最近 ASR 初始化耗时和受控错误类别。文件不包含设置、API Key、Authorization、绝对路径、stack、音频、逐字稿或 LLM 内容；不在后台持续写日志，也不自动上传。未开始录音或未安装模型时，对应字段明确为 `null`/`not-installed`。
+## 文档维护
+
+文档职责、身份与历史处理遵循 [唯一文档治理入口](README.md#维护规则)。

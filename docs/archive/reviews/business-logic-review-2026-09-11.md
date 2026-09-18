@@ -1,6 +1,8 @@
 # 整体业务逻辑与数据流梳理（评审工作稿）
 
-> **状态：历史评审快照。** 其中产品建议已由 2026-09-16 的 [需求基线](../requirements/requirements.md)、[目标架构](../architecture/target.md)和[当前 Roadmap](../roadmap.md)取代；本文只用于追溯当时的源码观察，不作为当前需求或计划。
+> **身份：Archived。** 历史源码观察、提案和评审结论均非当前事实或验收依据。现行定义与承接位置见 [职责矩阵](../../README.md)。未被当前 Canonical 接受的建议不因归档而晋升。
+
+> **状态：历史评审快照。** 其中产品建议已由 2026-09-16 的 [需求基线](../../product/requirements.md)、[目标架构](../../architecture/target.md)和[当前 Roadmap](../../roadmap.md)取代；本文只用于追溯当时的源码观察，不作为当前需求或计划。
 > 日期：2026-09-11；源码快照：`c859fd6`。
 > 用途：围绕“帮助用户发现表达问题、获得改善建议”，逐项判断现有业务的必要性和优化方向。
 > 证据：当前源码、现有测试用例与文档对照；本稿不代表真实用户研究、外部 AI 效果或设备验收结论。
@@ -37,7 +39,7 @@
 - **产品判断**：代码不能证明某条提醒有帮助，也不能证明用户愿意配置或重练。
 - **文档差异**：既有说明可能早于实现，不直接复制成当前缺陷。
 
-本轮发现：当前字数已排除标点；粘贴后录音选择入口已保留；空 AI 反馈已有正常状态；启动时已有帮助、保留说明和模型准备逻辑。不能把这些继续列为旧版未修问题。[源码：统计](../../shared/text-statistics.js)、[源码：主流程](../../src/app.js)。
+本轮发现：当前字数已排除标点；粘贴后录音选择入口已保留；空 AI 反馈已有正常状态；启动时已有帮助、保留说明和模型准备逻辑。不能把这些继续列为旧版未修问题。[源码：统计](../../../shared/text-statistics.js)、[源码：主流程](../../../src/app.js)。
 
 历史 [UI state audit](ui-state-audit-2026-09-02.md) 仍以 `7252005` 为基线，其中记录的用户决定曾作为评审输入，但行为表需按当前代码复核。本文不覆盖或改写该历史快照。
 
@@ -58,7 +60,7 @@
 | 维持应用可用 | ASR 模型安装／切换、配置保存、故障恢复 | 支撑核心训练 | 不能因“用户不直接看到”而认定这些逻辑无价值 |
 | 获取帮助 | 帮助页、诊断导出、打开反馈文档 | 排查障碍、记录意见 | 效果依赖实际内测反馈，当前不自动采集用户内容 |
 
-模型 benchmark、打包、签名和发布属于维护／交付流程，沿用[路线图](../roadmap.md)和[当前架构](../architecture/current.md)，不展开成表达训练的用户步骤。
+模型 benchmark、打包、签名和发布属于维护／交付流程，沿用[路线图](../../roadmap.md)和[当前架构](../../architecture/current.md)，不展开成表达训练的用户步骤。
 
 ## 3. 用户流程与系统数据流
 
@@ -130,7 +132,7 @@ AI 是 OpenAI、DeepSeek、Ollama 或自定义兼容后端中的所选配置。�
 | 回放 | 有音频和片段时间轴 | 没有音频时间轴 |
 | 整篇报告 | 可主动生成 | 可主动生成；语速与每分钟频率不适用 |
 
-源码入口：[主训练流程](../../src/app.js) 的 `handleASRResult`、`analyzeCurrentSentence`、`analyzePastedText`；[主进程](../../main.js) 的 `analyze-text`、`analyze-texts`。
+源码入口：[主训练流程](../../../src/app.js) 的 `handleASRResult`、`analyzeCurrentSentence`、`analyzePastedText`；[主进程](../../../main.js) 的 `analyze-text`、`analyze-texts`。
 
 ## 4. 业务规则清单
 
@@ -155,23 +157,23 @@ AI 是 OpenAI、DeepSeek、Ollama 或自定义兼容后端中的所选配置。�
 
 | ID | 输入／条件 | 当前处理 | 下游影响 | 源码 |
 |---|---|---|---|---|
-| R11 | 每个非空片段 | 在静态词表中优先匹配长词；未命中则拆单字 | 仅词形归类，不判断上下文用途 | [lexicon.js](../../lib/lexicon.js) `segmentText` |
+| R11 | 每个非空片段 | 在静态词表中优先匹配长词；未命中则拆单字 | 仅词形归类，不判断上下文用途 | [lexicon.js](../../../lib/lexicon.js) `segmentText` |
 | R12 | 命中填充／犹豫／笼统／情绪词 | 返回词、分词位置、替换候选或情绪元数据 | 计数与提醒；部分输出无当前界面消费者 | `analyzeText` |
-| R13 | 本地数字统计 | 只计文字数字；排除标点与符号；密度按被排除的填充／犹豫字符计算 | 笼统词不参与密度排除；重叠命中同一位置只排除一次 | [text-statistics.js](../../shared/text-statistics.js) |
-| R14 | 录音片段包含笼统词／至少2次填充词／至少1次犹豫词 | 固定前三个替换词／“试试停顿”／“直接说” | 与 AI 提示混合出现在右侧，无统一价值排序 | [app.js](../../src/app.js) `analyzeCurrentSentence` |
+| R13 | 本地数字统计 | 只计文字数字；排除标点与符号；密度按被排除的填充／犹豫字符计算 | 笼统词不参与密度排除；重叠命中同一位置只排除一次 | [text-statistics.js](../../../shared/text-statistics.js) |
+| R14 | 录音片段包含笼统词／至少2次填充词／至少1次犹豫词 | 固定前三个替换词／“试试停顿”／“直接说” | 与 AI 提示混合出现在右侧，无统一价值排序 | [app.js](../../../src/app.js) `analyzeCurrentSentence` |
 | R15 | `analyzeText` 返回 `suggestions` | 模块内部另生成建议，填充阈值3、犹豫阈值2 | 当前主界面未消费该数组，而自行按 R14 生成提醒 | `lib/lexicon.js` `generateSuggestions` |
-| R16 | 展示最终字幕、粘贴文本、回放字幕 | 前端独立正则匹配，先笼统、再填充、再犹豫 | 共享静态词表，但不使用分析结果位置；额外口癖未进入这条高亮链路 | [safe-rendering.js](../../src/safe-rendering.js) |
+| R16 | 展示最终字幕、粘贴文本、回放字幕 | 前端独立正则匹配，先笼统、再填充、再犹豫 | 共享静态词表，但不使用分析结果位置；额外口癖未进入这条高亮链路 | [safe-rendering.js](../../../src/safe-rendering.js) |
 | R17 | 新本地或实时 AI 提示到达 | 最近3条完全相同内容去重，最多保留12条 | 按到达顺序追加，无统一严重程度或原句证据结构 | `app.js` `addFeedbackItem` |
 
 ### 4.3 AI 请求与结果
 
 | ID | 触发 | 发给模型的数据 | 结果／约束 | 源码 |
 |---|---|---|---|---|
-| R18 | 录音增长30字符或粘贴分析完成 | 最近500个字符串字符＋自定义上下文；没有本地统计或本地建议 | 提示词要求一条短提示；允许空结果；无历史对话消息 | [ai-feedback.js](../../lib/ai-feedback.js) `sendFeedback` |
-| R19 | 实时提示词构建 | 函数支持已讲时长、开头主题、历史观点，但调用传 `null` | 时间、跨段重复与跑题判断缺少对应输入；不能把模板字段当成已接入能力 | [prompts.js](../../lib/prompts.js) `getRealtimePrompt` |
+| R18 | 录音增长30字符或粘贴分析完成 | 最近500个字符串字符＋自定义上下文；没有本地统计或本地建议 | 提示词要求一条短提示；允许空结果；无历史对话消息 | [ai-feedback.js](../../../lib/ai-feedback.js) `sendFeedback` |
+| R19 | 实时提示词构建 | 函数支持已讲时长、开头主题、历史观点，但调用传 `null` | 时间、跨段重复与跑题判断缺少对应输入；不能把模板字段当成已接入能力 | [prompts.js](../../../lib/prompts.js) `getRealtimePrompt` |
 | R20 | 用户主动生成报告 | 完整逐字稿＋程序汇总统计＋部分训练设置 | AI 写正文；程序追加主观评分说明及统计表；无时长则频率不适用 | `getReportPrompt`、`sendReport` |
 | R21 | 录音记录正常形成，或用户重分析 | 片段 `id/text/startMs/endMs`＋部分训练设置 | 自动分析一次；最多600片段、合计30000字符；本地分析与音频被排除 | `app.js` `finalizeTrainingRecord`、`analyzeSelectedRecording` |
-| R22 | 回放 AI 返回 | JSON `items[{segmentId, advice}]` | 校验 ID 存在且不重复、字段精确、建议≤500字符；失败保留旧结果 | [playback-analysis.js](../../lib/playback-analysis.js) |
+| R22 | 回放 AI 返回 | JSON `items[{segmentId, advice}]` | 校验 ID 存在且不重复、字段精确、建议≤500字符；失败保留旧结果 | [playback-analysis.js](../../../lib/playback-analysis.js) |
 | R23 | 同一窗口同类 AI 新请求 | 取消上一同类请求 | 实时15秒、报告60秒、回放60秒；没有自动重试；不同类型可各自运行 | `ai-feedback.js` `createRequestCoordinator`、`callAPI` |
 | R24 | 开始新内容、删除／切换记录等 | 更新请求代际，并在相关路径取消请求 | 迟到结果按代际／记录归属过滤；结果结构校验不等于建议质量审核 | `app.js` 各 generation 与取消分支 |
 
@@ -180,15 +182,15 @@ AI 是 OpenAI、DeepSeek、Ollama 或自定义兼容后端中的所选配置。�
 | ID | 条件 | 当前行为 | 数据与产品边界 | 源码 |
 |---|---|---|---|---|
 | R25 | 回放播放进度变化 | 根据时间找片段，片段变化时更新高亮和已存建议 | 播放、暂停和拖动不触发 AI；无该片段建议时显示暂无特别建议 | `app.js` `handlePlaybackTimeUpdate`、`renderPlaybackAnalysis` |
-| R26 | 已有5条记录后完成第6条 | 淘汰最老记录，撤销音频 Blob URL | 只保留运行期间最近5条；退出释放；全程无识别文字的正常录音仍可有记录 | [training-records.js](../../src/training-records.js)、`finalizeTrainingRecord` |
+| R26 | 已有5条记录后完成第6条 | 淘汰最老记录，撤销音频 Blob URL | 只保留运行期间最近5条；退出释放；全程无识别文字的正常录音仍可有记录 | [training-records.js](../../../src/training-records.js)、`finalizeTrainingRecord` |
 | R27 | 回放视图点“清空” | 删除选中的录音并选择剩余记录 | 该路径直接删除，无粘贴清空的同一确认；其他空闲文字清空需确认 | `app.js` `clearAll`、`removeSelectedTrainingRecord` |
 | R28 | 保存原文或报告 | 打开文件对话框，用户主动写出 Markdown | 复制写剪贴板；保存内容不受应用退出时的内存清理影响 | `saveOriginalText`、`saveReport`、`main.js` `save-file` |
-| R29 | 修改 LLM 配置 | 设置页维护多组草稿，保存后持久化；连接测试不保存 | “当前使用”和“当前编辑”是不同选择；配置是否存在不等于已连接成功 | [settings.js](../../src/settings.js)、[llm-provider-config.js](../../lib/llm-provider-config.js) |
+| R29 | 修改 LLM 配置 | 设置页维护多组草稿，保存后持久化；连接测试不保存 | “当前使用”和“当前编辑”是不同选择；配置是否存在不等于已连接成功 | [settings.js](../../../src/settings.js)、[llm-provider-config.js](../../../lib/llm-provider-config.js) |
 | R30 | 回放区切换模型配置 | 持久化切换全局 active profile，不自动分析 | 影响后续其他 AI 请求；当前旧回放分析仍标记原生成模型，直至成功重分析 | `selectPlaybackProfile`、`main.js` `select-llm-profile` |
-| R31 | 保存训练规则 | 保存目标、规则、风格与额外口癖；自然语言字段拼入特定提示词 | 各链路消费范围见第6节；不是本地自然语言规则执行器 | [prompt-editor.html](../../src/prompt-editor.html)、[custom-prompt-config.js](../../lib/custom-prompt-config.js) |
-| R32 | 下载／切换 ASR | 只接受 Catalog 模型；下载校验后激活；无活动录音时切换 | 切换失败尝试恢复原模型；两者失败才不可用；ASR 模型与 LLM 配置是两套选择 | [asr-model-management.js](../../lib/asr-model-management.js)、[asr-model-service.js](../../lib/asr-model-service.js) |
-| R33 | 更改主题／布局 | 即时应用、单独保存、窗口间同步 | 不通过 LLM 配置保存，也不重建训练数据 | [settings.js](../../src/settings.js) `selectAppearance`、[appearance.js](../../src/appearance.js) |
-| R34 | 导出诊断／打开反馈文档 | 用户主动导出白名单 JSON、或打开固定反馈链接 | 诊断不含音频、逐字稿和密钥；不会自动把训练内容提交到反馈文档 | [diagnostics.js](../../lib/diagnostics.js)、[support-links.js](../../shared/support-links.js) |
+| R31 | 保存训练规则 | 保存目标、规则、风格与额外口癖；自然语言字段拼入特定提示词 | 各链路消费范围见第6节；不是本地自然语言规则执行器 | [prompt-editor.html](../../../src/prompt-editor.html)、[custom-prompt-config.js](../../../lib/custom-prompt-config.js) |
+| R32 | 下载／切换 ASR | 只接受 Catalog 模型；下载校验后激活；无活动录音时切换 | 切换失败尝试恢复原模型；两者失败才不可用；ASR 模型与 LLM 配置是两套选择 | [asr-model-management.js](../../../lib/asr-model-management.js)、[asr-model-service.js](../../../lib/asr-model-service.js) |
+| R33 | 更改主题／布局 | 即时应用、单独保存、窗口间同步 | 不通过 LLM 配置保存，也不重建训练数据 | [settings.js](../../../src/settings.js) `selectAppearance`、[appearance.js](../../../src/appearance.js) |
+| R34 | 导出诊断／打开反馈文档 | 用户主动导出白名单 JSON、或打开固定反馈链接 | 诊断不含音频、逐字稿和密钥；不会自动把训练内容提交到反馈文档 | [diagnostics.js](../../../lib/diagnostics.js)、[support-links.js](../../../shared/support-links.js) |
 
 ## 5. 状态与异常：用迁移表检查遗漏
 
@@ -229,7 +231,7 @@ AI 是 OpenAI、DeepSeek、Ollama 或自定义兼容后端中的所选配置。�
 | 引导／同意 | localStorage help-seen、recording-policy-seen；JSON acknowledged | 初次引导和开始录音 | 展示标记与录音同意分别保存；展示过不等于同意 | 否 |
 | 主动导出 | 原文／报告 Markdown、诊断 JSON | 用户选择的文件或剪贴板 | 用户控制的外部文件；应用不按5条录音策略管理它们 | 保存操作不发 LLM |
 
-字段来源：[app.js](../../src/app.js)、[training-records.js](../../src/training-records.js)、[main.js](../../main.js)、[preload.js](../../preload.js)、[ipc-input.js](../../lib/ipc-input.js)。
+字段来源：[app.js](../../../src/app.js)、[training-records.js](../../../src/training-records.js)、[main.js](../../../main.js)、[preload.js](../../../preload.js)、[ipc-input.js](../../../lib/ipc-input.js)。
 
 ### 6.1 自定义设置消费矩阵
 
@@ -240,7 +242,7 @@ AI 是 OpenAI、DeepSeek、Ollama 或自定义兼容后端中的所选配置。�
 | styleRef | 无 | 无 | 有 | 有 | 有 |
 | customWords | 解析成额外填充词 | 无 | 有 | 有 | 无 |
 
-证据：[prompts.js](../../lib/prompts.js) 三个提示词构建函数；[main.js](../../main.js) 的本地分析 handler。这个矩阵能直接发现“用户以为统一生效，实际只影响部分功能”的缺口。
+证据：[prompts.js](../../../lib/prompts.js) 三个提示词构建函数；[main.js](../../../main.js) 的本地分析 handler。这个矩阵能直接发现“用户以为统一生效，实际只影响部分功能”的缺口。
 
 ### 6.2 实际边界值
 
@@ -255,7 +257,7 @@ AI 是 OpenAI、DeepSeek、Ollama 或自定义兼容后端中的所选配置。�
 | 回放建议 | 每条≤500字符，最多600项 | 结构合法不等于建议可执行或有依据 |
 | AI 请求 | 实时15秒／150输出token；报告60秒／8192；回放60秒／4096 | 超时、截断或取消如何影响完成一次训练 |
 
-界限来自 [pcm-wav.js](../../src/pcm-wav.js)、[audio-feed-queue.js](../../src/audio-feed-queue.js)、[ipc-input.js](../../lib/ipc-input.js)、[ai-feedback.js](../../lib/ai-feedback.js)。输入大小上限不构成模型上下文容量或响应完整性的承诺。
+界限来自 [pcm-wav.js](../../../src/pcm-wav.js)、[audio-feed-queue.js](../../../src/audio-feed-queue.js)、[ipc-input.js](../../../lib/ipc-input.js)、[ai-feedback.js](../../../lib/ai-feedback.js)。输入大小上限不构成模型上下文容量或响应完整性的承诺。
 
 ## 7. 用一个真实入口示范怎样评审规则
 
@@ -325,9 +327,9 @@ AI 是 OpenAI、DeepSeek、Ollama 或自定义兼容后端中的所选配置。�
 
 本稿是本轮业务优化的评审材料，不建立第二套长期架构真相源。相关长期入口仍为：
 
-- [需求基线](../requirements/requirements.md)：批准后的期望业务行为。
-- [当前架构](../architecture/current.md)：实际运行边界和数据实现。
+- [需求基线](../../product/requirements.md)：批准后的期望业务行为。
+- [当前架构](../../architecture/current.md)：实际运行边界和数据实现。
 - [界面状态审计快照](ui-state-audit-2026-09-02.md)：只用于追溯当时观察，按当前实现复核具体状态。
-- [路线图](../roadmap.md)：已选择的改动及先后关系。
+- [路线图](../../roadmap.md)：已选择的改动及先后关系。
 
 本轮评审结束后，把已接受结论分别吸收到上述文档；不再需要逐项对照时删除本工作稿及其 README 导航，历史由 Git 保留。后续读取本稿时先对比源码快照，避免把已修正行为再次列为现存问题。

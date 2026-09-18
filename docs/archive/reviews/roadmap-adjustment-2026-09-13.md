@@ -1,6 +1,8 @@
 # Roadmap 调整评估与功能梳理
 
-> 日期：2026-09-13。状态：历史产品提案；已由 2026-09-16 的 [需求基线](../requirements/requirements.md)、[目标架构](../architecture/target.md)和[当前 Roadmap](../roadmap.md)取代，不作为当前产品决定。
+> **身份：Archived。** 历史源码观察、提案和评审结论均非当前事实或验收依据。现行定义与承接位置见 [职责矩阵](../../README.md)。未被当前 Canonical 接受的建议不因归档而晋升。
+
+> 日期：2026-09-13。状态：历史产品提案；已由 2026-09-16 的 [需求基线](../../product/requirements.md)、[目标架构](../../architecture/target.md)和[当前 Roadmap](../../roadmap.md)取代，不作为当前产品决定。
 > 依据：当前源码 `c859fd6`、工作区已有业务评审稿、既有路线图与模型评测，以及 `D:/ds-project/expression-trainer` 的实际数据文件。
 > 验证范围：源码核对、少量本地行为复现、词表清点和上游公开说明；不代表本轮完成了真实麦克风、完整界面或线上运行验收。
 
@@ -242,10 +244,10 @@ AI 开关建议：默认关闭；配置模型不隐式开启。开启后才允�
 
 ## 11. 本地依据
 
-- [当前路线图](../roadmap.md)与[需求基线](../requirements/requirements.md)：已完成工程基线、运行期保留和未完成公开交付。
+- [当前路线图](../../roadmap.md)与[需求基线](../../product/requirements.md)：已完成工程基线、运行期保留和未完成公开交付。
 - [业务逻辑评审稿](business-logic-review-2026-09-11.md)：现状数据流、规则清单及已有产品讨论。
 - [界面状态审计快照](ui-state-audit-2026-09-02.md)：保留过往观察；其旧源码行号不作为当前行为证据。
-- [训练入口、预加载、AI触发、回放与粘贴](../../src/app.js)、[页面入口](../../src/index.html)、[主题样式](../../src/styles.css)、[设置窗口](../../src/settings.html)。
-- [本地匹配](../../lib/lexicon.js)、[静态词表](../../shared/expression-rules.js)、[高亮](../../src/safe-rendering.js)、[统计定义](../../shared/text-statistics.js)。
-- [AI请求](../../lib/ai-feedback.js)、[提示词](../../lib/prompts.js)、[回放分析边界](../../lib/playback-analysis.js)、[临时训练记录](../../src/training-records.js)。
-- [BM-04七模型结果](../benchmark/bm04-seven-model-comparison-2026-08-30.md)与[ADR-0009](../architecture/adr/0009-productize-multiple-asr-models.md)：模型比较只采用项目已有证据。
+- [训练入口、预加载、AI触发、回放与粘贴](../../../src/app.js)、[页面入口](../../../src/index.html)、[主题样式](../../../src/styles.css)、[设置窗口](../../../src/settings.html)。
+- [本地匹配](../../../lib/lexicon.js)、[静态词表](../../../shared/expression-rules.js)、[高亮](../../../src/safe-rendering.js)、[统计定义](../../../shared/text-statistics.js)。
+- [AI请求](../../../lib/ai-feedback.js)、[提示词](../../../lib/prompts.js)、[回放分析边界](../../../lib/playback-analysis.js)、[临时训练记录](../../../src/training-records.js)。
+- [BM-04七模型结果](../../benchmark/bm04-seven-model-comparison-2026-08-30.md)与[ADR-0009](../../architecture/adr/0009-productize-multiple-asr-models.md)：模型比较只采用项目已有证据。
