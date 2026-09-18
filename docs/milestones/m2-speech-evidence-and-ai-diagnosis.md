@@ -27,7 +27,7 @@ Each step may run a focused spike before implementation. A spike closes its name
 - SenseVoiceSmall 可选主 ASR：模型选择、utterance 能力声明、转写等待与失败恢复、取消和资源上限，以及独立的公开分发许可边界；默认 streaming 模型不变。
 - Versioned deterministic metrics and Common Analysis for language organisation, structure, pace, pauses, fluency, and filler behaviour where evidence supports them.
 - Schema-validated AI diagnosis, evidence references, retryable failure states, and local/remote profile distinction.
-- One shared report composition and an evidence-driven radar chart. Processing / Report 可用性与恢复按 R-A08 / Training Flow §6–§7.4 集成；摘要、Finding 展开态与完整详细层遵循同一 Owner；历史详情复用同一容器，重练执行与比较不提前拉入 M2。
+- One shared report composition and an evidence-driven radar chart. 在 M1 完成后，沿用其共享容器与 [Training Flow §7.5](../product/training-flow.md#75-m1-的-report-内容与手动分析) 内容基础；Processing / Report 可用性与恢复按 R-A08 / Training Flow §6–§7.4 集成；摘要、Finding 展开态与完整详细层遵循同一 Owner；历史详情复用同一容器，重练执行与比较不提前拉入 M2。
 
 ## Out of Scope
 

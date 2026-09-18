@@ -87,7 +87,7 @@ Field names are illustrative domain names. Implemented SQL/storage details are i
 | `framework` | stable framework ID or null | Null for `free`; required for `structured`; initial IDs are `prep`, `star`, and `pyramid` |
 | `frameworkDefinitionVersion` | version or null | Null for `free`; records the selected definition for a Structured session |
 | `trainingPrompt` | `TrainingPromptSnapshot` or null | User-visible topic/scenario supplied before training; M1 always writes null because topic/scenario entry begins in M4 |
-| `title` | text or null | User or application label; not evidence |
+| `title` | text or null | User or application label; not evidence; M1 uses null and adds no title-editing feature |
 | `dataQuality` | flags/event references | Examples: timing unavailable, audio overrun, artifact missing |
 
 `status` is a product-visible integrity state, not only an internal database flag.
@@ -130,10 +130,12 @@ The setup values may change while the UI is preparing a session. Once recording 
 | `sha256` | digest | Integrity and duplicate/corruption diagnosis, not user identity |
 | `sampleRateHz` | integer or null | Recorded output format |
 | `channels` | integer or null | `1` for current recordings |
-| `durationMs` | integer or null | Artifact duration when known |
-| `createdAt` | UTC instant | Audit of artifact creation |
+| `durationMs` | integer or null | Artifact duration when known; derived from validated sample count/rate and rounded to integer milliseconds |
+| `createdAt` | UTC instant or null | Actual recorded artifact creation time; null when not recorded, never inferred from filesystem timestamps or session start time |
 
 Audio bytes are stored as files under the application data directory. The database stores metadata and relative references. Blob URLs are runtime handles and are never persisted.
+
+M1 的单音频不要求为上述逻辑字段重复增加 SQL 列：固定格式且已校验的 WAV 可从音频元数据派生时长，未知值返回 null。独立音频生成时间未采集时按未知处理，不为补字段伪造历史时间。字段的当前投影与尚未接入项统一见 [Current §10](current.md#10-m1-training-storage-foundation)。
 
 ### 4.3 Transcript
 

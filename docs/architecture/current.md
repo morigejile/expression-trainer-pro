@@ -340,6 +340,17 @@ The store accepts only `microphone`, `free`, null framework and null training pr
 fields are explicitly projected, excluding settings, endpoints and credentials. M1 does not promote
 estimated segment milliseconds into exact sample offsets.
 
+逻辑字段与 schema v1 的映射如下；目标语义见 [Data Model §4](data-model.md#4-m1-logical-entities)，下表区分现状与待补投影：
+
+| 逻辑字段 | 当前实现 | M1 剩余接入 |
+|---|---|---|
+| Session.title | facts_json 和视图均未输出 | 显式投影 null；无需新增 SQL 列或标题编辑 |
+| Artifact.durationMs | artifact 视图未输出；已有经格式校验的 byteLength 与固定采样格式 | 从有效 PCM 数据长度推算采样数/时长并取整；无法确定则 null，无需重复存储 |
+| Artifact.createdAt | schema v1 未记录 | 显式投影 null，不补猜历史生成时间 |
+| Segment.startSample / endSample / confidence | normalizeCompletion 写 null，实际保存在 segments_json 中 | 保留未知语义；M1 不把近似毫秒换算为精确采样证据 |
+
+以上待补字段投影尚未实现；当前没有度量/AI 结果写入 API，结果及其生成时来源仍待录音/结果接入切片实现。
+
 Existing databases are inspected read-only before any journal/recovery/schema write. A schema newer
 than version 1 returns `UNSUPPORTED_SCHEMA` without modifying its bytes. There is no older durable
 product format to import. Future numbered migrations must retain this refusal boundary.
@@ -401,11 +412,13 @@ This is scoped runtime/packaging evidence, not a new reproducible-install baseli
 with embedded Node 24.18.1 and SQLite 3.53.1.
 
 Next: add narrow Application/Preload commands and safe playback access; capture existing metric/AI result
-snapshots and their generation-time provenance; integrate microphone completion, durable history, explicit
-deletion and disclosure copy; remove the paste/copy/save/clear paths; finish M1 acceptance and full regression.
+snapshots and their generation-time provenance; integrate microphone completion, durable history,
+the minimal shared Report and manual AI actions, explicit deletion and disclosure copy; complete the field
+projection above and the readiness/diagnosis-entry slice in M1; remove the paste/copy/save/clear paths;
+finish M1 acceptance and full regression.
 
 ## 11. 诊断导出现状
 
-现有主窗口“🩺”与 Help 仍有入口；目标归属仅见 [Training Flow §13.1](../product/training-flow.md#131-已确认的-ia-归属)，本次不改 UI。
+现有主窗口“🩺”与 Help 仍有入口；目标归属仅见 [Training Flow §13.1](../product/training-flow.md#131-已确认的-ia-归属)，迁移已列入 [M1](../milestones/m1-training-persistence.md#user-experience)，尚未改变当前 UI。
 
 诊断按用户操作导出固定 schema 的 JSON：应用版本、OS/platform/arch、active 模型 ID/版本、请求/context/track 采样率、最近 ASR 初始化耗时和受控错误类别。文件不包含设置、API Key、Authorization、绝对路径、stack、音频、逐字稿或 LLM 内容；不在后台持续写日志，也不自动上传。未开始录音或未安装模型时，对应字段明确为 `null`/`not-installed`。

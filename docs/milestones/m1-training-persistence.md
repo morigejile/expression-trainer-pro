@@ -2,7 +2,7 @@
 
 > **Status:** In progress — storage foundation implemented; product integration pending
 > **Depends on:** M0 Architecture & Requirements Baseline
-> **Primary requirements:** R-P01–R-P09, NFR-01–NFR-03, NFR-08
+> **Primary requirements:** R-P01–R-P09, NFR-01–NFR-03, NFR-07–NFR-08
 
 ## Goal
 
@@ -50,9 +50,10 @@ M1 changes storage, application boundaries, and the target homepage entry surfac
 ### User experience
 
 - Training History（界面名称“训练历史”）list populated from durable sessions instead of the five-record memory buffer. 列表/单条打开切片按 R-P04 和 [Training Flow §13.2](../product/training-flow.md#132-history-与-comparison--review) 验收；选择对比仍归 M3。
-- Open a session after restart and view transcript, existing statistics, and audio playback when available.
+- 单条记录复用 Report Workspace，交付 [Training Flow §7.5](../product/training-flow.md#75-m1-的-report-内容与手动分析) 的 M1 内容与手动分析切片；M2 在同一容器继续扩展完整报告能力。
 - Delete a session and its managed artifacts through an explicit user action.
 - 按 R-P09 落实 [Training Flow §3.1](../product/training-flow.md#31-默认状态) 的极简 Preparing 首页与 Start Control Area；Screen / State 和 Utility 边界引用该文档 §13，仍不提前加入 M4 配置继承能力或整套 UI 重设计。
+- 同步交付 §3.5 的准备检查，以及 R-P09 / §13.1 的诊断入口迁移；复用现有诊断导出能力，不以此要求整套 Settings / Help 重设计。
 - Update first-recording/help copy to state local persistence, manual deletion, the cloud-audio boundary, and which transcript/metric/instruction data a configured remote AI profile may receive.
 - Visible error/degraded states for failed finalisation, missing audio, corrupt records, and unsupported data versions. 本阶段所涉及的检查与错误反馈遵循 [Training Flow §3.5、§12.2](../product/training-flow.md#35-麦克风与-asr-的准备检查)；Report 分析失败不等于保存失败，已存记录继续可读；M2 的报告 timeout 集成与 M3 Comparison 不提前成为本阶段条件。
 
@@ -67,7 +68,7 @@ M1 changes storage, application boundaries, and the target homepage entry surfac
 
 ## Out of Scope
 
-[Core Experience Flow v1](../product/training-flow.md) 已确认目标体验，但不扩大本里程碑。短倒计时、实时提醒改造、主动“给我提示”、静音询问、首次/完整报告重设计、问题详情和重练闭环不作为 M1 新增工作或完成条件；Focus Mode 留在 Backlog，Interaction TBD 保持未决。
+[Core Experience Flow v1](../product/training-flow.md) 已确认目标体验，但不扩大本里程碑。短倒计时、实时提醒改造、主动“给我提示”、静音询问、首次/完整报告重设计、问题详情和重练闭环不作为 M1 新增工作或完成条件；这里的报告重设计不排除 In Scope 的共享容器及 §7.5 最小内容切片。Focus Mode 留在 Backlog，Interaction TBD 保持未决。
 
 - New deterministic metrics or changes to existing scoring rules.
 - Token-timestamp integration, pause/fluency algorithms, VAD, F0, energy, or prosody analysis.
@@ -87,18 +88,22 @@ M1 changes storage, application boundaries, and the target homepage entry surfac
 
 | AC | 权威要求 / 规则 | 本阶段集成验证 |
 |---|---|---|
-| AC-M1-01 | R-P01–R-P03、R-P06；Data Model §4/§8 | 完成麦克风训练后完整重启，核对单条记录、逐字稿/片段、可用音频、上下文与来源；已有结果随后产生也写入 |
-| AC-M1-02 | R-P08/R-P09 | 同时核对首页入口及 Application API，不允许仅隐藏按钮保留目标粘贴路径 |
+| AC-M1-01 | R-P01–R-P04、R-P06；Data Model §4/§8；Training Flow §7.5/§13.2 | 完成麦克风训练后完整重启，核对 History 列表/Empty 态、共享 Report 内的事实和已有结果（含上下文与来源）、返回上下文；手动生成的结果随后自动写入同一 Session，单条打开不自动请求 AI |
+| AC-M1-02 | R-P08/R-P09/NFR-07；Training Flow §3.1/§3.5/§13.1 | 核对首页及 Application API 的粘贴路径移除、诊断入口收敛；验证启动静默预检不提前授权、未检查/检查中不伪称就绪、开始前复检及操作旁恢复提示，不阻塞历史访问 |
 | AC-M1-03 | R-P05/NFR-02；Data Model §8 | 注入数据库/音频写入失败及中断，重启后核对健康记录与异常状态、重试 |
 | AC-M1-04 | R-P01；Data Model §8 幂等性；Target §5 请求身份 | 重复完成和迟到回调不产生重复记录或覆盖新结果 |
 | AC-M1-05 | R-P04；Data Model §9 | 删除及部分失败重试覆盖元数据、子项和受管文件 |
 | AC-M1-06 | R-P03/R-P05；Data Model §9 | 缺失/损坏音频只影响对应播放能力，健康记录可读 |
 | AC-M1-07 | NFR-02；Data Model §9 | 受支持旧 schema 前向迁移，未知未来 schema 不被改写 |
-| AC-M1-08 | R-P07/NFR-03；Data Model §4.5 | 核对实际持久化/诊断/LLM payload 和首次录音/Help 告知，不仅检查界面文案 |
+| AC-M1-08 | R-P07/NFR-03；Data Model §4.5 | 对照首次录音/Help 告知核对实际持久化、诊断导出和各既有 LLM 路径的请求体；覆盖文本、时间/指标摘要、分析指令及禁止发送内容，并确认用户同意前不申请麦克风权限 |
 | AC-M1-09 | NFR-01 | 无网络和 LLM 凭据下完成、重启、打开、播放健康音频、删除 |
 | AC-M1-10 | R-C01/R-C03/R-C06/NFR-08 | 保持已有 ASR/暂停/恢复/收尾/过载/单条上限路径的 focused tests 与 smoke |
 
 需求编号均指向 [Requirements](../product/requirements.md)；数据章节均指向 [Data Model](../architecture/data-model.md)。
+
+实现验证沿用现有测试边界：粘贴批量通道为 `analyzeTexts` / `analyze-texts`，录音统计依赖的 `analyzeText` / `analyze-text` 必须保留；AC-M1-02 同时检查 UI 调用、Preload 暴露与 Main handler。AC-M1-03 复用存储测试的文件发布失败、SQLite 事务失败和中断恢复注入，再验证产品反馈。AC-M1-08 复用 LLM `fetchImpl` 请求捕获、诊断字段白名单与存储回读，不新增通用观测系统。
+
+验收证据关联实际命令/测试、版本、结果和未验证项，在 Current 的验证段及已有测试输出中记录；无需新建独立审计报告。里程碑收尾按 [Development](../development.md#环境与安装) 声明的工具链执行验证，历史替代运行时证据不能代替该组合通过；未完成时保留限制说明。
 
 ## Implementation sequence
 
@@ -112,9 +117,9 @@ This sequence minimises coupled change:
 2. **Implemented foundation:** schema v1 for session facts, transcripts/stable segments, and audio metadata; add current-result snapshots with their generation-time provenance during Application integration.
 3. **Implemented:** managed artifact publication, integrity checks, startup recovery and retryable deletion.
 4. Add application services and the narrow Preload API.
-5. Adapt the microphone completion path and remove the paste command/UI path.
-6. Replace the in-memory history source with repository queries and apply the R-P09 homepage changes.
-7. Add deletion, degraded states, and updated consent/help copy.
+5. Adapt microphone completion and existing-result persistence, complete the logical-field projection described in Data Model / Current, and remove the paste command/UI path while preserving recording statistics.
+6. Replace the in-memory history source with repository queries; integrate the minimal shared Report, manual AI actions, R-P09 Preparing/readiness and diagnosis-entry changes.
+7. Add deletion, degraded states, and consent/help copy checked against actual data flows.
 8. Run focused tests and packaged restart smoke.
 
 ## Completion conditions

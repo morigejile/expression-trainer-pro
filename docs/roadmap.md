@@ -1,7 +1,7 @@
 # Expression Trainer Roadmap
 
 > 状态：Active
-> 更新日期：2026-09-18
+> 更新日期：2026-09-19
 > 当前模式：内部开发/测试；公开模型分发、签名和扩展平台支持仍受外部条件约束。
 
 ## 1. 排序原则
@@ -54,7 +54,7 @@ M0/M1 是当前产品关键路径。M2 接入 SenseVoiceSmall 作为可选主 AS
 | ID | P | 状态 | 任务 | 完成标准 |
 |---|---|---|---|---|
 | M0 | P0 | Complete | 冻结需求、目标架构、训练数据模型、训练/报告流程、Speech Engine 契约、Backlog 和 M1 范围 | 于 2026-09-16 完成基线一致性审查；M1 无需重议产品目标、数据模型和主要架构边界即可开发 |
-| M1 | P0 | In progress | Training Persistence：SQLite/音频存储基础已实现，待接入 Application API、录音完成与历史界面 | 满足 [M1 milestone](milestones/m1-training-persistence.md) 的 AC-M1-01～10 |
+| M1 | P0 | In progress | Training Persistence：SQLite/音频存储基础已实现；待接入 Application API、录音/结果、History 与最小共享 Report，并交付准备检查、诊断入口迁移及真实数据告知 | 满足 [M1 milestone](milestones/m1-training-persistence.md) 的 AC-M1-01～10 |
 
 M0 的 Complete 记录上述历史完成事件；[当时的审查](archive/reviews/m0-consistency-review-2026-09-16.md)已归档，不证明后续修订仍通过审查。后续修订按[文档维护规则](README.md#维护规则)验证。
 
