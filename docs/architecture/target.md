@@ -1,7 +1,7 @@
 # Target Architecture
 
 > **Status:** M0 target baseline
-> **Date:** 2026-09-18
+> **Date:** 2026-09-19
 > **Current-state reference:** [current.md](current.md)
 > **Product-flow reference:** [training-flow.md](../product/training-flow.md)
 > **Decision horizon:** enough to execute M1 without deciding M2–M4 implementation details
@@ -77,9 +77,9 @@ M1 does not create a local HTTP server, generic RPC framework, plugin host, or s
 
 Owns presentation state, user intent, navigation, charts, and playback controls. It receives serialisable view models. It does not own credentials, file paths, database handles, PCM persistence, or ASR model objects.
 
-已确认的窗口、Workspace 和状态边界统一见 [Training Flow §13](../product/training-flow.md#13-screen-structure-收敛基线)。Product UI 使用该 Screen Structure，不把报告上下文、Finding 展开态或 comparison 的不同展示入口各自实现成独立产品模型；架构层不复制导航、按钮或信息层级规则。
+已确认的窗口、Workspace 和状态边界统一见 [Training Flow §13](../product/training-flow.md#13-screen-structure-收敛基线)。Product UI 使用该 Screen Structure，承载 Training Workspace 的展示状态、报告下钻来源和原 History / Comparison 的查看上下文，以及 Utility Surface 覆盖前的 context，不把 Home、报告上下文、Finding 展开态或 comparison 的不同展示形态各自实现成独立产品模型；架构层不复制导航、按钮或信息层级规则。
 
-跨窗口与浮层的产品约束统一见 [Training Flow §12.1](../product/training-flow.md#121-跨-screen-的-ux-约束)。窗口、Panel、Dialog 的显示生命周期不能重置 Application Core 的 Training/Report 业务状态；不在此另建一套 UI 状态规则。
+跨窗口与浮层的产品约束统一见 [Training Flow §12.1](../product/training-flow.md#121-跨-screen-的-ux-约束)。Utility Surface、窗口、Panel、Dialog 的显示生命周期不能重置 Application Core 的 Training/Report 业务状态；不在此另建一套 UI 状态规则。
 
 ### 4.2 Application Core
 
@@ -93,6 +93,7 @@ Owns use cases and transaction boundaries:
 - enforce the R-A04/R-A11 diagnosis scheduling and profile-enablement boundary;
 - distinguish re-analysis of existing evidence from re-training that creates a new session;
 - compose one report view from Common Analysis, optional Framework Analysis, evidence, and AI Coaching;
+- own bounded report-generation waiting/timeout and per-part result availability required by [Training Flow §6–§7.4](../product/training-flow.md#6-自动持久化与分析状态); navigation does not own task lifetime or persistence;
 - enforce stale-result and late-event rules;
 - redact data before provider calls.
 
@@ -109,6 +110,8 @@ Owns managed relative paths, staging/finalisation, hashes, open/read/delete oper
 ### 4.5 Speech adapter
 
 Owns mapping between the current AudioWorklet/Utility Process implementation and [Speech Engine Contract](speech-contract.md). M1 persists only the stable results it currently provides; M2 adds absolute timing evidence where supported.
+
+启动预检与操作前复检复用既有采集/ASR 能力边界：适配层提供实际可用性与失败结果，Application Core 在依赖能力的操作前重新确认，UI 按 [Training Flow §3.5、§12.2](../product/training-flow.md#35-麦克风与-asr-的准备检查) 呈现。预检结果不等于麦克风授权或活跃录音 Session，不引入独立健康检查服务。
 
 M2 的 SenseVoiceSmall 接入本 adapter，产品角色按 [R-A10](../product/requirements.md#6-m2表达证据ai-分析与雷达图)，能力/缓冲基线按 [ADR-0009](adr/0009-productize-multiple-asr-models.md)。主 ASR 的数据归属见 Data Model §6。
 
@@ -141,7 +144,7 @@ The Renderer crosses one explicit Preload/Application API boundary.
 - Commands use named request/response schemas and bounded payloads.
 - Session APIs exchange IDs, metadata, text, timing, metrics, and controlled playback handles; raw database rows and absolute file paths do not cross.
 - PCM follows the existing specialised speech path, not general request/response IPC.
-- Long-running work exposes cancellation and progress where the user can act on it.
+- Long-running work exposes cancellation and progress where the user can act on it. Report generation returns measurable progress only when meaningful; otherwise the UI uses indeterminate progress. Timeout budgets belong to orchestration, not a fabricated UI percentage.
 - Every asynchronous result includes the request/session identity needed to reject stale responses.
 - Errors use stable product categories with safe messages; native exceptions remain behind the boundary.
 
@@ -187,18 +190,21 @@ TrainingSession facts
 
 分析资格与重练来源关系统一由 [Data Model §6](data-model.md#6-analysis-and-retraining-invariants) 定义；用户流程见 [Training Flow §9–§11](../product/training-flow.md#9-带上下文再次进入-training-workspace)。Core 为重新分析与新训练提供不同命令，并复用同一 Session/report 边界，不复制交互规则。
 
+报告生成按 Flow §6 使用完成等待与 timeout，不建设 progressive report rendering 管线。Core 汇总完成/局部失败/不可用结果，任务在 Renderer 导航离开后仍可管理并保存；超时结束本次等待/attempt，取消支持取消的底层任务，不可取消的迟到结果仍按 request/session/attempt 身份隔离，不复活旧等待或覆盖新一次重试。具体预算与恢复实现随 M2 细化，不新增独立调度服务。
+
 报告保持统一 composition。完整分析保留有效 findings，训练呈现层选择优先问题；首次报告与完整报告使用同一分析来源，不形成独立结论副本。展示顺序、数量和导航由 [Training Flow](../product/training-flow.md) 定义；架构只负责 Common Analysis、可选 Framework Analysis、Evidence 和 AI Coaching 的组合与证据引用。
 
 M3 的 comparison 属于 Application Core 的共同用例边界，为历史完整差异视图提供证据与版本兼容判断；M4 的针对性练习反馈复用该能力，在 Report 中投影聚焦目标的结果。两种展示不各自计算一套 comparison，也不因此新增通用比较框架或 M1 服务。数据不变量及 Practice Chain 的实体未决项分别由 [Data Model §10/§12](data-model.md) 维护。
 
 ## 8. Privacy and network boundary
 
-Application Core 在调用 LLM 前执行 [R-P07、R-A11、NFR-03](../product/requirements.md) 的知情与数据最小化要求；Renderer 不直接持有凭据或发起绕过该边界的请求。Session 对话按 R-R03 声明上下文。数据快照排除规则见 [Data Model §4.5](data-model.md#45-sourcesnapshot)。本地目标架构不需要 hosted gateway 或 sync 服务。
+Application Core 在调用 LLM 前执行 [R-P07、R-A11、NFR-03](../product/requirements.md) 的知情与数据最小化要求；Renderer 不直接持有凭据或发起绕过该边界的请求。未来 Finding-scoped 对话按 R-R03 声明上下文，当前仍 deferred。数据快照排除规则见 [Data Model §4.5](data-model.md#45-sourcesnapshot)。本地目标架构不需要 hosted gateway 或 sync 服务。
 
 ## 9. Failure and degradation
 
 | Failure | Required behaviour |
 |---|---|
+| Report generation timeout | End the active wait/attempt, preserve saved facts and valid results, expose recoverable availability per Flow §6/§7.4; retry remains tied to the same Session |
 | LLM unavailable or invalid schema | Keep facts/local metrics; mark analysis failed or unavailable; allow retry |
 | Neural VAD unavailable | Keep primary ASR facts; mark affected speech evidence and dependent metrics degraded; allow retry |
 | Selected primary ASR (including SenseVoiceSmall) unavailable or failed | Preserve captured/saved facts; expose unavailable/failed transcription and explicit recovery. Do not claim transcript success or silently switch models; previously saved records remain readable |

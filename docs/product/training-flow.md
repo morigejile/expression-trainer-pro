@@ -1,13 +1,13 @@
 # Training and Report Flow
 
-> **Status:** Core Experience Flow v1 — 已确认的目标交互基线
-> **Date:** 2026-09-18
+> **Status:** Core Experience Flow v1 — Screen Structure / Screen State Structure 已确认的目标交互基线
+> **Date:** 2026-09-19
 > **Applies to:** 跨里程碑的核心体验；交付顺序见 Roadmap；验收见 Requirements；阶段切片见 M1/M2 milestone
 > **Does not describe:** 当前 Renderer 的已实现状态；实现事实见 [Current Architecture](../architecture/current.md)。[旧 UI audit](../archive/reviews/ui-state-audit-2026-09-02.md) 已过期，仅作历史归档，不作为当前交互或验收依据。
 
 ## 1. 文档职责与范围
 
-本文是训练与报告交互、Practice Chain 产品语义、已确认 IA 归属及 Screen Structure 的唯一产品定义。Finding 详情、证据、报告层级和导航在本文维护；Requirements 只引用其验收边界，架构文档不复制 UI 规则。已确认结论与尚待确定的容器细节分开维护，不记录讨论过程。
+本文是训练与报告交互、Practice Chain 产品语义、已确认 IA 归属及 Screen Structure 的唯一产品定义。Finding 详情、证据、报告层级和导航在本文维护；Requirements 只引用其验收边界，架构文档不复制 UI 规则。已确认结论与deferred 容器及未冻结实现细节分开维护，不记录讨论过程。
 
 - 可验收的产品行为、优先级和交付里程碑见 [Requirements](requirements.md)。
 - 数据所有权、不可变事实与比较约束见 [Training Data Model](../architecture/data-model.md)。
@@ -19,16 +19,16 @@
 ## 2. Core Experience Flow v1
 
 ```text
-首页：默认开始自由表达；训练模式、场景/题目可选
+Training Workspace / Home：Preparing 默认态，恢复上次配置（首次 Free）；主题/场景可选（§3.1）
   ↓
-Training Workspace：短倒计时 → 自动开始录音
+同一 Training Workspace：操作前复检 → 短倒计时 → 自动开始录音
   ├─ 按所选 ASR 能力反馈：streaming 以实时字幕为主；utterance 不伪造 partial（见 §4）
   ├─ 卡壳默认不接管；用户可主动「给我提示」
   └─ 用户手动结束；超长静音只询问是否继续，不自动结束
   ↓
 结束表达：停止语音输入，自动收尾并保存已有训练数据
   ↓
-分析中：后台分析，结果产生后自动保存
+同一 Training Workspace：Processing，后台分析并自动保存；完成/Partial 判定或 timeout 后进入 Report（§6）
   ↓
 Report Workspace（当前 Session；首次/完整报告共用）
   ├─ 摘要与优先 Finding；更多问题、详细分析按需展开
@@ -37,7 +37,7 @@ Report Workspace（当前 Session；首次/完整报告共用）
        ↓
      推荐句子 / 片段 / 完整表达范围，用户可调整
        ↓
-     Training Workspace（带来源 Finding 与练习目标）
+     Training Workspace（Preparing；继承 Training Context，带来源 Finding 与 Practice Focus）
        ↓
      新 Session 自动保存 → 自动分析并保存结果
        ↓
@@ -46,7 +46,8 @@ Report Workspace（当前 Session；首次/完整报告共用）
        └─ 本次报告：用户从 Finding 选择是否继续、继续练哪个问题
 
 History → 打开一条 Session → Report Workspace
-History → 选择两个 Session → Comparison / Review Workspace（M3）
+History → 普通列表 checkbox 勾选两个 Session → 点击 [对比] → Comparison / Review Workspace（M3）
+Comparison → 单侧 Report → contextual Back 返回原 Comparison
 ```
 
 自动持久化贯穿全过程：数据产生后尽早保存，图中的结束收尾不是唯一保存时机，也不等待用户离开报告。用户不需要理解 Session 生命周期或执行“完成 Session → 保存”。报告导航与 Finding 动作的层级见 §8.2。
@@ -55,6 +56,8 @@ History → 选择两个 Session → Comparison / Review Workspace（M3）
 
 ### 3.1 默认状态
 
+无上次配置时的初始值：
+
 ```text
 trainingMode = free
 framework = none
@@ -62,9 +65,20 @@ trainingPrompt = none
 input = microphone
 ```
 
-首页主操作可直接开始自由表达，无需选择模式、理解框架或填写题目。目标产品没有粘贴文本入口；首页不提供“复制”“保存”“清空”。删除持久化记录属于历史/详情中的明确删除动作。M1 不以新的首页快捷入口替代这些被移除的操作。
+Home 就是 Training Workspace 的 Preparing / default state，不是进入训练前的独立中转页。首页保持极简：以“开始表达”为主操作，模式与主题/场景是可选准备内容；无需先选模式、理解框架或填题目。历史通过主导航、设置与帮助通过低频 Utility 入口访问（§13.6），不把首页做成报告、指标、练习链或设备诊断仪表盘。
+
+目标产品没有粘贴文本入口；首页不提供“复制”“保存”“清空”。删除持久化记录属于历史/详情中的明确删除动作。M1 不以新的首页快捷入口替代这些被移除的操作。后台准备及异常反馈见 §3.5，不增加常驻自检步骤或独立检查页。
 
 场景/题目在目标体验中可选；M1 不提供 topic/scenario 输入或生成，始终保存 `trainingPrompt = null`，相关能力沿用 R-F02 的 M4 归属。
+
+普通新训练默认恢复上一次使用的 Framework、Topic、Scenario（含空值），不每次重置为 Free；Practice Focus 不作为上次配置继承，只来自当前 Finding / Practice Chain（§9）。首次无配置才使用上述默认值。后续能力按原里程碑启用，M1 的 Free / null 边界不变。
+
+Preparing 的内容分成两个区域：
+
+- **Context Area**：轻量展示 Framework、Topic / Scenario（如有）及“本次练习”的 Practice Focus（针对性练习时）。
+- **Start Control Area**：把轻量、水印/背景感的“准备就绪”紧邻“开始表达”，不在二者之间插入 Context indicator。主 CTA 水平居中，位于主内容视觉中心偏下，不贴窗口底部、不放右下角。
+
+“准备就绪”表达真实 readiness，只有所需检查已通过才显示；未检查/检查中不伪称就绪。启动静默预检及点击开始时复检仍按 §3.5 执行。阻断异常在同一 Start Control Area 显示原因与恢复操作（例如“麦克风不可用 / 检查设置”），不把原因藏到页面角落。当前使用默认/既有输入设备，不增加麦克风选择；后续入口见 Backlog B-15。
 
 ### 3.2 一条训练流程，两类训练方式
 
@@ -93,15 +107,33 @@ PREP、STAR、Pyramid 属于 Structured frameworks，不是独立应用或独立
 
 选择 Structured 后，可显示轻量 Guidance，解释框架目标、顺序、简短示例或准备提示。不得要求用户先逐项填写框架槽位，也不在证据产生前给出评估结论。训练前 Guidance 与训练后 Framework Analysis 的职责和文案分开。
 
+### 3.4 Training Context 与 Practice Focus
+
+Training Context 的主题/场景回答“这次讲什么、在什么情境下讲”，对应可空的 `trainingPrompt`；Practice Focus 回答“这次着重练什么”，Finding-aware 练习时来自用户选定的 Finding。两者正交：主题不是待改进问题，Finding 也不是新的题目或场景。训练方式/framework 是另一维选择，分析指令则属于设置中的分析偏好。
+
+普通新训练可以没有主题/场景，也没有 Practice Focus。从 Finding 继续练习时按 §9 继承来源训练上下文并带入该问题目标；即使原训练没有主题，也可以针对该 Finding 继续练习。显示时分别标识主题/场景与本轮练习目标，不把问题标题填入题目字段，也不要求用户为重练补一个主题。
+
+### 3.5 麦克风与 ASR 的准备检查
+
+应用启动后在后台静默预检麦克风与所选 ASR 的可用状态，让首页保持可用；正常或检查成功无需弹窗、成功通知或常驻健康面板。启动预检不是开始训练，不能创建训练记录、开始训练录音/转写，也不能以预检为由提前触发麦克风授权。
+
+首次录音的数据告知与用户确认仍遵循 R-P07：确认后才能申请麦克风权限。后台只能检查当前无需额外授权即可取得的状态；尚未授权或无法确定的项保留待检查状态，不把它显示成可用，也不在启动时强迫用户处理。
+
+开始录音等实际依赖麦克风/ASR 的操作前再次检查，不能把启动时的成功当成永久有效。设备、权限或模型状态已变化时，以操作前结果为准；必要能力不可用时明确阻止该操作，并给出相关设置/恢复入口。仍可访问训练历史、已保存 Report 和其他不依赖该能力的功能；不静默替用户切换 ASR。错误层级见 §12.2。
+
 ## 4. 训练页与实时交互
 
-用户从首页开始后进入训练页，经短倒计时自动录音。所选 ASR 支持 streaming 时，实时字幕是主要反馈；录音状态和必要控制保持清晰。
+用户在 Training Workspace 的首页准备态发起开始，按 §3.5 复检后，经短倒计时在同一 Workspace 内自动录音。Recording 包含 Active / Paused 两个子状态，支持 Pause / Resume 与 End；Pause / Resume 是已确认能力，可按合理里程碑落地，既有能力在 M1 集成中继续保持，不新增 Pause Screen。
+
+主区域按所选 ASR 能力展示实时 transcript（streaming；utterance 例外见下文）。信息权重为 **ASR 文本 > Recording 状态 > 控制 > 时长/声波 > Context indicator**：录音指示、时长与声波/音频活动反馈保持轻量；声波只表示是否检测到声音，不代表表达质量或得分。Active 显示暂停/结束，Paused 显示继续/结束，保留已有 ASR 文本且不允许编辑。
+
+轻量只读 Context indicator 显示如“STAR · 项目复盘”、主题/场景和当前针对性练习目标；不允许在 Recording（含 Paused）编辑 Training Context。ASR 文本不混入实时评分、Finding、结构分析或 AI 建议。后续主区/辅助区布局与机械设备主题见 Backlog B-13/B-14，不改变当前 ASR 主显示的信息层级。
 
 所选主 ASR 的产品角色按 [R-A10](requirements.md#6-m2表达证据ai-分析与雷达图)；SenseVoiceSmall 的 utterance 交互边界如下。Utterance 能力不提供实时 partial，不能伪造实时字幕或依赖尚未产生的文本给出实时提醒；应明确显示录音与等待转写状态。既有 utterance 有界缓冲基线见 [ADR-0009](../architecture/adr/0009-productize-multiple-asr-models.md)，实施验证由 Backlog D-08 跟踪；等待、失败与能力差异的详细交互留到 Interaction / State Design，不在本阶段确定新的切句方案。
 
 已确认的克制提醒原则不等于已决定保留实时 AI。现有实时 AI 是否保留、承担哪些反馈及具体交互，留待对应阶段决定，由 Backlog D-10 跟踪；本阶段不冻结其触发方式或展示容器。
 
-- 问题提示使用字幕原位轻标记，并在固定区域最多显示一条简短提醒。
+- 后续若启用实时问题提醒，应独立于 ASR 主文本，在辅助区域最多显示一条简短提醒；不把评分、Finding 或 AI 建议混入转写。此前字幕原位问题标记不作为当前 Recording 方案。
 - 限制提醒频率并设置冷却；具体冷却时间待实测，不在本基线填入未经验证的秒数。
 - 不实时展示长解释或整段改写。需要较多上下文的组织、逻辑等问题留到结束后分析。
 - 卡壳时系统默认只记录，不主动接管、补话或替用户完成表达。
@@ -125,7 +157,10 @@ Focus Mode/专注模式仍在 [Backlog B-12](backlog.md#not-now)，不纳入当�
 - 结束录音后不等待 AI 返回才保存已有训练事实；分析结果产生后单独自动保存。分析等待、失败或重试不覆盖已保存的事实与结果。
 - 保存成功尽量无感，可使用弱“已保存”状态，不弹确认窗；保存失败才明显提示并提供重试，不把失败显示为成功。
 - 回到报告、回到首页和继续当前问题只表达导航/训练意图，不承担保存职责；持久化职责不依赖报告是否仍然打开。
-- 分析中应可识别正在处理、不可用或失败的状态。缺少有效 AI profile 时提供配置入口；失败时提供重试，并保留可用的本地事实和确定性分析。等待/失败状态的具体呈现与操作形式见 §14。
+- Processing 仍是 Training Workspace 的状态，UI 仅显示“正在生成报告”与进度；不展开 ASR / VAD / LLM 等技术步骤。有可信、单调的进度才显示百分比，否则使用 indeterminate progress，不伪造百分比。
+- Processing 允许离开，后台任务与保存不依赖该 Screen 保持打开；结果在 History 对应记录中可访问。用户仍停留在本次 Processing 时才自然进入对应 Report，不因后台完成强制抢回已离开的页面。
+- **不做 Progressive Report Rendering**：等待完整结果或已完成的 Partial 判定后进入 Report，不在核心结果刚出现时先打开报告再增量补齐。采用合理、有界的 timeout 处理卡住；到期终止本次等待，进入对应 Report Unavailable / 失败恢复状态（§7.4），不无限卡在 Processing。timeout 数值按真实任务耗时与资源预算确定，尚未冻结秒数；超时/重试仍保护已保存数据。
+- 缺少有效 AI profile 时就地提供配置入口；失败时提供重试，保留可用的本地事实和确定性分析。报告可用性与局部恢复见 §7.4；timeout 的实现细节见 §14。
 
 M1 对本原则的落实限于已有完成逐字稿、稳定片段、音频和已有结果的自动保存，不新增每个 ASR partial 的持久化、完整事件日志或后续分析算法。崩溃恢复与完整性规则由数据模型和 M1 定义，不承诺录音中断时每个尚未持久化的采样都可恢复。
 
@@ -149,19 +184,29 @@ AI Coaching 的默认诊断与启用边界按 [R-A04/R-A11](requirements.md#6-m2
 
 | 区域 | 内容与默认层级 |
 |---|---|
-| Header | 轻量展示报告身份、日期、时长、训练方式与全局导航（§8.2）；不承载分析结论 |
+| Header | Screen Header 轻量展示报告身份、日期、时长、训练方式与 contextual Back（如有）；全局导航由独立 App Header 承载（§13.6），不混入分析结论 |
 | 针对性练习结果 | 仅在 Finding-aware 针对性练习的 Session 中出现，具体规则见 §10；普通 Report 不显示 |
 | 本次表现摘要 | 用简短总结先回答“这次整体怎么样”，配少量关键指标；Summary 是答案，Metric 是证据 |
 | 最值得改善 / Finding 列表 | 回答“最值得改什么、下一步练什么”；默认突出 1～3 个优先问题，保留其他有效问题数量及展开入口 |
 | 详细信息 | 逐字稿、音频/时间线、详细指标、分析信息（版本/来源等）；按需展开 |
 
-首屏不堆放完整逐字稿、全部数字和多维图表。采用 progressive disclosure：先结论，再解释与证据，详细数据按需查看。证据不足时如实说明，不为凑出 1～3 项编造问题。“还有 N 个问题可以继续查看/练习”的 N 对应实际未在重点中展示的问题。
+首屏不堆放完整逐字稿、全部数字和多维图表。采用 progressive disclosure：先结论，再解释与证据，详细数据按需查看。这是已有内容的按需展开，不是 §6 已排除的 progressive report rendering。证据不足时如实说明，不为凑出 1～3 项编造问题。“还有 N 个问题可以继续查看/练习”的 N 对应实际未在重点中展示的问题。
 
 ### 7.3 完整分析与用户选择
 
 Free 与 Structured 共用 Summary、Common Analysis、按需出现的 Framework Analysis、Evidence 和 AI Coaching；详细层保留全部有效发现，框架映射与较长解释也按需展开。雷达与其他多维展示仍遵循 M2 的定义、证据和缺失态要求，不替代摘要与优先问题。框架结果说明哪部分有效或不足，不只给总分；具体图形未冻结。
 
 系统可给某个 Finding 标“建议优先”，用户自行选择下一轮练哪个 Finding，也可只查看或结束。推荐不是自动选择，不强迫用户练完全部问题。练习入口只按 §8.2 挂在具体 Finding 上。
+
+### 7.4 Report 可用性与恢复
+
+Report 内部状态为 Complete / Partial / Unavailable；正常 UI 不显示“Complete / 报告完整”标签。
+
+- **Complete**：本次报告正常可用，按 §7.2 展示。
+- **Partial**：报告仍有基本训练价值，但部分分析/Finding/指标不可用。失败在哪，说明和重试就放在哪；正常内容可阅读，其他正常 Finding 的继续练习不被锁住，不把局部失败写成整份“报告生成失败”。这是完成后的降级判定，不是后台渐进式补齐。
+- **Unavailable**：无法形成具有基本训练价值的报告，或 Processing 已超时而未形成可用结果。保留 Report Screen 身份，就地解释原因并提供“重新生成报告”等恢复动作；成功后仍在同一 Report 中转为 Complete / Partial，不要求重新训练，不新增 Error Screen。
+
+Session 保存与 Report 生成是两件事：Session 已持久化时明确说明“这次训练已经保存”，分析失败不表示训练丢失；实际保存失败仍按 §6 单独提示，不能假称已保存。正常完成/Partial 判定与 timeout 的进入边界只由 §6 定义。
 
 ## 8. Finding 原位展开与证据
 
@@ -183,7 +228,8 @@ Finding 是 Report 内的 Card / Row。点击该行的展开入口后，在原�
 
 | 层级 | 入口与含义 |
 |---|---|
-| Report 全局导航 | 保留“返回报告列表 / History”和“首页”；报告列表是主要返回路径，首页是较弱的跨任务入口 |
+| Contextual Back | 仅依据进入来源恢复上下文，具体路径由 §13.6 定义；Training → Report 不强制增加“← Training”或虚构 History 来源 |
+| Report 全局导航 | 使用 §13.6 的 App Shell；App name/logo 回 Training，History 去训练历史，与 contextual Back 区分层级 |
 | 页面内定位 | Finding 展开区可有“回到问题列表”；必要时可补轻量“回到报告顶部”，不与全局导航并为一组 |
 | Finding 行动作 | “继续练习”，对象明确是该行 Finding |
 | Finding 展开后动作 | “针对这个问题继续练习”，与该行入口指向同一练习目标 |
@@ -195,6 +241,8 @@ Finding 是 Report 内的 Card / Row。点击该行的展开入口后，在原�
 ## 9. 带上下文再次进入 Training Workspace
 
 “继续练习/重练”描述为什么开始本次训练，以及它与上一轮的关系；不是独立训练模式、独立 Workspace 或需要重新讨论的一条训练流程。用户通过 §8.2 的 Finding 入口带着上下文再次进入同一 Training Workspace，复用录音、暂停、继续、结束、ASR 与持久化机制，不新增 Practice Workspace。Training Workspace 轻量显示本轮练习目标与必要提示，让用户知道本轮针对什么问题。
+
+从 Finding 进入 Preparing 时，默认继承来源 Session 的主题/场景（没有则保持空）、训练方式与 framework，并另带入所选 Finding、Practice Focus 与来源引用；不把改善目标改写为 Training Context，也不要求从空白首页重新填一遍。Preparing 中的可调整边界仍遵循 §5；继承不改写来源记录，也不保证不同范围/上下文天然可比，按 §11 判断。
 
 用户选择“重练”后，系统根据当前问题推荐句子、片段或完整表达范围，用户可调整；范围选择器的具体形式仍为 Interaction TBD。
 
@@ -254,39 +302,67 @@ Free 报告可在证据支持时推荐框架，解释原因并等待用户选择
 |---|---|
 | 键盘与焦点 | 保证 Dialog、Panel 的基础键盘操作与焦点恢复正确 |
 | 主题 | 所有窗口保持一致；切换主题不重置业务状态 |
-| 窗口 | Settings 为单实例独立窗口；主窗口承载核心业务 |
+| Utility Surface | Settings / Help 的覆盖与关闭语义统一见 §13.1；主窗口承载核心业务 |
 | 状态保护 | 打开或关闭窗口、Panel、Dialog 不影响 Training、Report 等业务状态 |
 | 冲突操作 | 仅局部禁用相互冲突的操作，不锁死整个界面 |
 
 快捷键、焦点细则、窗口尺寸/位置等统一留到 Interaction / State Design 阶段。旧 UI audit 中的全局禁用、状态表或焦点建议不得覆盖本节。
 
+### 12.2 异常提示层级
+
+异常分 **Silent / Contextual / Blocking**：无需用户处理则静默；可在任务内恢复则在相关区域提示；无法完成当前核心任务才使用明显 Blocking state。任务未改变时优先保留原 Screen，不新增 Microphone Error Screen、Recording Error Screen 或 Processing Error Screen。只有真正无法使用应用的严重初始化问题才考虑应用级阻断。
+
+提示的强度取决于对当前动作和数据的影响，不把所有异常都提升为全局阻塞：
+
+| 情况 | 提示与影响范围 |
+|---|---|
+| 后台检查正常、保存成功等无需处理的结果 | 静默或弱状态反馈，不打断操作 |
+| 后台发现问题但当前任务不依赖该能力 | 在相关入口/状态处轻量提示；不抢占首页，不妨碍历史与报告阅读 |
+| 用户发起的动作缺少必要能力或执行失败 | 在动作附近明确说明原因与恢复入口，只阻止/禁用依赖该能力的操作；不以短暂消失的弱提示代替可处理错误 |
+| 保存失败、数据损坏等影响结果可靠性的问题 | 明显且可重新找到的状态及重试/处理入口，已保存的健康内容保持可用；不伪装成功 |
+| 权限/隐私确认、明确删除等必须由用户决定的操作 | 使用相应确认交互；不因普通后台预检失败就弹出阻断全局的确认窗 |
+
+麦克风/ASR 检查时机由 §3.5 定义；分析不可用与保存失败分别遵循 §6。具体 Banner、inline、Dialog 等控件、文案和状态转换留到 Interaction / State Design，已确认的提示层级不再作为未决产品原则。
+
 ## 13. Screen Structure 收敛基线
 
-Screen 以用户任务与 Workspace 职责划分，不按报告内容层数机械拆页。
+Screen 以用户任务与 Workspace 职责划分：任务未改变优先 State，任务改变才切换 Screen，不按视觉变化或报告内容层数机械拆页。Preparing → Recording → Processing 是同一 Training Workspace 内的 state transition；Processing → Report 才是 screen transition。
 
 现有三条 AI 路径——实时反馈、最终报告、回放分析——属于历史实现能力，不对应三个独立 Screen。这部分目标 IA 按用户任务收敛到 Training Workspace 与统一 Report Workspace：训练中的交互由前者承载，报告、回放与分析证据由后者统一组织。实时 AI 是否保留及具体交互留待对应阶段决定；历史调用路径不构成保留承诺或新增页面的依据。
 
-当前候选收敛如下；它是目标结构，不是已实现路由列表：
+已确认的 Screen × State Map 如下；这是目标结构，不是已实现路由清单。各状态的完整规则只在所引章节维护。
 
-| Screen / Workspace 候选 | 职责与边界 |
+| Screen / Surface | States 与唯一职责入口 |
 |---|---|
-| 首页 / Home | 默认自由表达入口；可选模式/题目与新训练准备 |
-| Training Workspace | §4–§5 的录音交互；按 §9 承接针对性练习上下文 |
-| Report Workspace | §7–§10 的统一报告、Finding 展开态和针对性练习结果；History 打开的单次详情也属于这里 |
-| History / 训练历史 | 找记录、打开记录、明确删除；M3 增加选择记录比较，见 §13.2 |
-| Comparison / Review Workspace | M3 两次 Session 的完整差异视图，见 §13.2；独立工作区不等于新增一级导航 |
-| Settings / 设置 | 已确认的独立设置窗口，见 §13.1 |
-| Help / 帮助 | 长期帮助、数据/隐私说明及“问题与反馈”；窗口或 Panel 容器仍待确定 |
+| Training Workspace（Home） | Preparing（§3：Context Area + Start Control Area）→ Recording（§4：Active / Paused）→ Processing（§6） |
+| Report Workspace | Complete / Partial / Unavailable（§7.4）；内容与 Report B / Practice Chain 见 §7–§10 |
+| History / 训练历史 | Empty / Populated；Populated 内 0 / 1 / 2 selected（§13.2） |
+| Comparison / Review Workspace | Ready / Partial / Unavailable（§13.3）；M3 固定两条记录的差异视图 |
+| Settings / Help | 覆盖当前 Screen 的 Utility Surface，以 × 关闭（§13.1） |
 
-首次报告、完整报告、历史详情、Finding 详情、Evidence、针对性练习结果和练习历程均不再单列为 Screen。Practice Workspace 不在候选中。分析等待/失败仍是处理状态，其具体承载形式见 §14，不因为流程图有一个节点就新增页面。
+```text
+App Shell（Primary：Training / History；Utility：···）
+├─ Training Workspace = Home
+│  └─ Preparing → Recording（Active ⇄ Paused）
+│       └─ End（Active / Paused 均可）→ Processing
+│       └─ 完成 / Partial 判定 / timeout → Report 对应状态（§6、§7.4）
+│           └─ Finding → 同一 Training Workspace（optional Practice Focus）→ Report B
+├─ History.Empty / Populated（0–2 selected）
+│  ├─ 打开单条 → Report
+│  └─ 两条 + [对比] → Comparison.Ready / Partial / Unavailable
+│                       └─ 下钻单侧 Report → ← 返回对比
+└─ Utility Layer：当前 Screen → Settings 或 Help → × 恢复原 context
+Deferred：Progress / Trends；Finding-scoped AI Conversation（§13.5）
+```
 
-后续低保真原型只细化未冻结的容器、布局与状态：例如首页与训练准备的容器关系、帮助的窗口/Panel 形式，不重新打开上述合并边界。
+首次/完整报告、历史详情、Finding/Evidence、针对性练习结果和历程均不单列 Screen；Targeted Practice 复用同一 Training Workspace，不新增 Retraining Screen。Report 的来源变化只改变 navigation context，不复制报告模板。导航关系见 §13.6，后续原型只细化 §14 中未冻结的细节。
 
 ### 13.1 已确认的 IA 归属
 
 | 内容 | 已确认归属与边界 |
 |---|---|
-| Settings / 设置 | 单实例独立窗口；设置子页位于该设置窗口内，跨窗口约束见 §12.1 |
+| Settings / 设置 | 大尺寸 overlay / Utility Surface，可接近全屏；默认行为与长期配置在这里，本次 Framework / Topic / Scenario 仍在 Preparing |
+| Help / 帮助 | 同一 Utility Surface 模型；Contextual Help 为主要帮助方式，Help 是统一兜底入口 |
 | 自定义规则／分析偏好编辑器 | 设置子页；分析指令不等同于训练题目/场景 |
 | 关于／应用版本 | 暂放设置页底部，不单独建页 |
 | 诊断（运行环境/ASR 故障排查） | 唯一入口为“帮助 → 问题与反馈”，诊断导出也在这里；移除主窗口顶部等其他位置的重复入口。这里不指 Report 中的 AI 表达诊断，也不属于报告导出待办 |
@@ -294,19 +370,75 @@ Screen 以用户任务与 Workspace 职责划分，不按报告内容层数机�
 | 数据与隐私说明 | 放帮助页并长期可查；首次录音确认和远程 AI 启用仍在对应操作前完成，不以帮助说明替代确认 |
 | 继续练习／重练 | 复用 Training Workspace，用户路径见 §9；数据关系见 Data Model §6 |
 
+Settings / Help 用“×”关闭，不用“← 返回”；关闭后恢复打开前的 Screen/context，不构成普通层级 Screen。两者可以有内部 local navigation，但最多同时打开一个主要 Utility Surface；Settings 中求助使用就地解释或替换 Surface 内容，不叠加多层 overlay。这里的 × 仅表示 Utility 关闭，不替代 Report / Comparison 下钻的 contextual Back。
+
 History 的内容职责与路径由 §13.2 维护，单条历史详情共用 Report Workspace。以上是目标归属，不声明所有调整已实现，也不改变既有里程碑范围。
 
 ### 13.2 History 与 Comparison / Review
 
-History 负责找记录、打开记录与选择记录比较，并保留已有的明确删除职责。打开一条 Session 的路径是 **History → Report Workspace**，不再建立另一套历史详情 Screen。
+History 负责找记录、打开记录、明确删除及选择两条记录发起比较。它保持按创建时间倒序排列的普通 Session 列表，不按练习链重排、分层或嵌套；同一 Session 只是一条记录。打开一条 Session 的路径是 **History → Report Workspace**，不另建历史详情 Screen。
 
-M3 History Comparison 的路径是 **History → 选择两个 Session（明确基线和目标）→ 独立 Comparison / Review Workspace**。独立的双 Session 工作区承载完整比较任务，展示差异视图，不把两份完整 Report 并排复制。
+条目用于识别本次训练：日期/时间、时长、训练方式，以及可用的主题/场景、练习目标与记录状态应保持各自语义；主题/场景与 Practice Focus 的区分见 §3.4，缺失内容不伪造。条目不显示“上游报告 / 下游报告”，也不展开整条练习链、多个报告或完整分析。来源关系仍保存在数据层，需要查看针对性练习结果或历程时进入 Report（§10）。
 
-差异视图围绕比较对象与范围、变化结论、改善/持续/新出现的问题、前后原文或音频证据，以及必要指标组织，不以综合评分为核心。比较状态与限制遵循 §11；对需要归一化的指标说明口径，对无法可靠比较的部分说明原因。可打开任一 Session 的 Report 深入证据，不以更多完整报告替代差异视图。
+History 只有 Empty / Populated 状态。Empty 就地说明暂无记录并提供去 Training Workspace 的“开始表达”入口，不新建 Empty Page。
 
-针对性练习的轻量对比留在 Report（§10），历史完整对比进入 Comparison / Review；两者共用底层 comparison 概念、证据引用和可比性规则，展示层不同，不建设两套相互独立的比较系统。Application Core 与数据职责分别见 [Target Architecture §7](../architecture/target.md#7-analysis-architecture) 和 [Data Model §10](../architecture/data-model.md#10-comparison-invariants)。
+M3 的唯一完整对比发起路径是 **History 普通列表 → checkbox 勾选两条 Session → 点击明确的 [对比] → Comparison / Review Workspace**。选择仅为 Populated 内的 0 / 1 / 2 selected 状态，不是独立选择模式、页面或向导；保持列表浏览与单条打开。最多选择两条：选满后其余记录自动 disabled，已选项仍可取消；取消后其余恢复可选，[对比] 仅恰好两条时启用，不因第二条被勾选就自动跳转。比较须明确基线与目标角色。
 
-此前“双入口共享延伸页”不再作为整体待确认方案：History 的双 Session 入口与独立差异工作区已确认。是否再从 Report 提供历史完整对比快捷入口、返回时恢复哪些选择/滚动状态，以及长期趋势和记录关联 AI 对话的具体位置仍待后续 Screen Structure 细化；它们不改变已确认的 Report 原位轻量对比，也不新增一级 Review 首页。本节不提前交付 R-R01～R-R04，不把 M3/M4 能力加入 M1。
+不同 Framework 仍允许选择并进入 Comparison；[对比] 附近可轻提示“部分结构化指标可能无法直接比较”，不以框架不同替用户禁止选择。具体可比性按 §11 / §13.3 逐项说明。
+
+Report 不提供“选择另一条历史记录来对比”的完整 Comparison 发起入口。Report 内针对性练习结果的当前轮/上一轮轻量对比按 §10 保留，它不需要用户从历史选择另一条记录，也不因此变成独立 Comparison 的第二入口。
+
+### 13.3 Comparison Workspace 信息结构
+
+Comparison 是固定两个 Session 的完整差异工作区，回答“这两次有哪些可被证据支持的变化”，不把两份完整 Report 并排复制，不新增一级 Review 首页。已确认的从上到下结构为：
+
+| 区域 | 职责与边界 |
+|---|---|
+| Header | 说明基线 Session 与目标 Session 的身份、日期/时间、训练方式与可用的 Training Context，明确比较对象/范围与可比性限制；可下钻任一侧 Report |
+| Summary（可选） | 有可靠比较结果时简短概括主要变化；无足够依据时可省略，不为了填满区域生成总体进步结论，也不以综合分数为核心 |
+| Analysis Comparison | 比较有效的 Common/适用 Framework 分析与 Finding；改善、持续、新出现、不再出现是比较项的结果语义，不拆成四个必备顶层区域 |
+| Metrics Comparison | 展示可用训练事实/指标的两侧值、可解释的差异及必要归一化口径；逐项说明缺失或不可比，不强制每项生成差值 |
+
+Evidence 就近附着在它支持的 Finding 或指标比较项下，按需查看两侧原文、时间位置和可用音频；不设一个脱离比较项的页面尾部 Evidence 总区。无 Finding、AI 不可用或分析不完整时，已有时长、逐字稿、音频及可靠指标仍可比较/查看；分析缺失明确标识，不等于“没有问题”。“不再出现”不能仅由另一侧未分析或证据缺失推断，更不自动等同已经解决。
+
+比较状态与限制遵循 §11；不能以某个可比指标推断整体可比。针对性练习的轻量对比与这里的完整对比共用底层 comparison 概念、证据引用和可比性规则，展示层不同。Application Core 与数据职责分别见 [Target Architecture §7](../architecture/target.md#7-analysis-architecture) 和 [Data Model §10](../architecture/data-model.md#10-comparison-invariants)。
+
+Comparison 状态为 **Ready / Partial / Unavailable**：Ready 正常展示；Partial 中单侧缺失数据、某指标/Framework 不可直接比较或 Evidence 不可用，在对应项就地说明，能比较的继续比较，不阻止整个 Comparison，也不把 Evidence 拆到全局错误区。仅核心输入不足、真正无法完成有意义的比较时才 Unavailable，就地提供重试与返回 History；已保存的两次训练记录仍保留。选择发生在 History，Comparison 不新增“请选择两个 Session”状态。
+
+### 13.4 Comparison 下钻与返回
+
+Comparison 可打开任一侧 Session 的完整 Report。Report 主体保持 §7–§10 的统一结构，包括该 Session 原有的针对性练习结果；不增加专属“Comparison Report”模板。
+
+从 Comparison 下钻时，Report 的 contextual Back 为“← 返回对比”，恢复原比较对象、基线/目标角色、查看位置与展开状态；不要求重新勾选或创建比较。全局导航仍可直接离开当前比较任务，完整导航规则见 §13.6。焦点恢复的具体实现留到 §14。
+
+Comparison 内不提供换 Session、选择其他历史记录或重新配对的操作。要比较另一对记录，回到 History 勾选；Header 的对象信息是身份与下钻入口，不是 Session 选择器。返回入口与全局导航的层级统一见 §8.2。
+
+职责边界：History 组织记录与发起两条记录的比较；Report 解释单次 Session、承载 Finding 与针对性练习结果/历程；Comparison 解释固定两次 Session 的完整差异。三者共享原始事实与证据，不复制成三套分析结果。
+
+### 13.5 尚未确定的 Screen 事项
+
+本轮当前范围内的 Screen / State / Utility 容器及导航职责已确认，没有待选的 Screen Structure 方案。Help 容器不再未决。尚未决定的只是 deferred 能力未来落地与 §14 的实现细节，不重开已封板结构。
+
+- **Progress / Trends**：回答长期是否改善，暂不进入当前 Screen Structure 或一级导航；数据与指标稳定后按 Backlog B-16 重开。
+- **AI Conversation**：deferred，未来优先 Finding-scoped，绑定来源 Report / Session / Finding / Evidence，不先建通用 Chat；具体容器待 Backlog B-17 / D-05 重开。
+
+上述定位不提前交付 R-R03/R-R04，也不把 M3/M4、机械主题、双显示区或麦克风选择加入 M1。
+
+### 13.6 App Shell 与 Navigation Context
+
+Primary Navigation 仅 **Training（Home）与 History**。极简全局 App Header 为 `Expression Trainer / App name或logo → Training`、`History`、`··· → Settings / Help`，不重复放 Home / Training 两个按钮；History 在当前顶层目的地有 active state。Settings / Help 是低频 Utility，不与主导航争抢权重。
+
+App Header 表达全局去向；Screen Header 表达当前页面身份、对象与 contextual Back。Report / Comparison 标题不进入一级导航；Home 无需额外“Training”大标题。Top-level Training / History 没有 contextual Back。
+
+| 来源 / 操作 | 返回与上下文 |
+|---|---|
+| Training → Report | 自然结果 Screen，不强制“← Training”；新训练/针对性练习由内容动作发起 |
+| History → Report | “← 训练历史”，恢复原列表滚动位置、checkbox selection，以及未来若有的筛选/搜索状态 |
+| History → Comparison | “← 训练历史”，恢复原 History 状态；换比较对象在 History 完成 |
+| Comparison → 单侧 Report | “← 返回对比”，恢复 §13.4 的原 Comparison |
+| 当前 Screen → Settings / Help | 按 §13.1 用 × 关闭并恢复原 Screen/context |
+
+Global Navigation 负责切换主目的地，Contextual Back 负责下钻后的上下文恢复，In-content Action 负责当前任务（如 Finding 继续练习）；三者职责分离。Back 表达有限的来源关系，不做浏览器式无限 Back stack，也不为当前浅层结构增加 breadcrumb。
 
 ## 14. Interaction TBD
 
@@ -316,12 +448,14 @@ M3 History Comparison 的路径是 **History → 选择两个 Session（明确�
 |---|---|---|
 | 主动“给我提示” | 用户主动触发，轻量启发，不替用户完成表达 | 提示具体形式 |
 | 超长静音 | 只询问是否继续，不自动暂停/结束 | 实测阈值 |
-| 实时提醒 | 字幕轻标记 + 固定区域最多一条短提醒，有频率限制和冷却 | 实测冷却时间 |
+| 后续实时提醒 | §4 的 ASR 主文本隔离原则；是否启用实时 AI 仍由 D-10 决定 | 辅助提示形式、实测冷却时间 |
 | 重练范围 | 按问题推荐句子/片段/完整表达，用户可调整 | 范围选择器形式 |
-| 分析等待/失败 | 状态明确、本地事实保留、配置/重试可恢复 | 等待及失败状态的具体交互 |
+| Processing timeout / 恢复 | §6 / §7.4 的完成等待、可信进度、超时退出与就地恢复已确认，不做渐进式报告 | 实测 timeout 预算、重试/迟到结果的具体处理及文案；不再待决是否采用 timeout |
+| 麦克风/ASR 检查与异常反馈 | §3.5 的启动静默预检、操作前复检及 §12.2 的提示层级已确认 | 具体控件、文案与检查中/恢复后的状态转换 |
+| 导航与返回状态 | §13.2/§13.4/§13.6 的两条选择、显式对比按钮及原上下文恢复已确认 | 键盘/焦点和恢复实现细节，不重议滚动位置、展开项或选择状态应恢复 |
 
 实时 AI 是否保留及具体交互仍待对应阶段决定（D-10），与表内已确认提醒原则的待细化项区分；不能因历史实现存在而直接视为已接受能力。
 
-跨 Screen 的已确认约束见 §12.1；快捷键、焦点细则、窗口尺寸/位置与具体状态转换留到 Interaction / State Design。届时基于当前产品流程与源码重新讨论状态设计；已过期的 UI audit 不再充当设计或验收基准，本次不生成新的 As-Is 审计。
+跨 Screen 的已确认约束见 §12.1；快捷键、焦点细则、Utility 尺寸/位置与状态转换的实现细节留到 Interaction / State Design。届时基于已确认 Screen / State 结构与源码细化实现；已过期的 UI audit 不再充当设计或验收基准，本次不生成新的 As-Is 审计。
 
-Focus Mode 是 Backlog，不属于本表中的已接受待细化能力。下一会话以本文作为核心体验 source of truth，结合 Requirements 的验收边界和 Roadmap 的里程碑顺序开展 IA/Screen Structure，不从历史对话重新推导已确认结论。
+Focus Mode 是 Backlog，不属于本表中的已接受待细化能力。后续以本文作为核心体验与 Screen Structure source of truth，结合 Requirements 的验收边界和 Roadmap 的里程碑顺序细化 §13.5 与本节剩余项，不从历史对话重新推导已确认结论。

@@ -1,7 +1,7 @@
 # Training Data Model
 
 > **Status:** M0 target baseline
-> **Date:** 2026-09-18
+> **Date:** 2026-09-19
 > **Scope:** logical model plus the minimum M1 persistence decisions; this is not a complete future SQL schema.
 
 ## 1. Purpose
@@ -31,7 +31,7 @@ TrainingSession
 ├── AIAnalysis[]              derived, versioned
 ├── FrameworkAnalysis[]       M4, derived, versioned
 ├── Comparison[]              M3
-└── Conversation[]            M3
+└── Conversation[]            deferred; M3 candidate
     └── Message[]
 ```
 
@@ -92,6 +92,8 @@ Field names are illustrative domain names. Implemented SQL/storage details are i
 
 `status` is a product-visible integrity state, not only an internal database flag.
 
+Training Workspace 的 Preparing / Recording / Processing，以及 Report / Comparison 的可用性是展示或任务结果状态，不直接映射为 Session 持久化状态。报告分析超时或局部失败不能把已完成、已保存的 Session 改成 incomplete/corrupt；保存失败也不能被 Report 状态掩盖。重试基于同一 Session 追加版本化结果，不重复创建训练事实。
+
 `TrainingPromptSnapshot` has only the fields needed to reproduce the user-visible topic/scenario context:
 
 | Field | Type/shape | Rule |
@@ -107,6 +109,10 @@ trainingMode = free       -> framework = null and frameworkDefinitionVersion = n
 trainingMode = structured -> framework != null and frameworkDefinitionVersion != null
 trainingPrompt             -> independent of trainingMode and framework
 ```
+
+产品中的 Training Context（主题/场景）对应可空的 `trainingPrompt`，Practice Focus 是本轮练习目标；来自 Finding 时通过 §6 的来源关系识别。二者正交，Finding 标题不能写入 `trainingPrompt` 代替主题，空主题也不妨碍保留练习目标。`trainingMode`/framework、分析指令继续保持各自独立语义；不新增平行的题目或 Focus 事实副本。
+
+上次 Framework / Topic / Scenario 配置属于可复用的准备偏好，恢复行为由 [Training Flow §3.1](../product/training-flow.md#31-默认状态) 定义；它不是当前 Session 的事实引用。Practice Focus 由 §6 的 Finding / 练习链来源识别，不进入普通上次配置。新 Session 开始时复制实际采用的上下文快照，之后偏好或来源变化不得改写旧事实。当前 `TrainingPromptSnapshot` 是逻辑示意，M4 若同时提供 Topic 与 Scenario 须完整保留二者语义及来源，具体表示待实施细化，不提前扩张 M1 schema。
 
 The setup values may change while the UI is preparing a session. Once recording begins, the session snapshots and freezes `trainingMode`, `framework`, `frameworkDefinitionVersion`, and `trainingPrompt`. M1 exposes no topic/scenario input, so every M1 session uses `trainingPrompt = null`; the nullable field is reserved for the accepted M4 flow rather than produced early.
 
@@ -183,7 +189,7 @@ Only ownership and invariants are frozen now.
 | `MetricRun` | M2 | Belongs to a session/transcript revision; immutable Common metric result with analyzer definition version and evidence references |
 | `AIAnalysis` | M2 | Default derived result for each analyzable session; validated Common Analysis or AI Coaching payload with provider/model/prompt versions, status, evidence references, and explicit unavailable/failed states |
 | `Comparison` | M3 | References explicit baseline and target sessions plus the metric/analysis versions used |
-| `Conversation` / `Message` | M3 | Conversation declares the session IDs included in its context; messages do not mutate session facts |
+| `Conversation` / `Message` | Deferred；M3 候选 | 未来优先引用来源 Session / Report、Finding 所属分析版本及 Evidence；声明使用的上下文，messages 不修改 Session facts；具体 schema 随 B-17 / D-05 重开 |
 | `FrameworkAnalysis` | M4 | Belongs to a session/transcript revision and records `framework`, `analyzerVersion`, status, findings, and evidence references; it never changes the session's training context |
 
 No SQL columns for these later entities are frozen in M0.
@@ -199,7 +205,7 @@ No SQL columns for these later entities are frozen in M0.
 - AI Coaching consumes facts and validated Common/Framework results to explain priorities, suggest improvements, or recommend a framework. It is not an independent source of deterministic facts or scores.
 - 每次继续练习/重练均创建新的 `TrainingSession`，包括句子/片段/完整表达范围的 Free 重练；自动保存新事实与新结果，不复用源 Session identity，不覆盖原表达、原分析或此前 attempts。
 - Finding-aware 重练的新 Session 必须持久化来源 Session 与来源 Finding 的关系。Finding 引用应能定位其所属来源 Session 和分析结果/版本，不能仅靠显示名称或当前页面状态识别。
-- 来源关系记录训练意图与前后关联，独立于 `trainingMode`、framework 和训练题目，不产生独立 Session 类型；用户导航由 Training Flow §9 定义。
+- 来源关系记录训练意图与前后关联，独立于 `trainingMode`、framework 和训练题目，不产生独立 Session 类型；继承的准备值在新 Session 开始时形成它自己的事实快照，不引用一个可变的源上下文替代快照。继承与用户调整流程由 [Training Flow §9](../product/training-flow.md#9-带上下文再次进入-training-workspace) 定义。History 不展示上/下游报告不取消这些关系或持久化义务。
 - 此处冻结逻辑关系和持久化义务，不提前冻结 SQL 字段或新建 M1 重练表。Practice Chain 的产品语义由 [Training Flow §10.2](../product/training-flow.md#102-多轮练习历程) 定义；数据关系需支持恢复目标、轮次与相邻比较双方，不能只按时间邻近或 Finding 显示名推测。是否引入独立实体及其关系表达见 §12。
 - Session identity 不等于链成员 identity；不得用“每个 Session 只能属于一条链”的存储约束排除同一 Session 在不同练习目标下的角色。跨轮 Finding 关联须保留各自分析版本/证据引用，而非要求重用同一 Finding ID。来源记录删除后的引用与历程降级语义仍待细化，不得把持久化关系退回为可选 UI 参数。
 - Training-time Guidance is framework-definition content shown before a session. Post-training Framework Analysis is versioned derived output. They may share a definition but not a storage record or UI responsibility.
@@ -225,7 +231,7 @@ Implementation must be idempotent for a repeated finalization request with the s
 
 ## 9. Read, delete, and migration semantics
 
-- History queries order sessions by `createdAt` and use a stable secondary key; user-visible naming/navigation belongs to Training Flow §13.
+- History queries order sessions by `createdAt` descending and use a stable secondary key; user-visible naming/navigation belongs to Training Flow §13.
 - Reading one corrupt record does not prevent healthy records from loading.
 - Deleting a session removes its managed artifact files and database-owned children. Partial failure remains visible and is retryable.
 - Schema migrations are numbered, forward-only, and transactional where supported.
@@ -234,9 +240,11 @@ Implementation must be idempotent for a repeated finalization request with the s
 
 ## 10. Comparison invariants
 
-这些逻辑约束让 M1 事实可用于后续比较，不要求 M1 实现 comparison 子系统。重练轻量对比与历史完整对比共享同一个 `Comparison` 概念：显式引用基线/目标 Session、比较范围、证据与分析版本；UI 容器不产生另一套比较事实或评分标准。具体 schema/API 留待对应里程碑。
+这些逻辑约束让 M1 事实可用于后续比较，不要求 M1 实现 comparison 子系统。重练轻量对比与历史完整对比共享同一个 `Comparison` 概念：显式引用基线/目标 Session、比较范围、证据与分析版本；UI 容器不产生另一套比较事实或评分标准。具体 schema/API 留待对应里程碑。Comparison 的两个 Session 引用与基线/目标角色须明确；查看任一侧报告不改变原比较对象。UI 的入口、返回来源和展开/滚动状态由 Training Flow §13 定义，属于展示/导航上下文，不因此新增 Session 事实字段或 M1 比较表。
 
 比较按指标/证据项判定为可比、需归一化或不可可靠比较，不因其中一项可比就推断整份报告都可比。归一化必须声明口径和分母（例如按分钟或字数的口头禅频率），仅在范围有意义且事实支持时执行；保留原值，不把句子、片段与完整表达的总量差异当作进步。无法建立可靠对应关系时说明限制，不强行生成改善结论。
+
+不同 framework 的两个 Session 可以成为同一 Comparison 的输入；以下同 framework 条件只限制特定比较项，不构成整对 Session 的拒绝条件。缺失/不可比项与可用项的结果应可分别表达；详细 metric/framework/analyzer version 兼容规则由 Backlog D-13 在 M3 细化。
 
 版本与证据约束：
 

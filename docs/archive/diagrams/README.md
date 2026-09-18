@@ -27,7 +27,7 @@ route_rhythm、legend_clearance）。单文件 HTML 内含明暗主题、平移�
 
 ## 事实来源
 
-**2026-09-18 状态说明：** `workflow.json/html` 与 `lifecycle.json/html` 引用了已过期 UI audit，仅保留为历史快照，不再代表当前 UI 行为、目标 IA 或验收标准。目标交互和跨 Screen 约束由 [Training Flow §12–§14](../../product/training-flow.md#12-ui-与文案原则) 承接；具体状态图待 Interaction / State Design 重新讨论后再生成。本次未重新审计源码或更新图的制品，其他图也不能代替目标 Screen Structure。
+**2026-09-18 状态说明：** `workflow.json/html` 与 `lifecycle.json/html` 引用了已过期 UI audit，仅保留为历史快照，不再代表当前 UI 行为、目标 IA 或验收标准。目标交互和跨 Screen 约束由 [Training Flow §12–§14](../../product/training-flow.md#12-ui-与文案原则) 承接；当前目标 Screen × State Map 已在 Training Flow §13 确认；历史图不随之重画，若需新图须基于该 Owner 重新生成与验证。本次未重新审计源码或更新图的制品，其他图也不能代替目标 Screen Structure。
 
 | 图 | 主要证据 |
 |---|---|

@@ -23,7 +23,7 @@ flowchart LR
   M1 --> U1[ASR-U01 SenseVoiceSmall]
   V1 --> M2[M2 语音证据与默认 AI 诊断]
   U1 --> M2
-  M2 --> M3[M3 对比、复盘与 AI 对话]
+  M2 --> M3[M3 对比与复盘]
   M3 --> M4P[M4 结构化表达训练]
   B --> M4[ASR-M04 公开包内默认资格]
   B --> P5[PKG-05 签名与公开发布材料]
@@ -58,7 +58,7 @@ M0/M1 是当前产品关键路径。M2 接入 SenseVoiceSmall 作为可选主 AS
 
 M0 的 Complete 记录上述历史完成事件；[当时的审查](archive/reviews/m0-consistency-review-2026-09-16.md)已归档，不证明后续修订仍通过审查。后续修订按[文档维护规则](README.md#维护规则)验证。
 
-目标交互与 Screen Structure 统一见 [Training Flow](product/training-flow.md)，阶段切片见 M1/M2 milestone。后续原型只细化既有未决项，不把 M2–M4、Focus Mode 或交互细节自动加入 M1；暂缓/待决项及重开条件见 [Backlog](product/backlog.md)。
+目标交互与 Screen Structure 统一见 [Training Flow](product/training-flow.md)，阶段切片见 M1/M2 milestone。本轮已确认的结构和导航不再作为开放选项；当前 Screen / State 结构已收口，deferred 定位与实现细节分别由该文档 §13.5/§14 维护；Processing timeout 交付跟随 M2 AC-M2-05，未来视觉/设备选择跟随 Backlog B-13～B-15。后续原型只细化既有未决项，不把 M2–M4、Focus Mode 或交互细节自动加入 M1；暂缓/待决项及重开条件见 [Backlog](product/backlog.md)。
 
 ### 4.2 Streaming ASR public delivery
 
@@ -96,7 +96,7 @@ M0 的 Complete 记录上述历史完成事件；[当时的审查](archive/revie
 | M0 Architecture & Requirements Baseline | Complete | Gap、Requirements、Data Model、Training Flow、Speech Contract、Target、Backlog、M1、Consistency Review | M1 有稳定、可追踪的实施边界 |
 | M1 Training Persistence | In progress | R-P01～R-P09 | 按 [M1 milestone](milestones/m1-training-persistence.md) 交付持久化闭环与入口收敛 |
 | M2 Speech Evidence & AI Diagnosis | Planned | R-A01～R-A11 | 按 [M2 milestone](milestones/m2-speech-evidence-and-ai-diagnosis.md) 依次交付时间/语音证据、确定性度量、Common Analysis、具有远程知情边界的默认结构化 AI 诊断、统一报告和证据驱动雷达图 |
-| M3 Comparison & Review | Planned | R-R01～R-R04 | 以简短前后证据为主的对比、复盘、趋势和 Session 关联 AI 对话 |
+| M3 Comparison & Review | Planned | R-R01～R-R02；R-R03/R-R04 deferred | 按 [Training Flow §13.2–§13.4](product/training-flow.md#132-history-与-comparison--review) 交付 History 发起的 Comparison 与 Report 下钻返回；Comparison Compatibility 细化见 D-13；趋势与 Finding-scoped AI 对话按 B-16/B-17 重开，不作为当前 Comparison 完成依赖 |
 | M4 Structured Training | Planned | R-F01～R-F08 | Free/Structured 选择、PREP/STAR/Pyramid、Framework Analysis 与问题重练闭环（复用 M3 比较能力；重练不强制选择框架） |
 | Streaming ASR public delivery | In progress | ASR-M01～M04（含 M04a 内部资格） | 已完成部分见 §3；剩余公开交付任务及门槛见 §4.2；这是并行交付轨道，不占用产品里程碑编号 |
 | Public desktop delivery | External gate | PKG-05、PKG-06 | 签名、许可和目标平台证据满足公开发布；这是外部门禁，不是 M4 的后续产品里程碑 |

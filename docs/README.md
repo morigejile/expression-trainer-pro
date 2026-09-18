@@ -9,7 +9,7 @@
 | 产品定位、目标与边界 | [Requirements §3](product/requirements.md#3-产品目标与原则) | 不另建产品定义副本 |
 | 必须做到什么、如何验收？ | [Requirements](product/requirements.md) | R-/NFR-/AC- 编号、优先级与验收；不维护按钮/Screen 清单 |
 | 用户怎么完成训练、理解 Finding、继续练习？ | [Training Flow §2–§11](product/training-flow.md#2-core-experience-flow-v1) | 用户流程、报告交互和 Practice Chain 产品语义 |
-| Screen / Workspace、Settings / Help / History 如何组织？ | [Training Flow §12–§14](product/training-flow.md#12-ui-与文案原则) | Screen Structure 与跨 Screen UX 的现有承载位置；未决容器/交互显式保留，不补做设计 |
+| Screen / Workspace、Settings / Help / History 如何组织？ | [Training Flow §3、§12–§14](product/training-flow.md#13-screen-structure-收敛基线) | Home/准备检查、Screen × State Map、Utility 与导航的唯一 Owner；deferred 定位在 §13.5，实现细节在 §14 |
 | Session、来源 Finding、Comparison、Persistence 的数据含义？ | [Data Model](architecture/data-model.md) | 实体、事实/派生结果、关系与不变量；不定义页面导航 |
 | 当前实际实现是什么？ | [Current As-Is](architecture/current.md) | 包含未接入普通录音的存储基础；实现与产品验收完成分开 |
 | 目标系统如何支撑？ | [Target To-Be](architecture/target.md) | 组件职责与依赖，不复制现状表或产品规则 |
@@ -36,7 +36,7 @@
 | [Roadmap 调整提案](archive/reviews/roadmap-adjustment-2026-09-13.md) | Roadmap、Requirements、Backlog |
 | [M0 Gap Analysis](archive/reviews/m0-gap-analysis-2026-09-16.md) | Current、Requirements、Data Model |
 | [M0 Consistency Review](archive/reviews/m0-consistency-review-2026-09-16.md) | 当前 Canonical 文档；历史 Pass 不能证明后续修订仍正确 |
-| [过期 UI audit](archive/reviews/ui-state-audit-2026-09-02.md) | Flow 的现有 UX 约束；细节待 Interaction / State Design |
+| [过期 UI audit](archive/reviews/ui-state-audit-2026-09-02.md) | Flow §12–§14 的目标 UX、Screen / State 与导航；仅未冻结实现细节待 Interaction / State Design |
 
 ## 维护规则
 

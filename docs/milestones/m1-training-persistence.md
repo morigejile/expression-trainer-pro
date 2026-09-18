@@ -49,12 +49,12 @@ M1 changes storage, application boundaries, and the target homepage entry surfac
 
 ### User experience
 
-- Training History（界面名称“训练历史”）list populated from durable sessions instead of the five-record memory buffer.
+- Training History（界面名称“训练历史”）list populated from durable sessions instead of the five-record memory buffer. 列表/单条打开切片按 R-P04 和 [Training Flow §13.2](../product/training-flow.md#132-history-与-comparison--review) 验收；选择对比仍归 M3。
 - Open a session after restart and view transcript, existing statistics, and audio playback when available.
 - Delete a session and its managed artifacts through an explicit user action.
-- 按 R-P09 落实 [Training Flow §3.1](../product/training-flow.md#31-默认状态) 的首页动作收敛。
+- 按 R-P09 落实 [Training Flow §3.1](../product/training-flow.md#31-默认状态) 的极简 Preparing 首页与 Start Control Area；Screen / State 和 Utility 边界引用该文档 §13，仍不提前加入 M4 配置继承能力或整套 UI 重设计。
 - Update first-recording/help copy to state local persistence, manual deletion, the cloud-audio boundary, and which transcript/metric/instruction data a configured remote AI profile may receive.
-- Visible error/degraded states for failed finalisation, missing audio, corrupt records, and unsupported data versions. 保存成功尽量弱提示，失败明显提示并提供重试。
+- Visible error/degraded states for failed finalisation, missing audio, corrupt records, and unsupported data versions. 本阶段所涉及的检查与错误反馈遵循 [Training Flow §3.5、§12.2](../product/training-flow.md#35-麦克风与-asr-的准备检查)；Report 分析失败不等于保存失败，已存记录继续可读；M2 的报告 timeout 集成与 M3 Comparison 不提前成为本阶段条件。
 
 ### Focused verification
 

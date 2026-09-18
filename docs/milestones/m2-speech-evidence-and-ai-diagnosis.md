@@ -27,11 +27,11 @@ Each step may run a focused spike before implementation. A spike closes its name
 - SenseVoiceSmall 可选主 ASR：模型选择、utterance 能力声明、转写等待与失败恢复、取消和资源上限，以及独立的公开分发许可边界；默认 streaming 模型不变。
 - Versioned deterministic metrics and Common Analysis for language organisation, structure, pace, pauses, fluency, and filler behaviour where evidence supports them.
 - Schema-validated AI diagnosis, evidence references, retryable failure states, and local/remote profile distinction.
-- One shared report composition and an evidence-driven radar chart. Report Workspace 的摘要、Finding 展开态与完整详细层遵循 R-A08 及 Training Flow；历史详情复用同一容器，重练执行与比较不提前拉入 M2。
+- One shared report composition and an evidence-driven radar chart. Processing / Report 可用性与恢复按 R-A08 / Training Flow §6–§7.4 集成；摘要、Finding 展开态与完整详细层遵循同一 Owner；历史详情复用同一容器，重练执行与比较不提前拉入 M2。
 
 ## Out of Scope
 
-- Comparison, longitudinal trends, or Session-linked AI conversation; these belong to M3.
+- Comparison belongs to M3; Progress / Trends and Finding-scoped AI conversation remain deferred under Backlog B-16/B-17, not M2 delivery requirements.
 - PREP, STAR, Pyramid Guidance or Framework Analysis; these belong to M4.
 - 问题重练执行、范围选择与新 attempt 闭环沿用 M4；M2 的问题详情不使这些后续能力成为当前完成条件。
 - Electron-to-Tauri migration, native capture rewrite, mobile, cloud sync, hosted gateway, vector retrieval, or a generic model/plugin system.
@@ -52,8 +52,8 @@ AC 编号用于交付切片，验收规则引用唯一 Owner：
 | AC-M2-02 | R-A09/R-A10；Data Model §5–§6 | VAD 与所选主 ASR 分别验证来源、取消/失败、本地事实保护和模型切换 |
 | AC-M2-03 | R-C04、R-A01–R-A03/R-A07；Data Model §3 | 保留既有本地统计、无 LLM 可用及指标含义说明；同事实和定义版本可重算，Finding 可定位证据并支持未知态 |
 | AC-M2-04 | R-A04/R-A11 | 本地/远程 profile、首次启用、无配置、无效 schema、超时及重试 |
-| AC-M2-05 | R-A05/R-A08；Training Flow §7–§8 | 统一 Report、渐进披露与雷达证据/版本/缺失态；不拉入 M4 重练执行 |
-| AC-M2-06 | NFR-01；R-A09/R-A10；Target §9 | 离线及模型失败时已保存记录可读；新训练明确恢复/改选路径，无静默换模型或伪成功 |
+| AC-M2-05 | R-A05/R-A08；Training Flow §6–§8 | 验证可信/不确定进度、正常/Partial 判定后进入 Report、卡住时 timeout 与恢复、离开后保存；局部失败不锁其他内容，保存提示真实；已有内容按需展开与雷达缺失态，不做 progressive report rendering，不拉入 M4 重练执行 |
+| AC-M2-06 | NFR-01/NFR-07；R-A09/R-A10；Target §9；Training Flow §3.5/§12.2 | 离线及模型失败时已保存记录可读；新训练明确恢复/改选路径，无静默换模型或伪成功 |
 
 编号引用 [Requirements](../product/requirements.md)；协议见 [Speech Contract](../architecture/speech-contract.md)，数据规则见 [Data Model](../architecture/data-model.md)，交互见 [Training Flow](../product/training-flow.md)，组件故障职责见 [Target](../architecture/target.md)。
 
