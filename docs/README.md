@@ -19,7 +19,7 @@
 | 什么时候做、当前进度如何？ | [Roadmap](roadmap.md) | 阶段顺序、任务状态、依赖及外部门禁 |
 | 暂时不做什么、何时重开？ | [Backlog](product/backlog.md) | Not Now、重开条件、待决追踪；交互细节只在 Flow §14，链实体细节只在 Data Model §12 |
 | AI 启用与 Privacy 要求？ | [R-P07 / R-A11 / NFR-03](product/requirements.md) | 用户知情与数据边界；界面归属引用 Flow，实现引用 Current |
-| SenseVoice 的产品角色？ | [R-A10](product/requirements.md#6-m2表达证据ai-分析与雷达图) | 选用主 ASR；选择理由/资源基线见 ADR-0009，集成待办见 D-08 |
+| SenseVoice 的产品角色？ | [R-A10](product/requirements.md#6-m2表达证据ai-分析与雷达图) | 可选主 ASR；选择理由/资源基线见 ADR-0009；下载异常和真实设备验收按 Backlog B-23 / D-08 延期 |
 | 开发命令、版本与验证触发？ | [Development](development.md) | 具体版本仍以项目配置为准；不复制运行时协议 |
 | 平台和制品已验证到什么程度？ | [Support Matrix](support-matrix.md) | 已有证据及限制，不以目标推断已支持 |
 | Benchmark 如何复跑？ | [Harness](benchmark/harness.md)、[数据集契约](../benchmark/datasets/README.md) | 开发工具合同；候选/产品模型字段分别由两个机器 registry 管理 |

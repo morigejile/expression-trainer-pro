@@ -180,7 +180,7 @@ M1 对本原则的落实限于已有完成逐字稿、稳定片段、音频和�
 
 Common Analysis 覆盖共享维度，如流畅/节奏、清晰/精确、简洁/聚焦、组织/衔接，具体定义沿用 M2。Free 可识别结论过晚、支撑不足、顺序混乱、重复或衔接问题；用户未请求框架视角时，不按 PREP/STAR/Pyramid 槽位判错。
 
-Finding 使用稳定、精简、受控的 category，AI 不自由创建分类；无足够证据不创建 Finding。M2 初始枚举已确认：`organization`（组织与衔接）、`argument`（论点与论据）、`delivery`（节奏与停顿）、`wording`（措辞与口头禅）。后续可在实际需求下版本化扩展，当前响应不得临时增加类别。category 不等于 Radar dimension，也不要求每类都有分数或图轴；量程、映射与校准仍归 [Backlog D-04](backlog.md#m2-decision-state)。Finding 的字段、证据与 provenance 仍只由 [Data Model §5–§6](../architecture/data-model.md#5-later-derived-entities) 定义。
+Finding 使用稳定、精简、受控的 category，AI 不自由创建分类；无足够证据不创建 Finding。M2 初始枚举已确认：`organization`（组织与衔接）、`argument`（论点与论据）、`delivery`（节奏与停顿）、`wording`（措辞与口头禅）。后续可在实际需求下版本化扩展，当前响应不得临时增加类别。category 不等于 Radar dimension，也不要求每类都有分数或图轴；量程、映射与完整校准延后至 [Backlog B-20](backlog.md#not-now)，M2 决策状态见 D-04。Finding 的字段、证据与 provenance 仍只由 [Data Model §5–§6](../architecture/data-model.md#5-later-derived-entities) 定义。
 
 Structured 在 Common Analysis 外增加所选框架的 Framework Analysis。专项分析说明框架部分的存在、顺序、比例、支撑或层级关系，不替代 Common Analysis，也不重复给无关表达问题评分。
 

@@ -113,7 +113,7 @@ Owns mapping between the current AudioWorklet/Utility Process implementation and
 
 启动预检与操作前复检复用既有采集/ASR 能力边界：适配层提供实际可用性与失败结果，Application Core 在依赖能力的操作前重新确认，UI 按 [Training Flow §3.5、§12.2](../product/training-flow.md#35-麦克风与-asr-的准备检查) 呈现。预检结果不等于麦克风授权或活跃录音 Session，不引入独立健康检查服务。
 
-M2 的 SenseVoiceSmall 接入本 adapter，产品角色按 [R-A10](../product/requirements.md#6-m2表达证据ai-分析与雷达图)，能力/缓冲基线按 [ADR-0009](adr/0009-productize-multiple-asr-models.md)。主 ASR 的数据归属见 Data Model §6。
+M2 的 SenseVoiceSmall 接入本 adapter，产品角色按 [R-A10](../product/requirements.md#6-m2表达证据ai-分析与雷达图)，能力/缓冲基线按 [ADR-0009](adr/0009-productize-multiple-asr-models.md)。主 ASR 的数据归属见 Data Model §6。SenseVoice 下载修复与真实设备/资源验收按 B-23 延期，不作为 M2 Closeout 依赖。
 
 ### 4.6 Speech evidence pipeline
 
@@ -193,6 +193,8 @@ TrainingSession facts
 ```
 
 Finding is the diagnosis single source of truth for the shared Report. Radar is only a projection of already available evidence, MetricRuns and validated interpretations: each dimension declares its source, mapping, version and unavailable condition. It may combine evidence types, but it is not an analyzer, does not turn unavailable into zero, and does not assume a universal 0–100 scale.
+
+M2 的雷达交付边界按 R-A05 验收未校准状态；完整投影与校准按 Backlog B-20 重开，不成为 M2 Core 或 Report 的完成依赖。
 
 分析资格与重练来源关系统一由 [Data Model §6](data-model.md#6-analysis-and-retraining-invariants) 定义；用户流程见 [Training Flow §9–§11](../product/training-flow.md#9-带上下文再次进入-training-workspace)。Core 为重新分析与新训练提供不同命令，并复用同一 Session/report 边界，不复制交互规则。
 

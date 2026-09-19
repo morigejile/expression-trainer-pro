@@ -268,6 +268,8 @@ Transcript evidence 继续使用既有稳定 segment ID；payload 内的音频�
 
 `common-metrics-v1` 是对保存事实的纯确定性测量。文字计数为 Unicode 文字与数字字符，排除空白、标点和其他符号；词表命中沿用当次本地统计及自定义词表快照，不以今日词表重新扫描历史。实现入口为 [Common Analysis](../../lib/common-analysis.js)，共享字符口径见 [text statistics](../../shared/text-statistics.js)。
 
+Common result 的 `localStatsSnapshot` 保存本次采用的词项计数输入，未知时为 null；可知的自定义词表保存在同一 result 的 `provenance.promptSnapshot.customWords`。新训练首次完成事实保存时可计算该输入；Partial 重试优先复用同一 transcript revision 的已有 Common 输入或旧 `metrics` 统计，不因之后修改词表而改变它。早期 M2 结果只有词表快照时可按该快照恢复；历史两类证据均缺失时，依赖词项的指标为 unavailable，其余测量和 AI 诊断仍可运行。AI 的训练目标/分析指令可在显式重试时更新，不改变已保存词项统计。
+
 | Metric ID | 单位 / 分母 | 输入与含义 |
 |---|---|---|
 | `text-character-count` | `characters` | 已保存 transcript 的文字与数字字符数；不是分词后的词数 |
@@ -287,7 +289,7 @@ Transcript evidence 继续使用既有稳定 segment ID；payload 内的音频�
 
 依赖缺损按项传播：无效 transcript/本地统计阻断相应文字统计；音频缺失、范围不匹配、`audio-overrun` 或 `audio-discontinuity` 阻断依赖完整覆盖的 VAD 与混合速率；同时检查 Session 质量标记与 timing quality events。ASR 失败或接受 sample 少于采集 sample 时阻断需要完整转写的音频速率，仍保留已有文字观察。单纯缺少 token timestamp 不使所有文字或总量指标失效。
 
-VAD 是模型观察。当前 `vad-thresholds-uncalibrated` 作为降级原因随 Source 和 Metric 保留；只要音频覆盖完整、区间有效，可显示检测总量与间隔，但不得据此宣称检测了所有短停顿。短静音可能被合并、边界可能带模型 padding；“间隔时长”不能直接解释为“停顿过长”“不流利”或数值评分。阈值校准仍归 D-07，雷达量程仍归 D-04。
+VAD 是模型观察。当前 `vad-thresholds-uncalibrated` 作为降级原因随 Source 和 Metric 保留；只要音频覆盖完整、区间有效，可显示检测总量与间隔，但不得据此宣称检测了所有短停顿。短静音可能被合并、边界可能带模型 padding；“间隔时长”不能直接解释为“停顿过长”“不流利”或数值评分。D-07 的 M2 有限人工复核已通过，但不据此移除未校准标记；扩大统计校准按 Backlog B-24 重开；雷达量程与完整校准延后至 Backlog B-20，M2 保持上述未校准快照。
 
 ### 5.4 Structured Diagnosis V1
 

@@ -1,13 +1,13 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43；内部开发/测试，持久化训练与 M2 分析链已集成，三款 streaming ASR 及可选 SenseVoice utterance ASR；验证范围与剩余证据见 §10/§13，公开模型分发仍受外部门禁约束
+> 状态：Verified from Source + Electron 43；内部开发/测试，M2 已按有限人工验收边界关闭；SenseVoice 下载与实机验收延期，最终证据见 §13；公开模型分发仍受外部门禁约束
 > 运行时基线日期：2026-09-01；存储基础证据：2026-09-16；M1 产品集成证据：2026-09-19
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`
 > 描述对象：当前集成分支的产品运行时、开发工具边界与已验证的内部安装基线
 
 ## 1. 证据边界
 
-当前事实来自源码、依赖清单和 Git 状态，并由 Node 测试、Electron smoke、packaged native-load、真实 Paraformer 首次安装及升级 smoke 支持。已验证 Main/Preload/Renderer、utility-process IPC、执行单元退出与重建、Fake LLM、M1 首次录音告知、持久化 WAV 回放与结构化片段分析，以及 Electron AudioWorklet 对 16/44.1/48 kHz fixture 的适配。真实可配置麦克风、真实外部 LLM、接近资格线硬件及非 Windows x64 制品仍未形成证据。
+当前事实来自源码、依赖清单和 Git 状态，并由 Node 测试、Electron smoke、packaged native-load、真实 Paraformer 首次安装及升级 smoke 支持。已验证 Main/Preload/Renderer、utility-process IPC、执行单元退出与重建、Fake LLM、M1 首次录音告知、持久化 WAV 回放与结构化片段分析，以及 Electron AudioWorklet 对 16/44.1/48 kHz fixture 的适配。本轮真实麦克风 + Zipformer Small CTC 中文 INT8、Report/History 播放与保存恢复、VAD/Evidence 有限人工复核及真实外部 AI 已获用户确认，结论见 M2 验收矩阵。多采样率/可配置设备、接近资格线硬件及非 Windows x64 制品仍不外推。
 
 M1 增量：[训练存储与产品集成](current.md#10-m1-training-storage-foundation) 已接入普通录音、已有结果、训练历史与共享 Report；包含极简 Preparing、静默准备检查、删除和保存失败重试。旧图集已归档，§4 图按当前源码更新；自动化证据与真实设备验收分开记录。
 
@@ -209,7 +209,7 @@ getUserMedia({audio:true})
 └→ Renderer Float32→Int16 → 当前有界录音缓冲（不经 IPC）
 ```
 
-AudioCapture 返回并保留请求值、`audioContext.sampleRate` 与可用的 track rate；实际 context 不是 16000 时在创建 worklet 前失败关闭。固定 Electron fixture 已证明 16/44.1/48 kHz 确定性缓冲进入 16 kHz graph 后的总帧数、平台均值与时间过渡；真实麦克风/驱动仍为 Runtime-TBD。
+AudioCapture 返回并保留请求值、`audioContext.sampleRate` 与可用的 track rate；实际 context 不是 16000 时在创建 worklet 前失败关闭。固定 Electron fixture 已证明 16/44.1/48 kHz 确定性缓冲进入 16 kHz graph 后的总帧数、平台均值与时间过渡；当前默认真实麦克风主链路已通过用户验收；其他采样率/驱动组合仍为 Runtime-TBD。
 
 每块仍经 TypedArray 规范化和两次 structured clone；空载吞吐已足够，当前保留 10-block 可观测队列而不增加共享内存。
 
@@ -243,7 +243,7 @@ endpoint/final sentence
 → 播放/拖动跨片段更新字幕与已有建议，不再次推理
 ```
 
-导航不改变结果归属；删除后的迟到结果不能恢复记录。失败状态单独保存，上一份成功报告/回放结果仍可读。缺失的指标显示未知，不补零；M2 Common 独立计算，不以旧 metrics 快照是否存在阻止重试。旧自由文本报告仅留兼容接口。生成时无法获知的来源字段保持 null。
+导航不改变结果归属；删除后的迟到结果不能恢复记录。失败状态单独保存，上一份成功报告/回放结果仍可读。缺失的指标显示未知，不补零；M2 Common 不以旧 metrics 快照是否存在阻止重试，但历史词项统计遵循 Data Model §5.3 的快照复用/缺失规则。旧自由文本报告仅留兼容接口。生成时无法获知的来源字段保持 null。
 
 ### 6.4 设置与 Prompt
 
@@ -262,7 +262,7 @@ Settings/Prompt Renderer 通过 Preload 调用 Main 中的 userData JSON store�
 
 | ID | 当前风险 | 已有边界 | 下一次触发条件 |
 |---|---|---|---|
-| TD-03 | 真实麦克风/驱动的采样率行为仍无设备证据 | 固定 Electron graph 已覆盖 16/44.1/48 kHz | 有可配置真实设备时复核；实测失败才评估 WASM 备选 |
+| TD-03 | 默认真实麦克风链路已通过，其他采样率/驱动组合仍缺设备证据 | 固定 Electron graph 已覆盖 16/44.1/48 kHz | 有可配置真实设备时复核；实测失败才评估 WASM 备选 |
 | TD-04 | 320 样本块仍经两次 structured clone | 10-block 队列可观测且失败关闭 | 真实推理 profile 证明复制成为瓶颈时再换通道 |
 | TD-07 | `ExpressionTrainer` 仍编排多个训练阶段 | session、stop single-flight、迟到结果和 overrun 已分别受控 | 新状态使现有局部状态无法可靠组合时再抽取状态机 |
 | TD-08 | 无 CI，Experimental 平台无制品证据 | Windows x64 Node/Electron/安装/升级 smoke 已建立 | OPS-01 或实际新增支持平台时增加最小验证 |
@@ -289,7 +289,7 @@ Settings/Prompt Renderer 通过 Preload 调用 Main 中的 userData JSON store�
 - Audio 逐块 invoke、TypedArray 规范化与跨进程 structured-clone 复制；
 - 完整训练状态仍由一个 Renderer 编排类组合，只有状态继续增长时才做局部抽取；
 - settings/custom-prompt 外层大小、页面 CSP/sandbox 与明文密钥留到对应具体风险或公开发布收口；
-- 接近资格线性能、真实麦克风和 Experimental 平台仍无证据；
+- 接近资格线性能、多采样率/其他麦克风组合和 Experimental 平台仍缺证据；默认真实麦克风链路见 M2 验收；
 - 首次安装与 1.0.0→1.0.1 升级已可复现，后续只维护能发现实质回归的验证。
 
 结论：当前内部基线的运行时、评测和交付边界已经收敛。剩余风险只随模型公开交付、utterance 轨道或其他已重开工作渐进处理，不开展脱离当前任务的全面重构。
@@ -372,7 +372,7 @@ npm run smoke:package
 | AC-M1-09 | Product Electron offline/offline-read 两个进程：阻断 HTTP(S)/Main fetch 且无 AI 配置，完成同一记录的保存、重启、读取、播放与删除 |
 | AC-M1-10 | `test/transcript.test.js` 与 ASR/audio/PCM/Electron 回归：暂停、恢复、收尾、过载和单条上限 |
 
-上述 M1 桌面 smoke 使用隔离 userData、确定性音频输入与 Fake ASR/LLM，真实麦克风/驱动及外部 LLM 联调尚未验证。历史 2026-09-16/19 基础/API 切片使用替代工具链的证据仅代表当时切片；M1 代码实施与设备人工验收分别记录，后续 M2 增量另见 §13。
+上述 M1 历史 smoke 使用隔离 userData、确定性音频输入与 Fake ASR/LLM，当时未验证真实麦克风/驱动及外部 LLM；本轮默认真实录音、播放/恢复及 AI E2E 结果统一见 M2 人工验收，不能将历史缺口当成当前仍未测试。历史 2026-09-16/19 基础/API 切片使用替代工具链的证据仅代表当时切片；M1 代码实施与设备人工验收分别记录，后续 M2 增量另见 §13。
 
 ## 11. 诊断导出现状
 
@@ -399,14 +399,23 @@ npm run smoke:package
 2026-09-19：已保存训练由 Main 的 `session-analysis.js` 调度 Speech Evidence、Common Analysis、结构化 Diagnosis 和 Report snapshot；唯一数据定义见 [Data Model §5](data-model.md#5-later-derived-entities)。沿用 SQLite v2 的不可变 results，快照绑定本次确切结果 ID；Renderer 不能写入这四种受控结果。新增 `analyzeTrainingSession` 与 `cancelTrainingAnalysis` 主窗口 API。保存事实不依赖 AI，历史 get/list 不重新分析，显式重试追加结果，不覆盖先前成功诊断。
 
 - 时间证据增加有序 quality-event、stopped 汇总及持久 `timing.qualityEvents`；queue overrun 保存可知的排队/拒绝块范围，未知范围保留 null。utterance 识别失败或用户取消收尾时保留已捕获 WAV，ASR 质量标为不可用，不能生成伪转写成功诊断。
-- SenseVoice 使用冻结的可选 Provider，无 partial，最多 4,800,000 Float32 样本。停止时推理；取消能终止正在执行 stop 的识别子进程，下一会话重建。技术默认仍为 Zipformer Large。
+- SenseVoice 使用冻结的可选 Provider，无 partial，最多 4,800,000 Float32 样本。停止时推理；取消能终止正在执行 stop 的识别子进程，下一会话重建。技术默认仍为 Zipformer Large；用户本轮选用并验收的实用主路径为 Zipformer Small CTC 中文 INT8。SenseVoice 本轮下载异常、真实设备/资源验收未完成，按 Backlog B-23 延期。
 - Silero VAD 使用独立 `models/speech-evidence-registry.json`，复用 Model Manager 的固定文件大小/hash 安装与离线缓存；首次分析按需安装到 modelRoot 下的 speech-evidence 目录。独立 utility process 隔离 native 崩溃，并支持硬取消/超时；单个 Main 串行执行 VAD，最多接纳三条分析任务。整个分析预算为 120 秒，AI 请求预算为 60 秒。失败保存 unavailable，已保存事实与可用指标继续可读。
-- Common 的 15 个指标是确定性观测值，不输出表达质量分。VAD 区间明确带未校准限制；缺失/不连续证据按依赖使指标 unknown，不用零填补。AnalysisContext 只携带当前文本、允许的指标/语音区间、质量及分析指令；没有音频字节、Key、endpoint、路径或其他记录。
+- Common 的 15 个指标是确定性观测值，不输出表达质量分。`session-analysis-inputs.js` 复用已保存词项输入，首次 finalize 的新训练才可采用当前词表；历史缺失统计不以当前设置补算。VAD 区间明确带未校准限制；缺失/不连续证据按依赖使指标 unknown，不用零填补。AnalysisContext 只携带当前文本、允许的指标/语音区间、质量及分析指令；没有音频字节、Key、endpoint、路径或其他记录。
 - LLM 配置 schema 3 增加每个 profile 的自动诊断开关；新配置为空、旧配置迁移默认关闭。Main 在实际发起前重新解析精确 active profile，未启用、缺失或删除不会自动选择其他服务。界面披露实际本地/远程目标与发送内容；改变 Provider、模型或地址会清除该 profile 的自动启用状态。
 - 训练中只使用本地规则。报告显示摘要、首三项 Finding、可展开的更多发现/指标、证据定位及缺失状态。四类 Finding 与未校准雷达的产品语义只见 [Training Flow](../product/training-flow.md)。Processing 在事实保存后可离开到 History，完成不会强制跳回；分析取消/失败可恢复，历史读取保持原快照。
+- 保存期间取消分析后，Renderer 只读取已保存结果，不再调用可能新建任务的分析入口。分析刷新保留尚未写入的结果、统计和失败提示；成功重试同一结果 ID 后才清除待保存状态。
 
-真实模型有限测量与尚未完成的代表性校准见 [M2](../milestones/m2-speech-evidence-and-ai-diagnosis.md#当前实施与有限证据)。真实 Electron 43.4.1 / 内置 Node 24.18.1 已验证 VAD 中文 WAV、损坏 ONNX 子进程退出隔离、取消及下一任务恢复；这些探测不代表准确率、资格线硬件或全部 M2 验收。
+历史真实模型有限测量与本轮有限人工复核边界见 [M2](../milestones/m2-speech-evidence-and-ai-diagnosis.md#当前实施与有限证据)。真实 Electron 43.4.1 / 内置 Node 24.18.1 已验证 VAD 中文 WAV、损坏 ONNX 子进程退出隔离、取消及下一任务恢复；这些探测不代表准确率、资格线硬件或全部 M2 验收。
 
-真实模型制品验证另从新 `app.asar` 加载 VAD worker、SenseVoice Factory 和 Sherpa native 依赖，无源码 node_modules 回退。VAD 的上述四项场景通过；SenseVoice 对既有 5.592 秒中文 WAV 初始化约 1.49 秒、识别约 136 毫秒，返回「开饭时间早上九点至下午五点」，验证无 partial、取消后空结果及释放，峰值约 382 MiB。普通制品仍不携带模型权重，探针复用 Git 外缓存，不改变模型公开再分发状态。
+此前真实模型制品验证另从当次 `app.asar` 加载 VAD worker、SenseVoice Factory 和 Sherpa native 依赖，无源码 node_modules 回退。VAD 的上述四项场景通过；SenseVoice 对既有 5.592 秒中文 WAV 初始化约 1.49 秒、识别约 136 毫秒，返回「开饭时间早上九点至下午五点」，验证无 partial、取消后空结果及释放，峰值约 382 MiB。普通制品仍不携带模型权重，探针复用 Git 外缓存，不改变模型公开再分发状态。
 
-当前集成验证：Node 24.20.0 / npm 11.19.0 下 `npm test` 共 704 项，702 通过、0 失败、2 项因 Windows 文件符号链接权限跳过。Windows x64 `npm run package` 成功，`npm run smoke:package` 返回 `PACKAGED_APP_SMOKE_OK`。桌面/制品产品流验证连续七条训练、自动诊断、修改设置后重启读取原来源、播放、删除及无配置断网保存；ASR/LLM 为确定性替身。定向测试另覆盖取消与采集尾块排空顺序、超时、无效响应与引用、启用/撤销、保存重试和导航后的结果归属。真实麦克风和外部 LLM 联调仍未验证。
+2026-09-19 最终收尾验证：Node 24.20.0 / npm 11.19.0 下 `npm test` 共 724 项，722 通过、0 失败、2 项因 Windows 文件符号链接权限跳过。Windows x64 `npm run package` 成功，`npm run smoke:package` 返回 `PACKAGED_APP_SMOKE_OK`。桌面/制品产品流验证连续七条训练、自动诊断、修改设置后重启读取原来源、播放、删除及无配置断网保存；ASR/LLM 为确定性替身。定向测试另覆盖取消与采集尾块排空顺序、保存期间取消不重启分析、待保存结果不被刷新覆盖、超时、无效响应与引用、启用/撤销、保存重试和导航后的结果归属。
+
+此前打包首次直连下载源超时；已有 Electron 43.4.1 ZIP 与安装包内 checksum 匹配，但打包器仍需获取远端校验清单。仅在重试命令环境中启用现有系统代理后打包成功，未关闭校验、修改依赖或持久更改代理配置。
+
+本机 HTTP 回环集成验证经真实 fetch、Provider 协议、严格响应校验、SQLite 持久化和报告投影，覆盖 custom/Ollama 协议、401/429/503、超时、非法证据、活动请求取消与显式重试、撤销后不发送，以及修改词表后统计稳定、重启不重复请求。完整链路确认 Source/Metric/Diagnosis/Report 的精确 ID 与三类 Finding 引用（文本、指标、语音区间）；结果写入失败的故障注入确认重试不拼入孤立旧结果。服务响应及区间仍为受控 fixture，不代表外部 LLM 输出质量或 VAD 准确率。
+
+人工核验已有 VAD 的入口为只读 [`inspect-speech-evidence.js`](../../scripts/inspect-speech-evidence.js)：读取 Report 精确引用的 Source、校验原 WAV，并导出语音区间、内部 gap、首尾非语音的 sample/秒边界与原始快照；用既有 Common Metric 定义核对已保存汇总。正式 Report、模型参数、持久化 Schema 均未改变。操作方法见 [Development](../development.md#m2-已保存-vad-区间核验)。现有粒度足以复核区间/汇总及当前 Finding 的文本、指标、语音区间引用；仍不提供词级对齐或证明 AI 解释在语义上成立，本轮用户反馈确认 AI Diagnosis 正常，不外推所有推理结论。
+
+本次 Closeout 归档此前未提交的统计输入快照修复、取消/保存刷新修复、HTTP/异常测试及只读 VAD 核验工具，并落盘最终验收决定；本轮未新增实现。M2 正式关闭，人工证据和各项边界只在 [M2 验收矩阵](../milestones/m2-speech-evidence-and-ai-diagnosis.md#acceptance-criteria) 定义。SenseVoice 下载异常与真实 smoke/资源验收（B-23）明确延期；Report UX（B-22）、雷达完整校准（B-20）和扩大 VAD 校准（B-24）为非阻塞后续项，重开条件只见 [Backlog](../product/backlog.md#not-now)。雷达及 VAD 来源的未校准标记保持不变。

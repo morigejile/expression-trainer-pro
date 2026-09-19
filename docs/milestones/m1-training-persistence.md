@@ -1,6 +1,6 @@
 # M1 — Training Persistence
 
-> **Status:** Implementation complete — automated and packaged verification passed; physical-device acceptance pending
+> **Status:** Implementation complete — automated/package verification passed; default-path microphone, playback and save/restore evidence accepted in M2; extended-device coverage remains limited
 > **Depends on:** M0 Architecture & Requirements Baseline
 > **Primary requirements:** R-P01–R-P09, NFR-01–NFR-03, NFR-07–NFR-08
 
@@ -108,7 +108,7 @@ M1 changes storage, application boundaries, and the target homepage entry surfac
 ## Implementation sequence
 
 Steps 1–8 are implemented and automatically verified in the normal product flow; evidence and limitations are recorded in [Training storage](../architecture/current.md#10-m1-training-storage-foundation).
-自动化产品 smoke 使用确定性音频和 Fake ASR/LLM，覆盖 Renderer 录音完成、重启、History/Report、播放和删除；真实麦克风与外部 LLM 验收尚未完成，不将自动化替身等同真实设备证据。
+自动化产品 smoke 使用确定性音频和 Fake ASR/LLM，覆盖 Renderer 录音完成、重启、History/Report、播放和删除。本轮用户已确认默认真实麦克风、Report/History 播放、保存恢复及真实外部 AI 正常，人工结论统一引用 [M2 H-01～H-03](m2-speech-evidence-and-ai-diagnosis.md#收尾后的剩余验收输入)；不将自动化替身等同真实设备证据，也不外推其他设备组合。
 
 This sequence minimises coupled change:
 

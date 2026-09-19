@@ -29,10 +29,24 @@ This backlog keeps plausible future work visible without making it a dependency 
 | B-17 | Finding-scoped AI Conversation | 当前不新增通用 Chat 或对话 Screen；未来优先围绕具体 Finding。 | R-R03 的解释/追问任务重开并关闭 D-05，确认上下文与隐私边界后选择容器。 | M3 候选；不是当前 M3 Comparison 完成条件 |
 | B-18 | 更深层 AI 介入与动态判断 | 在 Evidence/Metrics 可信事实基础上，探索更多场景中的 AI 深度分析与动态决策，提高灵活性、适应性和能力上限；不让 AI 取代稳定测量，也不扩大当前 M2 scope。 | 具体场景能说明 AI 新增判断的价值、最小输入/隐私边界、可验证收益及失败时保护事实的降级方式，并分配独立决策/里程碑。 | M2 后的独立探索；不是当前 M2 完成依赖，也不代替 D-10 |
 | B-19 | 独立启用的可选实时 AI | M2 的训练中本地规则/结束后 AI 分工已在 Training Flow §4 确认；不随自动诊断开关附带启用实时发送。 | 有明确使用场景与收益，确定独立启用、最小上下文、触发/冷却、延迟/成本及局部降级，遵循远程知情边界后再排期。 | 后续独立能力；不是当前 M2 或其他既定里程碑的完成依赖 |
+| B-20 | 雷达维度、量程与完整校准 | M2 按 R-A05 保持 uncalibrated / unavailable；完整校准明确不阻塞 M2，不把 Finding 类别当作评分轴。 | 有代表性样本、维度定义与 MECE 检查、证据到数值的 mapping、量程、版本及缺失条件，并有独立验证结果和明确排期后才启用数值投影。 | M2 之后按证据重开；不自动进入 M3/M4 |
+| B-21 | 主页增加建议语速显示 | 已记录的后续展示需求；建议值来源、适用场景、计量单位及显示位置待细化，不纳入当前 M2 收尾。 | 后续排期时明确建议语速的取值依据与展示方式，并与实际测得的语速区分。 | 待排期；不是 M2 完成依赖 |
+| B-22 | AI Report UX / 内容呈现优化 | 本轮真实 AI Diagnosis 已跑通，但内容密度、信息组织、技术性 Evidence 表达（如 speech ID、sample、estimated）和重复证据/指标入口仍影响阅读；不属于 M2 核心正确性 blocker。 | 后续 Report 产品设计排期时，基于本轮真实报告梳理摘要、Finding、详情与 Evidence 层级；原型验证可读性和入口数量，同时保留可追溯性，再实施。 | M2 后独立设计/实现；不自动扩大 M3 |
+| B-23 | SenseVoice 下载异常 + 真实设备 smoke / 资源验证 | 用户本轮下载异常，未完成真实验收；已有 Provider、自动化和历史制品原生探测不等于下载/实机通过。当前继续使用已验收的 Zipformer Small CTC 中文 INT8。 | 恢复 SenseVoice 支持工作时先复现并修复下载问题，再用 1 条约 60～90 秒自然表达验证下载/加载→录音→识别→保存→Report/History、等待时长、CPU/内存与卡顿/崩溃；同时复核取消/失败恢复和缓存离线使用。无须新模型 Benchmark；公开分发另需许可。 | 明确延期，待单独排期；不是 M2/M3 gate，D-08 跟随此项 |
+| B-24 | 扩大 VAD 数据集 / 代表性统计校准 | 本轮有限人工复核已满足 M2；尚无大规模准确率、跨噪声阈值和资格线资源预算证明，继续保留未校准标记。 | 出现可复现的停顿/边界错误、新噪声或设备场景，或产品确需量化准确率/资源承诺时，限定相关场景，收集独立人工标注并报告误检/漏检、边界偏差及耗时/CPU/内存；影响阈值时版本化，不回写历史。 | 证据触发后单独排期；不自动进入 M3/M4 |
 
 ### VAD 后续优化方向
 
-复杂噪声适配、多 VAD 比较、自动/个性化阈值、多场景深度校准、大规模标注 Benchmark、高级实时语音状态判断均留待后续优化，不进入 M2 最小 VAD V1，也不成为当前交付的新依赖。当前范围与有限验证见 [M2](../milestones/m2-speech-evidence-and-ai-diagnosis.md#有限工程验证范围)。这些方向的具体重开条件、优先级、里程碑和验收要求尚未确认；后续按本页既有重开规则处理，本轮不补造编号或排期。
+扩大数据集、代表性统计校准与资格线资源验证统一由 B-24 管理。复杂噪声适配、多 VAD 比较、自动/个性化阈值及高级实时语音状态判断等方向，只有 B-24 的实际证据表明现有单一 VAD 无法满足需求时才另行界定范围；不进入已关闭的 M2。
+
+### M2 收尾非阻塞限制
+
+- 更细的服务错误文案：当前 503 等非认证/限流 HTTP 错误保存为通用 `analysis-failed`，本地事实保留且可显式重试。只有真实服务验收表明无法据此恢复时再细化，不为文案扩大当前 scope。
+- Finding 优先展示当前采用有效响应顺序的首三项，全部发现可展开；独立排序或反馈偏好优化留待真实使用证据，不在收尾增加评分或排序算法。
+- 逐字音频对齐、逐帧 VAD 概率与专用可视化标注界面不进入当前验收工具。现有 Source 区间、原始 WAV、版本/质量及精确结果引用已支持 M2 的区间与汇总核验；只有已确认 Finding 需要词级定位，或实际边界错误无法用现有证据诊断时，再明确最小数据与工具范围后重开，不能因验收需要向正式 Report 加入全量调试数据。
+- Windows 文件符号链接权限跳过项与较低配置/其他设备覆盖不足保留为验证限制；复验入口与平台提升条件沿用 [Current §13](../architecture/current.md#13-m2-analysis-pipeline) 和 [支持矩阵](../support-matrix.md)，不把内部 M2 收尾变成公开平台资格认证。
+
+上述限制及 B-20/B-22/B-23/B-24 不阻塞 M2；若后续使用发现事实丢失、错误证据归属、越权发送或关键降级失效，则按核心正确性问题处理，不能归入非阻塞优化。
 
 ## Deferred product choices required by planned milestones
 
@@ -43,11 +57,11 @@ These are not architecture projects. Decisions close before the named delivery s
 | D-01 | 容量清理提醒：规则已确认，实施待排期 | After M1；未指定里程碑 | 唯一行为定义见 [Requirements §9.1](requirements.md#91-已确认的后续容量提醒策略实施待排期)。只待细化统计范围/计量单位、检测时机、清理后档位与提醒状态持久化；不以硬配额或自动删除替代可忽略提醒。 |
 | D-02 | Transcript correction scope | After M1 | User workflow and revision/provenance semantics |
 | D-03 | Timing-capable model support policy | M2 | Per-model capability matrix and graceful-degradation examples |
-| D-04 | Finding categories and Radar dimensions/scales | M2 | 初始 Finding 类别按 Training Flow §7.1；剩余雷达定义、映射、量程与校准证据 |
+| D-04 | Finding categories and Radar dimensions/scales | M2 类别与未校准边界已收口；完整校准归 B-20 | 初始 Finding 类别按 Training Flow §7.1；M2 不要求完成雷达定义、映射、量程或校准 |
 | D-05 | Finding-scoped AI context boundary | B-17 重开时；M3 候选 | 明确来源 Finding / Evidence / Report / Session 的最小上下文、用户可见范围、删除与 token budget；不作为当前 Comparison 交付依赖 |
 | D-06 | Framework definitions and scoring | M4 | Versioned PREP/STAR/Pyramid definitions, examples, and evidence rules |
-| D-07 | Neural VAD model, thresholds, and resource budget | M2 | 按 [M2 有限工程验证范围](../milestones/m2-speech-evidence-and-ai-diagnosis.md#有限工程验证范围) 收敛单一 VAD V1 的模型、阈值、资源与区间/降级/打包证据；不整体推迟 VAD，也不扩大为研究级 Benchmark。 |
-| D-08 | SenseVoiceSmall 可选主 ASR 的集成与资源验证 | M2 | 基于 [ADR-0009](../architecture/adr/0009-productize-multiple-asr-models.md) 的 utterance/5 分钟有界缓冲基线，验证模型选择、结束后解码、取消、时长与 CPU/内存、失败恢复、打包和公开分发许可；不作为另一主 ASR 的辅助证据任务。详细等待/失败交互留到 Interaction / State Design。 |
+| D-07 | Neural VAD model, thresholds, and resource budget | M2 有限验收已关闭；扩大验证归 B-24 | 现有单一 Silero 的工程证据与有限人工复核满足本阶段；不将其写成统计准确率、完整阈值或资格线资源预算认证。 |
+| D-08 | SenseVoiceSmall 可选主 ASR 的集成与资源验证 | 集成证据保留；下载/实机验收延期至 B-23 | 沿用 ADR-0009 的 utterance/5 分钟有界缓冲基线；下载修复、真实等待/资源、取消恢复和离线使用按 B-23 一并验收，公开分发许可独立跟进。 |
 | D-09 | Default AI onboarding and initial profile availability | M2 | Fresh-install flow defining how local and remote profiles are distinguished, when a profile becomes active, and how the accepted R-A11 disclosure/enablement boundary is presented |
 | D-10 | M2 本地实时规则与结束后 AI 的分工 | M2；决策已关闭 | 按 Training Flow §4 实施并验证；后续可选实时 AI 的上下文、触发、延迟/成本与独立启用归 B-19，不重开当前阶段选择。 |
 | D-11 | 报告复制／导出／分享、备份 | After M1；后续待办，未指定里程碑 | 先明确报告/详情入口、格式与数据范围、分享方式、备份及恢复边界；不预设云分享或账号。M1 首页移除复制/保存不等于永久禁止这些能力，也不将诊断 JSON 导出误并为训练内容导出。 |
@@ -60,11 +74,11 @@ These are not architecture projects. Decisions close before the named delivery s
 
 | ID | 本轮状态 | Canonical owner | 仍需交付/证据 |
 |---|---|---|---|
-| D-03 | **Closed — policy; acceptance evidence partial** | [Speech Contract §6](../architecture/speech-contract.md#6-time-and-timestamp-rules)、R-A06 | 当前适配器矩阵、quality-event/range 映射及持久化/降级已接入，证据见 Speech Contract §11 和 Current §12–§13；代表性设备验收仍待完成，四款 ASR 的词级时间戳仍明确不可用。讨论中的示例能力表不构成逐模型实测，不据此扩展当前能力矩阵。 |
-| D-04 | **Partially closed — initial categories closed; radar calibration open** | [Training Flow §7.1](training-flow.md#71-完整分析与训练重点分层)、[Target §7](../architecture/target.md#7-analysis-architecture)、R-A05 | 四类初始 Finding 已确认并有结构化校验；后续可扩展类别。Radar 的维度映射、量程与校准仍需证据，当前没有数值评分或多边形，不把类别直接当图轴。 |
-| D-07 | **Partially closed — Silero V1 integrated; calibration/acceptance open** | [Data Model §5.1–§5.3](../architecture/data-model.md#51-speech-evidence-v1)、R-A09 | 单一 Silero/Sherpa、固定来源安装、独立进程和区间归一化已有有限工程验证，见 M2。仍缺人工 VAD 边界、短停顿/真实噪声代表性与阈值校准；设备资源预算和本轮产品打包验收不由探测代替。 |
-| D-08 | **Partially closed — provider integrated; device/resource acceptance open** | R-A10、[Speech Contract §4.1](../architecture/speech-contract.md#41-start) | SenseVoice Provider 已接入且完成有限本地资源探测；5 分钟上限不等于资源预算已达标。继续验证代表性设备、等待/取消/失败恢复、产品打包和公开再分发许可；不新增自动模型切换或音频重放。 |
-| D-09 | **Closed — onboarding/profile rules; end-to-end acceptance pending** | R-A11、[Training Flow §6.1](training-flow.md#61-m2-自动诊断的配置与启用) | 已定义首次无预置 profile、精确选中配置的显式启用、实际 endpoint 本地/远程判断、身份变更撤销和无自动 fallback；schema 3 与旧配置默认关闭的实现见 Current。首次启用/关闭/配置改变及离线恢复的完整产品验收仍需记录。 |
+| D-03 | **Closed for M2 — policy and default-path acceptance** | [Speech Contract §6](../architecture/speech-contract.md#6-time-and-timestamp-rules)、R-A06 | 适配器矩阵与质量/持久化降级已实施；默认真实路径验收见 M2 H-02，扩展设备不外推。四款 ASR 仍无词级时间戳。 |
+| D-04 | **Closed for M2 — categories and uncalibrated boundary; full calibration deferred** | [Training Flow §7.1](training-flow.md#71-完整分析与训练重点分层)、[Target §7](../architecture/target.md#7-analysis-architecture)、R-A05 | 四类初始 Finding 已确认并有结构化校验；M2 保持未校准、无数值评分或多边形，不把类别直接当图轴。完整维度映射、量程与校准归 B-20，不是 M2 closeout 依赖。 |
+| D-07 | **Closed for M2 — limited manual review accepted** | [Data Model §5.1–§5.3](../architecture/data-model.md#51-speech-evidence-v1)、R-A09 | 单一 Silero 工程及制品证据见 Current §13，有限 VAD/Evidence 人工验收见 M2 H-01；保留未校准来源标记，扩大统计/资源验证按 B-24 重开。 |
+| D-08 | **Deferred — download defect and real-device/resource acceptance (B-23)** | R-A10、[Speech Contract §4.1](../architecture/speech-contract.md#41-start) | Provider、自动化、有限资源和历史包内执行证据保留；用户本轮模型下载异常，未通过真实设备验收。按 B-23 合并修复/验收，不阻塞 M2，不新增自动切换或音频重放。 |
+| D-09 | **Closed for M2 — profile rules and real AI E2E accepted** | R-A11、[Training Flow §6.1](training-flow.md#61-m2-自动诊断的配置与启用) | 首次无预置 profile、显式启用/撤销、身份变更撤销、异常与离线恢复已有自动化证据；真实外部 AI 成功链路见 M2 H-03，未执行的真实故障组合不冒充人工通过。 |
 | D-10 | **Closed — M2 local rules during training, AI after recording** | [Training Flow §4](training-flow.md#4-训练页与实时交互)、R-A04 | 验证训练中没有自动实时 AI、结束后按已启用配置调度结构化诊断，并维持 ASR 主文本隔离；未来独立启用的可选实时 AI 按 B-19 重开。 |
 
 ## Screen Structure 与 Interaction TBD 的唯一入口

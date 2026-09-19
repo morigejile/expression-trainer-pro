@@ -22,7 +22,7 @@ flowchart LR
   M1 --> V1[SP-A01 神经 VAD]
   M1 --> U1[ASR-U01 SenseVoiceSmall]
   V1 --> M2[M2 语音证据与默认 AI 诊断]
-  U1 --> M2
+  U1 -. 下载及实机验收延期 B-23 .-> U3[后续 SenseVoice 验证]
   M2 --> M3[M3 对比与复盘]
   M3 --> M4P[M4 结构化表达训练]
   B --> M4[ASR-M04 公开包内默认资格]
@@ -31,7 +31,7 @@ flowchart LR
   U1 --> U2[ASR-U02 FireRedASR2]
 ```
 
-M1 的持久化实施构成 M2 基础，M1 真实设备验收仍需完成；当前产品实施推进 M2 的 SenseVoiceSmall 可选主 ASR、持久化音频上的神经 VAD、确定性测量与结束后结构化 AI 诊断。ASR-M04 受模型再分发许可和公开制品条件约束，可作为独立外部门禁跟进；FireRedASR2 仍不进入当前关键路径。
+M1 持久化及 M2 稳定快照已构成后续基础。M2 已完成最终 Closeout，默认真实录音/播放/恢复、有限 VAD/Evidence 和真实 AI E2E 验收通过，详见 M2 矩阵。SenseVoice 下载及实机验收按 B-23 延期，不再作为 M2 → M3 的门禁；M3 可进入下一阶段，既有设计草案保持独立。ASR-M04 公开再分发许可、签名及扩展设备/平台资格仍独立跟进。
 
 ## 3. 已完成基线
 
@@ -54,7 +54,7 @@ M1 的持久化实施构成 M2 基础，M1 真实设备验收仍需完成；当�
 | ID | P | 状态 | 任务 | 完成标准 |
 |---|---|---|---|---|
 | M0 | P0 | Complete | 冻结需求、目标架构、训练数据模型、训练/报告流程、Speech Engine 契约、Backlog 和 M1 范围 | 于 2026-09-16 完成基线一致性审查；M1 无需重议产品目标、数据模型和主要架构边界即可开发 |
-| M1 | P0 | Implementation complete / acceptance pending | Training Persistence：录音/结果持久化、History/共享 Report、准备检查、诊断入口与告知已实施；自动化及打包验证通过，真实设备验收待完成（Current §10） | 满足 [M1 milestone](milestones/m1-training-persistence.md) 的 AC-M1-01～10 |
+| M1 | P0 | Implementation complete / default-path manual evidence accepted | 持久化闭环已实施；默认真实录音、Report/History 播放及保存恢复在本轮 M2 人工验收确认，扩展设备限制继续保留（Current §10） | 满足 [M1 milestone](milestones/m1-training-persistence.md) 的交付边界；本次不另做 M1 Closeout |
 
 M0 的 Complete 记录上述历史完成事件；[当时的审查](archive/reviews/m0-consistency-review-2026-09-16.md)已归档，不证明后续修订仍通过审查。后续修订按[文档维护规则](README.md#维护规则)验证。
 
@@ -70,12 +70,12 @@ M0 的 Complete 记录上述历史完成事件；[当时的审查](archive/revie
 
 | ID | P | 状态 | 任务 | 完成标准 |
 |---|---|---|---|---|
-| TIME-M201 | P0 | Timing integration implemented / acceptance pending | 契约化绝对时间与质量事件 | 绝对计数、估计来源/版本、quality-event/range 和 stopped 汇总已贯通保存/重启读取；能力缺失明确声明，代表性设备与时间证据按 [M2 AC-M2-01](milestones/m2-speech-evidence-and-ai-diagnosis.md#acceptance-criteria) 验收 |
-| SP-A01 | P0 | Implemented slice / calibration and acceptance pending | 单一 Silero VAD 的检测区间、固定模型安装与进程隔离 | 按 [R-A09](product/requirements.md#6-m2表达证据ai-分析与雷达图)、M2 AC-M2-02 验收；已有 [有限工程证据](milestones/m2-speech-evidence-and-ai-diagnosis.md#当前实施与有限证据)，D-07 标注/短停顿/真实噪声、资源预算与产品验收仍未关闭 |
-| ASR-U01 | P1 | Provider integrated / device and resource acceptance pending | SenseVoiceSmall 可选主 ASR | 按 [R-A10](product/requirements.md#6-m2表达证据ai-分析与雷达图)、M2 AC-M2-02/06 验收；有限 5 分钟资源探测、取消恢复与包内原生执行见 Current §13，不替代 D-08 代表性设备、产品资源预算和公开再分发许可 |
-| METRIC-M201 | P0 | Common V1 implemented / radar calibration pending | 版本化客观时间/词表测量与逐项缺损传播 | 定义见 Data Model §5.3，按 M2 AC-M2-03 验收；D-04 初始 Finding 类别已确认，雷达维度/量程/校准仍待证据 |
-| AI-M201 | P0 | D-09/D-10 closed / integration acceptance pending | 结束后结构化诊断、精确 profile 显式启用和局部恢复 | 按 M2 AC-M2-04 验收；规则见 Training Flow §4/§6.1/§7.1，可选实时 AI 按 B-19 延后，不作为本阶段完成依赖 |
-| REPORT-M201 | P1 | Snapshot composition implemented / UI acceptance pending | 精确结果版本绑定、历史被动读取、Partial 重试与共享报告 | 按 M2 AC-M2-05 验收；雷达保持未校准缺失态，不制造评分；历史快照不自动重分析，重练执行仍归 M4 |
+| TIME-M201 | P0 | Complete for M2 | 契约化绝对时间与质量事件 | 自动化与 H-02 默认真实路径验收通过，见 M2 AC-M2-01；无词级时间戳和扩展设备限制保持明确 |
+| SP-A01 | P0 | Complete for M2 / limited manual review passed | 单一 Silero VAD、安装与进程隔离 | M2 AC-M2-02 / H-01 通过；完整统计、跨场景校准与资源预算归 B-24，不移除未校准来源标记 |
+| ASR-U01 | P1 | Deferred device acceptance / provider integrated | SenseVoiceSmall 可选主 ASR | 本轮下载异常；修复与真实 smoke/资源验收按 B-23 一并处理，不阻塞 M2；历史自动化与原生制品证据保留，公开许可独立跟进 |
+| METRIC-M201 | P0 | Complete for M2 | 版本化客观测量与逐项缺损传播 | M2 AC-M2-03 通过；定义见 Data Model §5.3，完整雷达校准归 B-20 |
+| AI-M201 | P0 | Complete for M2 / real AI E2E passed | 结束后结构化诊断、显式启用和局部恢复 | M2 AC-M2-04 / H-03 通过；可选实时 AI 按 B-19 延后，真实异常组合不冒充已全部人工执行 |
+| REPORT-M201 | P1 | Complete for M2 / UX follow-up in B-22 | 稳定快照、历史被动读取、Partial 重试与共享报告 | M2 AC-M2-05 通过；Report/History 播放及保存恢复正常，内容呈现优化归 B-22；雷达保持未校准 |
 | ASR-U02 | P2 | Deferred | FireRedASR2 多来源安装和 utterance UX | SenseVoiceSmall 实施完成后，产品证据表明第二个 utterance 模型能改变用户结果 |
 
 ### 4.4 Delivery and maintenance
@@ -94,8 +94,8 @@ M0 的 Complete 记录上述历史完成事件；[当时的审查](archive/revie
 | 里程碑 | 状态 | 包含 | 结果 |
 |---|---|---|---|
 | M0 Architecture & Requirements Baseline | Complete | Gap、Requirements、Data Model、Training Flow、Speech Contract、Target、Backlog、M1、Consistency Review | M1 有稳定、可追踪的实施边界 |
-| M1 Training Persistence | Implementation complete / acceptance pending | R-P01～R-P09 | 按 [M1 milestone](milestones/m1-training-persistence.md) 交付持久化闭环与入口收敛 |
-| M2 Speech Evidence & AI Diagnosis | In progress — source/metrics/AI/report integration; acceptance pending | R-A01～R-A11 | 已实施时间基础、Source/Common V1、结构化诊断与稳定快照；D-09/D-10 和初始 Finding 分类已收口。仍按 [M2 milestone](milestones/m2-speech-evidence-and-ai-diagnosis.md) 验证整条产品流程及设备/打包证据，关闭 D-04/D-07/D-08 剩余校准与验收，不把局部测试当作 M2 完成 |
+| M1 Training Persistence | Implementation complete / default-path manual evidence accepted | R-P01～R-P09 | 默认录音、播放与保存恢复已在本轮 M2 人工验收确认；扩展设备限制见 Current，未单独新增 M1 Closeout |
+| M2 Speech Evidence & AI Diagnosis | **Complete — 2026-09-19** | R-A01～R-A11（R-A10 实机验收明确延期） | [M2 最终验收](milestones/m2-speech-evidence-and-ai-diagnosis.md#acceptance-criteria) 通过，最终回归与制品证据见 Current §13；B-20/B-22/B-23/B-24 不阻塞 Closeout，可进入 M3 |
 | M3 Comparison & Review | Planned | R-R01～R-R02；R-R03/R-R04 deferred | 按 [Training Flow §13.2–§13.4](product/training-flow.md#132-history-与-comparison--review) 交付 History 发起的 Comparison 与 Report 下钻返回；Comparison Compatibility 细化见 D-13；趋势与 Finding-scoped AI 对话按 B-16/B-17 重开，不作为当前 Comparison 完成依赖 |
 | M4 Structured Training | Planned | R-F01～R-F08 | Free/Structured 选择、PREP/STAR/Pyramid、Framework Analysis 与问题重练闭环（复用 M3 比较能力；重练不强制选择框架） |
 | Streaming ASR public delivery | In progress | ASR-M01～M04（含 M04a 内部资格） | 已完成部分见 §3；剩余公开交付任务及门槛见 §4.2；这是并行交付轨道，不占用产品里程碑编号 |
@@ -107,7 +107,7 @@ M0 的 Complete 记录上述历史完成事件；[当时的审查](archive/revie
 
 ## 7. 外部跟进
 
-- 真实可配置麦克风和接近 4-core/8-GB/3-GB 资格线设备的运行证据。
+- 当前默认真实麦克风主链路已有验收；多采样率/其他可配置麦克风与接近 4-core/8-GB/3-GB 资格线设备的覆盖仍待扩展。
 - Zipformer Large 等模型的公开再分发许可。
 - Windows 签名凭据；macOS/Linux/ARM64 对应构建与 native 模型证据。
 

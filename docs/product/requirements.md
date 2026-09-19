@@ -115,12 +115,12 @@ M1 完成录音的音频随 Session 保留至用户明确删除；不按条数�
 | R-A02 | 应用判断语言组织能力。 | 结果覆盖主题聚焦、信息顺序、衔接或同等明确定义的维度；每个结论关联原文证据；无法判断时允许返回未知。 | P1 | Accepted | M2 |
 | R-A03 | 应用判断表达结构合理性。 | 结果说明主张、理由、事实或结论之间的关系；结构建议定位到相关片段；不把单个词汇直接判为逻辑错误。 | P1 | Accepted | M2 |
 | R-A04 | 每个完成且可分析的 Session 默认进入 AI 诊断与建议流程。 | 存在有效且显式启用的当前 AI profile 时自动生成版本化、结构化诊断；Schema 与 `evidenceRefs` 校验后才可产生 Observation → Interpretation → Recommendation Finding；证据不足不凑 Finding。未配置、未启用、技术失败或无效结果时显示明确状态、引导配置或重试，本地事实与确定性分析仍保留。 | P0 | Accepted | M2 |
-| R-A05 | 应用用雷达图展示已定义的表达维度。 | Radar 只投影已有证据、确定性结果和经验证解释；每个维度有固定名称、来源、mapping、版本及 unavailable 条件，相近维度通过 MECE 检查；缺证据显示 unavailable 而不伪造分数，不预设统一 0–100。具体维度/量程/校准仍按 D-04 的证据收敛。 | P1 | Accepted | M2 |
+| R-A05 | 雷达按证据成熟度展示表达维度或明确的未校准状态。 | M2 验收 uncalibrated / unavailable 的诚实呈现，不产生分数或多边形；完整雷达校准不阻塞 M2，后续按 Backlog B-20 重开。启用数值投影前，每个维度须有固定名称、证据来源、mapping、版本及 unavailable 条件，相近维度通过 MECE 检查；只投影已有证据、确定性结果和经验证解释，缺证据不补零，不预设统一 0–100。 | P1 | Accepted | M2 缺失态；完整校准延后 |
 | R-A06 | 时间维度用于分析速度、停顿、流畅度和卡壳。 | 语速、停顿和片段时长使用 capability-based Timing Contract 声明的时间来源；ASR 成功不代表具 token timing，近似时间与模型时间戳可区分且禁止伪造；时间轴或 Speech Evidence 缺失时仅相关指标显式降级。 | P0 | Accepted | M2 |
 | R-A07 | 每个可分析的 Session 都具有 Common Analysis。 | Common Analysis 使用跨训练方式一致的维度和版本规则；Free 仍可分析聚焦、顺序、衔接和一般结构问题，但在用户未请求框架视角时不得按 PREP、STAR 或金字塔槽位判定。 | P0 | Accepted | M2 |
 | R-A08 | 报告使用一套统一骨架并优先给出可行动结论。 | 按 [Training Flow §7–§8](training-flow.md#7-分析层与首次报告) 验收同一 Report Workspace 的摘要、优先 Finding、原位详情/证据和已有内容按需展开；历史详情复用该容器，不维护另一套报告。有效发现不因默认折叠而丢失，证据不足显式降级；导航和 Finding 动作遵循该文档 §8.2；按 [§6–§7.4](training-flow.md#6-自动持久化与分析状态) 验收 Processing 完成等待/合理 timeout、可信进度、允许离开，以及 Report 局部失败恢复和 Session 保存状态，不采用 progressive report rendering。 | P1 | Accepted | M2；M4 扩展 |
-| R-A09 | 使用版本化神经 VAD 产生语音活动和静音区间。 | VAD 对完成音频生成带模型/阈值/规范化规则版本和绝对 sample 边界的区间证据；结果不覆盖 ASR 时间戳，leading/trailing silence 不默认计 pause；失败时停顿/流畅度指标显式降级；代表性样本上具有可重复的准确率、实时系数和资源证据。 | P0 | Accepted | M2 |
-| R-A10 | SenseVoiceSmall 是用户可选的主 ASR 模型之一。 | 通过模型选择与其他主 ASR 择一使用；被选中时产生该 Session 的主转写并记录模型/版本与实际 timing 能力，未选中时不额外运行辅助识别。Utterance 不伪造 partial，等待/失败状态明确且可恢复；失败保留已取得的本地事实，不伪称转写成功。标签不得直接等同表达质量；沿用 ADR-0009 的能力与资源基线，D-08 完成实施验证；默认 streaming 模型与公开分发许可边界不变。 | P1 | Accepted | M2 |
+| R-A09 | 使用版本化神经 VAD 产生语音活动和静音区间。 | VAD 对完成音频生成带模型/阈值/规范化规则版本和绝对 sample 边界的区间证据；结果不覆盖 ASR 时间戳，leading/trailing silence 不默认计 pause；失败时停顿/流畅度指标显式降级；M2 以有限真实表达人工复核及已有工程/资源证据验收；更大规模代表性准确率、阈值与资源预算校准按 B-24 重开，未完成前保留未校准标记。 | P0 | Accepted | M2 |
+| R-A10 | SenseVoiceSmall 是用户可选的主 ASR 模型之一。 | 通过模型选择与其他主 ASR 择一使用；被选中时产生该 Session 的主转写并记录模型/版本与实际 timing 能力，未选中时不额外运行辅助识别。Utterance 不伪造 partial，等待/失败状态明确且可恢复；失败保留已取得的本地事实，不伪称转写成功。标签不得直接等同表达质量；沿用 ADR-0009 的能力与资源基线，D-08 的 Provider 集成证据保留；本轮下载异常及真实设备 smoke/资源验收明确延期至 B-23，不阻塞 M2。当前可用路径继续采用用户已验收的 Zipformer Small CTC 中文 INT8；Catalog 技术默认与公开分发许可边界不变。 | P1 | Accepted；实机验收延期 | M2 集成；下载/实机验收归 B-23 |
 | R-A11 | 远程 AI 自动诊断具有明确、可撤销的知情边界。 | 首次启用远程 Profile 前说明 Provider 及将发送的数据类别；用户明确启用后才允许自动请求；设置中可停用；本地 Provider 不被描述为云端传输；音频、密钥、无关历史和未声明数据不得发送。 | P0 | Accepted | M2 |
 
 ## 7. M3：历史对比、复盘与 AI 对话

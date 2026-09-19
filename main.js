@@ -19,7 +19,7 @@ const {
   selectActiveLlmProfile
 } = require('./lib/llm-provider-config');
 const {resolveAutomaticDiagnosisProfile} = require('./lib/llm-provider-config');
-const {analysisCharacterCounts} = require('./shared/text-statistics');
+const {buildSessionAnalysisInputs} = require('./lib/session-analysis-inputs');
 const {createSpeechEvidenceRunner} = require('./lib/speech-evidence-model');
 const {buildAnalysisContext} = require('./lib/analysis-context');
 const {
@@ -511,14 +511,7 @@ app.whenReady().then(async () => {
         spawn:entry => utilityProcess.fork(entry,[],{serviceName:'expression-trainer-speech-evidence',stdio:'pipe'})
       }).run,
       getDiagnosisProfile:() => resolveAutomaticDiagnosisProfile(loadLlmProviderSettings(app.getPath('userData'))),
-      getAnalysisInputs:session => {
-        const analysisInstructions=loadCustomPrompt();
-        const analysis=analyzeText(session.transcript.text,{extraFillers:customWordsToFillers(analysisInstructions.customWords)});
-        const counts=analysis ? analysisCharacterCounts(analysis) : {excludedCharacters:0,hedgeCharacters:0};
-        return {analysisInstructions,localStats:analysis ? {fillers:analysis.fillers.length,hedges:analysis.hedges.length,
-          vagueWords:analysis.vagueWords.length,totalWords:analysis.totalWords,...counts} : null,
-          provenance:{promptSnapshot:{customWords:analysisInstructions.customWords}}};
-      },
+      getAnalysisInputs:(session,options) => buildSessionAnalysisInputs(session,loadCustomPrompt(),options),
       diagnose:({profile,signal,...input}) => {
         const context=buildAnalysisContext(input);
         return (isSmokeTest ? smokeTest.fakeLlm.sendStructuredDiagnosis : require('./lib/ai-feedback').sendStructuredDiagnosis)(context,profile,{signal});

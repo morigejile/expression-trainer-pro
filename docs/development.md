@@ -1,7 +1,7 @@
 # 开发与验证
 
 > 当前开发基线：Windows 11 25H2 build 26200 x64、Node.js 24.20.0、npm 11.19.0、Electron 43.4.1、sherpa-onnx-node 1.13.3
-> 更新日期：2026-09-18（文档整理；不表示重新执行历史验证）
+> 更新日期：2026-09-19（M2 Closeout；最终执行证据统一见 Current §13）
 > 当前用途：内部开发/测试。发布级 review、审计、签名、广泛平台支持和未解决的模型再分发权利均是非阻塞跟进，除非它们使当前技术实验无法运行或结论失效。
 
 ## 环境与安装
@@ -67,9 +67,9 @@ npm run smoke:package
 
 ## ASR 模型
 
-模型权重不进入 Git。唯一 schema-v2 产品 Catalog 是 `models/registry.json`，固定 Paraformer、Zipformer Small 和 Zipformer Large 三款 streaming 模型；受信任 Factory 只创建代码支持的两类 Provider。启动按严格 `--asr-model=<modelId>`、持久选择、Catalog 默认值解析，设置页可下载、取消、重试、重新安装或在空闲时切换模型；安装使用独立短生命周期 utility，不影响当前识别 controller。archive/runtime 的固定大小、hash 与再分发状态见 registry 和 ADR-0004/0009。
+模型权重不进入 Git。唯一 schema-v2 产品 Catalog 是 `models/registry.json`，包含 Paraformer、Zipformer Small、Zipformer Large 三款 streaming 模型和可选 SenseVoice utterance 模型；受信任 Factory 只创建代码支持的 Provider。启动按严格 `--asr-model=<modelId>`、持久选择、Catalog 默认值解析，设置页可下载、取消、重试、重新安装或在空闲时切换模型；安装使用独立短生命周期 utility，不影响当前识别 controller。当前用户已验收并继续采用 Zipformer Small CTC 中文 INT8，Catalog 技术默认仍为 Zipformer Large；SenseVoice 下载和真实验收延期见 Backlog B-23。archive/runtime 的固定大小、hash 与再分发状态见 registry 和 ADR-0004/0009。
 
-内部开发阶段 `.tar.bz2` 解包调用系统 `tar`。PKG-03 已证明 packaged utility 可从零下载并校验真实约 1 GB Paraformer、调用系统 `tar`、完成 native 初始化和强制离线二次启动，且模型仍位于安装目录外。真实麦克风、接近资格线硬件、macOS/Linux 和正式发布制品仍需对应环境证据。
+内部开发阶段 `.tar.bz2` 解包调用系统 `tar`。PKG-03 已证明 packaged utility 可从零下载并校验真实约 1 GB Paraformer、调用系统 `tar`、完成 native 初始化和强制离线二次启动，且模型仍位于安装目录外。当前默认真实麦克风链路已在 M2 验收；其他麦克风/采样率组合、接近资格线硬件、macOS/Linux 和正式发布制品仍需对应环境证据。
 
 耗时模型资产统一留在 Git 外的本机缓存中。只有首次安装/下载链路 smoke 从空目录验证完整下载，其余模型开发与测试可以复用已校验缓存；缓存本身不构成 native-load、benchmark 或发布许可证据。候选 URL、大小和 hash 的 canonical 来源是 registry，历史准备过程见证据索引和 Git 历史，本文件不维护本机路径、下载代理或一次性速度记录。
 
@@ -103,6 +103,44 @@ BM-04 已完成七候选验证，ADR-0009 据此选择 Zipformer Large 作为技
 ## 诊断导出
 
 操作前核对 [Current 的诊断实现](architecture/current.md#11-诊断导出现状)；目标入口归属见 [Training Flow §13.1](product/training-flow.md#131-已确认的-ia-归属)。仅修改文档不表示 UI 入口迁移已实现。
+
+### M2 已保存 VAD 区间核验
+
+[`scripts/inspect-speech-evidence.js`](../scripts/inspect-speech-evidence.js) 是本地开发/验收命令，不进入安装包，不改变正式 Report。直接以只读 SQLite 事务读取已有快照，不调用会执行恢复/迁移的 store，不运行模型或 AI。数据契约沿用 [Data Model §5.2–§5.3](architecture/data-model.md#52-m2-结果快照与证据引用)。
+
+在仓库根目录的 PowerShell 中使用项目 Node 版本（见 `package.json#engines`）：
+
+```powershell
+$trainingRoot = Join-Path $env:APPDATA '宇宙无敌表达训练\training'
+node scripts/inspect-speech-evidence.js --root "$trainingRoot" --list
+
+# 从列表按本地时间、录音长度和文字预览找到记录，复制完整 Session ID。
+$sessionId = '替换为列表中的完整 ID'
+$exportRoot = Join-Path $env:TEMP ('m2-vad-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+node scripts/inspect-speech-evidence.js --root "$trainingRoot" --session $sessionId --output "$exportRoot"
+```
+
+若应用使用其他 `userData`，将 `--root` 改为该目录下包含 `sessions.sqlite` 的 `training` 目录。找不到数据库时命令报错，不创建空数据库。下一条正常录音完成并生成报告后重复 `--list` 即可；无需切换 ASR、重录旧样本或重新点击 AI 分析。
+
+默认选择与当前 Report 相同的完整关联快照，按精确 ID 关联 Source/Metric/Diagnosis；失败重试后可能仍选此前成功诊断，不将较新的孤立 Source 拼入报告。需要检查特定重试时追加 `--report <report-snapshot-id>`，文本头部和 JSON `selection` 会显示实际选择与最近重试 ID。
+
+输出包含：
+
+- 终端文本及 UTF-8 `.txt`、`.json`（省略 `--output` 时只输出文本）。目录须在训练存储之外，已有同名文件不覆盖。
+- 原始 Source result、Session/revision/Report/Source/Metric ID、模型 hash、阈值与规范化版本、quality；WAV 路径和已保存 SHA-256 的实际校验结果。
+- `speechRegions`、相邻语音间正长度 `gaps`、独立的 `edgeNonSpeech`。每行含 start/end/duration 的 sample 和秒值；文本时间显示为 `mm:ss.mmm`，精确 sample 以 JSON 为准。内部 gap 不包含首尾非语音，完全无检测语音单列 `all-non-speech`。
+- 与原报告五项 VAD 汇总的逐项核对。只按已有定义重算检查，不覆盖历史指标。VAD 失败、音频缺损或覆盖不足时派生区间为 `null/unavailable`，不能当作零次停顿或整段静音；原始 Source 仍保留。
+
+退出码 `0` 表示读取/导出成功（VAD 本身仍可能 unavailable）；`1` 表示参数、数据库、关联快照或输出错误；`2` 表示录音校验、已保存汇总或结果完整性有分歧。出现 `MISMATCH` 先保留导出并排查，不据此调 VAD 参数。
+
+人工操作：
+
+1. 用文本头部 `WAV:` 指向的原始录音或同一 History 记录播放。以 WAV 从零开始的时间为基准；Recording 暂停期间未采集的墙钟时间不在其中，ASR segment 时间也不是人工真值。
+2. 先独立试听，记录听到的语音结束/再开始时间和不确定处，再与 `Internal gaps` 比较。需要细边界时用能显示小数秒/波形的本地音频编辑器查看同一 WAV；只显示整数秒的播放器只能支持粗核验。
+3. 回放候选 gap 前后各约 1 秒，记录 `Session ID、Source ID、gap ID（没有则填 unmatched）、人工 start/end、模型 start/end、漏检/误检/边界差、备注`。也必须检查 speech region 内听到但模型没有列出的短停顿，不能只验证模型已找到的 gap。
+4. 先用已有普通表达、短停顿录音验证核对方法，再补长停顿和轻噪声覆盖。VAD 是模型观察；短停顿可能合并，padding 可使边界偏移，非语音也可能含呼吸/噪声。实际漏检与边界误差待人工标注决定，不因 sample 表示精确就宣称模型准确。
+
+该命令只检查保存后的证据与计算一致性；本轮有限人工结论见 [M2 H-01](milestones/m2-speech-evidence-and-ai-diagnosis.md#收尾后的剩余验收输入)，扩大准确率、阈值和资源验证按 Backlog B-24 重开，不因保留此复核方法继续要求 M2 采样。原 [`validate-speech-evidence.js`](../scripts/validate-speech-evidence.js) 继续负责既有语料的有限推理/资源探测，不能替代某条历史 Report 的快照核对。
 
 ## 文档维护
 

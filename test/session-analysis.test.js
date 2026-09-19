@@ -118,3 +118,31 @@ test('profile read failure produces an unavailable diagnosis and usable local re
   assert.doesNotMatch(JSON.stringify(saved),/private config/);
   await analyzer.close();
 });
+
+test('a result write failure retains facts and retry never mixes orphaned evidence into a new report',async t=>{
+  const {createSessionAnalysis}=require('../lib/session-analysis');
+  const {selectStructuredReport}=require('../src/structured-report');
+  const {store,id}=await fixture(t);
+  const before=await store.get(id);
+  let fail=true;
+  const analyzer=createSessionAnalysis({store:{...store,appendResult:async (sessionId,input)=>{
+    if (fail && input.kind==='diagnosis') throw new Error('temporary result write failure');
+    return store.appendResult(sessionId,input);
+  }}});
+  await assert.rejects(analyzer.start(id),/temporary result write failure/);
+  const interrupted=await store.get(id);
+  assert.deepEqual(interrupted.transcript,before.transcript);
+  assert.equal(interrupted.status,'completed');
+  assert.equal(interrupted.artifact.state,'available');
+  assert.deepEqual(interrupted.results.map(run=>run.kind),['speech-evidence','common-analysis']);
+  assert.equal(selectStructuredReport(interrupted.results),null);
+  fail=false;
+  await analyzer.start(id,{retry:true});
+  const recovered=await store.get(id);
+  const report=selectStructuredReport(recovered.results);
+  assert.deepEqual(recovered.results.slice(0,2),interrupted.results);
+  assert.equal(report.snapshot.value.evidenceRunId,recovered.results[2].id);
+  assert.equal(report.snapshot.value.metricRunId,recovered.results[3].id);
+  assert.equal(report.analysisRun.value.metricRunId,report.metricRun.id);
+  await analyzer.close();
+});

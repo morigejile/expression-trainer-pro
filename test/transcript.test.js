@@ -288,6 +288,68 @@ function completedM2Session(record) {
       wrap('snapshot','report-snapshot',{schemaVersion:1,availability:'partial',evidenceRunId:'evidence',metricRunId:'common',analysisRunId:'diagnosis'})]};
 }
 
+test('analysis refresh preserves a failed result write until save retry succeeds', async t => {
+  const {createTrainingPersistence} = require('../src/training-persistence');
+  const trainer = startupTrainer(t,async () => ({ok:true,events:[]}),{storage:new Map([['expression-trainer.help-seen','1']])});
+  await flushMicrotasks();
+  const record = installPlaybackRecord(trainer,playbackRecord({factsSaved:false,audioBlob:new Blob(['recorded WAV'])}));
+  const stats = record.stats;
+  const savedSession = completedM2Session(record);
+  let fail = true;
+  const attempts = [];
+  window.api = {...window.api,
+    finalizeTrainingSession:async () => ({ok:true,value:{}}),
+    appendTrainingResult:async command => {
+      attempts.push(command.input.id);
+      if (fail) return {ok:false,error:{message:'disk unavailable'}};
+      savedSession.results.push(command.input);
+      return {ok:true,value:command.input};
+    },
+    analyzeTrainingSession:async () => ({ok:true,value:savedSession.results.at(-1)}),
+    getTrainingSession:async () => ({ok:true,value:savedSession})};
+  trainer.persistence = createTrainingPersistence({api:window.api,onChange:owner=>trainer.renderRecordStatus(owner)});
+  assert.equal(await trainer.persistence.save(record),false);
+  assert.equal(record.factsSaved,true);
+  assert.equal(await trainer.awaitTrainingAnalysis(record),true);
+  trainer.showRecord(record);
+  assert.equal(record.saveState,'failed');
+  assert.equal(record.saveError,'disk unavailable');
+  assert.deepEqual(record.stats,stats);
+  assert.equal(record.pendingResults.length,1);
+  assert.equal(trainer.retrySave.classList.contains('hidden'),false);
+  trainer.releaseSavedRecordCache();
+  assert.ok(trainer.trainingRecords.list().includes(record));
+  fail = false;
+  assert.equal(await trainer.retryTrainingSave(),true);
+  assert.equal(record.saveState,'saved');
+  assert.equal(record.pendingResults.length,0);
+  assert.equal(attempts[0],attempts[1]);
+});
+
+test('cancellation during fact saving never starts another analysis after cancel', async t => {
+  const trainer=createTrainer();
+  const saving=createDeferred();
+  const record=playbackRecord({factsSaved:true,saveState:'saved',savePromise:saving.promise});
+  let cancels=0,analyses=0;
+  global.window={api:{stopASR:async()=>({ok:true,events:[]}),cancelLLMRequests:async()=>({success:true}),
+    cancelTrainingAnalysis:async()=>{cancels++;return {ok:true};},
+    analyzeTrainingSession:async()=>{analyses++;return {ok:true};},
+    getTrainingSession:async()=>({ok:true,value:completedM2Session(record)})}};
+  t.after(()=>{delete global.window;});
+  trainer.beginRecordingBuffer('saving-cancel');
+  trainer.asrEventState=beginAsrSession(null,'saving-cancel');
+  trainer.recordingStopOperation={sessionId:'saving-cancel',cancelled:false};
+  trainer.finalizeTrainingRecord=()=>record;
+  trainer.showRecord=()=>{};
+  const stopping=trainer.finishOwnedAsrStopAndUi('saving-cancel');
+  await flushMicrotasks();
+  trainer.recordingStopOperation.cancelled=true;
+  saving.resolve();
+  await stopping;
+  assert.equal(cancels,1);
+  assert.equal(analyses,0,'waiting after cancellation must not create a new job');
+});
+
 for (const leaveReport of [false,true]) {
   test(`save retry follows automatic analysis and refreshes its original record (leave report=${leaveReport})`, async t => {
     const {createTrainingPersistence} = require('../src/training-persistence');

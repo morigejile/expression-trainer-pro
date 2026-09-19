@@ -891,10 +891,16 @@ class ExpressionTrainer {
           if (completed?.savePromise) await completed.savePromise;
           if (completed?.factsSaved && typeof window.api.analyzeTrainingSession === 'function') {
             this.processingRecordId = completed.id;
-            if (this.recordingStopOperation?.cancelled) await window.api.cancelTrainingAnalysis({requestId:globalThis.crypto.randomUUID(),sessionId:completed.id});
             if (this.btnLeaveProcessing) this.btnLeaveProcessing.disabled = false;
-            this.trainingStatus.textContent = tailSucceeded ? '训练已保存，正在整理语音证据和诊断…' : '转写未完成，录音已保存，正在整理可用证据…';
-            await this.awaitTrainingAnalysis(completed);
+            if (this.recordingStopOperation?.cancelled) {
+              await window.api.cancelTrainingAnalysis({requestId:globalThis.crypto.randomUUID(),sessionId:completed.id});
+              // A cancelled job can finish before this continuation. Read saved
+              // results without accidentally starting a replacement job.
+              await this.refreshTrainingRecord(completed);
+            } else {
+              this.trainingStatus.textContent = tailSucceeded ? '训练已保存，正在整理语音证据和诊断…' : '转写未完成，录音已保存，正在整理可用证据…';
+              await this.awaitTrainingAnalysis(completed);
+            }
           }
           if (completed && !this.recordingStopOperation?.left) this.showRecord(completed);
         } else if (this.recordingSessionId === sessionId) {
@@ -1227,12 +1233,7 @@ class ExpressionTrainer {
     try {
       const result=await window.api.analyzeTrainingSession({requestId:globalThis.crypto.randomUUID(),sessionId:record.id,retry});
       if (!result?.ok) throw new Error(result?.error?.message || '分析暂不可用，可重试；已保存训练保持不变。');
-      const saved=await window.api.getTrainingSession({requestId:globalThis.crypto.randomUUID(),sessionId:record.id});
-      if (record.deleted || this.deletedTrainingRecordIds?.has(record.id) || !saved?.ok || !saved.value) return false;
-      const audioUrl=record.audioUrl;
-      Object.assign(record,Persistence.sessionToRecord(saved.value),{audioUrl,reportPending:true});
-      if (this.viewingTrainingRecordId===record.id && this.currentScreen==='report') this.renderCurrentReport(record);
-      return true;
+      return await this.refreshTrainingRecord(record);
     } catch (error) {
       if (this.viewingTrainingRecordId===record.id) this.reportAiStatus.textContent=error.message;
       return false;
@@ -1240,6 +1241,23 @@ class ExpressionTrainer {
       record.reportPending=false;
       if (this.viewingTrainingRecordId===record.id) this.btnReport.disabled=false;
     }
+  }
+
+  async refreshTrainingRecord(record) {
+    const saved=await window.api.getTrainingSession({requestId:globalThis.crypto.randomUUID(),sessionId:record.id}).catch(()=>null);
+    if (record.deleted || this.deletedSessionIds?.has(record.id) || !saved?.ok || !saved.value) return false;
+    const retained={audioUrl:record.audioUrl};
+    if (record.pendingResults?.length || ['saving','failed'].includes(record.saveState)) {
+      for (const key of ['saveState','saveError','stats','metricsAvailable','segments','report','reportStatus','playbackAnalysis','playbackStatus']) {
+        retained[key]=record[key];
+      }
+    }
+    Object.assign(record,Persistence.sessionToRecord(saved.value),retained);
+    if (this.viewingTrainingRecordId===record.id && this.currentScreen==='report') {
+      this.renderCurrentReport(record);
+      this.renderRecordStatus(record);
+    }
+    return true;
   }
 
   retryTrainingSave() {
