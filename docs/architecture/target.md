@@ -44,7 +44,7 @@ The stable assets are the product requirements, training data model, and transpo
 
 ## 2. Current versus target
 
-实际实现仅由 [Current](current.md) 维护；其中 [§10](current.md#10-m1-training-storage-foundation) 记录 SQLite 存储基础已实现、普通录音与历史 UI 尚未接入的边界。本文件只定义目标组件，不能把 Accepted 当作已经交付。产品验收与交付分别见 [Requirements](../product/requirements.md) 和 [Roadmap](../roadmap.md)。
+实际实现仅由 [Current](current.md) 维护；其中 [§10](current.md#10-m1-training-storage-foundation) 记录 SQLite、普通录音与历史/Report 的已实现边界及验证限制。本文件只定义目标组件，不能把 Accepted 当作已经交付。产品验收与交付分别见 [Requirements](../product/requirements.md) 和 [Roadmap](../roadmap.md)。
 
 ## 3. M1 deployment shape
 
@@ -117,17 +117,19 @@ M2 的 SenseVoiceSmall 接入本 adapter，产品角色按 [R-A10](../product/re
 
 ### 4.6 Speech evidence pipeline
 
-M2 在持久化音频上运行版本化神经 VAD，生成独立的 `SpeechEvidenceRun`。结果可支持停顿/流畅度指标与 AI 上下文，不覆盖所选主 ASR 的转写或 timing provenance；任务可取消、有资源上限，失败显式降级。
+M2 在持久化音频上运行版本化神经 VAD，生成独立的 `SpeechEvidenceRun`。Raw VAD segments → deterministic segment normalization → canonical speech segments，统一使用 Speech Contract 的绝对 sample 边界；该段规范化不同于输入 PCM 规范化。VAD 记录模型/阈值/规则 provenance。结果可支持停顿/流畅度指标与 AI 上下文，不覆盖所选主 ASR 的转写或 timing provenance；leading/trailing silence 不默认计为 pause，任务可取消、有资源上限，失败显式降级。
+
+统一 Evidence 的组成、Source/Derived 快照、版本与分区质量只由 [Data Model §5.1](data-model.md#51-speech-evidence-v1) 定义。VAD 是其中一个 source；§4.7 复用该边界计算确定性结果，不另建一套 Derived 计算器。V1 选型与有限验证范围见 [M2](../milestones/m2-speech-evidence-and-ai-diagnosis.md#有限工程验证范围)。
 
 SenseVoiceSmall 的主 ASR 职责属于 §4.5；若其识别输出包含事件/情绪标签，标签也只是模型观察，不直接构成表达质量分数。
 
 ### 4.7 Metric engine
 
-Introduced in M2. Owns pure, versioned deterministic calculations. It consumes facts and produces immutable result records with evidence references. It does not call LLMs.
+Introduced in M2. Owns pure, versioned deterministic calculations. It consumes facts and produces immutable result records with evidence references; Common facts use one definition across Free and Structured training and retain threshold/algorithm versions. It does not call LLMs or delegate factual measurement to AI.
 
 ### 4.8 AI orchestration
 
-Introduced incrementally in M2–M3. Owns post-session scheduling, template/schema versioning, provider calls, validation, bounded retry/degradation, and derived-result storage. It enforces [R-A04/R-A11](../product/requirements.md#6-m2表达证据ai-分析与雷达图) and [NFR-03](../product/requirements.md#9-非功能需求); result ownership and immutability follow [Data Model §3](data-model.md#3-fact-and-derived-data-rules).
+Introduced incrementally in M2–M3. Owns post-session scheduling, template/schema versioning, provider calls, validation, bounded retry/degradation, and derived-result storage. It builds a bounded `AnalysisContext` from facts/evidence/MetricRuns, validates response schema plus `evidenceRefs`, and emits only supported first-class Findings (`Observation → Interpretation → Recommendation`). It enforces [R-A04/R-A11](../product/requirements.md#6-m2表达证据ai-分析与雷达图) and [NFR-03](../product/requirements.md#9-非功能需求); result ownership and immutability follow [Data Model §3](data-model.md#3-fact-and-derived-data-rules).
 
 ### 4.9 Framework layer
 
@@ -169,6 +171,8 @@ M2 separates four result classes:
 
 事实与派生结果的信任规则见 [Data Model §3](data-model.md#3-fact-and-derived-data-rules)、[§5](data-model.md#5-later-derived-entities) 与 [§6](data-model.md#6-analysis-and-retraining-invariants)；确定性度量及雷达维度的验收分别见 [R-A01 / R-A05](../product/requirements.md#6-m2表达证据ai-分析与雷达图)。
 
+上表区分结果来源与职责；[统一 Speech Evidence](data-model.md#51-speech-evidence-v1) 将可用事实、模型观察与确定性快照提供给消费者，不改变这些归属。AI 的输入来自 AnalysisContext，不以 Radar 计算完成为前置条件。
+
 Product analysis is composed in layers over the result classes above:
 
 ```text
@@ -185,8 +189,10 @@ TrainingSession facts
         └── AI Coaching                        default; explains evidence and suggests next action
                       │
                       ▼
-              Shared Report Composer
+               Shared Report Composer
 ```
+
+Finding is the diagnosis single source of truth for the shared Report. Radar is only a projection of already available evidence, MetricRuns and validated interpretations: each dimension declares its source, mapping, version and unavailable condition. It may combine evidence types, but it is not an analyzer, does not turn unavailable into zero, and does not assume a universal 0–100 scale.
 
 分析资格与重练来源关系统一由 [Data Model §6](data-model.md#6-analysis-and-retraining-invariants) 定义；用户流程见 [Training Flow §9–§11](../product/training-flow.md#9-带上下文再次进入-training-workspace)。Core 为重新分析与新训练提供不同命令，并复用同一 Session/report 边界，不复制交互规则。
 
@@ -206,6 +212,7 @@ Application Core 在调用 LLM 前执行 [R-P07、R-A11、NFR-03](../product/req
 |---|---|
 | Report generation timeout | End the active wait/attempt, preserve saved facts and valid results, expose recoverable availability per Flow §6/§7.4; retry remains tied to the same Session |
 | LLM unavailable or invalid schema | Keep facts/local metrics; mark analysis failed or unavailable; allow retry |
+| AI response has an unknown evidence reference or cannot support a Finding | Reject only that AI result/Finding, retain valid local results and other valid Findings; expose a recoverable local unavailable state |
 | Neural VAD unavailable | Keep primary ASR facts; mark affected speech evidence and dependent metrics degraded; allow retry |
 | Selected primary ASR (including SenseVoiceSmall) unavailable or failed | Preserve captured/saved facts; expose unavailable/failed transcription and explicit recovery. Do not claim transcript success or silently switch models; previously saved records remain readable |
 | ASR execution exits | Fail active speech session explicitly; retain prior completed sessions; recreate for next attempt |

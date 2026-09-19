@@ -13,7 +13,10 @@ const SMOKE_CANCEL_SESSION_ID = '123e4567-e89b-42d3-a456-426614174001';
 
 const calls = {
   llmFeedback: 0,
-  llmConnection: 0
+  llmConnection: 0,
+  llmReport: 0,
+  llmDiagnosis: 0,
+  llmPlayback: 0
 };
 
 const fakeAsrProvider = createFakeAsrProvider({
@@ -88,6 +91,14 @@ async function runCoordinatedRequest(
 }
 
 const fakeLlm = {
+  async sendStructuredDiagnosis(context) {
+    calls.llmDiagnosis += 1;
+    const {parseStructuredDiagnosisResponse} = require('../lib/structured-diagnosis');
+    return parseStructuredDiagnosisResponse(JSON.stringify({schemaVersion:1,summary:'先说明目标，再给出支持理由。',
+      findings:context.transcript.segments.length ? [{id:'finding-1',category:'organization',observation:'表达可以先说明目标。',
+        interpretation:'先给出重点可以帮助听者理解。',recommendation:'下一次先用一句话说明重点。',
+        evidenceRefs:[context.transcript.segments[0].id]}] : []}),context);
+  },
   createRequestCoordinator,
   runCoordinatedRequest,
 
@@ -97,10 +108,12 @@ const fakeLlm = {
   },
 
   async sendReport() {
+    calls.llmReport += 1;
     return 'SMOKE_LLM_REPORT';
   },
 
   async sendPlaybackAnalysis() {
+    calls.llmPlayback += 1;
     return [{segmentId: 'segment-1', advice: 'SMOKE_PLAYBACK_ADVICE'}];
   },
 
@@ -152,8 +165,21 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.equal(require.cache[require.resolve('sherpa-onnx-node')], undefined);
   assert.equal(require.cache[require.resolve('../lib/ai-feedback')], undefined);
   await waitForPage(mainWindow, 'index.html');
+  if (process.env.EXPRESSION_TRAINER_PRODUCT_SMOKE) {
+    await require('./training-product-smoke').run({
+      app, mainWindow, BrowserWindow, phase: process.env.EXPRESSION_TRAINER_PRODUCT_SMOKE
+    });
+    return;
+  }
+  if (process.env.EXPRESSION_TRAINER_TRAINING_API_SMOKE) {
+    await require('./training-session-api-smoke').run({
+      app, mainWindow, BrowserWindow, phase: process.env.EXPRESSION_TRAINER_TRAINING_API_SMOKE
+    });
+    return;
+  }
   await waitUntil('speech model prepared before recording', () => mainWindow.webContents.executeJavaScript(
-    `document.getElementById('training-status')?.textContent.trim() === '准备就绪'
+    `document.getElementById('training-status')?.dataset.microphoneState !== 'checking'
+      && document.getElementById('training-status')?.textContent.includes('就绪')
       && !document.getElementById('btn-start')?.disabled`
   ));
 
@@ -164,13 +190,18 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       'getAppearance', 'saveAppearance', 'onAppearanceChanged',
       'getRecordingPolicy', 'acknowledgeRecordingPolicy',
       'openPromptEditor', 'getCustomPrompt', 'saveCustomPrompt', 'closeWindow',
-      'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText', 'analyzeTexts',
+      'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText',
+      'createTrainingSession', 'finalizeTrainingSession', 'appendTrainingResult',
+      'listTrainingSessions', 'getTrainingSession', 'deleteTrainingSession', 'readTrainingAudio',
       'getRealtimeFeedback', 'getFinalReport', 'analyzePlayback', 'testLLMConnection',
       'cancelLLMRequests', 'saveFile', 'exportDiagnostics', 'openSupportLink'
     ];
     return {
       title: document.title,
       missing: expected.filter(name => typeof window.api?.[name] !== 'function'),
+      removedApis: ['analyzeTexts'].filter(name => name in window.api),
+      removedUi: ['btn-paste','paste-modal','btn-copy-text','btn-save-text','btn-clear',
+        'report-modal','training-record-select','btn-diagnostics'].filter(id => document.getElementById(id)),
       missingUi: [
         'user-message', 'user-message-text', 'user-message-action', 'user-message-close',
         'training-status', 'feedback-status'
@@ -189,12 +220,15 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   })()`);
   assert.equal(apiContract.title, '宇宙无敌表达训练系统');
   assert.deepEqual(apiContract.missing, []);
+  assert.deepEqual(apiContract.removedApis, []);
+  assert.deepEqual(apiContract.removedUi, []);
   assert.deepEqual(apiContract.missingUi, []);
+  assert.ok(['准备就绪','语音模型已就绪；开始时检查麦克风权限'].includes(apiContract.initialUi.trainingStatus));
   assert.deepEqual(apiContract.initialUi, {
     theme: 'graphite',
     layout: 'coach-rail',
-    trainingStatus: '准备就绪',
-    feedbackStatus: '本地分析可用；AI 建议约每新增 30 字生成',
+    trainingStatus: apiContract.initialUi.trainingStatus,
+    feedbackStatus: '训练中使用本地规则；结束后按设置自动生成 AI 诊断',
     vagueClass: 'stat-value stat-yellow',
     fillerClass: 'stat-value stat-red',
     hedgeClass: 'stat-value stat-orange',
@@ -263,7 +297,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.deepEqual(llmSettingsNotification, {saved: {success: true}, notifications: 1});
 
   const smokeProfileSave = await settingsWindow.webContents.executeJavaScript(`window.api.saveLlmProviderSettings({
-    schemaVersion: 2,
+    schemaVersion: 3,
     activeProfileId: 'smoke-profile',
     profiles: [{
       id: 'smoke-profile',
@@ -271,6 +305,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       provider: 'deepseek',
       apiKey: 'smoke-key',
       model: 'fake-model',
+      autoDiagnosisEnabled: true,
       ollamaUrl: '',
       baseUrl: '',
       customModel: ''
@@ -319,6 +354,11 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     ['id', 'model', 'name', 'provider']
   );
   assert.doesNotMatch(JSON.stringify(playbackAnalysisIpcState.success.analysis.profile), /apiKey|baseUrl|ollamaUrl|customModel/);
+  assert.ok(Number.isFinite(Date.parse(playbackAnalysisIpcState.success.createdAt)));
+  assert.equal(playbackAnalysisIpcState.success.provenance.provider, 'deepseek');
+  assert.equal(playbackAnalysisIpcState.success.provenance.model, 'fake-model');
+  assert.equal(playbackAnalysisIpcState.success.provenance.profileId, 'smoke-profile');
+  assert.doesNotMatch(JSON.stringify(playbackAnalysisIpcState.success.provenance), /apiKey|baseUrl|ollamaUrl|smoke-key/);
 
   const initialRecordingPolicy = await mainWindow.webContents.executeJavaScript(
     'window.api.getRecordingPolicy()'
@@ -354,32 +394,23 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     closed: true
   });
 
-  const blankPasteState = await mainWindow.webContents.executeJavaScript(`(() => {
-    document.getElementById('btn-paste').click();
-    document.getElementById('btn-analyze-paste').click();
-    const state = {
-      message: document.getElementById('user-message-text').textContent.trim(),
-      settingsActionHidden: document.getElementById('user-message-action').classList.contains('hidden')
-    };
-    document.getElementById('user-message-close').click();
-    document.getElementById('btn-close-paste').click();
-    return {...state, dismissed: document.getElementById('user-message').classList.contains('hidden')};
-  })()`);
-  assert.deepEqual(blankPasteState, {
-    message: '请先粘贴需要分析的逐字稿',
-    settingsActionHidden: true,
-    dismissed: true
-  });
+  const preparingState = await mainWindow.webContents.executeJavaScript(`(() => ({
+    screen: document.body.dataset.screen,
+    state: document.body.dataset.trainingState,
+    startVisible: document.getElementById('btn-start').getBoundingClientRect().height > 0,
+    transcriptHidden: getComputedStyle(document.getElementById('subtitle-scroll')).display === 'none',
+    reportHidden: getComputedStyle(document.getElementById('report-ai-section')).display === 'none'
+  }))()`);
+  assert.deepEqual(preparingState, {screen:'training',state:'preparing',startVisible:true,transcriptHidden:true,reportHidden:true});
 
   assert.deepEqual(mainWindow.getMinimumSize(), [960, 640]);
   const desktopUsability = await mainWindow.webContents.executeJavaScript(`(() => {
-    const buttonIds = ['btn-prompt-editor', 'btn-diagnostics', 'btn-settings'];
+    const buttonIds = ['btn-home', 'btn-history', 'btn-settings'];
     const controls = buttonIds.map(id => {
       const button = document.getElementById(id);
       return {
         id,
-        label: button.getAttribute('aria-label'),
-        text: button.querySelector('.btn-icon-label')?.textContent.trim()
+        text: button.textContent.trim()
       };
     });
     const densityLabel = document.getElementById('stat-density-label');
@@ -400,9 +431,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     };
   })()`);
   assert.deepEqual(desktopUsability.controls, [
-    { id: 'btn-prompt-editor', label: '训练规则', text: '规则' },
-    { id: 'btn-diagnostics', label: '导出诊断信息', text: '诊断' },
-    { id: 'btn-settings', label: '打开设置', text: '设置' }
+    { id: 'btn-home', text: '表达训练' },
+    { id: 'btn-history', text: '训练历史' },
+    { id: 'btn-settings', text: '设置' }
   ]);
   assert.match(desktopUsability.densityDescription, /字数.*不含标点.*同一字符只扣除一次/);
   assert.equal(desktopUsability.reducedMotionRule, true);
@@ -412,6 +443,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.deepEqual(desktopUsability.unlabeledSvgControls, []);
 
   const visualMotionState = await mainWindow.webContents.executeJavaScript(`(() => {
+    document.querySelector('.utility-menu').open = true;
     const subtitle = document.getElementById('subtitle-scroll');
     const timer = document.getElementById('timer');
     const settings = document.getElementById('btn-settings');
@@ -434,6 +466,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
 
   const originalContentSize = mainWindow.getContentSize();
   await mainWindow.webContents.executeJavaScript(`(() => {
+    document.body.dataset.trainingState = 'recording';
     const transcript = document.getElementById('subtitle-scroll');
     const feedback = document.getElementById('feedback-content');
     const transcriptSpacer = document.createElement('div');
@@ -524,40 +557,22 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     document.getElementById('timer').textContent = '00:00';
     document.getElementById('training-status').textContent = '准备就绪';
     delete window.__layoutSmoke;
+    document.body.dataset.trainingState = 'preparing';
     return window.api.saveAppearance({theme: 'graphite', layout: 'coach-rail'});
   })()`);
   mainWindow.setContentSize(...originalContentSize);
   await delay(40);
 
   const modalKeyboardState = await mainWindow.webContents.executeJavaScript(`(() => {
-    const opener = document.getElementById('btn-paste');
-    const modal = document.getElementById('paste-modal');
-    const textarea = document.getElementById('paste-textarea');
-    opener.focus();
-    opener.click();
-    textarea.value = '尚未分析的草稿';
-    textarea.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
-    const closedAfterEscape = modal.classList.contains('hidden');
-    const focusAfterEscape = document.activeElement?.id;
-    opener.click();
-    return {
-      role: modal.getAttribute('role'),
-      ariaModal: modal.getAttribute('aria-modal'),
-      closedAfterEscape,
-      focusAfterEscape,
-      retainedDraft: textarea.value
-    };
+    const opener = document.getElementById('btn-help');
+    const modal = document.getElementById('help-modal');
+    opener.focus(); opener.click();
+    modal.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
+    return {role:modal.getAttribute('role'),ariaModal:modal.getAttribute('aria-modal'),
+      closedAfterEscape:modal.classList.contains('hidden'),
+      focusReturnedToUtilityMenu:document.activeElement === document.querySelector('.utility-menu summary')};
   })()`);
-  assert.deepEqual(modalKeyboardState, {
-    role: 'dialog',
-    ariaModal: 'true',
-    closedAfterEscape: true,
-    focusAfterEscape: 'btn-paste',
-    retainedDraft: '尚未分析的草稿'
-  });
-  await mainWindow.webContents.executeJavaScript(
-    `document.getElementById('btn-close-paste').click()`
-  );
+  assert.deepEqual(modalKeyboardState, {role:'dialog',ariaModal:'true',closedAfterEscape:true,focusReturnedToUtilityMenu:true});
 
   const graphWindow = new BrowserWindow({
     show: false,
@@ -590,17 +605,20 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     const partial = await window.api.feedAudio({
       sessionId,
       sequence: 0,
+      absoluteSampleStart: 0,
       samples: new Float32Array([0.1, 0.2, 0.3])
     });
     const final = await window.api.feedAudio({
       sessionId,
       sequence: 1,
+      absoluteSampleStart: 3,
       samples: new Float32Array([0.1, 0.2, 0.3])
     });
     const stop = await window.api.stopASR({ sessionId });
     const staleFeed = await window.api.feedAudio({
       sessionId,
       sequence: 2,
+      absoluteSampleStart: 6,
       samples: new Float32Array([0.1, 0.2, 0.3])
     });
     return { start, partial, final, stop, staleFeed };
@@ -613,6 +631,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   const exitFeed = await mainWindow.webContents.executeJavaScript(`window.api.feedAudio({
     sessionId: '${SMOKE_EXIT_SESSION_ID}',
     sequence: 0,
+    absoluteSampleStart: 0,
     samples: new Float32Array([0.1, 0.2, 0.3])
   })`);
   const recoveredAsrResult = await mainWindow.webContents.executeJavaScript(`(async () => {
@@ -627,7 +646,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.deepEqual(initialAsrResult, {
     start: {
       ok: true,
-      events: [{ type: 'ready', sessionId: SMOKE_SESSION_ID, sequence: 0 }]
+      events: [{type: 'ready', sessionId: SMOKE_SESSION_ID, sequence: 0, capabilities: {recognitionMode: 'streaming', partialResults: true, tokenTimestamps: false, timingSource: 'unavailable', confidence: false}}]
     },
     partial: {
       ok: true,
@@ -635,7 +654,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
         type: 'partial',
         sessionId: SMOKE_SESSION_ID,
         sequence: 1,
-        text: 'SMOKE_ASR_PARTIAL'
+        text: 'SMOKE_ASR_PARTIAL', acceptedSampleStart: 0, acceptedSampleEnd: 3, timingSource: 'unavailable'
       }]
     },
     final: {
@@ -644,7 +663,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
         type: 'final',
         sessionId: SMOKE_SESSION_ID,
         sequence: 2,
-        text: 'SMOKE_ASR_FINAL'
+        text: 'SMOKE_ASR_FINAL', acceptedSampleStart: 3, acceptedSampleEnd: 6, timingSource: 'unavailable'
       }]
     },
     stop: {
@@ -654,16 +673,16 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
           type: 'final',
           sessionId: SMOKE_SESSION_ID,
           sequence: 3,
-          text: 'SMOKE_ASR_STOP_FINAL'
+          text: 'SMOKE_ASR_STOP_FINAL', timingSource: 'unavailable'
         },
-        { type: 'stopped', sessionId: SMOKE_SESSION_ID, sequence: 4 }
+        {type: 'stopped', sessionId: SMOKE_SESSION_ID, sequence: 4, finalAcceptedSampleCursor: 6, timingSource: 'unavailable',qualityEvents:[{code:'timing-unavailable',startSample:0,endSample:6}]}
       ]
     },
     staleFeed: { ok: true, events: [] }
   });
   assert.deepEqual(exitStart, {
     ok: true,
-    events: [{ type: 'ready', sessionId: SMOKE_EXIT_SESSION_ID, sequence: 0 }]
+    events: [{type: 'ready', sessionId: SMOKE_EXIT_SESSION_ID, sequence: 0, capabilities: {recognitionMode: 'streaming', partialResults: true, tokenTimestamps: false, timingSource: 'unavailable', confidence: false}}]
   });
   assert.deepEqual(exitFeed, {
     ok: false,
@@ -672,7 +691,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.deepEqual(recoveredAsrResult, {
     cancelStart: {
       ok: true,
-      events: [{ type: 'ready', sessionId: SMOKE_CANCEL_SESSION_ID, sequence: 0 }]
+      events: [{type: 'ready', sessionId: SMOKE_CANCEL_SESSION_ID, sequence: 0, capabilities: {recognitionMode: 'streaming', partialResults: true, tokenTimestamps: false, timingSource: 'unavailable', confidence: false}}]
     },
     cancel: {
       ok: true,
@@ -748,29 +767,40 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   });
   await mainWindow.webContents.executeJavaScript(`document.getElementById('btn-stop').click()`);
 
-  const playbackSmokeState = await waitUntil('completed recording playback analysis', async () => {
+  const playbackSmokeState = await waitUntil('completed recording saved to Report', async () => {
     return mainWindow.webContents.executeJavaScript(`(async () => {
       const trainer = window.__recordingSmokeTrainer;
       const record = trainer.trainingRecords?.selected();
-      if (!record?.playbackAnalysis
-          || document.getElementById('playback-controls').classList.contains('hidden')
-          || !document.getElementById('feedback-content').textContent.includes('SMOKE_PLAYBACK_ADVICE')) {
-        return null;
-      }
+      if (record?.saveState !== 'saved' || document.body.dataset.screen !== 'report') return null;
       const audioBlob = await fetch(record.audioUrl).then(response => response.blob());
-      return {
-        playbackVisibleAfterStop: true,
-        recordOptionCount: document.getElementById('training-record-select').options.length,
-        modelLabels: Array.from(document.getElementById('playback-model').options, option => option.textContent),
-        analysisStatus: document.getElementById('feedback-status').textContent.trim(),
-        analysisProfileModel: record.playbackAnalysis.profile.model,
-        analysisSegmentIds: record.playbackAnalysis.items.map(item => item.segmentId),
-        audioType: audioBlob.type
-      };
+      return {playbackVisibleAfterStop:getComputedStyle(document.getElementById('playback-controls')).display !== 'none',
+        screen:document.body.dataset.screen, saved:record.saveState === 'saved',
+        reportAbsent:!record.report, playbackAnalysisAbsent:!record.playbackAnalysis,
+        modelLabels:Array.from(document.getElementById('playback-model').options, option => option.textContent),
+        audioType:audioBlob.type};
     })()`);
   });
-  assert.equal(playbackSmokeState.analysisProfileModel, 'fake-model');
-  assert.deepEqual(playbackSmokeState.analysisSegmentIds, ['segment-1']);
+  assert.equal(playbackSmokeState.reportAbsent, true);
+  assert.equal(playbackSmokeState.playbackAnalysisAbsent, true);
+  assert.equal(calls.llmReport, 0);
+  assert.equal(calls.llmPlayback, 1, 'only explicit IPC contract test requests playback analysis');
+  await waitUntil('automatic AI diagnosis persisted', () => mainWindow.webContents.executeJavaScript(`(() => {
+    const record = window.__recordingSmokeTrainer.trainingRecords?.selected();
+    return !record?.reportPending && record?.saveState === 'saved'
+      && document.getElementById('report-body').textContent.includes('先说明目标，再给出支持理由');
+  })()`));
+  assert.equal(calls.llmReport, 0);
+  assert.equal(calls.llmDiagnosis, 1);
+  const savedReport = await mainWindow.webContents.executeJavaScript(`(async () => {
+    const record = window.__recordingSmokeTrainer.trainingRecords.selected();
+    const saved = await window.api.getTrainingSession({requestId:crypto.randomUUID(),sessionId:record.id});
+    return saved.value.results.find(result => result.kind === 'diagnosis');
+  })()`);
+  assert.equal(savedReport.status, 'completed');
+  assert.equal(savedReport.provenance.provider, 'deepseek');
+  assert.equal(savedReport.provenance.model, 'fake-model');
+  assert.ok(Number.isFinite(Date.parse(savedReport.createdAt)));
+  assert.doesNotMatch(JSON.stringify(savedReport.provenance), /apiKey|baseUrl|ollamaUrl|smoke-key/);
   assert.deepEqual(await mainWindow.webContents.executeJavaScript('window.api.getRecordingPolicy()'), {
     acknowledged: true
   });
@@ -780,6 +810,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   );
   assert.deepEqual(restoredLlmSettings, {success: true});
   const policyPath = getRecordingPolicyPath(app.getPath('userData'));
+  assert.deepEqual(JSON.parse(fs.readFileSync(policyPath, 'utf8')), {schemaVersion: 2, acknowledged: true});
   const corruptPolicy = '{"acknowledged":';
   fs.writeFileSync(policyPath, corruptPolicy, 'utf8');
   assert.deepEqual(
@@ -801,7 +832,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       const provider = document.getElementById('provider');
       const model = document.getElementById('model');
       const cards = document.querySelectorAll('.asr-model-card');
-      if (!provider || !model || cards.length !== 3) return null;
+      if (!provider || !model || cards.length !== 4) return null;
       return {
         title: document.title,
         hasGetLlmProviderSettings: typeof window.api?.getLlmProviderSettings === 'function',
@@ -824,7 +855,8 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     modelNames: [
       'Paraformer 中英双语',
       'Zipformer Small CTC 中文 INT8',
-      'Zipformer Large CTC 中文 INT8'
+      'Zipformer Large CTC 中文 INT8',
+      'SenseVoiceSmall INT8 多语种'
     ],
     status: '当前使用：Paraformer 中英双语'
   });
@@ -927,9 +959,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   );
   assert.equal(successfulSwitch.ok, true);
   assert.equal(successfulSwitch.state.effectiveModelId, 'zipformer-small-ctc-zh-int8-2025-04-01');
-  settingsWindow.close();
-
-  await mainWindow.webContents.executeJavaScript(
+  await settingsWindow.webContents.executeJavaScript(
     `document.getElementById('btn-prompt-editor').click()`
   );
   const promptEditorWindow = await waitUntil('prompt editor window creation', () => {
@@ -938,6 +968,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     });
   });
   await waitForPage(promptEditorWindow, 'prompt-editor.html');
+  assert.equal(promptEditorWindow.getParentWindow(), settingsWindow);
   if (process.platform !== 'darwin') {
     assert.equal(promptEditorWindow.isMenuBarVisible(), false, 'prompt editor must not render a second menu header');
   }
@@ -984,56 +1015,30 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     `window.api.saveAppearance({theme: 'graphite', layout: 'coach-rail'})`
   );
   promptEditorWindow.destroy();
+  settingsWindow.close();
 
-  await mainWindow.webContents.executeJavaScript(`(() => {
-    document.getElementById('btn-paste').click();
-    const textarea = document.getElementById('paste-textarea');
-    textarea.value = '嗯我觉得这个方案很好。';
-    document.getElementById('btn-analyze-paste').click();
-  })()`);
-
-  const pasteState = await waitUntil('pasted transcript analysis', async () => {
-    return mainWindow.webContents.executeJavaScript(`(() => {
-      const reportButton = document.getElementById('btn-report');
-      const feedback = document.getElementById('feedback-content').textContent;
-      if (reportButton.classList.contains('hidden') || !feedback.includes('SMOKE_LLM_FEEDBACK')) {
-        return null;
-      }
-      return {
-        subtitle: document.getElementById('subtitle-container').textContent.trim(),
-        fillers: document.getElementById('stat-fillers').textContent,
-        hedges: document.getElementById('stat-hedges').textContent,
-        vague: document.getElementById('stat-vague').textContent,
-        density: document.getElementById('stat-density').textContent,
-        reportVisible: !reportButton.classList.contains('hidden'),
-        copyVisible: !document.getElementById('btn-copy-text').classList.contains('hidden'),
-        saveVisible: !document.getElementById('btn-save-text').classList.contains('hidden'),
-        clearVisible: !document.getElementById('btn-clear').classList.contains('hidden'),
-        feedback
-      };
-    })()`);
-  });
-  assert.deepEqual(pasteState, {
-    subtitle: '嗯我觉得这个方案很好。',
-    fillers: '2',
-    hedges: '1',
-    vague: '1',
-    // Ten characters; 嗯 + 我觉得 + 这个 exclude six distinct characters.
-    density: '40%',
-    reportVisible: true,
-    copyVisible: true,
-    saveVisible: true,
-    clearVisible: true,
-    feedback: 'SMOKE_LLM_FEEDBACK'
-  });
-  assert.equal(calls.llmFeedback, 1);
+  await mainWindow.webContents.executeJavaScript(`document.getElementById('btn-history').click()`);
+  await waitUntil('History opens saved session', () => mainWindow.webContents.executeJavaScript(`(() => {
+    const button = document.querySelector('#history-list [data-record-id]');
+    if (!button) return false;
+    button.click(); return true;
+  })()`));
+  await waitUntil('History Report restored without analysis rerun', () => mainWindow.webContents.executeJavaScript(`document.body.dataset.screen === 'report'
+    && !document.getElementById('btn-report-back').classList.contains('hidden')
+    && document.getElementById('report-body').textContent.includes('先说明目标，再给出支持理由')`));
+  assert.equal(calls.llmReport, 0);
+  assert.equal(calls.llmDiagnosis, 1);
+  assert.equal(calls.llmFeedback, 0);
 
   console.log(`${RESULT_MARKER}${JSON.stringify({
     policyShownBeforeRecording: Boolean(policyShownBeforeRecording),
     playbackVisibleAfterStop: playbackSmokeState.playbackVisibleAfterStop,
-    recordOptionCount: playbackSmokeState.recordOptionCount,
+    reportOpenedAfterStop: playbackSmokeState.screen === 'report',
+    saved: playbackSmokeState.saved,
+    historyReportRestored: true,
     modelLabels: playbackSmokeState.modelLabels,
-    analysisStatus: playbackSmokeState.analysisStatus,
+    manualReportRequests: calls.llmReport,
+    automaticDiagnosisRequests: calls.llmDiagnosis,
     audioType: playbackSmokeState.audioType
   })}`);
   console.log(SUCCESS_MARKER);
@@ -1044,8 +1049,16 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
 }
 
 module.exports = {
+  async fakeSpeechEvidence({audio}) {
+    const sampleCount=(audio.byteLength-44)/2;
+    return {schemaVersion:1,status:'completed',audio:{sampleRateHz:16000,sampleCount},
+      provenance:{engine:'smoke',engineVersion:'1',modelId:'fake-vad',modelVersion:'1',modelSha256:'0'.repeat(64),thresholdVersion:'smoke-v1',normalizationVersion:'speech-segments-v1'},
+      segments:sampleCount ? [{id:'speech-1',startSample:0,endSample:sampleCount}] : [],
+      capabilities:{speechIntervals:true,lexicalTiming:false},quality:{vad:{status:'degraded',reasons:['vad-thresholds-uncalibrated']}}};
+  },
   configureApp,
   fakeAsrProvider,
   fakeLlm,
+  calls,
   run
 };

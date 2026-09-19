@@ -77,7 +77,7 @@ test('ModelManager accepts one validated fixed archive source', (t) => {
   assert.equal(loadModelCatalog(registry).models[0].sources[0].type, 'archive');
 });
 
-test('ModelManager rejects source layouts outside the current single-archive streaming path', async (t) => {
+test('ModelManager rejects a single file source that cannot supply all registered runtime files', async (t) => {
   const {createModelManager} = require('../lib/model-manager');
   const data = fixture(t);
   const fileRegistry = structuredClone(data.registry);
@@ -93,6 +93,60 @@ test('ModelManager rejects source layouts outside the current single-archive str
   }];
   const manager = createModelManager({...data, registry: fileRegistry, appVersion: '1.0.0'});
   await assert.rejects(manager.install(data.model.id), /unsupported source layout/);
+});
+
+function singleFileFixture(t) {
+  const data = fixture(t);
+  const registry = structuredClone(data.registry);
+  const model = registry.models[0];
+  const file = model.files[0];
+  model.files = [file];
+  model.downloadBytes = file.bytes;
+  model.sources = [{type: 'file', url: 'https://example.test/model.onnx', relativePath: file.relativePath,
+    sha256: file.sha256, bytes: file.bytes, builtIn: false}];
+  const bytes = data.runtimeFiles[file.relativePath];
+  return {...data, registry, bytes, fetchImpl: async () => new Response(bytes, {
+    status: 200, headers: {'content-length': String(bytes.length)}
+  })};
+}
+
+test('single-file model installation verifies bytes, atomically activates and reuses offline', async t => {
+  const {createModelManager} = require('../lib/model-manager');
+  const data = singleFileFixture(t);
+  let downloads = 0;
+  const manager = createModelManager({...data, appVersion: '1.0.0',
+    fetchImpl: async (...args) => { downloads++; return data.fetchImpl(...args); },
+    extractArchive() { assert.fail('single model file must not run archive extraction'); }});
+  const installed = await manager.install(data.model.id, {activate: true});
+  assert.deepEqual(fs.readFileSync(installed.files[0].path), data.bytes);
+  assert.equal((await manager.getActive(data.model.id)).files[0].sha256, data.registry.models[0].files[0].sha256);
+  assert.equal((await manager.install(data.model.id, {activate: true})).reused, true);
+  assert.equal(downloads, 1);
+  fs.writeFileSync(installed.files[0].path, Buffer.alloc(data.bytes.length));
+  await assert.rejects(manager.getActive(data.model.id), /SHA-256 mismatch/);
+});
+
+test('single-file corrupt downloads never publish an active model', async t => {
+  const {createModelManager} = require('../lib/model-manager');
+  const data = singleFileFixture(t);
+  const manager = createModelManager({...data, appVersion: '1.0.0', fetchImpl: async () =>
+    new Response(Buffer.alloc(data.bytes.length), {status: 200, headers: {'content-length': String(data.bytes.length)}})});
+  await assert.rejects(manager.install(data.model.id, {activate: true}), /SHA-256 mismatch/);
+  assert.equal(await manager.getActive(data.model.id), null);
+  assert.equal(fs.existsSync(path.join(manager.modelsRoot, data.model.id, data.model.version)), false);
+});
+
+test('cancelled single-file download leaves no active or published model', async t => {
+  const {createModelManager} = require('../lib/model-manager');
+  const data = singleFileFixture(t);
+  const controller = new AbortController();
+  const manager = createModelManager({...data, appVersion: '1.0.0', fetchImpl: async () => {
+    controller.abort(new Error('cancel single file'));
+    return data.fetchImpl();
+  }});
+  await assert.rejects(manager.install(data.model.id, {activate: true, signal: controller.signal}), /cancel single file|aborted/i);
+  assert.equal(await manager.getActive(data.model.id), null);
+  assert.equal(fs.existsSync(path.join(manager.modelsRoot, data.model.id, data.model.version)), false);
 });
 
 test('committed product registry pins the accepted Paraformer artifact and runtime files', () => {

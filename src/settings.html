@@ -266,6 +266,9 @@
     }
 
     .appearance-error.show { opacity: 1; }
+    .auto-diagnosis-option { display: flex; align-items: flex-start; gap: 8px; color: var(--color-text); font-size: 13px; }
+    .auto-diagnosis-option input { margin-top: 2px; accent-color: var(--color-accent); }
+    .auto-diagnosis-disclosure { margin: 8px 0; color: var(--color-text-muted); font-size: 12px; line-height: 1.6; }
   </style>
 </head>
 <body>
@@ -299,6 +302,7 @@
       <div class="asr-model-list" id="asr-model-list"></div>
     </section>
 
+    <section class="settings-section"><h2>分析偏好</h2><button id="btn-prompt-editor" type="button">训练规则与分析指令</button></section>
     <section class="settings-section" aria-labelledby="ai-heading">
       <h2 id="ai-heading">AI 服务</h2>
 
@@ -326,7 +330,7 @@
       <select id="provider">
         <option value="openai">OpenAI</option>
         <option value="deepseek">DeepSeek（推荐）</option>
-        <option value="ollama">Ollama（本地）</option>
+        <option value="ollama">Ollama</option>
         <option value="custom">自定义 OpenAI 兼容</option>
       </select>
     </div>
@@ -354,6 +358,15 @@
       <div class="hint">请求时会自动追加 /chat/completions</div>
     </div>
 
+    <div class="automatic-diagnosis">
+      <label class="auto-diagnosis-option" for="auto-diagnosis-enabled">
+        <input type="checkbox" id="auto-diagnosis-enabled" aria-describedby="auto-diagnosis-disclosure auto-diagnosis-hint" disabled>
+        启用录音结束后的自动 AI 诊断
+      </label>
+      <p id="auto-diagnosis-disclosure" class="auto-diagnosis-disclosure" aria-live="polite">先添加 AI 服务配置，再选择是否启用自动诊断。</p>
+      <p id="auto-diagnosis-hint" class="auto-diagnosis-disclosure">仅对当前使用的配置生效。取消勾选并保存可停用；更换服务、模型或地址后需重新启用。</p>
+    </div>
+
     <div class="message-container">
       <div class="save-success" id="save-success">✓ 已保存</div>
       <div class="connection-error" id="connection-error"></div>
@@ -367,6 +380,7 @@
 
   <script src="appearance.js"></script>
   <script>window.Appearance.initializeAppearance();</script>
+  <script src="../lib/llm-provider-config.js"></script>
   <script src="settings.js"></script>
 </body>
 </html>

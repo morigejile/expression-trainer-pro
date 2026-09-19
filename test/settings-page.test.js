@@ -29,6 +29,8 @@ function createPage() {
   page.ollamaUrlInput = { value: 'http://localhost:11434' };
   page.customBaseUrlInput = { value: '' };
   page.customModelInput = { value: '' };
+  page.autoDiagnosisEnabled = {checked:false,disabled:false};
+  page.autoDiagnosisDisclosure = {textContent:''};
   page.btnSave = { textContent: '保存设置', disabled: false, classList: createClassList() };
   page.btnTestConnection = { textContent: '测试连接', disabled: false, classList: createClassList() };
   page.saveSuccess = { textContent: '✓ 已保存', classList: createClassList() };
@@ -63,7 +65,7 @@ function profile(id, overrides = {}) {
 }
 
 function createSettingsWithProfiles(profiles, activeProfileId) {
-  return { schemaVersion: 2, activeProfileId, profiles };
+  return { schemaVersion: 3, activeProfileId, profiles };
 }
 
 function createSettingsPageWithProfiles(profiles, activeProfileId) {
@@ -113,7 +115,101 @@ test('incomplete profiles remain manageable but are absent from active model cho
 
   assert.deepEqual(page.profileSelect.children.map(option => option.value), ['incomplete', 'configured']);
   assert.deepEqual(page.activeProfileSelect.children.map(option => option.value), ['configured']);
-  assert.equal(page.activeProfileSelect.value, 'configured');
+  assert.equal(page.activeProfileSelect.value, '');
+  assert.equal(page.settings.activeProfileId, 'incomplete');
+});
+
+test('saving credentials alone keeps automatic diagnosis off until the explicit checkbox is selected', () => {
+  const page = createSettingsPageWithProfiles([profile('remote',{apiKey:'key'})],'remote');
+  assert.equal(page.autoDiagnosisEnabled.checked,false);
+  assert.equal(page.buildDraftSettings().profiles[0].autoDiagnosisEnabled,false);
+  page.autoDiagnosisEnabled.checked = true;
+  assert.equal(page.buildDraftSettings().profiles[0].autoDiagnosisEnabled,true);
+  page.autoDiagnosisEnabled.checked = false;
+  assert.equal(page.buildDraftSettings().profiles[0].autoDiagnosisEnabled,false);
+});
+
+test('privacy disclosure distinguishes a remote Ollama endpoint from local processing and excludes credential values', () => {
+  const page = createSettingsPageWithProfiles([
+    profile('remote',{provider:'ollama',ollamaUrl:'https://user:password@remote.example',apiKey:'do-not-display'})
+  ],'remote');
+  assert.match(page.autoDiagnosisDisclosure.textContent,/Ollama/);
+  assert.match(page.autoDiagnosisDisclosure.textContent,/远程/);
+  assert.match(page.autoDiagnosisDisclosure.textContent,/转写文本/);
+  assert.match(page.autoDiagnosisDisclosure.textContent,/语音证据/);
+  assert.match(page.autoDiagnosisDisclosure.textContent,/指标/);
+  assert.match(page.autoDiagnosisDisclosure.textContent,/分析指令/);
+  assert.doesNotMatch(page.autoDiagnosisDisclosure.textContent,/password|do-not-display/);
+  page.ollamaUrlInput.value = 'http://127.0.0.1:11434';
+  page.onAutoDiagnosisProfileChange();
+  assert.match(page.autoDiagnosisDisclosure.textContent,/本机处理/);
+  assert.doesNotMatch(page.autoDiagnosisDisclosure.textContent,/远程/);
+});
+
+test('provider, model and actual endpoint changes require a new automatic-diagnosis opt-in', () => {
+  for (const [field,value] of [['providerSelect','custom'],['modelSelect','new-model'],['ollamaUrlInput','http://remote.example:11434']]) {
+    const page = createSettingsPageWithProfiles([
+      profile('enabled',{provider:'ollama',model:'old-model',autoDiagnosisEnabled:true})
+    ],'enabled');
+    assert.equal(page.autoDiagnosisEnabled.checked,true);
+    page[field].value = value;
+    page.onAutoDiagnosisProfileChange();
+    assert.equal(page.autoDiagnosisEnabled.checked,false,field);
+    assert.equal(page.buildDraftSettings().profiles[0].autoDiagnosisEnabled,false,field);
+    page.autoDiagnosisEnabled.checked = true;
+    assert.equal(page.buildDraftSettings().profiles[0].autoDiagnosisEnabled,true,field);
+  }
+  const page = createSettingsPageWithProfiles([
+    profile('enabled',{provider:'custom',model:'m',baseUrl:'https://first.example',autoDiagnosisEnabled:true})
+  ],'enabled');
+  page.customBaseUrlInput.value = 'https://second.example';
+  assert.equal(page.buildDraftSettings().profiles[0].autoDiagnosisEnabled,false);
+});
+
+test('renaming or switching the edited profile preserves its opt-in but duplicating it does not grant new consent', () => {
+  const page = createSettingsPageWithProfiles([
+    profile('enabled',{autoDiagnosisEnabled:true}),profile('disabled',{autoDiagnosisEnabled:false})
+  ],'enabled');
+  page.renameProfile('Renamed');
+  page.selectProfile('disabled');
+  assert.equal(page.autoDiagnosisEnabled.checked,false);
+  page.selectProfile('enabled');
+  assert.equal(page.autoDiagnosisEnabled.checked,true);
+  page.idFactory = () => 'copy';
+  page.duplicateProfile();
+  assert.equal(page.autoDiagnosisEnabled.checked,false);
+  assert.equal(page.buildDraftSettings().profiles.find(item => item.id === 'copy').autoDiagnosisEnabled,false);
+  assert.equal(page.settings.profiles.find(item => item.id === 'enabled').autoDiagnosisEnabled,true);
+});
+
+test('deleting the active profile does not silently activate a different enabled remote profile', () => {
+  const {resolveAutomaticDiagnosisProfile} = require('../lib/llm-provider-config');
+  const page = createSettingsPageWithProfiles([
+    profile('active',{apiKey:'key',autoDiagnosisEnabled:true}),profile('other',{apiKey:'key',autoDiagnosisEnabled:true})
+  ],'active');
+  page.deleteProfile();
+  assert.deepEqual(resolveAutomaticDiagnosisProfile(page.buildDraftSettings()),{profile:null,reason:'not-configured'});
+});
+
+test('bound model input and provider-change events revoke consent immediately', t => {
+  global.document = {getElementById:() => null,createElement};
+  t.after(() => {delete global.document;});
+  const page = createSettingsPageWithProfiles([profile('active',{autoDiagnosisEnabled:true})],'active');
+  page.appearanceControls = [];
+  for (const name of ['providerSelect','activeProfileSelect','profileSelect','profileNameInput','btnProfileNew',
+    'btnProfileDuplicate','btnProfileDelete','btnSave','btnTestConnection','modelSelect','ollamaUrlInput','customBaseUrlInput']) {
+    page[name].listeners = {};
+    page[name].addEventListener = function(event,handler) {this.listeners[event] = handler;};
+  }
+  page.bindEvents();
+  page.modelSelect.value = 'different-model';
+  page.modelSelect.listeners.input();
+  assert.equal(page.autoDiagnosisEnabled.checked,false);
+  page.autoDiagnosisEnabled.checked = true;
+  page.providerSelect.value = 'openai';
+  page.providerSelect.listeners.change();
+  assert.equal(page.autoDiagnosisEnabled.checked,false);
+  assert.match(page.autoDiagnosisDisclosure.textContent,/OpenAI/);
 });
 
 test('selecting a configuration to edit preserves the active model and sibling drafts', () => {

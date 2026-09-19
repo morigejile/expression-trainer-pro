@@ -1,15 +1,15 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43 / packaged smoke；内部开发/测试，录音回放、结构化同步分析、三款 streaming ASR、模型管理和内部包内默认资格已实现；公开模型分发仍受外部门禁约束
-> 运行时基线日期：2026-09-01；存储增量证据日期：2026-09-16；文档整理：2026-09-18（不表示重新运行验收）
+> 状态：Verified from Source + Electron 43；内部开发/测试，持久化训练与 M2 分析链已集成，三款 streaming ASR 及可选 SenseVoice utterance ASR；验证范围与剩余证据见 §10/§13，公开模型分发仍受外部门禁约束
+> 运行时基线日期：2026-09-01；存储基础证据：2026-09-16；M1 产品集成证据：2026-09-19
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`
 > 描述对象：当前集成分支的产品运行时、开发工具边界与已验证的内部安装基线
 
 ## 1. 证据边界
 
-当前事实来自源码、依赖清单和 Git 状态，并由 Node 测试、Electron smoke、packaged native-load、真实 Paraformer 首次安装及升级 smoke 支持。已验证 Main/Preload/Renderer、utility-process IPC、执行单元退出与重建、Fake LLM、粘贴分析、首次录音告知、运行期 WAV 回放与结构化片段分析，以及 Electron AudioWorklet 对 16/44.1/48 kHz fixture 的适配。真实可配置麦克风、真实外部 LLM、接近资格线硬件及非 Windows x64 制品仍未形成证据。
+当前事实来自源码、依赖清单和 Git 状态，并由 Node 测试、Electron smoke、packaged native-load、真实 Paraformer 首次安装及升级 smoke 支持。已验证 Main/Preload/Renderer、utility-process IPC、执行单元退出与重建、Fake LLM、M1 首次录音告知、持久化 WAV 回放与结构化片段分析，以及 Electron AudioWorklet 对 16/44.1/48 kHz fixture 的适配。真实可配置麦克风、真实外部 LLM、接近资格线硬件及非 Windows x64 制品仍未形成证据。
 
-2026-09-16 M1 增量：已增加[训练存储基础](current.md#10-m1-training-storage-foundation)，包含 SQLite schema v1、受管 WAV、事务完成、中断恢复、完整性检查与可重试删除。当前仅由 focused tests 和显式 persistence smoke 使用，尚未接入普通录音/历史 UI；下文的五条内存记录仍准确描述当前产品行为，旧图集已归档，不作为当前实现依据。
+M1 增量：[训练存储与产品集成](current.md#10-m1-training-storage-foundation) 已接入普通录音、已有结果、训练历史与共享 Report；包含极简 Preparing、静默准备检查、删除和保存失败重试。旧图集已归档，§4 图按当前源码更新；自动化证据与真实设备验收分开记录。
 
 | 标记 | 含义 |
 |---|---|
@@ -31,19 +31,19 @@
 
 ## 2. 当前目标与范围
 
-当前系统实现两条输入路径：
+当前系统以麦克风训练为唯一输入：
 
 ```text
-麦克风音频块 ┬→ 本地 ASR → final 文本 ┐
-             └→ Renderer-only Int16/WAV（最多五条）→ 本地回放
-粘贴逐字稿 ────────────────────────────┤
-                                         └→ 词库分析 → 可选 LLM 实时反馈/报告 → UI/Markdown
-ASR 最终片段 + 时间 → 结构化 LLM 回放分析 → 随播放进度显示
+麦克风音频块 ┬→ 本地 ASR → final 文本 → 本地词库统计
+             └→ Renderer 有界 Int16/WAV
+结束 → Application → SQLite 事实 + 受管 WAV → VAD/Common/按设置 AI → 保存报告快照 → 共享 Report
+训练历史 → 按 ID 读取同一 Session → 共享 Report/播放/手动分析/删除
+诊断重试与手动回放分析 → Main LLM → 带生成时来源的结果写回原 Session
 ```
 
 具体产品能力与 Existing/Partial/Planned 状态统一维护在[需求基线](../product/requirements.md)；本文只描述这些能力如何在当前源码中运行。
 
-普通产品录音仍未接入训练数据库；SQLite 存储基础已实现但只由测试与显式 smoke 使用（§10）。系统没有大型前端框架、独立后端或微服务。音频、ASR、模型、配置和交付边界已从原型职责中拆开；Renderer 的训练编排仍集中在 `ExpressionTrainer`。
+普通录音结束时自动保存，跨重启历史由数据库查询；正常启动持有 SQLite 存储并注册 Application/Preload API（§10）。系统没有大型前端框架、独立后端或微服务。音频、ASR、模型、配置和交付边界已从原型职责中拆开；Renderer 的训练编排仍集中在 `ExpressionTrainer`。
 
 ## 3. 当前技术栈与版本
 
@@ -53,10 +53,10 @@ ASR 最终片段 + 时间 → 结构化 LLM 回放分析 → 随播放进度显�
 | 音频 | `getUserMedia` + 16 kHz AudioContext + AudioWorklet | 320 帧 mono Float32 送 ASR；Renderer 同时生成有界 Int16/WAV；epoch 隔离暂停前旧块 |
 | 权限桥接 | Preload `contextBridge` + `ipcRenderer.invoke` | `contextIsolation:true`、`nodeIntegration:false` |
 | ASR 引擎 | `sherpa-onnx-node` `1.13.3` | 仅由 utility process 内的当前 Provider 延迟加载，Main 不 require |
-| ASR 模型 | Paraformer、Zipformer Small、Zipformer Large | schema-v2 Catalog 固定 archive/runtime；模型安装到 `appData/expression-trainer-pro-models`，权重不纳入 Git；当前 Catalog 默认是 Zipformer Large，但公开分发仍受许可约束 |
+| ASR 模型 | Paraformer、Zipformer Small、Zipformer Large、SenseVoice Small | schema-v2 Catalog 固定 archive/runtime；模型安装到 `appData/expression-trainer-pro-models`，权重不纳入 Git；默认仍为 Zipformer Large，SenseVoice 为可选整段识别；公开分发仍受许可约束 |
 | 本地分析 | `lib/lexicon.js` + `data/emotion-lexicon.json` + `shared/expression-rules.js` | 146 个情绪词；16 个填充词、14 个犹豫词、20 组笼统词映射由 Renderer/Main 共用；未启用数据不放入活跃 `data/` 目录 |
 | LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接/实时/报告/回放分析有独立超时，支持 AbortSignal、按 Renderer 取消和严格结构化响应验证；回放请求不含音频 |
-| 设置 | `userData/appearance.json`、`userData/asr-selection.json`、`userData/llm-provider-settings.json`、`userData/recording-policy.json`、legacy `userData/settings.json`、`userData/custom-prompt.json` | Appearance、ASR 选择、多 LLM profile 与录音策略确认各自持久化且互不覆盖；只持久化确认布尔值，不保存录音内容；小文件原子发布；API Key 明文 |
+| 设置 | `userData/appearance.json`、`userData/asr-selection.json`、`userData/llm-provider-settings.json`、`userData/recording-policy.json`、legacy `userData/settings.json`、`userData/custom-prompt.json` | Appearance、ASR 选择、多 LLM profile 与录音策略确认各自持久化且互不覆盖；录音策略文件只保存确认布尔值，训练内容另存 SQLite/受管 WAV；小文件原子发布；API Key 明文 |
 | 构建/测试 | Node test + Electron smoke + Electron Forge 7.5/Squirrel | `package`/`make` 固定 Windows x64；packaged smoke 覆盖 Fake 产品流、utility-only Sherpa native load、完整 DLL unpack 和外部模型目录；尚无 CI |
 
 开发工具精确版本见[开发与验证](../development.md)；已验证平台、制品和硬件边界见[支持矩阵](../support-matrix.md)。
@@ -67,7 +67,7 @@ ASR 最终片段 + 时间 → 结构化 LLM 回放分析 → 随播放进度显�
 
 ### 3.2 Model Manager 与生产模型
 
-产品层以 `models/registry.json` 作为唯一 schema-v2 Catalog，不依赖 `benchmark/`。Catalog 只描述三款 streaming 模型；Factory 只接受代码内冻结的 Paraformer 与 online CTC Provider 类型。模型安装到 `appData/expression-trainer-pro-models`（Windows 为 `%APPDATA%\expression-trainer-pro-models`），与可能本地化的 Electron `userData` 路径分离；旧 `userData/models` 在目标不存在时整目录迁移，双目录并存时拒绝覆盖。模型经过大小和 hash 校验、白名单解压、不可变版本发布与 native 初始化后才激活；中断、空间不足或校验失败不替换上一可用版本。
+ASR 产品层以 `models/registry.json` 作为唯一 schema-v2 Catalog，不依赖 `benchmark/`。Catalog 描述三款 streaming 模型和可选 SenseVoice utterance 模型；Factory 只接受代码内冻结的 Provider 类型并延迟载入实现。模型安装到 `appData/expression-trainer-pro-models`（Windows 为 `%APPDATA%\expression-trainer-pro-models`），与可能本地化的 Electron `userData` 路径分离；旧 `userData/models` 在目标不存在时整目录迁移，双目录并存时拒绝覆盖。模型经过大小和 hash 校验、白名单解压、不可变版本发布与 native 初始化后才激活；中断、空间不足或校验失败不替换上一可用版本。独立 VAD 目录与任务见 §13。
 
 `AsrModelService` 按严格命令行覆盖、持久选择、Catalog 默认值启动，并保证任意时刻最多一个识别 utility。模型切换先验证目标，再销毁旧 controller；失败时创建新的原模型 controller 回退，双失败进入 unavailable。安装由独立短生命周期 utility 执行，支持有界进度、取消和重试，不占用当前识别 controller。模型管理 IPC 只允许设置窗口调用四个固定 channel，Renderer 只接收脱敏快照并提交精确模型 ID。
 
@@ -89,13 +89,16 @@ flowchart LR
   UserData[(userData/llm-provider-settings.json\nrecording-policy.json\nappearance/asr-selection/custom-prompt JSON\nlegacy settings.json)]
 
   subgraph Electron[Expression Trainer / Electron]
-    R[Renderer\nUI + Web Audio + 训练状态\n运行期 WAV/五条记录\nsrc/app.js]
+    R[Renderer\nUI + Web Audio + 训练状态\n有界 WAV 缓冲/History/Report\nsrc/app.js]
     P[Preload\nwindow.api\npreload.js]
     M[Main Process\n窗口 + 文件 + IPC Router\nmain.js]
     C[ASR Controller\n请求关联 + 退出/重建]
     A[Utility Process\nSelected Sherpa Provider\nsherpa-onnx-node]
     X[Lexicon\nlib/lexicon.js]
     F[LLM\nlib/ai-feedback.js + prompts.js]
+    T[Training Application\nRepository + Audio Store\nSession Analysis + Common + Context]
+    V[VAD Utility Process\nSilero / Sherpa]
+    DB[(userData/training\nSQLite + managed WAV)]
   end
 
   Mic --> R
@@ -115,6 +118,11 @@ flowchart LR
   M --> F
   F -->|fetch| LLM
   M <--> UserData
+  M --> T
+  T <--> DB
+  T --> V
+  Model --> V
+  T --> F
 ```
 
 Main 负责 Electron 控制面、词库分析、小型 userData JSON 原子文件 I/O 和 LLM 请求编排；ASR 初始化与同步 decode 已移入单个 utility process。
@@ -125,8 +133,8 @@ Main 负责 Electron 控制面、词库分析、小型 userData JSON 原子文�
 
 - `ExpressionTrainer` 编排录音、暂停、逐字稿、本地分析和 LLM 状态；`AudioCapture`/AudioWorklet 独立管理 16 kHz 采集、epoch 与 tail flush。
 - 音频以最多 10 块的串行队列送入 ASR，overrun 失败关闭；Renderer 只接受当前 session 且 sequence 递增的规范事件。
-- 同一 Float32 chunk 在 Renderer 转为有界 Int16。正常结束后组装 WAV，最多保留五条内存记录并在淘汰、删除或退出时撤销 Blob URL。
-- 单条录音最长 20 分钟，达到上限走正常结束/尾部收尾并生成可回放记录。首次录音前告知运行期保留策略，帮助页长期保留该说明。
+- 同一 Float32 chunk 在 Renderer 转为有界 Int16。正常结束后组装 WAV 并通过 Application 持久化；内存仅缓存正在展示、保存失败或分析中的记录，离开、删除或退出时撤销不再使用的 Blob URL。
+- streaming 单条录音最长 20 分钟；SenseVoice utterance 最长 5 分钟，结束后才转写，不显示伪 partial。达到上限走正常结束并保存可回放记录。首次录音前告知本地持久化、手动删除及远程 AI 数据边界，帮助页长期保留该说明。
 - final 文本进入逐字稿、本地统计和单调片段时间轴；片段边界统一规范为严格递增的整毫秒，因此不足一整块的录音尾块不会让回放分析输入校验整体失败。播放只根据片段边界切换已完成建议，不触发推理。
 - 首次录音在申请麦克风前等待用户确认；回放分析的失败、取消或迟到响应不覆盖上一份成功结果。
 - 回放区模型下拉框只显示模型名；切换配置不自动请求，用户点击“重新分析”才用所选配置分析当前录音。
@@ -152,9 +160,9 @@ Main 负责 Electron 控制面、词库分析、小型 userData JSON 原子文�
 
 ### 5.4 ASR Provider / session、managed provider 与 Factory
 
-Main 只持有 `AsrProcessController`；实际 session wrapper、managed provider、Sherpa adapter、模型安装和模型对象均位于 utility process。`lib/asr-session.js` 维护单一 active session：start 创建 session 并发出 `ready`，feed 验证连续 input sequence 并发出 `partial/final/error`，stop flush 后发出可选 `final` 和必有 `stopped`，cancel 不 flush 且发出 `stopped`。
+Main 只持有 `AsrProcessController`；实际 session wrapper、managed provider、Sherpa adapter、模型安装和模型对象均位于 utility process。`lib/asr-session.js` 维护单一 active session：start 创建 session 并在 `ready` 中声明识别与 timing 能力；feed 验证连续 input sequence 和绝对 sample cursor，结果标注已接收的 sample 区间；stop flush 后发出可选 `final` 及含最终 cursor/qualityEvents 的 `stopped`，cancel 不 flush 且发出 `stopped`。四款 ASR 均明确 `tokenTimestamps: false` / `timingSource: unavailable`；模型 token timing 尚未接入，独立后处理 VAD 保存为 §13 的结果快照。
 
-`lib/asr-provider-factory.js` 只接受 Catalog 中代码支持的 provider type：Paraformer 由 `lib/asr.js` 创建，Zipformer Small/Large 由 `lib/zipformer-ctc-asr-provider.js` 创建。`lib/managed-asr-provider.js` 从选中模型的不可变 active 版本取得 role 文件，完成准备和 native 初始化后才把 Provider 交给 session wrapper；Factory 不接收 Renderer 提供的路径、URL、hash 或 provider type。
+`lib/asr-provider-factory.js` 只接受 Catalog 中代码支持的 provider type：Paraformer 由 `lib/asr.js` 创建，Zipformer Small/Large 由 `lib/zipformer-ctc-asr-provider.js` 创建，SenseVoice 由 `lib/sensevoice-asr-provider.js` 创建。`lib/managed-asr-provider.js` 从选中模型的不可变 active 版本取得 role 文件，完成准备和 native 初始化后才把 Provider 交给 session wrapper；Factory 不接收 Renderer 提供的路径、URL、hash 或 provider type。
 
 三款 Provider 均只支持一个并发识别流，使用 16 kHz mono Float32 输入、CPU、2 threads 和 greedy search。Paraformer 从 encoder、decoder、tokens role 创建 recognizer；Zipformer 从 model、tokens 及可选 BPE role 创建 online CTC recognizer。adapter `feed()` 同步 decode 并返回 `{text,isFinal}` / `null`，`stop()` flush 最后的未确认文本。重复 `initialize()` 复用 recognizer，session start 创建新 stream。`lib/fake-asr-provider.js` 通过同一 session wrapper 用于普通测试与 Electron smoke；没有通用插件系统或依赖注入容器。
 
@@ -162,11 +170,11 @@ Main 只持有 `AsrProcessController`；实际 session wrapper、managed provide
 
 ### 5.5 Lexicon / `lib/lexicon.js`
 
-`lib/lexicon.js` 读取情绪词并输出填充词、犹豫词、笼统词、情绪词、密度和建议；实时模式逐句调用，粘贴模式经 `analyze-texts` 一次提交整批句子，两者共用同一分析函数。Renderer 高亮与 Main 统计共用 `shared/expression-rules.js`；自定义词经去重、长度和 64 项上限后参与本地分析与 prompt。未接入运行时的词库不放在活跃 `data/` 目录。
+`lib/lexicon.js` 读取情绪词并输出填充词、犹豫词、笼统词、情绪词、密度和建议；录音模式逐句调用 `analyze-text`；粘贴入口、`analyzeTexts` Preload API 和 `analyze-texts` Main handler 已移除。Renderer 高亮与 Main 统计共用 `shared/expression-rules.js`；自定义词经去重、长度和 64 项上限后参与本地分析与 prompt。未接入运行时的词库不放在活跃 `data/` 目录。
 
 ### 5.6 LLM / `lib/ai-feedback.js`、`lib/prompts.js`
 
-本节的实时反馈、最终报告和回放分析是三条历史实现路径，不定义三个目标 Screen，也不表示已确认保留实时 AI。目标用户任务与 Workspace 归属以 [Training Flow §13](../product/training-flow.md#13-screen-structure-收敛基线) 为准；实时 AI 的取舍与具体交互仍待对应阶段决定。下文继续记录 As-Is 技术行为。
+历史实时反馈和自由文本报告接口保留兼容，但普通录音已不调用实时 AI，完成后的 M2 结构化诊断接线见 §13。手动回放分析仍保留。目标用户任务与 Workspace 归属以 [Training Flow §13](../product/training-flow.md#13-screen-structure-收敛基线) 为准；后续可选实时 AI 见 Backlog B-19。
 
 - 支持 OpenAI、DeepSeek、Ollama 和自定义 OpenAI-compatible；自定义训练规则附加到 prompt。
 - 连接测试、实时反馈、报告和回放分析使用独立超时与 AbortSignal；同类请求互相 supersede，迟到结果由 Main 协调和 Renderer 代际双重抑制。
@@ -175,9 +183,9 @@ Main 只持有 `AsrProcessController`；实际 session wrapper、managed provide
 
 ### 5.7 设置与数据
 
-`llm-provider-settings.json` 使用 schema-v2 `activeProfileId + profiles[]`；旧 schema/file 单向迁移，canonical 文件优先，不删除或双向同步 legacy 文件。损坏 JSON 保留原文，future schema 拒绝降级保存。API Key 当前仍明文保存。
+`llm-provider-settings.json` 使用 schema-v3 `activeProfileId + profiles[]`，自动启用字段见 §13；旧 schema/file 单向迁移，canonical 文件优先，不删除或双向同步 legacy 文件。损坏 JSON 保留原文，future schema 拒绝降级保存。API Key 当前仍明文保存。
 
-`recording-policy.json` 只保存 `{schemaVersion:1,acknowledged:true}`。录音、逐字稿片段时间轴、本地统计和回放分析只存在于 Renderer 内存；关闭窗口释放全部五条记录和 Blob URL，不形成跨重启训练历史。用户主动复制或保存的原文/报告仍沿用现有明确操作边界。
+`recording-policy.json` 使用 `{schemaVersion:2,acknowledged:true}`。旧版确认不代表已同意新的持久化告知，须重新确认；未知未来版本和损坏文件不被覆写。训练事实、WAV、本地统计及手动报告/回放结果保存在 §10 的训练存储中；Home 已移除粘贴、复制、保存和清空入口。
 
 `custom-prompt.json` 由 `lib/custom-prompt-store.js` 读写，与其余 store 同形；解析结果按 mtime+size 缓存、保存时失效，避免逐句分析反复同步读盘。
 
@@ -215,8 +223,9 @@ Renderer 请求 AudioCapture flush，关闭队列入口并 drain 已接受 chunk
 → Renderer 过滤当前 session/sequence，并经 mergeFinalText 去重 final
 → 非空新文本进入字幕、统计、片段时间轴、分析和报告
 → Renderer 组装 16-bit mono WAV Blob，释放 PCM 分块
-→ 加入最近五条内存队列；第六条撤销最老 Blob URL
-→ 原生播放器显示当前记录；应用退出撤销全部 URL
+→ 使用录音开始时建立的 Session ID 完成事实/WAV 写入，再保存统计快照
+→ 共享 Report 显示保存状态及播放器；失败时保留原音频供同 ID 重试
+→ 历史查询不设五条保留上限；离开/删除/退出撤销不再使用的 URL
 ```
 
 ### 6.3 分析与 LLM
@@ -224,27 +233,17 @@ Renderer 请求 AudioCapture flush，关闭队列入口并 drain 已接受 chunk
 ```text
 endpoint/final sentence
 → analyze-text invoke → Main lexicon → stats/建议
-→ 累计文本较上次反馈增加 >=30 字
-→ get-realtime-feedback invoke → Main 受控 fetch → 成功时更新右侧反馈
+→ Renderer 本地规则提示
 
-粘贴逐字稿
-→ Renderer 分句后一次 analyze-texts invoke（有界数组，最多 5000 句、
-  合计不超过与 report/realtime 相同的文本上限）
-→ Main 取一次训练规则和 extraFillers，逐句复用同一 lexicon 分析
-→ 整批返回后累计 stats；批量被拒时给固定文案并复位粘贴流程
-
-停止/粘贴完成后用户点击生成报告
-→ fullText + stats → Main fetch → Renderer 受控 Markdown token/DOM 渲染 → 可保存 Markdown
-
-录音正常结束后自动分析，或用户选择 profile 后点击“重新分析”
-→ Renderer 提交 {profileId, segments:[{id,text,startMs,endMs}]}，不提交音频
-→ Preload / Main 校验输入并从设置读取完整 profile 快照
-→ Main 结构化 LLM fetch → 严格校验 segment ID/JSON/长度
-→ Renderer 仅在请求代际和当前记录仍匹配时整体替换上次成功结果
-→ 播放/拖动跨越片段边界时更新当前字幕与建议，不再次推理
+录音结束 → 保存事实/WAV → Main VAD/Common/按 profile 启用的 AI 诊断 → 结果快照 → 共享 Report
+历史打开 → 读取原快照 → 共享 Report（不自动请求 AI）
+用户重试诊断 → Main 为同一训练追加结果 → 精确引用新快照，失败保留此前成功诊断
+用户手动回放分析 → profileId + 片段文本/估计时间 → Main 校验 → 结构化 fetch
+→ 将结果与实际使用的 profile/model/分析指令快照保存到原 Session
+→ 播放/拖动跨片段更新字幕与已有建议，不再次推理
 ```
 
-LLM 失败只返回安全的 `{success:false,error}`，不会修改本地词库结果或覆盖上一份成功的回放分析；粘贴模式在请求 LLM 前完成本地分析，实时模式的分析 IPC 与 LLM IPC 也彼此独立。
+导航不改变结果归属；删除后的迟到结果不能恢复记录。失败状态单独保存，上一份成功报告/回放结果仍可读。缺失的指标显示未知，不补零；M2 Common 独立计算，不以旧 metrics 快照是否存在阻止重试。旧自由文本报告仅留兼容接口。生成时无法获知的来源字段保持 null。
 
 ### 6.4 设置与 Prompt
 
@@ -299,23 +298,30 @@ Settings/Prompt Renderer 通过 Preload 调用 Main 中的 userData JSON store�
 
 ## 10. M1 training storage foundation
 
-Date: 2026-09-16. This implements the storage portion of [M1](../milestones/m1-training-persistence.md).
-It is exercised by tests and an explicit Electron smoke. Normal recording, current-result snapshots,
-Preload APIs, history UI and disclosure copy are not integrated yet.
+存储基础：2026-09-16；Application、普通录音、已有结果与 History/Report 集成：2026-09-19。实现范围见 [M1](../milestones/m1-training-persistence.md)，数据语义仍由 [Data Model](data-model.md) 定义。
 
 ### Runtime and ownership
 
-Use `node:sqlite` / `DatabaseSync` from the fixed runtime. There is no new npm dependency, ORM,
-download or additional native addon. The [Node API documentation](https://nodejs.org/download/release/latest-v24.x/docs/api/sqlite.html)
-still classifies this API as a release candidate, so Electron upgrades must rerun the persistence smoke.
-Only `lib/training-session-repository.js` imports the binding; change that module if a future runtime
-requires a replacement. No generic database adapter is needed now.
+仅 Repository 使用运行时内置的 `node:sqlite/DatabaseSync`，没有新增依赖、ORM 或 native binding。正常 Main 启动在取得单实例锁后打开 `userData/training`，初始化及恢复完成后接受命令；第二实例只唤起已有主窗口。初始化失败返回安全类别，未知未来 schema 不改写。
 
-The Application layer will own one `openTrainingSessionStore({root})` instance per data root,
-under `userData/training`. Opening a store runs recovery and must happen before accepting commands.
-Concurrent owners of the same root are not supported: Application integration must enforce single ownership,
-including across desktop instances, before enabling normal recording persistence.
-`close()` rejects while a write/delete is in progress and otherwise releases the database.
+窗口关闭先请求 Renderer 停止录音、等待收尾、已有分析与保存，排空期间拒绝新录音/分析。保存失败可取消退出并重试；10 秒未响应会明确提示继续等待或放弃未保存内容后退出。收到 Renderer 完成确认后，Application 拒绝新命令并排空已受理操作（默认 5 秒）；超时返回 `STORAGE_SHUTDOWN_TIMEOUT`，不伪报成功，下次启动恢复。这些预算与 M2 Processing timeout 无关。
+
+### Application and Preload commands
+
+`training-session-ipc.js` 只接受当前主窗口、主 frame、预期主文档（可含 hash）调用，其他窗口或文档返回 `FORBIDDEN`。命令使用 requestId，单条操作另带 sessionId；Renderer 不能指定文件路径。
+
+| Preload API | 行为 |
+|---|---|
+| createTrainingSession | 建立稳定 ID、冻结 Main 提供的真实应用/ASR 来源，返回 recording |
+| finalizeTrainingSession | 同一 ID 保存事实和有界 WAV，重复完成不覆盖已完成数据 |
+| interruptTrainingSession | recording 标记 incomplete；不覆写已完成或复活已删除记录 |
+| appendTrainingResult | 幂等追加已有统计/报告/回放快照，拒绝过期输入版本及已删 Session |
+| listTrainingSessions | 按创建时间和 ID 倒序分页，含状态/模式/有界摘要，不附音频全文 |
+| getTrainingSession | 按 ID 读取事实、结果与完整性，删除/不存在返回 null |
+| readTrainingAudio | 验证音频完整性和删除状态后返回字节，不暴露任意路径 |
+| deleteTrainingSession | 删除 Session、子项与受管文件；部分失败可重试 |
+
+错误类别包括输入无效、记录不存在/忙、完成失败、删除失败、音频不可用、结果过期、未知 schema、存储不可用/正在关闭及未授权。Application 映射固定安全文案；Renderer 分开显示事实保存失败、结果保存失败与分析失败。事实失败保留原 Blob，结果失败保留同一结果 ID，重试不会制造重复记录。
 
 ### Files and schema
 
@@ -326,99 +332,81 @@ training/
   staging/<session-id>.part
 ```
 
-Schema version is SQLite `user_version`. Migration 0 → 1 creates these tables transactionally:
+SQLite `user_version` 0→1 事务创建 sessions/transcripts/artifacts，1→2 增加 results（不可变快照 JSON，Session 外键级联删除）。打开前只读检查版本；大于 2 的数据库拒绝降级，保持字节不变。没有旧版运行期记录可导入。
 
-| Table | Stored content |
-|---|---|
-| `sessions` | Stable generated UUID, recording/finalizing/completed/incomplete/corrupt status, UTC dates, duration, immutable Free/microphone source snapshot, quality flags, deletion-pending flag |
-| `transcripts` | One canonical text per session and JSON stable segments with their order and declared timing source; revision 1 |
-| `artifacts` | One WAV per session, managed relative filename, byte length, SHA-256 and integrity state |
+Session 只接受 microphone/free、null framework/trainingPrompt，title 显式为 null。音频时长从校验后的固定 PCM 格式推算，独立 createdAt 未采集时为 null。片段保留稳定 ID、顺序和 estimated timing，未知 startSample/endSample/confidence 为 null，不冒充精确时间证据。
 
-Transcript and artifact rows reference their session with `ON DELETE CASCADE`. History sorts by
-creation time descending and UUID descending; limit/offset paginate without deleting old sessions.
-The store accepts only `microphone`, `free`, null framework and null training prompt. ASR/app source
-fields are explicitly projected, excluding settings, endpoints and credentials. M1 does not promote
-estimated segment milliseconds into exact sample offsets.
-
-逻辑字段与 schema v1 的映射如下；目标语义见 [Data Model §4](data-model.md#4-m1-logical-entities)，下表区分现状与待补投影：
-
-| 逻辑字段 | 当前实现 | M1 剩余接入 |
-|---|---|---|
-| Session.title | facts_json 和视图均未输出 | 显式投影 null；无需新增 SQL 列或标题编辑 |
-| Artifact.durationMs | artifact 视图未输出；已有经格式校验的 byteLength 与固定采样格式 | 从有效 PCM 数据长度推算采样数/时长并取整；无法确定则 null，无需重复存储 |
-| Artifact.createdAt | schema v1 未记录 | 显式投影 null，不补猜历史生成时间 |
-| Segment.startSample / endSample / confidence | normalizeCompletion 写 null，实际保存在 segments_json 中 | 保留未知语义；M1 不把近似毫秒换算为精确采样证据 |
-
-以上待补字段投影尚未实现；当前没有度量/AI 结果写入 API，结果及其生成时来源仍待录音/结果接入切片实现。
-
-Existing databases are inspected read-only before any journal/recovery/schema write. A schema newer
-than version 1 returns `UNSUPPORTED_SCHEMA` without modifying its bytes. There is no older durable
-product format to import. Future numbered migrations must retain this refusal boundary.
+结果保留生成时间、输入修订、证据引用、定义/分析器版本以及实际使用的来源。统计标识为 expression-rules-v1/lexicon-v1；AI 来源在 Main 发起请求时捕获，只保存实际参与该类请求的分析指令及 provider/model/profileId，排除 Key、endpoint 和凭据。未知字段为 null，不用之后的设置重建历史来源。失败快照不覆盖上一份成功结果；损坏结果单独标记，健康事实继续可读。
 
 ### Writes, reads and deletion
 
-- `create(input)` freezes source/context and returns a generated ID in `recording` state.
-- `finalize(id, input)` accepts the completed transcript, stable segments and the current recorder's
-  bounded mono 16 kHz PCM WAV bytes. It validates before changing state, records `finalizing` plus an
-  artifact intent, writes staging exclusively, flushes/closes, hashes, and renames inside the same root.
-  Transcript, artifact integrity and completion then commit in one SQLite transaction.
-- Concurrent finalizations of one ID share the first operation. A completed ID cannot be rewritten.
-  An absent/deleted ID cannot be recreated by late finalization. Write failure yields `incomplete`
-  plus `FINALIZATION_FAILED`; retry needs the original recording still held by the caller.
-- Startup changes interrupted recording/finalizing rows to incomplete and checks artifact integrity.
-  Interrupted records stay visible. Referenced staging files remain associated with their record for
-  retry/deletion. Only unreferenced regular `.part` files older than 24 hours are reclaimed; fresh,
-  unrelated and symlink entries are left alone. Completed audio has no automatic retention cleanup.
-- `get(id)` checks audio; missing or altered WAV disables `readAudio(id)` while preserving text.
-  Malformed record JSON produces `corrupt`, including in history, without blocking other rows.
-  `readAudio` verifies the actual returned bytes and rechecks lifecycle after asynchronous I/O.
-  No view model exposes an absolute path or a stored playback URL.
-- `delete(id)` first marks deletion pending, then unlinks only generated, managed audio/staging names,
-  and finally deletes the database row and children. A partial failure returns `DELETION_FAILED`, keeps
-  the retryable tombstone, and disables playback. Repeating a successful deletion is harmless.
-
-File I/O is asynchronous. Metadata transactions are short synchronous operations; audio bytes are never
-stored in SQLite. Leaf symlinks are not read as audio, managed directories cannot be symlink redirects,
-and modified database paths do not grant arbitrary read/delete access.
+- 录音开始建立 Session 后才启用音频提交；建立失败停止采集。停止等待 ASR 尾部与本地分析，完成事实/WAV 后追加统计。M2 随后自动运行 §13 分析链；历史打开不重跑，回放分析仍为手动操作。
+- WAV 发布经过 finalizing intent、独占 staging、flush/close、hash、同目录 rename，最终事务提交逐字稿和音频元数据。并发完成共享一次操作，已完成不能覆写；失败留下 incomplete，使用保留的原录音重试。
+- 启动把中断的 recording/finalizing 变为 incomplete 并检查音频；只清理超过 24 小时且无引用的普通 staging 文件，不自动删除已保存录音。
+- get/readAudio 在异步 I/O 后复查记录生命周期；Renderer 也检查导航代际和删除集合，迟到读取/结果不恢复已删记录。音频缺失/损坏只禁用播放，健康文本/结果仍可读；损坏记录与其他行隔离。
+- 删除先标记 pending，再移除生成的受管音频/staging 文件，最后删除数据库行与子项；部分失败返回可重试状态并禁用播放。路径/符号链接边界阻止任意文件读写。
+- History 每页 50 条，支持更多、空态与返回上下文；普通录音和历史打开复用 Report。内存缓存不是保留策略，不存在五条产品上限。
 
 ### Verification and remaining integration
 
-Focused tests cover six-record restart retention, immutable/duplicate completion, invalid inputs,
-failed rename, transaction rollback, crash-state recovery, conservative staging reclamation,
-missing/changed audio, partial deletion, deletion/read races, record corruption, unsafe paths and future schemas.
-The Electron smoke uses the existing PCM WAV encoder, writes in one complete process, reads and deletes in
-a second process, then confirms future-schema refusal. It does not use a real microphone or LLM.
+2026-09-19 使用项目声明的 Node 24.20.0 / npm 11.19.0、Electron 43.4.1 验证。工具链下载仅用于临时验证，未更改全局运行时。`npm test` 共 575 项：573 通过、0 失败、2 跳过（Windows 不允许创建文件符号链接，不能计为通过）。Windows x64 `npm run package` 成功，`npm run smoke:package` 返回 `PACKAGED_APP_SMOKE_OK`。
 
 ```powershell
-node --test test/training-session-store.test.js test/training-persistence-electron.test.js test/pcm-wav.test.js
+npm test
 npm run package
 npm run smoke:package
 ```
 
-The ordinary packaged smoke includes both persistence phases as well as the existing renderer and native-load checks.
-Its persistence switch requires an absolute isolated `EXPRESSION_TRAINER_SMOKE_USER_DATA`; ordinary startup
-does not open a training database yet. The explicit smoke path can be removed once equivalent production
-restart coverage replaces it.
+测试覆盖 Repository/Application 的事务失败、迁移、异常恢复、幂等、删除/读取竞态与来源过滤；Renderer 测试覆盖关闭排空、迟到请求、保存重试、静默准备检查及原有 ASR 暂停/恢复/过载/20 分钟上限。产品 Electron smoke 走正常 Renderer 录音完成路径，保存 7 条、手动分析、修改设置后重启核对历史来源、播放、缺失音频降级、删除和空态；无 LLM 配置时仍可本地保存。制品 smoke 另覆盖原生依赖与 API/存储/产品重启流。
 
-Verification on 2026-09-16: 27 focused tests passed across the session store, Electron persistence,
-PCM encoder, package configuration and existing Electron product-flow suites. Windows x64 Forge packaging
-exited successfully; `node scripts/verify-packaged-app.js` returned `PACKAGED_APP_SMOKE_OK`, including both
-persistence process launches. The existing product smoke was corrected to await model preparation,
-explicitly start after onboarding, and assert the current character-based density definition.
+| M1 验收映射 | 已运行的主要自动化证据 |
+|---|---|
+| AC-M1-01 | `test/training-product-electron.test.js`：正常 Renderer 完成 7 条、结果落盘、重启 History/Report/播放/返回 |
+| AC-M1-02 | `test/microphone-readiness.test.js`、`test/transcript.test.js`、`test/electron-smoke.test.js`：静默预检/开始复检、入口移除、Help 诊断 |
+| AC-M1-03 | `test/training-session-store.test.js`、`test/training-persistence-client.test.js`：失败注入、恢复、同 ID 重试；Renderer 关闭失败保护 |
+| AC-M1-04 | `test/training-session-application.test.js`、`test/training-session-results.test.js`、`test/transcript.test.js`：重复完成/结果、导航与删除后的迟到响应 |
+| AC-M1-05 | Store/Application/Product Electron 测试：文件与元数据删除、部分失败重试、删除后空态 |
+| AC-M1-06 | Store/Results/Product Electron 测试：缺失/损坏音频、损坏结果与健康事实隔离 |
+| AC-M1-07 | Store/Results/API Electron 测试：v1→v2、未知未来版本拒写与正常启动错误 |
+| AC-M1-08 | `test/recording-policy-store.test.js`、`test/analysis-provenance.test.js`、现有 LLM/诊断/Renderer 测试：v2 告知、实际请求/来源白名单、授权前不申请麦克风 |
+| AC-M1-09 | Product Electron offline/offline-read 两个进程：阻断 HTTP(S)/Main fetch 且无 AI 配置，完成同一记录的保存、重启、读取、播放与删除 |
+| AC-M1-10 | `test/transcript.test.js` 与 ASR/audio/PCM/Electron 回归：暂停、恢复、收尾、过载和单条上限 |
 
-The local execution host used Node 24.19.0 (the bundled tool runtime), rather than the documented development
-floor 24.20.0, and had no `npm` command. Packaging therefore used the installed Forge CLI directly.
-This is scoped runtime/packaging evidence, not a new reproducible-install baseline. Electron was 43.4.1
-with embedded Node 24.18.1 and SQLite 3.53.1.
-
-Next: add narrow Application/Preload commands and safe playback access; capture existing metric/AI result
-snapshots and their generation-time provenance; integrate microphone completion, durable history,
-the minimal shared Report and manual AI actions, explicit deletion and disclosure copy; complete the field
-projection above and the readiness/diagnosis-entry slice in M1; remove the paste/copy/save/clear paths;
-finish M1 acceptance and full regression.
+上述 M1 桌面 smoke 使用隔离 userData、确定性音频输入与 Fake ASR/LLM，真实麦克风/驱动及外部 LLM 联调尚未验证。历史 2026-09-16/19 基础/API 切片使用替代工具链的证据仅代表当时切片；M1 代码实施与设备人工验收分别记录，后续 M2 增量另见 §13。
 
 ## 11. 诊断导出现状
 
-现有主窗口“🩺”与 Help 仍有入口；目标归属仅见 [Training Flow §13.1](../product/training-flow.md#131-已确认的-ia-归属)，迁移已列入 [M1](../milestones/m1-training-persistence.md#user-experience)，尚未改变当前 UI。
+诊断导出只在 Help 中保留，主导航入口已移除，与 [Training Flow §13.1](../product/training-flow.md#131-已确认的-ia-归属) 一致。
 
 诊断按用户操作导出固定 schema 的 JSON：应用版本、OS/platform/arch、active 模型 ID/版本、请求/context/track 采样率、最近 ASR 初始化耗时和受控错误类别。文件不包含设置、API Key、Authorization、绝对路径、stack、音频、逐字稿或 LLM 内容；不在后台持续写日志，也不自动上传。未开始录音或未安装模型时，对应字段明确为 `null`/`not-installed`。
+
+## 12. M2 timing foundation slice
+
+2026-09-19 首个切片：适配器贯通采集 → ASR 接收游标 → Session 保存 → History 恢复。下述 212 项为该切片历史证据，后续增量见 §13，不代表整个 AC-M2-01 或 M2 完成。
+
+- Renderer 的 WAV frame count 与 ASR 接收计数分开。暂停不计入录音时间，endpoint/final 不重置绝对游标；过期、外来、重复或越界游标事件不推进时间事实。
+- 当前两种生产 ASR adapter 均无已接入的 token timing；Main 来源标记为 `unavailable`。Renderer 仅生成 `estimated` 回放片段，保留 `renderer-final-boundary-v1`，不把 chunk 接收范围变成词级边界；未知 sample/confidence 保持 null。
+- `Session.timing` 是 schemaVersion 1 的完成/中断快照：16000 Hz、capturedSampleCount、最后实际观察到的 asrAcceptedSampleCount（未观察为 null），以及独立 evidence capabilities。当前只具 audioTimeline；speechSegments/tokenTimestamps 为 false。完成时核对真实 WAV 样本数与时长；这不是每块音频的持久事件日志。
+- 快照沿用 SQLite v2 `facts_json` 的附加字段，质量标记沿用 `quality_json`，无需新表或历史重分析。旧记录 timing 为 null；已完成记录不被重试、中断或模型切换改写。
+- ASR error event 即使装在 `ok:true` envelope 内也会失败关闭；queue overrun/ASR 失败把质量标记和可知计数保存在 incomplete Session，不声称中断音频已保存。正常完成保存 timing-unavailable/estimated，仍保留文本、音频和已有本地分析。
+
+使用 Node 24.20.0 运行 ASR session/IPC/event/provider、capture/queue/PCM、训练存储/Application/client/Renderer 与 Electron API/product/smoke 的定向回归：212 项通过、无失败。新增测试先复现来源/质量丢失、错误事件伪成功和越界游标，再验证修复；覆盖暂停、连续 endpoint finals、零碎尾块、溢出、保存校验和跨进程重启恢复。Electron 使用隔离 userData、确定性输入与 Fake ASR/LLM，未做真实麦克风/模型时间戳校准、打包或全量里程碑验收。
+
+协议当前映射见 [Speech Contract §11](speech-contract.md#11-current-adapter-mapping)，里程碑验收仍按 [M2 AC-M2-01](../milestones/m2-speech-evidence-and-ai-diagnosis.md#acceptance-criteria) 跟踪。后续 quality-event、VAD、Metrics/Finding 实施见 §13；原生 token 时间戳/独立 alignment 和已校准雷达尚未接入。
+
+## 13. M2 analysis pipeline
+
+2026-09-19：已保存训练由 Main 的 `session-analysis.js` 调度 Speech Evidence、Common Analysis、结构化 Diagnosis 和 Report snapshot；唯一数据定义见 [Data Model §5](data-model.md#5-later-derived-entities)。沿用 SQLite v2 的不可变 results，快照绑定本次确切结果 ID；Renderer 不能写入这四种受控结果。新增 `analyzeTrainingSession` 与 `cancelTrainingAnalysis` 主窗口 API。保存事实不依赖 AI，历史 get/list 不重新分析，显式重试追加结果，不覆盖先前成功诊断。
+
+- 时间证据增加有序 quality-event、stopped 汇总及持久 `timing.qualityEvents`；queue overrun 保存可知的排队/拒绝块范围，未知范围保留 null。utterance 识别失败或用户取消收尾时保留已捕获 WAV，ASR 质量标为不可用，不能生成伪转写成功诊断。
+- SenseVoice 使用冻结的可选 Provider，无 partial，最多 4,800,000 Float32 样本。停止时推理；取消能终止正在执行 stop 的识别子进程，下一会话重建。技术默认仍为 Zipformer Large。
+- Silero VAD 使用独立 `models/speech-evidence-registry.json`，复用 Model Manager 的固定文件大小/hash 安装与离线缓存；首次分析按需安装到 modelRoot 下的 speech-evidence 目录。独立 utility process 隔离 native 崩溃，并支持硬取消/超时；单个 Main 串行执行 VAD，最多接纳三条分析任务。整个分析预算为 120 秒，AI 请求预算为 60 秒。失败保存 unavailable，已保存事实与可用指标继续可读。
+- Common 的 15 个指标是确定性观测值，不输出表达质量分。VAD 区间明确带未校准限制；缺失/不连续证据按依赖使指标 unknown，不用零填补。AnalysisContext 只携带当前文本、允许的指标/语音区间、质量及分析指令；没有音频字节、Key、endpoint、路径或其他记录。
+- LLM 配置 schema 3 增加每个 profile 的自动诊断开关；新配置为空、旧配置迁移默认关闭。Main 在实际发起前重新解析精确 active profile，未启用、缺失或删除不会自动选择其他服务。界面披露实际本地/远程目标与发送内容；改变 Provider、模型或地址会清除该 profile 的自动启用状态。
+- 训练中只使用本地规则。报告显示摘要、首三项 Finding、可展开的更多发现/指标、证据定位及缺失状态。四类 Finding 与未校准雷达的产品语义只见 [Training Flow](../product/training-flow.md)。Processing 在事实保存后可离开到 History，完成不会强制跳回；分析取消/失败可恢复，历史读取保持原快照。
+
+真实模型有限测量与尚未完成的代表性校准见 [M2](../milestones/m2-speech-evidence-and-ai-diagnosis.md#当前实施与有限证据)。真实 Electron 43.4.1 / 内置 Node 24.18.1 已验证 VAD 中文 WAV、损坏 ONNX 子进程退出隔离、取消及下一任务恢复；这些探测不代表准确率、资格线硬件或全部 M2 验收。
+
+真实模型制品验证另从新 `app.asar` 加载 VAD worker、SenseVoice Factory 和 Sherpa native 依赖，无源码 node_modules 回退。VAD 的上述四项场景通过；SenseVoice 对既有 5.592 秒中文 WAV 初始化约 1.49 秒、识别约 136 毫秒，返回「开饭时间早上九点至下午五点」，验证无 partial、取消后空结果及释放，峰值约 382 MiB。普通制品仍不携带模型权重，探针复用 Git 外缓存，不改变模型公开再分发状态。
+
+当前集成验证：Node 24.20.0 / npm 11.19.0 下 `npm test` 共 704 项，702 通过、0 失败、2 项因 Windows 文件符号链接权限跳过。Windows x64 `npm run package` 成功，`npm run smoke:package` 返回 `PACKAGED_APP_SMOKE_OK`。桌面/制品产品流验证连续七条训练、自动诊断、修改设置后重启读取原来源、播放、删除及无配置断网保存；ASR/LLM 为确定性替身。定向测试另覆盖取消与采集尾块排空顺序、超时、无效响应与引用、启用/撤销、保存重试和导航后的结果归属。真实麦克风和外部 LLM 联调仍未验证。

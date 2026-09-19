@@ -3,21 +3,21 @@ const assert = require('node:assert/strict');
 
 test('new LLM provider settings do not invent an unconfigured model', () => {
   const { createDefaultLlmProviderSettings } = require('../lib/llm-provider-config');
-  assert.deepEqual(createDefaultLlmProviderSettings(), { schemaVersion: 2, activeProfileId: null, profiles: [] });
+  assert.deepEqual(createDefaultLlmProviderSettings(), { schemaVersion: 3, activeProfileId: null, profiles: [] });
 });
 
 test('an explicitly empty profile list remains empty after normalization', () => {
   const { normalizeLlmProviderSettings } = require('../lib/llm-provider-config');
   assert.deepEqual(
     normalizeLlmProviderSettings({schemaVersion: 2, activeProfileId: null, profiles: []}),
-    {schemaVersion: 2, activeProfileId: null, profiles: []}
+    {schemaVersion: 3, activeProfileId: null, profiles: []}
   );
 });
 
 test('schema v1 providers migrate to named profiles without losing configured fields', () => {
   const { normalizeLlmProviderSettings, getActiveLlmProfile } = require('../lib/llm-provider-config');
   const migrated = normalizeLlmProviderSettings({ schemaVersion: 1, provider: 'deepseek', providers: { openai: { apiKey: 'openai-key', model: 'gpt-4o' }, deepseek: { apiKey: 'deepseek-key', model: 'deepseek-chat' }, ollama: { ollamaUrl: 'http://localhost:11434', model: 'qwen2.5:7b' }, custom: { apiKey: '', baseUrl: '', model: '', customModel: '' } } });
-  assert.equal(migrated.schemaVersion, 2);
+  assert.equal(migrated.schemaVersion, 3);
   assert.equal(getActiveLlmProfile(migrated).provider, 'deepseek');
   assert.equal(migrated.profiles.find(profile => profile.provider === 'openai').apiKey, 'openai-key');
 });
@@ -34,7 +34,7 @@ test('legacy flat LLM provider settings migrate every supported field', () => {
     const result = parseLlmProviderSettingsJson(JSON.stringify(raw));
     assert.equal(result.shouldPersist, true, provider);
     assert.equal(result.isFutureSchema, false, provider);
-    assert.equal(result.settings.schemaVersion, 2, provider);
+    assert.equal(result.settings.schemaVersion, 3, provider);
     assert.equal(getActiveLlmProfile(result.settings).provider, provider, provider);
     assert.deepEqual(Object.fromEntries(Object.keys(expected).map(key => [key, getActiveLlmProfile(result.settings)[key]])), expected, provider);
   }
@@ -102,4 +102,70 @@ test('future settings schema is read without requesting a destructive downgrade'
   assert.equal(result.shouldPersist, false);
   assert.equal(result.isFutureSchema, true);
   assert.equal(result.error, null);
+});
+
+function automaticSettings(overrides = {}) {
+  return {schemaVersion:3,activeProfileId:'remote',profiles:[
+    {id:'remote',provider:'deepseek',model:'configured-model',apiKey:'test-key',...overrides}]};
+}
+
+test('legacy profiles cannot inherit automatic diagnosis permission from previously unknown fields', () => {
+  const {normalizeLlmProviderSettings} = require('../lib/llm-provider-config');
+  for (const schemaVersion of [1,2,99]) {
+    const normalized = normalizeLlmProviderSettings({...automaticSettings({autoDiagnosisEnabled:true}),schemaVersion});
+    assert.equal(normalized.profiles[0].autoDiagnosisEnabled,false);
+  }
+  const legacy = normalizeLlmProviderSettings({provider:'ollama',model:'local-model',autoDiagnosisEnabled:true});
+  assert.ok(legacy.profiles.every(profile => profile.autoDiagnosisEnabled === false));
+});
+
+test('only an explicit boolean opt-in on the current schema enables automatic diagnosis and revocation persists', () => {
+  const {normalizeLlmProviderSettings,resolveAutomaticDiagnosisProfile} = require('../lib/llm-provider-config');
+  for (const value of [undefined,false,'true',1]) {
+    const normalized = normalizeLlmProviderSettings(automaticSettings({autoDiagnosisEnabled:value}));
+    assert.deepEqual(resolveAutomaticDiagnosisProfile(normalized),{profile:null,reason:'not-enabled'});
+  }
+  const enabled = normalizeLlmProviderSettings(automaticSettings({autoDiagnosisEnabled:true}));
+  assert.deepEqual(resolveAutomaticDiagnosisProfile(enabled),{profile:enabled.profiles[0],reason:null});
+  enabled.profiles[0].autoDiagnosisEnabled = false;
+  assert.deepEqual(resolveAutomaticDiagnosisProfile(normalizeLlmProviderSettings(enabled)),{profile:null,reason:'not-enabled'});
+});
+
+test('automatic diagnosis never falls back to another configured or enabled profile', () => {
+  const {resolveAutomaticDiagnosisProfile,normalizeLlmProviderSettings} = require('../lib/llm-provider-config');
+  const settings = automaticSettings({autoDiagnosisEnabled:true});
+  settings.profiles.push({id:'disabled',provider:'openai',model:'another-model',apiKey:'key',autoDiagnosisEnabled:false});
+  settings.activeProfileId = 'disabled';
+  assert.deepEqual(resolveAutomaticDiagnosisProfile(settings),{profile:null,reason:'not-enabled'});
+  settings.profiles[1].apiKey = '';
+  assert.deepEqual(resolveAutomaticDiagnosisProfile(settings),{profile:null,reason:'not-configured'});
+  for (const activeProfileId of ['deleted-profile',null]) {
+    assert.deepEqual(resolveAutomaticDiagnosisProfile({...settings,activeProfileId}),{profile:null,reason:'not-configured'});
+    assert.deepEqual(resolveAutomaticDiagnosisProfile(normalizeLlmProviderSettings({...settings,activeProfileId})),
+      {profile:null,reason:'not-configured'});
+  }
+  assert.deepEqual(resolveAutomaticDiagnosisProfile(null),{profile:null,reason:'not-configured'});
+});
+
+test('local classification follows the real endpoint rather than provider labels or lookalike hostnames', () => {
+  const {isLocalLlmProfile} = require('../lib/llm-provider-config');
+  for (const endpoint of ['http://localhost:11434','http://127.0.0.1:8000/v1','http://127.12.3.4:9000','http://[::1]:11434']) {
+    assert.equal(isLocalLlmProfile({provider:'ollama',ollamaUrl:endpoint}),true,endpoint);
+    assert.equal(isLocalLlmProfile({provider:'custom',baseUrl:endpoint}),true,endpoint);
+  }
+  for (const endpoint of ['https://remote.example/v1','http://192.168.1.2:11434','http://localhost.evil.example',
+    'http://localhost@remote.example','file://localhost/model','not a URL','']) {
+    assert.equal(isLocalLlmProfile({provider:'ollama',ollamaUrl:endpoint}),false,endpoint);
+  }
+  assert.equal(isLocalLlmProfile({provider:'deepseek',baseUrl:'http://localhost'}),false);
+  assert.equal(isLocalLlmProfile({provider:'openai',ollamaUrl:'http://localhost'}),false);
+});
+
+test('browser settings use the same endpoint classification as the Main-process privacy boundary', () => {
+  const fs = require('node:fs');
+  const vm = require('node:vm');
+  const browser = {URL};
+  vm.runInNewContext(fs.readFileSync(require.resolve('../lib/llm-provider-config'),'utf8'),browser);
+  assert.equal(browser.LlmProviderConfig.isLocalLlmProfile({provider:'ollama',ollamaUrl:'https://remote.example'}),false);
+  assert.equal(browser.LlmProviderConfig.isLocalLlmProfile({provider:'custom',baseUrl:'http://[::1]:8080'}),true);
 });

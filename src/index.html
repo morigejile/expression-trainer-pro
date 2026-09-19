@@ -6,7 +6,7 @@
   <title>宇宙无敌表达训练系统</title>
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body data-screen="training" data-training-state="preparing">
   <!-- 洋红闪烁边框 -->
   <div class="glow-border"></div>
 
@@ -27,8 +27,24 @@
     <symbol id="icon-search" viewBox="0 0 24 24"><circle cx="10.5" cy="10.5" r="6.5"/><path d="m16 16 5 5"/></symbol>
   </svg>
 
-  <!-- 主布局：三列 -->
+  <!-- 全局导航与训练 / 历史 / 报告工作区 -->
   <div class="layout">
+    <header class="topbar">
+      <nav class="primary-navigation" aria-label="主导航">
+        <button id="btn-home" class="app-title" type="button">表达训练</button>
+        <button id="btn-history" class="nav-history" type="button">训练历史</button>
+      </nav>
+      <div class="topbar-right">
+        <span id="timer" class="timer">00:00</span>
+        <details class="utility-menu">
+          <summary aria-label="设置与帮助" title="设置与帮助">···</summary>
+          <div class="utility-menu-items">
+            <button id="btn-settings" type="button">设置</button>
+            <button id="btn-help" type="button">帮助</button>
+          </div>
+        </details>
+      </div>
+    </header>
     <!-- 左栏：表达分析 -->
     <aside class="panel-left" data-region="insights" aria-labelledby="insights-title">
       <div id="insights-title" class="panel-title"><svg class="icon" aria-hidden="true"><use href="#icon-chart"/></svg>表达分析</div>
@@ -52,18 +68,6 @@
 
     <!-- 中间：主内容区 -->
     <main class="main-area" data-region="stage">
-      <!-- 顶部栏 -->
-      <div class="topbar">
-        <span class="app-title">表达训练</span>
-        <div class="topbar-right">
-          <span id="timer" class="timer">00:00</span>
-          <button id="btn-help" class="btn-help" title="帮助与反馈">帮助</button>
-          <button id="btn-prompt-editor" class="btn-icon" title="训练规则" aria-label="训练规则"><svg class="icon" aria-hidden="true"><use href="#icon-target"/></svg><span class="btn-icon-label">规则</span></button>
-          <button id="btn-diagnostics" class="btn-icon" title="导出诊断信息" aria-label="导出诊断信息"><svg class="icon" aria-hidden="true"><use href="#icon-diagnostics"/></svg><span class="btn-icon-label">诊断</span></button>
-          <button id="btn-settings" class="btn-icon" title="设置" aria-label="打开设置"><svg class="icon" aria-hidden="true"><use href="#icon-settings"/></svg><span class="btn-icon-label">设置</span></button>
-        </div>
-      </div>
-
       <div id="user-message" class="user-message hidden" role="status" aria-live="polite">
         <span id="user-message-text"></span>
         <div class="user-message-actions">
@@ -72,22 +76,25 @@
         </div>
       </div>
 
-      <!-- 字幕区顶部工具栏 -->
-      <div class="subtitle-topbar">
-        <div class="subtitle-topbar-left">
-          <button id="btn-paste" class="btn-sm btn-paste-top">
-            <svg class="icon" aria-hidden="true"><use href="#icon-clipboard"/></svg>粘贴逐字稿
-          </button>
-          <label class="training-record-picker">
-            <select id="training-record-select" class="hidden" aria-label="训练记录"></select>
-          </label>
+      <section id="history-screen" class="history-screen" aria-labelledby="history-title">
+        <h1 id="history-title">训练历史</h1>
+        <p id="history-status" class="screen-status" role="status" aria-live="polite"></p>
+        <div id="history-list" class="history-list"></div>
+        <button id="btn-history-start" class="btn-support hidden" type="button">开始表达</button>
+        <button id="btn-history-more" class="btn-support btn-support-secondary hidden" type="button">加载更多</button>
+      </section>
+
+      <div id="training-context" class="training-context">自由表达</div>
+
+      <header id="report-header" class="report-header">
+        <button id="btn-report-back" class="btn-support btn-support-secondary hidden" type="button">← 训练历史</button>
+        <h1>训练报告</h1>
+        <p id="record-identity" class="record-identity"></p>
+        <div class="record-save-state">
+          <span id="record-save-status" role="status" aria-live="polite"></span>
+          <button id="btn-retry-save" class="btn-support btn-support-secondary hidden" type="button">重试保存</button>
         </div>
-        <div class="subtitle-topbar-right">
-          <button id="btn-copy-text" class="btn-sm hidden" title="复制原文"><svg class="icon" aria-hidden="true"><use href="#icon-clipboard"/></svg>复制</button>
-          <button id="btn-save-text" class="btn-sm hidden" title="保存原文"><svg class="icon" aria-hidden="true"><use href="#icon-save"/></svg>保存</button>
-          <button id="btn-clear" class="btn-sm hidden" title="清空"><svg class="icon" aria-hidden="true"><use href="#icon-trash"/></svg>清空</button>
-        </div>
-      </div>
+      </header>
 
       <!-- 字幕滚动区 -->
       <div id="subtitle-scroll" class="subtitle-scroll">
@@ -100,40 +107,54 @@
         <audio id="recording-player" controls preload="metadata"></audio>
         <label for="playback-model">分析模型</label>
         <select id="playback-model"></select>
-        <button id="btn-reanalyze" type="button">重新分析</button>
+        <button id="btn-reanalyze" type="button">分析回放</button>
       </div>
 
-      <div id="training-status" class="operation-status" role="status" aria-live="polite">语音模型加载中，预计数秒至数分钟（首次安装可能更久）；本次启动只需加载一次。</div>
+      <div id="start-control-area" class="start-control-area">
+        <div id="training-status" class="operation-status" role="status" aria-live="polite">语音模型加载中，预计数秒至数分钟（首次安装可能更久）；本次启动只需加载一次。</div>
+        <div class="processing-controls">
+          <button id="btn-leave-processing" class="btn-support btn-support-secondary" type="button" disabled>离开并后台处理</button>
+          <button id="btn-cancel-processing" class="btn-support btn-support-secondary" type="button">取消分析，保留录音</button>
+        </div>
 
-      <!-- 底部按钮（只保留核心操作） -->
-      <div class="action-bar">
-        <button id="btn-start" class="btn-main btn-start" disabled>
-          <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-mic"/></svg>
-          <span class="btn-label">开始录制</span>
-        </button>
-        <button id="btn-pause" class="btn-main btn-pause hidden">
-          <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-pause"/></svg>
-          <span class="btn-label">暂停</span>
-        </button>
-        <button id="btn-resume" class="btn-main btn-resume hidden">
-          <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-play"/></svg>
-          <span class="btn-label">继续</span>
-        </button>
-        <button id="btn-stop" class="btn-main btn-stop hidden">
-          <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-stop"/></svg>
-          <span class="btn-label">结束</span>
-        </button>
-        <button id="btn-report" class="btn-main btn-report hidden">
-          <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-report"/></svg>
-          <span class="btn-label">生成报告</span>
-        </button>
+        <!-- 底部按钮（只保留核心操作） -->
+        <div class="action-bar">
+          <button id="btn-start" class="btn-main btn-start" disabled>
+            <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-mic"/></svg>
+            <span class="btn-label">开始表达</span>
+          </button>
+          <button id="btn-pause" class="btn-main btn-pause hidden">
+            <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-pause"/></svg>
+            <span class="btn-label">暂停</span>
+          </button>
+          <button id="btn-resume" class="btn-main btn-resume hidden">
+            <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-play"/></svg>
+            <span class="btn-label">继续</span>
+          </button>
+          <button id="btn-stop" class="btn-main btn-stop hidden">
+            <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-stop"/></svg>
+            <span class="btn-label">结束</span>
+          </button>
+        </div>
       </div>
+
+      <section id="report-ai-section" class="report-ai-section" aria-labelledby="report-ai-title">
+        <div class="report-ai-heading">
+          <h2 id="report-ai-title">分析与诊断</h2>
+          <button id="btn-report" class="btn-main btn-report" type="button">
+            <svg class="btn-icon-inner icon" aria-hidden="true"><use href="#icon-report"/></svg>
+            <span class="btn-label">重试诊断</span>
+          </button>
+        </div>
+        <p id="report-ai-status" class="screen-status" role="status" aria-live="polite">本地证据自动保存；AI 诊断须先在设置中明确启用。</p>
+        <div id="report-body" class="modal-body"></div>
+      </section>
     </main>
 
     <!-- 右栏：实时反馈 -->
     <aside class="panel-right" data-region="coach" aria-labelledby="coach-title">
-      <div id="coach-title" class="panel-title"><svg class="icon" aria-hidden="true"><use href="#icon-bulb"/></svg>实时反馈</div>
-      <div id="feedback-status" class="feedback-status" role="status" aria-live="polite">本地分析可用；AI 建议约每新增 30 字生成</div>
+      <div id="coach-title" class="panel-title"><svg class="icon" aria-hidden="true"><use href="#icon-bulb"/></svg>表达反馈</div>
+      <div id="feedback-status" class="feedback-status" role="status" aria-live="polite">训练中使用本地规则；结束后按设置自动生成 AI 诊断</div>
       <div id="feedback-content" class="feedback-content">
         <!-- 实时反馈内容 -->
       </div>
@@ -150,46 +171,16 @@
       <div class="modal-body recording-policy-body">
         <p>开始录音前，请了解以下说明：</p>
         <ul class="recording-policy-list">
-          <li>录音只保存在本次应用运行期间；</li>
-          <li>最多保留五条记录，第六条完成时自动释放最老记录；</li>
-          <li>关闭应用后释放全部录音资源；</li>
-          <li>录音用于本地回放、字幕同步和用户主动选择的大模型分析；</li>
-          <li>云端大模型只接收逐字稿、片段标识和片段时间信息，不接收原始录音。</li>
+          <li>录音、逐字稿和已有分析结果自动保存在本机，重启应用后仍可从训练历史查看，直到你明确删除记录；</li>
+          <li>流式模型每次最长 20 分钟，整段识别模型最长 5 分钟；记录不会因为数量增加而自动淘汰；</li>
+          <li>原始录音留在本机，用于回放和字幕同步，不发送给远程 AI；</li>
+          <li>本地统计可离线使用；语音活动模型首次需要联网安装。自动 AI 诊断须在设置中明确启用，回放分析由你主动发起；</li>
+          <li>使用已启用的远程 AI 时，会发送本次逐字稿、片段标识与时间、语音区间、质量状态、统计指标和分析指令；不会发送原始录音。</li>
         </ul>
         <div class="recording-policy-actions">
           <button id="btn-recording-policy-cancel" class="btn-support btn-support-secondary">暂不录音</button>
           <button id="btn-recording-policy-confirm" class="btn-support">我已了解并继续</button>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 粘贴逐字稿弹窗 -->
-  <div id="paste-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="paste-modal-title">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 id="paste-modal-title"><svg class="icon" aria-hidden="true"><use href="#icon-clipboard"/></svg>粘贴逐字稿</h2>
-        <button id="btn-close-paste" class="btn-close" aria-label="关闭粘贴逐字稿">×</button>
-      </div>
-      <div class="modal-body paste-modal-body">
-        <p class="paste-intro">把逐字稿粘贴进来，我帮你分析</p>
-        <textarea id="paste-textarea" placeholder="在这里粘贴文字..."></textarea>
-        <button id="btn-analyze-paste"><svg class="icon" aria-hidden="true"><use href="#icon-search"/></svg>开始分析</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 报告弹窗 -->
-  <div id="report-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="report-modal-title">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 id="report-modal-title"><svg class="icon" aria-hidden="true"><use href="#icon-report"/></svg>表达分析报告</h2>
-        <div class="modal-header-actions">
-          <button id="btn-copy-report" class="btn-sm"><svg class="icon" aria-hidden="true"><use href="#icon-clipboard"/></svg>复制全文</button>
-          <button id="btn-close-report" class="btn-close" aria-label="关闭训练报告">×</button>
-        </div>
-      </div>
-      <div id="report-body" class="modal-body">
       </div>
     </div>
   </div>
@@ -205,10 +196,11 @@
         <section class="help-section">
           <h2>快速开始</h2>
           <ol>
-            <li>点击“开始录制”，允许应用使用麦克风。</li>
-            <li>讲话时查看中间字幕、左侧统计和右侧实时反馈。</li>
-            <li>结束后点击“生成报告”，查看完整表达分析。</li>
-            <li>已有文字时，可用“粘贴逐字稿”直接分析。</li>
+            <li>等待准备完成，点击“开始表达”，允许应用使用麦克风。</li>
+            <li>讲话时查看字幕、本地统计和规则提示；可暂停、继续或结束。整段识别模型在结束后显示转写。</li>
+            <li>结束后自动保存并进入训练报告，可回放录音、查看逐字稿与统计。</li>
+            <li>在设置中为所选 AI 服务启用“结束后自动诊断”；诊断失败可重试，“分析回放”仍需主动点击。</li>
+            <li>从“训练历史”重开记录，或明确删除不再保留的记录。</li>
           </ol>
           <h3>字幕颜色</h3>
           <div class="help-color-grid">
@@ -217,17 +209,17 @@
             <span><b class="help-yellow">黄色</b>：笼统词</span>
             <span><b class="help-green">绿色</b>：有力表达</span>
           </div>
-          <p class="help-note">“训练规则”可编辑训练目标与自定义规则；“设置”可配置 AI 服务。本应用当前处于内部开发测试阶段。</p>
+          <p class="help-note">“设置”可配置 AI 服务与分析偏好；分析指令不属于本次训练题目。本应用当前处于内部开发测试阶段。</p>
         </section>
 
         <section class="help-section">
           <h2>录音保留与分析说明</h2>
           <ul class="recording-policy-list">
-            <li>录音只保存在本次应用运行期间；</li>
-            <li>最多保留五条记录，第六条完成时自动释放最老记录；</li>
-            <li>关闭应用后释放全部录音资源；</li>
-            <li>录音用于本地回放、字幕同步和用户主动选择的大模型分析；</li>
-            <li>云端大模型只接收逐字稿、片段标识和片段时间信息，不接收原始录音。</li>
+            <li>录音、逐字稿和已有分析结果自动保存在本机，重启应用后仍可从训练历史查看，直到你明确删除记录；</li>
+            <li>流式模型每次最长 20 分钟，整段识别模型最长 5 分钟；记录不会因为数量增加而自动淘汰；</li>
+            <li>原始录音留在本机，用于回放和字幕同步，不发送给远程 AI；</li>
+            <li>本地统计可离线使用；语音活动模型首次需要联网安装。自动 AI 诊断须在设置中明确启用，回放分析由你主动发起；</li>
+            <li>使用已启用的远程 AI 时，会发送本次逐字稿、片段标识与时间、语音区间、质量状态、统计指标和分析指令；不会发送原始录音。</li>
           </ul>
         </section>
 
@@ -254,6 +246,9 @@
   <script src="audio-feed-queue.js"></script>
   <script src="pcm-wav.js"></script>
   <script src="training-records.js"></script>
+  <script src="structured-report.js"></script>
+  <script src="training-persistence.js"></script>
+  <script src="microphone-readiness.js"></script>
   <script src="appearance.js"></script>
   <script>window.Appearance.initializeAppearance();</script>
   <script src="app.js"></script>

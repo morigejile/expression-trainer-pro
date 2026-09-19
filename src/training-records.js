@@ -17,6 +17,7 @@
     }
     if (candidate < 0) return null;
     const segment = segments[candidate];
+    if (!Number.isFinite(segment.startMs) || !Number.isFinite(segment.endMs)) return null;
     if (currentMs < segment.endMs) return segment;
     const final = segments[segments.length - 1];
     return candidate === segments.length - 1 && currentMs === final.endMs ? final : null;

@@ -73,14 +73,14 @@ IA 归属与确认状态以 [Training Flow §13](training-flow.md#13-screen-stru
 
 ## 4. 当前核心能力
 
-这些能力记录当前实现及后续重构需要保持的行为。其中实时 AI 仅是历史实现能力，是否保留及具体交互尚未确认，不能由本节的 Existing 状态推定为目标承诺。三条 AI 路径与目标 Workspace 的归属统一见 [Training Flow §13](training-flow.md#13-screen-structure-收敛基线)。
+这些能力记录当前实现及后续重构需要保持的行为。训练中本地规则与结束后 AI 的分工已按 [Training Flow §4](training-flow.md#4-训练页与实时交互) 确认；未来独立启用的实时 AI 由 Backlog B-19 跟踪。历史 AI 路径与目标 Workspace 的归属统一见 [Training Flow §13](training-flow.md#13-screen-structure-收敛基线)。
 
 | ID | 需求 | Acceptance Criteria | Priority | Status | Target Milestone |
 |---|---|---|---|---|---|
 | R-C01 | 用户可通过麦克风完成一次自由表达训练。 | 可开始、暂停、继续、结束和取消；准备与收尾期间阻止重复操作；结束后释放采集资源。 | P0 | Existing | Continuous |
 | R-C03 | 应用在本地提供流式语音识别。 | 展示 partial 与 final 文本；旧会话、重复或倒序事件不污染当前训练；执行单元失败可见且下次训练可恢复。 | P0 | Existing | Continuous |
 | R-C04 | 用户可获得本地、确定性的基础表达统计。 | 填充词等规则命中返回计数与位置；无 LLM 时仍能完成；界面解释指标含义。 | P0 | Existing | M2 |
-| R-C05 | 应用已有可配置 LLM Provider，以及实时反馈、最终报告、回放分析三条历史 AI 路径。 | Provider 未配置、离线、超时或失败时本地结果不丢失，错误可恢复；M2 将报告诊断升级为默认核心流程。三条路径不各自形成独立 Screen；实时 AI 是否保留及具体交互待对应阶段决定，见 Training Flow §4/§13 与 D-10。 | P1 | Existing | M2 |
+| R-C05 | 应用已有可配置 LLM Provider，以及实时反馈、最终报告、回放分析三条历史 AI 路径。 | Provider 未配置、离线、超时或失败时本地结果不丢失，错误可恢复；M2 将训练结束后的报告诊断升级为按 profile 明确启用的自动流程，训练中使用本地规则，后续可选实时 AI 见 Backlog B-19。三条路径不各自形成独立 Screen；更深层 AI 探索另见 Backlog B-18。 | P1 | Existing | M2 |
 | R-C06 | 用户可回放完成的录音并定位已有片段。 | 原生播放、拖动和快捷键共用同一时间轴；播放不触发新的推理；片段切换才更新关联内容。 | P1 | Existing | M1 持久化 |
 | R-C07 | 用户可安全管理 LLM 配置、自定义规则、主题、布局和本地 ASR 模型。 | 配置可跨重启恢复；迁移失败不破坏旧值；Renderer 不接收密钥；模型安装或激活失败保留上一可用版本。 | P1 | Existing | Continuous |
 | R-C09 | 应用提供普通用户可安装的桌面制品。 | 内部制品可安装、启动、升级和卸载；公开发布另受签名、模型许可和目标环境证据约束。 | P1 | External Gate | Public Delivery |
@@ -91,15 +91,15 @@ IA 归属与确认状态以 [Training Flow §13](training-flow.md#13-screen-stru
 
 | ID | 需求 | Acceptance Criteria | Priority | Status | Target Milestone |
 |---|---|---|---|---|---|
-| R-P01 | 每次完成的语音训练形成稳定、唯一的 `TrainingSession`。 | Session 有稳定 ID、创建时间、完成状态和内容摘要；结束语音输入后自动收尾保存，同一次提交不会生成重复的完成记录；不依赖“保存/完成”按钮或离开报告才持久化。 | P0 | Accepted | M1 |
-| R-P02 | Session 跨应用重启保留。 | 完成训练并重启后，“训练历史”列表仍可读取；能够打开逐字稿、已有统计和可用的录音。 | P0 | Accepted | M1 |
-| R-P03 | Session 关联逐字稿、片段时间线和音频可用状态。 | 文本和稳定片段按原顺序恢复；时间不存在时显式标记未知；音频缺失或损坏不能显示为可播放。 | P0 | Accepted | M1 |
-| R-P04 | 用户可查看和删除本地训练记录。 | 训练历史按创建时间倒序；列表与单条打开按 [Training Flow §13.2](training-flow.md#132-history-与-comparison--review) 及 [M1 Report 切片 §7.5](training-flow.md#75-m1-的-report-内容与手动分析) 验收，M3 勾选对比不提前成为 M1 条件；删除需明确触发；删除后关联用户内容不再通过应用访问，失败时给出可操作错误。 | P0 | Accepted | M1 |
-| R-P05 | 持久化失败、未完成写入和损坏记录必须可识别。 | 成功保存仅需弱提示；失败写入明显提示并可重试，不展示为成功；重启后能区分完整、未完成、音频缺失和记录损坏；健康记录仍可读取。 | P0 | Accepted | M1 |
-| R-P06 | Session 保存生成结果所需的来源与版本信息。 | 至少可识别 ASR 模型、规则/度量版本以及已有 AI 结果的 Provider/模型和生成时间；不得保存密钥。 | P0 | Accepted | M1 |
-| R-P07 | 用户在首次录音前获得真实的数据与云端边界说明。 | 说明本地持久化、删除方式、音频保留策略，以及配置远程 AI 后可能发送的逐字稿、时间/指标摘要和用户分析指令；明确音频是否离开设备；只有用户确认后才申请麦克风权限。 | P0 | Partial | M1 |
-| R-P08 | 目标产品只保留麦克风语音训练入口。 | 移除首页粘贴入口及粘贴分析流程；M1 不创建 `pasted-text` Session；当前实现仍记录在 As-Is 文档中。 | P0 | Accepted | M1 |
-| R-P09 | 首页动作与持久化记录删除入口按目标流程收敛。 | 按 [Training Flow §3.1](training-flow.md#31-默认状态) 验收首页 Preparing / Start Control Area、动作移除、删除入口归属及 M1 不新增替代快捷入口的约束；M1 同步落实 §13.1 的诊断入口收敛。准备检查按 NFR-07 / §3.5 验收；后续模式/题目等能力仍按原里程碑交付。 | P1 | Accepted | M1 |
+| R-P01 | 每次完成的语音训练形成稳定、唯一的 `TrainingSession`。 | Session 有稳定 ID、创建时间、完成状态和内容摘要；结束语音输入后自动收尾保存，同一次提交不会生成重复的完成记录；不依赖“保存/完成”按钮或离开报告才持久化。 | P0 | Existing | M1 |
+| R-P02 | Session 跨应用重启保留。 | 完成训练并重启后，“训练历史”列表仍可读取；能够打开逐字稿、已有统计和可用的录音。 | P0 | Existing | M1 |
+| R-P03 | Session 关联逐字稿、片段时间线和音频可用状态。 | 文本和稳定片段按原顺序恢复；时间不存在时显式标记未知；音频缺失或损坏不能显示为可播放。 | P0 | Existing | M1 |
+| R-P04 | 用户可查看和删除本地训练记录。 | 训练历史按创建时间倒序；列表与单条打开按 [Training Flow §13.2](training-flow.md#132-history-与-comparison--review) 及 [M1 Report 切片 §7.5](training-flow.md#75-m1-的-report-内容与手动分析) 验收，M3 勾选对比不提前成为 M1 条件；删除需明确触发；删除后关联用户内容不再通过应用访问，失败时给出可操作错误。 | P0 | Existing | M1 |
+| R-P05 | 持久化失败、未完成写入和损坏记录必须可识别。 | 成功保存仅需弱提示；失败写入明显提示并可重试，不展示为成功；重启后能区分完整、未完成、音频缺失和记录损坏；健康记录仍可读取。 | P0 | Existing | M1 |
+| R-P06 | Session 保存生成结果所需的来源与版本信息。 | 至少可识别 ASR 模型、规则/度量版本以及已有 AI 结果的 Provider/模型和生成时间；不得保存密钥。 | P0 | Existing | M1 |
+| R-P07 | 用户在首次录音前获得真实的数据与云端边界说明。 | 说明本地持久化、删除方式、音频保留策略，以及配置远程 AI 后可能发送的逐字稿、时间/指标摘要和用户分析指令；明确音频是否离开设备；只有用户确认后才申请麦克风权限。 | P0 | Existing | M1 |
+| R-P08 | 目标产品只保留麦克风语音训练入口。 | 移除首页粘贴入口及粘贴分析流程；M1 不创建 `pasted-text` Session；当前实现仍记录在 As-Is 文档中。 | P0 | Existing | M1 |
+| R-P09 | 首页动作与持久化记录删除入口按目标流程收敛。 | 按 [Training Flow §3.1](training-flow.md#31-默认状态) 验收首页 Preparing / Start Control Area、动作移除、删除入口归属及 M1 不新增替代快捷入口的约束；M1 同步落实 §13.1 的诊断入口收敛。准备检查按 NFR-07 / §3.5 验收；后续模式/题目等能力仍按原里程碑交付。 | P1 | Existing | M1 |
 
 M1 尽早自动保存语音流程已有的完成事实和结果，不等待 AI 成功或用户导航；随后产生的已有结果也自动保存，并收敛首页入口。既有手动报告/回放分析及结果恢复按 [Training Flow §7.5](training-flow.md#75-m1-的-report-内容与手动分析) 验收；R-A08 的完整报告能力仍归 M2。不新增评分算法、AI 对话、训练框架或每个 ASR partial 的持久化。
 
@@ -111,15 +111,15 @@ M1 完成录音的音频随 Session 保留至用户明确删除；不按条数�
 
 | ID | 需求 | Acceptance Criteria | Priority | Status | Target Milestone |
 |---|---|---|---|---|---|
-| R-A01 | 应用以版本化、可重算的方式计算确定性表达指标。 | 相同事实输入与相同规则版本得到相同结果；每项结果带计算版本和证据；旧结果不会被无声覆盖。 | P0 | Accepted | M2 |
+| R-A01 | 应用以版本化、可重算的方式计算确定性表达指标。 | 相同事实输入与相同规则版本得到相同结果；每项结果带计算版本和证据；同一 Common 可测事实跨训练方式使用同一口径；旧结果不会被无声覆盖，AI 不重复测量这些事实。 | P0 | Accepted | M2 |
 | R-A02 | 应用判断语言组织能力。 | 结果覆盖主题聚焦、信息顺序、衔接或同等明确定义的维度；每个结论关联原文证据；无法判断时允许返回未知。 | P1 | Accepted | M2 |
 | R-A03 | 应用判断表达结构合理性。 | 结果说明主张、理由、事实或结论之间的关系；结构建议定位到相关片段；不把单个词汇直接判为逻辑错误。 | P1 | Accepted | M2 |
-| R-A04 | 每个完成且可分析的 Session 默认进入 AI 诊断与建议流程。 | 存在有效 AI profile 时自动生成版本化、结构化诊断；包含问题、证据、建议和改写示例；未配置或失败时显示明确状态、引导配置或重试，本地事实与确定性分析仍保留。 | P0 | Accepted | M2 |
-| R-A05 | 应用用雷达图展示已定义的表达维度。 | 每个维度有固定名称、取值范围、证据来源和版本；相近维度通过 MECE 检查；缺证据时不伪造分数。 | P1 | Accepted | M2 |
-| R-A06 | 时间维度用于分析速度、停顿、流畅度和卡壳。 | 语速、停顿和片段时长使用声明的时间来源；近似时间与模型时间戳可区分；时间轴缺失时相关指标显式降级。 | P0 | Accepted | M2 |
+| R-A04 | 每个完成且可分析的 Session 默认进入 AI 诊断与建议流程。 | 存在有效且显式启用的当前 AI profile 时自动生成版本化、结构化诊断；Schema 与 `evidenceRefs` 校验后才可产生 Observation → Interpretation → Recommendation Finding；证据不足不凑 Finding。未配置、未启用、技术失败或无效结果时显示明确状态、引导配置或重试，本地事实与确定性分析仍保留。 | P0 | Accepted | M2 |
+| R-A05 | 应用用雷达图展示已定义的表达维度。 | Radar 只投影已有证据、确定性结果和经验证解释；每个维度有固定名称、来源、mapping、版本及 unavailable 条件，相近维度通过 MECE 检查；缺证据显示 unavailable 而不伪造分数，不预设统一 0–100。具体维度/量程/校准仍按 D-04 的证据收敛。 | P1 | Accepted | M2 |
+| R-A06 | 时间维度用于分析速度、停顿、流畅度和卡壳。 | 语速、停顿和片段时长使用 capability-based Timing Contract 声明的时间来源；ASR 成功不代表具 token timing，近似时间与模型时间戳可区分且禁止伪造；时间轴或 Speech Evidence 缺失时仅相关指标显式降级。 | P0 | Accepted | M2 |
 | R-A07 | 每个可分析的 Session 都具有 Common Analysis。 | Common Analysis 使用跨训练方式一致的维度和版本规则；Free 仍可分析聚焦、顺序、衔接和一般结构问题，但在用户未请求框架视角时不得按 PREP、STAR 或金字塔槽位判定。 | P0 | Accepted | M2 |
 | R-A08 | 报告使用一套统一骨架并优先给出可行动结论。 | 按 [Training Flow §7–§8](training-flow.md#7-分析层与首次报告) 验收同一 Report Workspace 的摘要、优先 Finding、原位详情/证据和已有内容按需展开；历史详情复用该容器，不维护另一套报告。有效发现不因默认折叠而丢失，证据不足显式降级；导航和 Finding 动作遵循该文档 §8.2；按 [§6–§7.4](training-flow.md#6-自动持久化与分析状态) 验收 Processing 完成等待/合理 timeout、可信进度、允许离开，以及 Report 局部失败恢复和 Session 保存状态，不采用 progressive report rendering。 | P1 | Accepted | M2；M4 扩展 |
-| R-A09 | 使用版本化神经 VAD 产生语音活动和静音区间。 | VAD 对完成音频生成带模型/阈值版本的区间证据；结果不覆盖 ASR 时间戳；失败时停顿/流畅度指标显式降级；代表性样本上具有可重复的准确率、实时系数和资源证据。 | P0 | Accepted | M2 |
+| R-A09 | 使用版本化神经 VAD 产生语音活动和静音区间。 | VAD 对完成音频生成带模型/阈值/规范化规则版本和绝对 sample 边界的区间证据；结果不覆盖 ASR 时间戳，leading/trailing silence 不默认计 pause；失败时停顿/流畅度指标显式降级；代表性样本上具有可重复的准确率、实时系数和资源证据。 | P0 | Accepted | M2 |
 | R-A10 | SenseVoiceSmall 是用户可选的主 ASR 模型之一。 | 通过模型选择与其他主 ASR 择一使用；被选中时产生该 Session 的主转写并记录模型/版本与实际 timing 能力，未选中时不额外运行辅助识别。Utterance 不伪造 partial，等待/失败状态明确且可恢复；失败保留已取得的本地事实，不伪称转写成功。标签不得直接等同表达质量；沿用 ADR-0009 的能力与资源基线，D-08 完成实施验证；默认 streaming 模型与公开分发许可边界不变。 | P1 | Accepted | M2 |
 | R-A11 | 远程 AI 自动诊断具有明确、可撤销的知情边界。 | 首次启用远程 Profile 前说明 Provider 及将发送的数据类别；用户明确启用后才允许自动请求；设置中可停用；本地 Provider 不被描述为云端传输；音频、密钥、无关历史和未声明数据不得发送。 | P0 | Accepted | M2 |
 
@@ -129,7 +129,7 @@ M1 完成录音的音频随 Session 保留至用户明确删除；不按条数�
 
 | ID | 需求 | Acceptance Criteria | Priority | Status | Target Milestone |
 |---|---|---|---|---|---|
-| R-R01 | 用户可比较两次训练。 | 按 [Training Flow §13.2–§13.4](training-flow.md#132-history-与-comparison--review) 验收 History 的 0–2 条选择与显式对比入口、Comparison 信息结构/可用性、单侧 Report 下钻与上下文恢复、固定比较对象边界；复用 [Data Model §10](../architecture/data-model.md#10-comparison-invariants) 的 comparison 约束，能区分可比、需归一化和不可可靠比较，并用证据说明变化与限制。 | P1 | Accepted | M3 |
+| R-R01 | 用户可比较两次训练。 | 按 [Training Flow §13.2–§13.4](training-flow.md#132-history-与-comparison--review) 验收 History 的 0–2 条选择与显式对比入口、Comparison 信息结构/可用性、单侧 Report 下钻与上下文恢复、固定比较对象边界；读取生成时稳定快照，复用 [Data Model §10](../architecture/data-model.md#10-comparison-invariants) 的 comparison 约束，能区分可比、需归一化和不可可靠比较，并用证据说明变化与限制。 | P1 | Accepted | M3 |
 | R-R02 | 用户可复盘一次或一组训练。 | 可从问题或建议跳回原文/时间位置；展示已经改善、持续存在和新出现的问题；不把模型版本变化冒充用户进步。 | P1 | Accepted | M3 |
 | R-R03 | 用户可围绕 Finding 与 AI 直接对话（deferred）。 | 未来优先 Finding-scoped；上下文须声明来源 Session / Report、Finding 及 Evidence，用户可知使用内容；失败不修改事实与分析，会话可继续查看和删除。当前不新增通用 Chat Screen；重开见 Backlog B-17 / D-05。 | P1 | Not Now | M3 候选，重开后排期 |
 | R-R04 | 用户可查看长期趋势（deferred）。 | Common 指标可跨训练方式形成趋势，但仅比较定义一致的指标；framework-specific 趋势按 framework 分组；版本变化时重新计算或分段展示；没有足够样本时不声称趋势；当前不新增 Progress Screen / 一级导航，重开见 Backlog B-16。 | P2 | Not Now | M3 候选，重开后排期 |
@@ -177,7 +177,7 @@ NFR-08 的 M1 验收仍是既有单条录音上限、手动删除、显式写入
 
 ## 11. 已取代的旧基线表述
 
-历史基线与提案见 [文档入口的历史材料](../README.md#资料身份)，不作为当前要求。五条内存记录、粘贴与首页工具按钮仍可能是 [Current](../architecture/current.md) 的已实现行为；目标要求由上述需求编号定义，不能把现状限制当作长期产品规则。
+历史基线与提案见 [文档入口的历史材料](../README.md#资料身份)，不作为当前要求。五条内存记录、粘贴与旧首页工具按钮属于 M1 之前的历史行为；当前实现与验证边界见 [Current](../architecture/current.md)，目标要求由上述需求编号定义。
 
 ## 12. 发布级验收场景
 

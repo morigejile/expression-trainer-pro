@@ -40,6 +40,24 @@ contextBridge.exposeInMainWorld('api', {
   stopASR: (options) => ipcRenderer.invoke('stop-asr', options),
   cancelASR: (options) => ipcRenderer.invoke('cancel-asr', options),
 
+  // 训练记录：稳定 ID 与有界完成 WAV，绝对路径/SQL 不跨边界。
+  createTrainingSession: command => ipcRenderer.invoke('training-session:create', command),
+  analyzeTrainingSession: command => ipcRenderer.invoke('training-session:analyze', command),
+  cancelTrainingAnalysis: command => ipcRenderer.invoke('training-session:cancelAnalysis', command),
+  finalizeTrainingSession: command => ipcRenderer.invoke('training-session:finalize', command),
+  listTrainingSessions: command => ipcRenderer.invoke('training-session:list', command),
+  getTrainingSession: command => ipcRenderer.invoke('training-session:get', command),
+  deleteTrainingSession: command => ipcRenderer.invoke('training-session:delete', command),
+  readTrainingAudio: command => ipcRenderer.invoke('training-session:readAudio', command),
+  appendTrainingResult: command => ipcRenderer.invoke('training-session:appendResult', command),
+  interruptTrainingSession: command => ipcRenderer.invoke('training-session:interrupt', command),
+  onPrepareTrainingClose: callback => {
+    const listener = () => callback();
+    ipcRenderer.on('training:prepare-close', listener);
+    return () => ipcRenderer.removeListener('training:prepare-close', listener);
+  },
+  finishTrainingClose: ready => ipcRenderer.send('training:close-ready', ready === true),
+
   // 受信任 ASR 模型管理
   getAsrModelState: () => ipcRenderer.invoke('get-asr-model-state'),
   installAsrModel: (modelId) => ipcRenderer.invoke('install-asr-model', {modelId}),
@@ -53,7 +71,6 @@ contextBridge.exposeInMainWorld('api', {
 
   // 词库分析
   analyzeText: (text) => ipcRenderer.invoke('analyze-text', text),
-  analyzeTexts: (texts) => ipcRenderer.invoke('analyze-texts', texts),
 
   // AI反馈
   getRealtimeFeedback: (text) => ipcRenderer.invoke('get-realtime-feedback', text),

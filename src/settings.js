@@ -1,5 +1,8 @@
 // 设置页逻辑
 
+const profilePrivacy = typeof module === 'object' && module.exports
+  ? require('../lib/llm-provider-config') : window.LlmProviderConfig;
+
 const PROVIDER_CONFIG = {
   openai: {
     needsKey: true,
@@ -41,6 +44,8 @@ class SettingsPage {
     this.modelHint = document.getElementById('model-hint');
     this.ollamaUrlInput = document.getElementById('ollama-url');
     this.customBaseUrlInput = document.getElementById('custom-base-url');
+    this.autoDiagnosisEnabled = document.getElementById('auto-diagnosis-enabled');
+    this.autoDiagnosisDisclosure = document.getElementById('auto-diagnosis-disclosure');
     this.btnSave = document.getElementById('btn-save');
     this.btnTestConnection = document.getElementById('btn-test-connection');
     this.saveSuccess = document.getElementById('save-success');
@@ -66,7 +71,12 @@ class SettingsPage {
   }
 
   bindEvents() {
+    document.getElementById('btn-prompt-editor')?.addEventListener('click', () => window.api.openPromptEditor());
     this.providerSelect.addEventListener('change', () => this.onProviderChange());
+    for (const control of [this.modelSelect,this.ollamaUrlInput,this.customBaseUrlInput]) {
+      control.addEventListener('input', () => this.onAutoDiagnosisProfileChange());
+      control.addEventListener('change', () => this.onAutoDiagnosisProfileChange());
+    }
     this.activeProfileSelect.addEventListener('change', () => this.selectActiveProfile(this.activeProfileSelect.value));
     this.profileSelect.addEventListener('change', () => this.selectProfile(this.profileSelect.value));
     this.profileNameInput.addEventListener('change', () => this.renameProfile());
@@ -195,6 +205,7 @@ class SettingsPage {
     if (this.btnProfileDelete) {
       this.btnProfileDelete.disabled = !enabled || (this.settings?.profiles?.length || 0) === 0;
     }
+    if (this.autoDiagnosisEnabled) this.autoDiagnosisEnabled.disabled = !enabled || !this.settings?.profiles?.length;
   }
 
   async loadAsrModels() {
@@ -349,12 +360,10 @@ class SettingsPage {
         option.textContent = `${profile.name} · ${profile.model}`;
         return option;
       }));
-      if (!configuredProfiles.some(profile => profile.id === this.settings.activeProfileId)) {
-        this.settings.activeProfileId = configuredProfiles[0]?.id || this.settings.activeProfileId;
-      }
     }
     if (this.profileSelect) this.profileSelect.value = this.editingProfileId || '';
-    if (this.activeProfileSelect) this.activeProfileSelect.value = this.settings.activeProfileId || '';
+    if (this.activeProfileSelect) this.activeProfileSelect.value = this.settings.profiles.some(profile =>
+      profile.id === this.settings.activeProfileId && isConfiguredProfile(profile)) ? this.settings.activeProfileId : '';
     if (this.btnProfileDelete) {
       this.btnProfileDelete.disabled = this.profileControlsEnabled === false || this.settings.profiles.length === 0;
     }
@@ -373,6 +382,7 @@ class SettingsPage {
   flushCurrentProfile() {
     const profile = this.getEditingProfile();
     if (!profile) return;
+    this.onAutoDiagnosisProfileChange();
     const provider = this.providerSelect.value;
     profile.name = this.profileNameInput.value.trim() || profile.name;
     profile.provider = provider;
@@ -381,6 +391,33 @@ class SettingsPage {
     profile.baseUrl = this.customBaseUrlInput.value.trim();
     profile.model = this.modelSelect.value.trim();
     profile.customModel = provider === 'custom' ? profile.model : '';
+    profile.autoDiagnosisEnabled = this.autoDiagnosisEnabled?.checked === true;
+  }
+
+  automaticDiagnosisIdentity() {
+    const provider = this.providerSelect.value;
+    const endpoint = provider === 'ollama' ? this.ollamaUrlInput.value.trim()
+      : provider === 'custom' ? this.customBaseUrlInput.value.trim() : '';
+    return JSON.stringify([provider,this.modelSelect.value.trim(),endpoint]);
+  }
+
+  onAutoDiagnosisProfileChange() {
+    const identity = this.automaticDiagnosisIdentity();
+    if (this.autoDiagnosisIdentity !== undefined && identity !== this.autoDiagnosisIdentity && this.autoDiagnosisEnabled) {
+      this.autoDiagnosisEnabled.checked = false;
+    }
+    this.autoDiagnosisIdentity = identity;
+    this.refreshAutoDiagnosisDisclosure();
+  }
+
+  refreshAutoDiagnosisDisclosure() {
+    if (!this.autoDiagnosisDisclosure) return;
+    const profile = {provider:this.providerSelect.value,ollamaUrl:this.ollamaUrlInput.value.trim(),baseUrl:this.customBaseUrlInput.value.trim()};
+    const providerName = {openai:'OpenAI',deepseek:'DeepSeek',ollama:'Ollama',custom:'自定义 OpenAI 兼容服务'}[profile.provider] || '所选服务';
+    const location = profilePrivacy.isLocalLlmProfile(profile) ? '本机处理' : '远程处理';
+    this.autoDiagnosisDisclosure.textContent = `${providerName} · ${this.modelSelect.value.trim() || '尚未填写模型'}：${location}。` +
+      '启用并保存后，录音结束时会向当前使用的该配置发送本次训练的转写文本、相关语音证据与确定性指标、分析指令。' +
+      '分析内容不包含音频、API 密钥或无关历史。';
   }
 
   loadSelectedProfile() {
@@ -392,12 +429,21 @@ class SettingsPage {
       this.modelSelect.value = '';
       this.ollamaUrlInput.value = 'http://localhost:11434';
       this.customBaseUrlInput.value = '';
+      if (this.autoDiagnosisEnabled) { this.autoDiagnosisEnabled.checked = false; this.autoDiagnosisEnabled.disabled = true; }
+      if (this.autoDiagnosisDisclosure) this.autoDiagnosisDisclosure.textContent = '先添加 AI 服务配置，再选择是否启用自动诊断。';
+      this.autoDiagnosisIdentity = undefined;
       return;
     }
     this.profileNameInput.value = profile.name;
     this.providerSelect.value = profile.provider;
-    this.onProviderChange();
+    this.onProviderChange({resetAutomaticDiagnosis:false});
     this.loadProviderFields(profile);
+    if (this.autoDiagnosisEnabled) {
+      this.autoDiagnosisEnabled.checked = profile.autoDiagnosisEnabled === true;
+      this.autoDiagnosisEnabled.disabled = this.profileControlsEnabled === false;
+    }
+    this.autoDiagnosisIdentity = this.automaticDiagnosisIdentity();
+    this.refreshAutoDiagnosisDisclosure();
   }
 
   selectProfile(profileId) {
@@ -418,7 +464,7 @@ class SettingsPage {
     this.flushCurrentProfile();
     const profile = {
       id: this.createProfileId(), name: '新配置', provider: 'deepseek', apiKey: '',
-      model: '', ollamaUrl: 'http://localhost:11434', baseUrl: '', customModel: ''
+      model: '', ollamaUrl: 'http://localhost:11434', baseUrl: '', customModel: '', autoDiagnosisEnabled: false
     };
     this.settings.profiles.push(profile);
     this.editingProfileId = profile.id;
@@ -431,7 +477,7 @@ class SettingsPage {
     if (!profile) return;
     this.flushCurrentProfile();
     const source = this.getEditingProfile();
-    const duplicate = {...source, id: this.createProfileId(), name: `${source.name} 副本`};
+    const duplicate = {...source, id: this.createProfileId(), name: `${source.name} 副本`, autoDiagnosisEnabled:false};
     this.settings.profiles.push(duplicate);
     this.editingProfileId = duplicate.id;
     this.loadSelectedProfile();
@@ -446,7 +492,7 @@ class SettingsPage {
     const deletedProfileId = this.editingProfileId;
     this.settings.profiles = this.settings.profiles.filter(profile => profile.id !== deletedProfileId);
     if (this.settings.activeProfileId === deletedProfileId) {
-      this.settings.activeProfileId = this.settings.profiles[0]?.id || null;
+      this.settings.activeProfileId = null;
     }
     this.editingProfileId = this.settings.profiles[0]?.id || null;
     this.loadSelectedProfile();
@@ -461,7 +507,7 @@ class SettingsPage {
     this.renderProfiles();
   }
 
-  onProviderChange() {
+  onProviderChange({resetAutomaticDiagnosis = true} = {}) {
     const provider = this.providerSelect.value;
     const config = PROVIDER_CONFIG[provider];
 
@@ -474,7 +520,7 @@ class SettingsPage {
     if (config.keyHint) {
       if (this.apikeyHint) this.apikeyHint.textContent = config.keyHint;
     }
-
+    if (resetAutomaticDiagnosis) this.onAutoDiagnosisProfileChange();
   }
 
   buildDraftSettings() {

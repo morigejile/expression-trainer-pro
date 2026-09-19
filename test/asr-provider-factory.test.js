@@ -9,19 +9,36 @@ function filesFor(model) {
   return Object.fromEntries(model.files.map(({role}) => [role, path.resolve('factory-fixtures', model.modelId, role)]));
 }
 
-test('factory creates every committed catalog model through the two trusted provider types', () => {
+test('factory creates every committed catalog model through trusted provider types', () => {
   const {createAsrProvider} = require('../lib/asr-provider-factory');
   for (const catalogEntry of registry.models) {
     const result = createAsrProvider({catalogEntry, modelFiles: filesFor(catalogEntry)});
     for (const method of ['initialize', 'start', 'feed', 'stop', 'cancel', 'dispose']) {
       assert.equal(typeof result.provider[method], 'function', `${catalogEntry.modelId} ${method}`);
     }
-    assert.deepEqual(result.capabilities, {mode: 'streaming', emitsPartial: true, sampleRateHz: 16000});
+    assert.deepEqual(result.capabilities, catalogEntry.providerType === 'sherpa.offline-sensevoice'
+      ? {mode: 'utterance', emitsPartial: false, sampleRateHz: 16000, maxDurationMs: 300000}
+      : {mode: 'streaming', emitsPartial: true, sampleRateHz: 16000});
   }
   assert.deepEqual(new Set(registry.models.map(({providerType}) => providerType)), new Set([
     'sherpa.online-paraformer',
-    'sherpa.online-ctc'
+    'sherpa.online-ctc',
+    'sherpa.offline-sensevoice'
   ]));
+});
+
+test('factory exposes trusted utterance capabilities without loading native model files', () => {
+  const {getAsrProviderCapabilities, createAsrProvider} = require('../lib/asr-provider-factory');
+  assert.equal(typeof getAsrProviderCapabilities, 'function');
+  const capabilities = getAsrProviderCapabilities('sherpa.offline-sensevoice');
+  assert.deepEqual(capabilities, {mode: 'utterance', emitsPartial: false, sampleRateHz: 16000, maxDurationMs: 300000});
+  assert.equal(Object.isFrozen(capabilities), true);
+  assert.throws(() => getAsrProviderCapabilities('untrusted'), /Unsupported ASR provider/);
+  for (const providerType of ['toString', '__proto__', 'constructor']) {
+    assert.throws(() => getAsrProviderCapabilities(providerType), /Unsupported ASR provider/);
+    assert.throws(() => createAsrProvider({catalogEntry: {providerType}, modelFiles: {}}), /Unsupported ASR provider/);
+  }
+  assert.throws(() => createAsrProvider({catalogEntry: {providerType: 'sherpa.offline-sensevoice'}, modelFiles: {model: path.resolve('model.onnx')}}), /missing tokens/);
 });
 
 test('factory rejects unknown provider types instead of loading catalog-controlled code', () => {

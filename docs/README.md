@@ -10,10 +10,10 @@
 | 必须做到什么、如何验收？ | [Requirements](product/requirements.md) | R-/NFR-/AC- 编号、优先级与验收；不维护按钮/Screen 清单 |
 | 用户怎么完成训练、理解 Finding、继续练习？ | [Training Flow §2–§11](product/training-flow.md#2-core-experience-flow-v1) | 用户流程、报告交互和 Practice Chain 产品语义 |
 | Screen / Workspace、Settings / Help / History 如何组织？ | [Training Flow §3、§12–§14](product/training-flow.md#13-screen-structure-收敛基线) | Home/准备检查、Screen × State Map、Utility 与导航的唯一 Owner；deferred 定位在 §13.5，实现细节在 §14 |
-| Session、来源 Finding、Comparison、Persistence 的数据含义？ | [Data Model](architecture/data-model.md) | 实体、事实/派生结果、关系与不变量；不定义页面导航 |
-| 当前实际实现是什么？ | [Current As-Is](architecture/current.md) | 包含未接入普通录音的存储基础；实现与产品验收完成分开 |
+| Session、Finding/Report 快照、Comparison、Persistence 的数据含义？ | [Data Model](architecture/data-model.md) | 实体、事实/派生结果、关系、版本与不变量；不定义页面导航 |
+| 当前实际实现是什么？ | [Current As-Is](architecture/current.md) | 包含已接入的录音持久化、History/Report 与验证边界；实现与设备验收分开 |
 | 目标系统如何支撑？ | [Target To-Be](architecture/target.md) | 组件职责与依赖，不复制现状表或产品规则 |
-| ASR 生命周期与 timing 契约？ | [Speech Contract](architecture/speech-contract.md) | 协议、能力和错误；模型的产品角色由需求定义 |
+| ASR 生命周期与 capability-based Timing Contract？ | [Speech Contract](architecture/speech-contract.md) | 协议、能力、绝对时间和错误；模型的产品角色由需求定义 |
 | 为什么做出架构选择？ | [ADR 索引](architecture/adr/README.md)与编号记录 | 索引维护决策状态；记录保留当时上下文/理由，不替代现状或排期 |
 | 本阶段交付什么？ | [M1](milestones/m1-training-persistence.md)、[M2](milestones/m2-speech-evidence-and-ai-diagnosis.md) | 实施切片、依赖、验收映射；不重定义产品行为 |
 | 什么时候做、当前进度如何？ | [Roadmap](roadmap.md) | 阶段顺序、任务状态、依赖及外部门禁 |

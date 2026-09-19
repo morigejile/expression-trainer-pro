@@ -1,6 +1,6 @@
 # M1 — Training Persistence
 
-> **Status:** In progress — storage foundation implemented; product integration pending
+> **Status:** Implementation complete — automated and packaged verification passed; physical-device acceptance pending
 > **Depends on:** M0 Architecture & Requirements Baseline
 > **Primary requirements:** R-P01–R-P09, NFR-01–NFR-03, NFR-07–NFR-08
 
@@ -107,20 +107,19 @@ M1 changes storage, application boundaries, and the target homepage entry surfac
 
 ## Implementation sequence
 
-Steps 1–3 have an implemented storage foundation described in [Training storage](../architecture/current.md#10-m1-training-storage-foundation).
-The normal microphone flow still uses the in-memory store. Existing-result snapshots, the Application/Preload boundary,
-history UI and product-level acceptance remain pending; the storage smoke is not completion of AC-M1-01–10.
+Steps 1–8 are implemented and automatically verified in the normal product flow; evidence and limitations are recorded in [Training storage](../architecture/current.md#10-m1-training-storage-foundation).
+自动化产品 smoke 使用确定性音频和 Fake ASR/LLM，覆盖 Renderer 录音完成、重启、History/Report、播放和删除；真实麦克风与外部 LLM 验收尚未完成，不将自动化替身等同真实设备证据。
 
 This sequence minimises coupled change:
 
 1. **Implemented:** use the runtime's built-in `node:sqlite`; dependency and packaging evidence are documented in Training storage.
-2. **Implemented foundation:** schema v1 for session facts, transcripts/stable segments, and audio metadata; add current-result snapshots with their generation-time provenance during Application integration.
+2. **Implemented:** schema v1 facts/transcripts/artifacts plus forward migration to v2 result snapshots with generation-time provenance.
 3. **Implemented:** managed artifact publication, integrity checks, startup recovery and retryable deletion.
-4. Add application services and the narrow Preload API.
-5. Adapt microphone completion and existing-result persistence, complete the logical-field projection described in Data Model / Current, and remove the paste command/UI path while preserving recording statistics.
-6. Replace the in-memory history source with repository queries; integrate the minimal shared Report, manual AI actions, R-P09 Preparing/readiness and diagnosis-entry changes.
-7. Add deletion, degraded states, and consent/help copy checked against actual data flows.
-8. Run focused tests and packaged restart smoke.
+4. **Implemented:** application services and narrow Preload commands, normal-startup storage ownership, safe playback access and bounded shutdown; real Electron API restart coverage.
+5. **Implemented:** normal microphone completion, existing-result persistence, logical-field projection, and paste command/UI removal while preserving recording statistics.
+6. **Implemented:** repository-backed History, shared Report, manual AI actions, R-P09 Preparing/readiness and Help-only diagnosis entry.
+7. **Implemented:** deletion, degraded states, retry, safe close drain, and versioned consent/help copy aligned with actual data flows.
+8. **Verified:** declared Node/npm toolchain full tests and Windows x64 packaged restart smoke passed; remaining physical-device checks are recorded in Current §10.
 
 ## Completion conditions
 

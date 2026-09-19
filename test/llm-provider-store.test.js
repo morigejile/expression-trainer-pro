@@ -28,7 +28,7 @@ function providerSettings(provider, apiKey) {
   };
 }
 
-test('canonical LLM provider file wins and migrates atomically to schema v2', async () => {
+test('canonical LLM provider file wins and migrates atomically to the explicit automatic-diagnosis schema', async () => {
   const { loadLlmProviderSettings } = require('../lib/llm-provider-store');
   await withUserData((userDataPath) => {
     writeJson(path.join(userDataPath, 'settings.json'), providerSettings('openai', 'legacy-key'));
@@ -36,7 +36,7 @@ test('canonical LLM provider file wins and migrates atomically to schema v2', as
 
     const settings = loadLlmProviderSettings(userDataPath);
 
-    assert.equal(settings.schemaVersion, 2);
+    assert.equal(settings.schemaVersion, 3);
     assert.equal(settings.activeProfileId, 'profile-deepseek');
     assert.equal(settings.profiles.find(profile => profile.id === 'profile-deepseek').apiKey, 'canonical-key');
     assert.deepEqual(JSON.parse(fs.readFileSync(path.join(userDataPath, 'llm-provider-settings.json'), 'utf8')), settings);
@@ -68,7 +68,7 @@ test('invalid legacy JSON uses defaults without creating the canonical file', as
 
     const settings = loadLlmProviderSettings(userDataPath, { logger: { warn: (message) => warnings.push(message) } });
 
-    assert.deepEqual(settings, {schemaVersion: 2, activeProfileId: null, profiles: []});
+    assert.deepEqual(settings, {schemaVersion: 3, activeProfileId: null, profiles: []});
     assert.equal(fs.existsSync(path.join(userDataPath, 'llm-provider-settings.json')), false);
     assert.equal(warnings.length, 1);
   });
@@ -131,5 +131,22 @@ test('migration write failure leaves the canonical file absent', async () => {
       /injected atomic failure/
     );
     assert.equal(fs.existsSync(path.join(userDataPath, 'llm-provider-settings.json')), false);
+  });
+});
+
+test('saved schema v2 profiles migrate with automatic diagnosis off and explicit opt-in can be revoked', async () => {
+  const {loadLlmProviderSettings,saveLlmProviderSettings} = require('../lib/llm-provider-store');
+  await withUserData(userDataPath => {
+    const settingsPath = path.join(userDataPath,'llm-provider-settings.json');
+    writeJson(settingsPath,{schemaVersion:2,activeProfileId:'p1',profiles:[
+      {id:'p1',provider:'deepseek',model:'configured-model',apiKey:'key',autoDiagnosisEnabled:true}]});
+    const migrated = loadLlmProviderSettings(userDataPath);
+    assert.equal(migrated.profiles[0].autoDiagnosisEnabled,false);
+    migrated.profiles[0].autoDiagnosisEnabled = true;
+    saveLlmProviderSettings(userDataPath,migrated);
+    assert.equal(loadLlmProviderSettings(userDataPath).profiles[0].autoDiagnosisEnabled,true);
+    migrated.profiles[0].autoDiagnosisEnabled = false;
+    saveLlmProviderSettings(userDataPath,migrated);
+    assert.equal(loadLlmProviderSettings(userDataPath).profiles[0].autoDiagnosisEnabled,false);
   });
 });

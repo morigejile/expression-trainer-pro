@@ -76,6 +76,8 @@ test('package payload excludes development-only trees but keeps runtime assets',
   assert.equal(ignore('/lib/asr-utility-process.js'), false);
   assert.equal(ignore('/lib/model-install-utility-process.js'), false);
   assert.equal(ignore('/models/registry.json'), false);
+  assert.equal(ignore('/models/speech-evidence-registry.json'), false);
+  assert.equal(ignore('/lib/speech-evidence-worker.js'), false);
   assert.equal(ignore('/smoke/electron-smoke-runner.js'), false);
   assert.equal(ignore('/src/index.html'), false);
 });
