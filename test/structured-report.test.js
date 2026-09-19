@@ -185,6 +185,7 @@ test('known zero remains zero and a successful empty diagnosis does not invent f
 test('the browser global exposes the same safe renderer used in node tests', () => {
   const fs = require('node:fs');const vm = require('node:vm');
   const browser = {};
+  vm.runInNewContext(fs.readFileSync(require.resolve('../shared/report-selection'),'utf8'),browser);
   vm.runInNewContext(fs.readFileSync(require.resolve('../src/structured-report'),'utf8'),browser);
   const target = container();
   browser.StructuredReport.renderStructuredReport(target,browser.StructuredReport.selectStructuredReport(runs()));

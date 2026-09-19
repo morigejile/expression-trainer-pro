@@ -769,7 +769,7 @@ body[data-screen="history"] .nav-history,
   width: 100%;
 }
 .utility-menu-items button:hover { background: var(--color-surface); }
-.history-screen, .report-header, .report-ai-section, .training-context { display: none; }
+.history-screen, .comparison-screen, .report-header, .report-ai-section, .training-context { display: none; }
 body:not([data-screen="training"]) #timer,
 .processing-controls { display:none; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:18px; }
 body[data-screen="training"][data-training-state="processing"] .processing-controls { display:flex; }
@@ -791,6 +791,11 @@ body[data-screen="history"] .panel-right,
 body[data-screen="history"] #subtitle-scroll,
 body[data-screen="history"] #playback-controls,
 body[data-screen="history"] #start-control-area,
+body[data-screen="comparison"] .panel-left,
+body[data-screen="comparison"] .panel-right,
+body[data-screen="comparison"] #subtitle-scroll,
+body[data-screen="comparison"] #playback-controls,
+body[data-screen="comparison"] #start-control-area,
 body[data-screen="report"] #start-control-area,
 body[data-screen="training"] #playback-controls,
 body[data-screen="training"][data-training-state="preparing"] .panel-left,
@@ -801,6 +806,7 @@ body[data-screen="training"][data-training-state="processing"] .panel-right,
 body[data-screen="training"][data-training-state="processing"] #subtitle-scroll,
 body[data-screen="training"][data-training-state="processing"] .action-bar { display: none !important; }
 body[data-screen="history"] .layout,
+body[data-screen="comparison"] .layout,
 body[data-screen="training"][data-training-state="preparing"] .layout,
 body[data-screen="training"][data-training-state="processing"] .layout {
   grid-template-columns: minmax(0, 1fr);
@@ -831,6 +837,35 @@ body[data-screen="training"][data-training-state="preparing"] .btn-start {
 }
 body[data-screen="training"][data-training-state="preparing"] .btn-start .btn-label { font-size: 16px; }
 body[data-screen="history"] .history-screen { display: block; }
+body[data-screen="comparison"] .comparison-screen { display: block; }
+.comparison-screen {
+  width:min(100%,1100px); margin-inline:auto; padding:24px clamp(20px,4vw,60px) 40px;
+  overflow-y:auto; -webkit-app-region:no-drag; line-height:1.7;
+}
+.comparison-screen h1 { font-size:24px; margin:18px 0 8px; }
+.comparison-screen h2 { font-size:18px; margin:14px 0 10px; }
+.comparison-screen h3 { font-size:15px; margin:0 0 8px; }
+.comparison-pair { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:16px; }
+.comparison-card,.comparison-metric { border:1px solid var(--color-border); border-radius:12px; padding:16px; min-width:0; }
+.comparison-card p,.comparison-metric p { margin:6px 0; overflow-wrap:anywhere; }
+.comparison-note { color:var(--color-text-muted); font-size:13px; }
+.comparison-values { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; font-variant-numeric:tabular-nums; }
+.comparison-delta { font-weight:600; }
+.comparison-measurements { display:grid; gap:12px; margin-top:24px; }
+.comparison-analysis { margin-top:28px; }
+.comparison-details { border-top:1px solid var(--color-border); margin-top:12px; }
+.comparison-details > summary { cursor:pointer; padding:10px 0; color:var(--color-text); }
+.comparison-evidence { margin:10px 0; }
+.comparison-evidence blockquote { margin:8px 0; padding:8px 12px; border-left:2px solid var(--color-border); white-space:pre-wrap; overflow-wrap:anywhere; }
+.comparison-finding + .comparison-finding { border-top:1px solid var(--color-border); padding-top:12px; margin-top:12px; }
+.comparison-player { max-width:100%; display:block; margin-top:8px; }
+.comparison-player[hidden],#btn-comparison-retry[hidden] { display:none; }
+.history-compare-toolbar { display:flex; align-items:center; flex-wrap:wrap; gap:12px; margin-top:16px; }
+.history-compare-choice { padding:12px 6px; cursor:pointer; flex-shrink:0; }
+.history-compare-choice input { width:18px; height:18px; accent-color:var(--color-accent); }
+@media (max-width:700px) {
+  .comparison-pair,.comparison-values { grid-template-columns:minmax(0,1fr); }
+}
 .history-screen {
   width: min(100%, 980px);
   margin-inline: auto;

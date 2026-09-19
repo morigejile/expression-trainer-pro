@@ -15,7 +15,7 @@
 | 目标系统如何支撑？ | [Target To-Be](architecture/target.md) | 组件职责与依赖，不复制现状表或产品规则 |
 | ASR 生命周期与 capability-based Timing Contract？ | [Speech Contract](architecture/speech-contract.md) | 协议、能力、绝对时间和错误；模型的产品角色由需求定义 |
 | 为什么做出架构选择？ | [ADR 索引](architecture/adr/README.md)与编号记录 | 索引维护决策状态；记录保留当时上下文/理由，不替代现状或排期 |
-| 本阶段交付什么？ | [M1](milestones/m1-training-persistence.md)、[M2](milestones/m2-speech-evidence-and-ai-diagnosis.md) | 实施切片、依赖、验收映射；不重定义产品行为 |
+| 本阶段交付什么？ | [M1](milestones/m1-training-persistence.md)、[M2](milestones/m2-speech-evidence-and-ai-diagnosis.md)、[M3](milestones/m3-comparison-and-review.md) | 实施切片、依赖、验收映射；不重定义产品行为 |
 | 什么时候做、当前进度如何？ | [Roadmap](roadmap.md) | 阶段顺序、任务状态、依赖及外部门禁 |
 | 暂时不做什么、何时重开？ | [Backlog](product/backlog.md) | Not Now、重开条件、待决追踪；交互细节只在 Flow §14，链实体细节只在 Data Model §12 |
 | AI 启用与 Privacy 要求？ | [R-P07 / R-A11 / NFR-03](product/requirements.md) | 用户知情与数据边界；界面归属引用 Flow，实现引用 Current |

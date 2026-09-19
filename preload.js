@@ -47,6 +47,7 @@ contextBridge.exposeInMainWorld('api', {
   finalizeTrainingSession: command => ipcRenderer.invoke('training-session:finalize', command),
   listTrainingSessions: command => ipcRenderer.invoke('training-session:list', command),
   getTrainingSession: command => ipcRenderer.invoke('training-session:get', command),
+  compareTrainingSessions: command => ipcRenderer.invoke('training-session:compare', command),
   deleteTrainingSession: command => ipcRenderer.invoke('training-session:delete', command),
   readTrainingAudio: command => ipcRenderer.invoke('training-session:readAudio', command),
   appendTrainingResult: command => ipcRenderer.invoke('training-session:appendResult', command),

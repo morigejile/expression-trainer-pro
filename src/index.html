@@ -79,9 +79,22 @@
       <section id="history-screen" class="history-screen" aria-labelledby="history-title">
         <h1 id="history-title">训练历史</h1>
         <p id="history-status" class="screen-status" role="status" aria-live="polite"></p>
+        <div class="history-compare-toolbar">
+          <span id="history-selection-status" role="status" aria-live="polite">已选择 0/2 条训练</span>
+          <button id="btn-history-compare" class="btn-support" type="button" disabled>对比</button>
+          <span class="comparison-note">选择两条训练；部分指标可能无法直接比较。</span>
+        </div>
         <div id="history-list" class="history-list"></div>
         <button id="btn-history-start" class="btn-support hidden" type="button">开始表达</button>
         <button id="btn-history-more" class="btn-support btn-support-secondary hidden" type="button">加载更多</button>
+      </section>
+
+      <section id="comparison-screen" class="comparison-screen" aria-labelledby="comparison-title" tabindex="-1">
+        <button id="btn-comparison-back" class="btn-support btn-support-secondary" type="button">← 训练历史</button>
+        <h1 id="comparison-title">训练对比</h1>
+        <p id="comparison-status" role="status" aria-live="polite"></p>
+        <button id="btn-comparison-retry" class="btn-support btn-support-secondary" type="button" hidden>重试读取</button>
+        <div id="comparison-content"></div>
       </section>
 
       <div id="training-context" class="training-context">自由表达</div>
@@ -246,8 +259,10 @@
   <script src="audio-feed-queue.js"></script>
   <script src="pcm-wav.js"></script>
   <script src="training-records.js"></script>
+  <script src="../shared/report-selection.js"></script>
   <script src="structured-report.js"></script>
   <script src="training-persistence.js"></script>
+  <script src="comparison.js"></script>
   <script src="microphone-readiness.js"></script>
   <script src="appearance.js"></script>
   <script>window.Appearance.initializeAppearance();</script>

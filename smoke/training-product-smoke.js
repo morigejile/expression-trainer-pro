@@ -117,11 +117,55 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
     assert.equal(await evaluate(`document.getElementById('btn-report-back').classList.contains('hidden')`), false);
   };
 
+  const compareHistory = async ids => {
+    if (ids.length < 2) return;
+    const before = aiCalls();
+    await evaluate(`document.getElementById('btn-history').click()`);
+    await wait('comparison selection available',`!window.__trainingProductTrainer.historyLoading && document.querySelectorAll('[data-compare-id]').length>=2`);
+    assert.equal(await evaluate(`document.getElementById('btn-history-compare').disabled`),true);
+    await evaluate(`document.querySelector('[data-compare-id="${ids[0]}"]').click()`);
+    assert.equal(await evaluate(`document.getElementById('btn-history-compare').disabled`),true);
+    await evaluate(`document.querySelector('[data-compare-id="${ids[1]}"]').click()`);
+    assert.equal(await evaluate(`document.body.dataset.screen`),'history');
+    assert.equal(await evaluate(`document.getElementById('btn-history-compare').disabled`),false);
+    if(ids.length>2)assert.equal(await evaluate(`document.querySelector('[data-compare-id="${ids[2]}"]').disabled`),true);
+    await evaluate(`document.getElementById('btn-history-compare').click()`);
+    await wait('comparison rendered',`document.body.dataset.screen==='comparison' && document.querySelector('.comparison-metric')`);
+    assert.match(await evaluate(`document.getElementById('comparison-content').textContent`),/暂未建立跨录音问题对应/);
+    assert.equal(await evaluate(`document.querySelectorAll('[data-comparison-report]').length`),2);
+    await evaluate(`document.querySelector('[data-detail-key="original-target"]').open=true`);
+    await wait('target recording evidence available',`document.querySelector('[data-detail-key="original-target"] audio')`);
+    await evaluate(`(()=>{const detail=document.querySelector('[data-detail-key="original-target"]');const audio=detail.querySelector('audio');audio.addEventListener('playing',()=>audio.dataset.played='true',{once:true});detail.querySelector('button').click();})()`);
+    await wait('comparison evidence audio decodes and plays',`document.querySelector('[data-detail-key="original-target"] audio').dataset.played==='true'`);
+    const pinned=await evaluate(`window.__trainingProductTrainer.comparison.context.projection.baseline.snapshot`);
+    await evaluate(`document.querySelector('[data-detail-key="metric-text-character-count"]').open=true`);
+    const scroll=await evaluate(`(()=>{const area=document.getElementById('comparison-screen');area.scrollTop=600;return area.scrollTop;})()`);
+    assert.ok(scroll>0,'comparison must scroll within its workspace');
+    await capture(offline?'comparison-offline':'comparison');
+    await evaluate(`document.querySelector('[data-comparison-report="baseline"]').click()`);
+    await wait('comparison drills into the shared report',`document.body.dataset.screen==='report' && window.__trainingProductTrainer.reportSource==='comparison'`);
+    assert.match(await evaluate(`document.getElementById('btn-report-back').textContent`),/返回对比/);
+    await evaluate(`document.getElementById('btn-report-back').click()`);
+    await wait('pinned comparison restored',`document.body.dataset.screen==='comparison' && !window.__trainingProductTrainer.comparison.loading`);
+    assert.deepEqual(await evaluate(`window.__trainingProductTrainer.comparison.context.projection.baseline.snapshot`),pinned);
+    assert.equal(await evaluate(`document.querySelector('[data-detail-key="metric-text-character-count"]').open`),true);
+    assert.equal(await evaluate(`document.getElementById('comparison-screen').scrollTop`),scroll,'Report return restores the comparison scroll position');
+    await evaluate(`document.getElementById('btn-help').click();document.getElementById('btn-close-help').click()`);
+    assert.equal(await evaluate(`document.querySelector('[data-detail-key="metric-text-character-count"]').open`),true);
+    await evaluate(`document.getElementById('btn-comparison-back').click()`);
+    await wait('history restores selection',`document.body.dataset.screen==='history' && !window.__trainingProductTrainer.historyLoading`);
+    assert.equal(await evaluate(`document.querySelectorAll('[data-compare-id]:checked').length`),2);
+    assert.equal(await evaluate(`document.activeElement.id`),'btn-history-compare');
+    await evaluate(`document.querySelector('[data-compare-id="${ids[0]}"]').click()`);
+    assert.equal(await evaluate(`document.getElementById('btn-history-compare').disabled`),true);
+    assert.deepEqual(aiCalls(),before,'comparison and report drill-down must not request AI');
+  };
+
   if (phase === 'write' || phase === 'offline') {
     if (phase === 'write') await saveProfile('fake-model');
     else assert.equal((await evaluate('window.api.getLlmProfileSummaries()')).profiles.length, 0);
     const ids=[];
-    for (let i=0;i<(phase==='write'?7:1);i++) ids.push(await recordOnce());
+    for (let i=0;i<(phase==='write'?7:2);i++) ids.push(await recordOnce());
     const listed = await invoke('listTrainingSessions',{requestId:'verify-count'});
     assert.equal(listed.value.length, ids.length, 'no five-record eviction');
     if (phase === 'write') {
@@ -149,10 +193,12 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
       assert.deepEqual(aiCalls(),initialCalls,'offline recording must not request any AI');
       fs.writeFileSync(fixturePath, JSON.stringify({ids}));
     }
+    await compareHistory(ids);
   } else {
     const fixture = JSON.parse(fs.readFileSync(fixturePath,'utf8'));
     const listed = await invoke('listTrainingSessions',{requestId:'after-restart'});
     assert.equal(listed.value.length,fixture.ids.length);
+    await compareHistory(fixture.ids);
     if (phase === 'degraded') {
       await openHistory(fixture.ids[0]);
       const state = await evaluate(`({text:document.getElementById('subtitle-container').textContent,save:document.getElementById('record-save-status').textContent,audio:window.__trainingProductTrainer.trainingRecords.selected().audioState})`);

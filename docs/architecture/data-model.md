@@ -1,8 +1,8 @@
 # Training Data Model
 
-> **Status:** Canonical model — M1 facts and M2 result contracts; remaining target entities are identified separately
+> **Status:** Canonical model — M1 facts, M2 result contracts and M3 comparison; remaining target entities are identified separately
 > **Date:** 2026-09-19
-> **Scope:** logical model, M1 persistence decisions and the M2 V1 result contracts; this is not a complete future SQL schema.
+> **Scope:** logical model, M1 persistence decisions, M2 V1 result contracts and M3 read-only comparison; this is not a complete future SQL schema.
 
 ## 1. Purpose
 
@@ -353,7 +353,7 @@ Implementation must be idempotent for a repeated finalization request with the s
 
 比较按指标/证据项判定为可比、需归一化或不可可靠比较，不因其中一项可比就推断整份报告都可比。归一化必须声明口径和分母（例如按分钟或字数的口头禅频率），仅在范围有意义且事实支持时执行；保留原值，不把句子、片段与完整表达的总量差异当作进步。无法建立可靠对应关系时说明限制，不强行生成改善结论。
 
-不同 framework 的两个 Session 可以成为同一 Comparison 的输入；以下同 framework 条件只限制特定比较项，不构成整对 Session 的拒绝条件。缺失/不可比项与可用项的结果应可分别表达；详细 metric/framework/analyzer version 兼容规则由 Backlog D-13 在 M3 细化。
+不同 framework 的两个 Session 可以成为同一 Comparison 的输入；以下同 framework 条件只限制特定比较项，不构成整对 Session 的拒绝条件。缺失/不可比项与可用项的结果应可分别表达；D-13 的 M3 兼容性细化见 §10.1，规则已按首版范围冻结，交付证据以 M3 milestone 为准。
 
 版本与证据约束：
 
@@ -363,6 +363,41 @@ Implementation must be idempotent for a repeated finalization request with the s
 - AI model output from different providers/models may be shown side by side but cannot alone establish user progress.
 - Missing audio/timing/evidence produces an explicit non-comparable state for the affected comparison item; remaining supported evidence can still be inspected. Missing values are not zero.
 - If calculation provenance is incompatible, the affected item has no deterministic change conclusion. “Not comparable” is neither improvement nor regression.
+
+### 10.1 M3 compatibility
+
+**状态：D-13 已按 M3 首版范围关闭。** 本节定义首版执行边界；跨录音 Finding 的语义变化判断延期至 B-25，不反向修改 M2 快照。交付切片见 [M3 milestone](../milestones/m3-comparison-and-review.md)。
+
+#### 输入与快照
+
+- 输入为两个不同的已保存 Session，明确 `baseline` / `target` 角色。比较范围由实际事实与可用证据决定；不同 topic、mode 或 framework 不拒绝整对输入，但不能把任务差异消除后再声称能力改善。
+- 进入比较时按既有稳定 Report 选择规则取得两侧快照，固定 Session ID、transcript revision、Report result ID 及其精确 Source/Metric/Diagnosis 引用。旧记录无结构化 Report 时保留可用事实，分析缺失局部说明，不自动补跑。比较期间新增结果不能悄悄替换已固定输入。
+- M3 首版采用只读 Comparison 投影，不新增 SQLite 表或持久化第二份报告。界面保留本次输入与查看上下文；退出后再次从 History 发起时重新选择当时的稳定快照，不承诺跨应用重启恢复未完成的比较任务。今后确有保存/分享比较的需求时再扩展持久化。
+- Evidence 引用必须携带所属侧、Session、revision 与实际 Run；`speech-1`、`metric:…` 或 Finding ID 相同不表示跨 Session 的同一对象。删除、损坏或引用失效时停止依赖该证据的结论，不换成另一条记录、另一个 Run，也不从缓存恢复已删除事实。
+
+#### 逐项兼容性
+
+先检查每侧值与引用有效，再判断两侧口径；不能只检查版本字符串相等。默认只接受已知的 V1 schema、Metric ID/单位与 producer 定义，未知版本不猜测兼容；首版不提供自动重算或版本转换。`analyzerVersion` 相同本身也不是质量或可比性保证。
+
+| 比较项 | 首版判定 | 可输出的变化与限制 |
+|---|---|---|
+| 录音时长、已保存原文与字符总量 | 有效事实可并列；完整范围和同一计量口径下可展示客观总量差异 | 说明比较的是录音/转写观察；更短、更多字不代表更好。不同 ASR 来源不妨碍读原文，但须标识识别差异可能影响文本 |
+| 词项命中次数 | `definitionVersion`、单位、有效统计输入及当次词表一致；默认词表/匹配规则以已知定义版本识别，自定义词表使用已保存快照判断；缺失身份不采用今日设置补齐 | 可展示总量差异；表达时长/范围不同不能由次数降低推断习惯改善，频率复盘使用下一行已存在的指标 |
+| 每录音分钟字符数、填充词命中频率、两个字符占比 | 使用 §5.3 已保存的相同分母定义；所依赖文本、词表、音频覆盖均有效。用于解释表达变化时还需已知且兼容的 ASR producer/model 来源；未知或不同来源只并列观察并说明限制 | 明确标为按录音分钟或字符归一化，不把两种分母互换。保留原值与分母依据，不新增第二套历史统计 |
+| VAD 语音/非语音时长、内部间隔次数/总时长/最长间隔 | 完整覆盖且 Source/Metric 链有效；`engine`、`engineVersion`、`modelId`、`modelVersion`、`modelSha256`、`thresholdVersion`、实际 `thresholds` 与 `normalizationVersion` 全部已知且一致 | 可比的是同一检测方法的观察差异；未校准状态始终可见，不据此评价流利度、长停顿或能力。总量受表达长度影响；不为首版增加新的间隔频率指标 |
+| 每检测语音分钟字符数 | 同时满足文本来源、转写覆盖与上一行 VAD 兼容条件，且检测语音分母为正 | 明确“字/检测语音分钟、非逐字对齐”；不能与含静音的“字/录音分钟”相减 |
+| Framework 分析 | 同 framework、同 framework definition 且 analyzer 已有明确兼容依据；首版无兼容转换表时只认已知相同版本 | 不同框架局部不可比；M3 不提前交付 M4 的框架分析 |
+| 雷达 | M2 快照为 `uncalibrated / unavailable` | 保持不可用，不画比较多边形，不把四类 Finding 转为数值轴；完整校准仍归 B-20 |
+
+同一 ASR/VAD 来源不保证测量正确，只限定可解释的方法一致性；缺失与质量限制继续按依赖传播。单纯没有 token timing 不阻断文字总量或有效的全段速率。
+
+比较结果逐项表达“可比 / 需归一化 / 暂时无法可靠比较”、理由、两侧原值、证据与适用的差值。归一化只使用上表已定义的速率/占比及其有效分母；条件不足时降为不可可靠比较，不能先计算一个看似精确的结论。差值统一为目标减基线；占比差使用百分点，零基线不产生无穷大或相对百分比改善。语速增加、时长减少、命中率下降首先是观察变化，没有目标/解释依据就不加“更好”的评级。
+
+#### Finding 对应与变化结论
+
+现有 `FindingV1` 的 ID 只在所属结果内有意义，没有跨录音的问题身份。四类类别用于组织内容，不作为“同一问题”的匹配键；同类、相似文案、相同局部 Evidence ID 或目标侧未返回 Finding 均不足以证明持续、改善、新出现或已解决。同 provider/model/prompt 只能减少来源差异，仍不能单独建立上述结论。
+
+M3 首版依据可靠指标解释客观变化，两侧 Findings 保留来源与 Evidence 供复盘；语义对应不足时明确“暂时无法可靠比较”。不推断问题改善、持续、新出现或消失。该语义判断能力及双录音 AI 比较延期至 [Backlog B-25](../product/backlog.md#not-now)，R-R02 已明确首版验收边界。
 
 ## 11. M1 non-goals
 

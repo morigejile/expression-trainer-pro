@@ -34,6 +34,7 @@ This backlog keeps plausible future work visible without making it a dependency 
 | B-22 | AI Report UX / 内容呈现优化 | 本轮真实 AI Diagnosis 已跑通，但内容密度、信息组织、技术性 Evidence 表达（如 speech ID、sample、estimated）和重复证据/指标入口仍影响阅读；不属于 M2 核心正确性 blocker。 | 后续 Report 产品设计排期时，基于本轮真实报告梳理摘要、Finding、详情与 Evidence 层级；原型验证可读性和入口数量，同时保留可追溯性，再实施。 | M2 后独立设计/实现；不自动扩大 M3 |
 | B-23 | SenseVoice 下载异常 + 真实设备 smoke / 资源验证 | 用户本轮下载异常，未完成真实验收；已有 Provider、自动化和历史制品原生探测不等于下载/实机通过。当前继续使用已验收的 Zipformer Small CTC 中文 INT8。 | 恢复 SenseVoice 支持工作时先复现并修复下载问题，再用 1 条约 60～90 秒自然表达验证下载/加载→录音→识别→保存→Report/History、等待时长、CPU/内存与卡顿/崩溃；同时复核取消/失败恢复和缓存离线使用。无须新模型 Benchmark；公开分发另需许可。 | 明确延期，待单独排期；不是 M2/M3 gate，D-08 跟随此项 |
 | B-24 | 扩大 VAD 数据集 / 代表性统计校准 | 本轮有限人工复核已满足 M2；尚无大规模准确率、跨噪声阈值和资格线资源预算证明，继续保留未校准标记。 | 出现可复现的停顿/边界错误、新噪声或设备场景，或产品确需量化准确率/资源承诺时，限定相关场景，收集独立人工标注并报告误检/漏检、边界偏差及耗时/CPU/内存；影响阈值时版本化，不回写历史。 | 证据触发后单独排期；不自动进入 M3/M4 |
+| B-25 | 跨录音 Finding 对应与语义变化判断 | M3 首版选择可靠指标与两侧证据复盘，现有 Finding ID/类别不能证明同一问题的改善、持续或新出现。 | 明确联合比较的用户价值、双方上下文、独立触发与远程知情边界、证据校验、结果来源/保存、费用及失败降级后单独排期；不以同类 Finding 或目标侧缺失代替语义对应。 | M3 首版之后另行排期；不是当前 R-R02 验收依赖 |
 
 ### VAD 后续优化方向
 
@@ -66,7 +67,7 @@ These are not architecture projects. Decisions close before the named delivery s
 | D-10 | M2 本地实时规则与结束后 AI 的分工 | M2；决策已关闭 | 按 Training Flow §4 实施并验证；后续可选实时 AI 的上下文、触发、延迟/成本与独立启用归 B-19，不重开当前阶段选择。 |
 | D-11 | 报告复制／导出／分享、备份 | After M1；后续待办，未指定里程碑 | 先明确报告/详情入口、格式与数据范围、分享方式、备份及恢复边界；不预设云分享或账号。M1 首页移除复制/保存不等于永久禁止这些能力，也不将诊断 JSON 导出误并为训练内容导出。 |
 | D-12 | Practice Chain 的实体与关系表达 | M4；不作为 M1/M3 前置依赖 | 产品语义已确认于 [Training Flow §10.2](training-flow.md#102-多轮练习历程)；数据未决项只在 [Data Model §12](../architecture/data-model.md#12-open-decisions-carried-forward) 维护。实现前验证既定轮次/来源语义能恢复，再选择最小数据表示；不预建通用链框架。 |
-| D-13 | Comparison Compatibility | M3 Comparison | 依据 [Data Model §10](../architecture/data-model.md#10-comparison-invariants) 细化 metric / framework / analyzer / definition version 可比性与归一化规则；不同 Framework 不阻止选中整对记录，不可比项局部说明。 |
+| D-13 | Comparison Compatibility | M3 首版规则已关闭 | 按 [Data Model §10.1](../architecture/data-model.md#101-m3-compatibility) 逐项判断定义、来源、词表和分母兼容性；不同 Framework 不阻止整对选择。用户已选择指标与证据复盘，R-R02 的自动语义变化判断延期至 B-25；交付证据见 [M3](../milestones/m3-comparison-and-review.md)。 |
 
 ### M2 decision state
 

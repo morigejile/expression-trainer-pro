@@ -1,0 +1,108 @@
+'use strict';
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const {createComparisonController,renderComparison}=require('../src/comparison');
+const {compareSessions}=require('../lib/session-comparison');
+const {comparisonSession}=require('./helpers/comparison-fixture');
+const {createTrainingRecordStore}=require('../src/training-records');
+
+class Element {
+  constructor(document,tag='div'){this.ownerDocument=document;this.tagName=tag.toUpperCase();this.children=[];this.dataset={};this.listeners=new Map();this.attributes={};this.className='';this.scrollTop=0;this.hidden=false;this._text='';this.open=false;}
+  set textContent(value){this._text=String(value);this.children=[];}
+  get textContent(){return this._text+this.children.map(child=>child.textContent).join('');}
+  set innerHTML(_){assert.fail('HTML parsing is forbidden');}
+  appendChild(child){this.children.push(child);return child;}
+  replaceChildren(...children){this._text='';this.children=children;}
+  setAttribute(key,value){this.attributes[key]=value;}
+  removeAttribute(key){delete this.attributes[key];}
+  addEventListener(key,handler){this.listeners.set(key,handler);}
+  focus(){this.ownerDocument.activeElement=this;}
+  pause(){this.paused=true;}
+  async play(){this.played=true;}
+  querySelectorAll(selector){return this.children.flatMap(child=>[child,...child.all()]).filter(child=>{
+    const data=selector.match(/\[data-([a-z-]+)(?:="([^"]*)")?\]/);
+    if(data){const key=data[1].replace(/-([a-z])/g,(_,c)=>c.toUpperCase());return Object.hasOwn(child.dataset,key) && (data[2]===undefined || child.dataset[key]===data[2]) && (!selector.startsWith('details') || child.tagName==='DETAILS');}
+    return selector.startsWith('.')?child.className.split(' ').includes(selector.slice(1)):child.tagName===selector.toUpperCase();
+  });}
+  all(){return this.children.flatMap(child=>[child,...child.all()]);}
+  querySelector(selector){return this.querySelectorAll(selector)[0] || null;}
+}
+class Document {
+  constructor(){this.elements=new Map();this.activeElement=null;}
+  createElement(tag){return new Element(this,tag);}
+  getElementById(id){if(!this.elements.has(id)){const el=this.createElement('div');el.id=id;this.elements.set(id,el);}return this.elements.get(id);}
+}
+const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
+function fixture(apiOverrides={}) {
+  const document=new Document();const sessions=new Map(['a','b','c','d'].map(id=>[id,comparisonSession(id)]));
+  const revoked=[];let url=0;const store=createTrainingRecordStore({maxRecords:100,revokeObjectURL:v=>revoked.push(v)});
+  const api={compareTrainingSessions:async cmd=>{try{return {ok:true,value:compareSessions(cmd.sessionIds.map(id=>sessions.get(id)),cmd.snapshots)};}catch(error){return {ok:false,error:{message:error.message,code:error.code}};}},
+    readTrainingAudio:async()=>({ok:true,value:new Uint8Array(44)}),...apiOverrides};
+  const trainer={historyList:document.getElementById('history-list'),navigationGeneration:0,currentScreen:'history',
+    reportBack:document.getElementById('btn-report-back'),releaseSavedRecordCache(){},
+    setScreen(screen){this.currentScreen=screen;this.navigationGeneration++;},
+    getObjectUrlApi:()=>({createObjectURL:()=>`blob:${++url}`,revokeObjectURL:v=>revoked.push(v)}),getTrainingRecordStore:()=>store,
+    showRecord(record,source){this.reportSource=source;this.viewingTrainingRecordId=record.id;this.setScreen('report');store.select(record.id);}};
+  const controller=createComparisonController({trainer,api,document});
+  controller.selection.add('a');controller.selection.add('b');
+  return {document,controller,trainer,api,sessions,store,revoked};
+}
+
+test('later comparison and navigation win over delayed reads without stale UI or data',async()=>{
+  const first=deferred();const {controller,api,document}=fixture();const original=api.compareTrainingSessions;let calls=0;
+  api.compareTrainingSessions=cmd=>++calls===1?first.promise:original(cmd);
+  const old=controller.open();controller.leave(true);controller.selection.add('c');controller.selection.add('d');
+  await controller.open();first.resolve(await original({sessionIds:['a','b']}));await old;
+  assert.equal(controller.context.projection.baseline.session.id,'c');
+  assert.equal(document.getElementById('comparison-screen').dataset.availability,'ready');
+  controller.leave(true);assert.equal(document.getElementById('comparison-content').children.length,0);
+});
+
+test('deleted input during report audio loading cannot be reopened from the comparison cache',async()=>{
+  const audio=deferred();const {controller,trainer,sessions,store}=fixture({readTrainingAudio:()=>audio.promise});
+  await controller.open();const work=controller.openReport('baseline');
+  await new Promise(resolve=>setImmediate(resolve));sessions.delete('a');
+  audio.resolve({ok:false,error:{code:'SESSION_NOT_FOUND'}});await work;
+  assert.equal(trainer.currentScreen,'comparison');assert.equal(store.list().length,0);
+});
+
+test('a pinned comparison survives newly appended reports and failed reloads preserve explicit retry identity',async()=>{
+  const {controller,sessions,document,api}=fixture();await controller.open();
+  const pin=controller.context.projection.baseline.snapshot;
+  const later=comparisonSession('a');for(const run of later.results)run.createdAt='2026-09-21T00:00:00Z';
+  // An unrelated orphan is never used as a replacement.
+  sessions.get('a').results.push({...later.results[1],id:'orphan'});
+  await controller.read();assert.deepEqual(controller.context.projection.baseline.snapshot,pin);
+  api.compareTrainingSessions=async()=>({ok:false,error:{message:'暂时无法读取'}});
+  await controller.read();assert.equal(document.getElementById('comparison-content').children.length,0);
+  assert.equal(document.getElementById('btn-comparison-retry').hidden,false);
+  assert.deepEqual(controller.context.projection.baseline.snapshot,pin);
+});
+
+test('comparison renders hostile content literally and expands side-qualified evidence without semantic claims',()=>{
+  const a=comparisonSession('a'),b=comparisonSession('b');
+  const hostile='<img src=x onerror=alert(1)>';
+  a.results[2].value.findings[0].observation=hostile;
+  const projection=compareSessions([a,b]);const document=new Document();const container=document.createElement('main');
+  let played;
+  renderComparison(container,projection,{onPlay:(role,ref)=>{played={role,ref};}});
+  const category=container.querySelector('[data-detail-key="category-wording"]');category.open=true;category.listeners.get('toggle')();
+  assert.ok(container.textContent.includes(hostile));assert.equal(container.querySelectorAll('img').length,0);
+  assert.match(container.textContent,/暂未建立跨录音问题对应/);
+  const play=category.querySelectorAll('button').find(el=>el.textContent==='播放此处');play.listeners.get('click')();
+  assert.deepEqual(played,{role:'baseline',ref:'segment-1'});
+});
+
+test('a newer evidence playback wins over late audio for the same comparison',async()=>{
+  const left=deferred(),right=deferred();
+  const {controller,document}=fixture({readTrainingAudio:cmd=>cmd.sessionId==='a'?left.promise:right.promise});
+  await controller.open();const content=document.getElementById('comparison-content');
+  const original=role=>{const el=content.querySelector(`[data-detail-key="original-${role}"]`);el.open=true;el.listeners.get('toggle')();return el;};
+  const baseline=original('baseline'),target=original('target');
+  const one=baseline.querySelector('button').listeners.get('click')();await new Promise(resolve=>setImmediate(resolve));
+  const two=target.querySelector('button').listeners.get('click')();await new Promise(resolve=>setImmediate(resolve));
+  right.resolve({ok:true,value:new Uint8Array(44)});await two;
+  left.resolve({ok:true,value:new Uint8Array(44)});await one;
+  assert.equal(target.querySelector('audio').played,true);
+  assert.equal(baseline.querySelector('audio').played,undefined);
+});

@@ -1,6 +1,6 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43；内部开发/测试，M2 已按有限人工验收边界关闭；SenseVoice 下载与实机验收延期，最终证据见 §13；公开模型分发仍受外部门禁约束
+> 状态：Verified from Source + Electron 43；内部开发/测试，M2 已按有限人工验收边界关闭；SenseVoice 下载与实机验收延期，M2 证据见 §13，M3 首版实现与自动化/制品证据见 §14；公开模型分发仍受外部门禁约束
 > 运行时基线日期：2026-09-01；存储基础证据：2026-09-16；M1 产品集成证据：2026-09-19
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`
 > 描述对象：当前集成分支的产品运行时、开发工具边界与已验证的内部安装基线
@@ -318,6 +318,7 @@ Settings/Prompt Renderer 通过 Preload 调用 Main 中的 userData JSON store�
 | appendTrainingResult | 幂等追加已有统计/报告/回放快照，拒绝过期输入版本及已删 Session |
 | listTrainingSessions | 按创建时间和 ID 倒序分页，含状态/模式/有界摘要，不附音频全文 |
 | getTrainingSession | 按 ID 读取事实、结果与完整性，删除/不存在返回 null |
+| compareTrainingSessions | 两条 Session ID 的只读对比；可携带已固定的 Session/revision/Report 引用复核，返回逐项兼容性、差值与所属侧证据；不调用分析或保存 Comparison，详见 §14 |
 | readTrainingAudio | 验证音频完整性和删除状态后返回字节，不暴露任意路径 |
 | deleteTrainingSession | 删除 Session、子项与受管文件；部分失败可重试 |
 
@@ -419,3 +420,18 @@ npm run smoke:package
 人工核验已有 VAD 的入口为只读 [`inspect-speech-evidence.js`](../../scripts/inspect-speech-evidence.js)：读取 Report 精确引用的 Source、校验原 WAV，并导出语音区间、内部 gap、首尾非语音的 sample/秒边界与原始快照；用既有 Common Metric 定义核对已保存汇总。正式 Report、模型参数、持久化 Schema 均未改变。操作方法见 [Development](../development.md#m2-已保存-vad-区间核验)。现有粒度足以复核区间/汇总及当前 Finding 的文本、指标、语音区间引用；仍不提供词级对齐或证明 AI 解释在语义上成立，本轮用户反馈确认 AI Diagnosis 正常，不外推所有推理结论。
 
 本次 Closeout 归档此前未提交的统计输入快照修复、取消/保存刷新修复、HTTP/异常测试及只读 VAD 核验工具，并落盘最终验收决定；本轮未新增实现。M2 正式关闭，人工证据和各项边界只在 [M2 验收矩阵](../milestones/m2-speech-evidence-and-ai-diagnosis.md#acceptance-criteria) 定义。SenseVoice 下载异常与真实 smoke/资源验收（B-23）明确延期；Report UX（B-22）、雷达完整校准（B-20）和扩大 VAD 校准（B-24）为非阻塞后续项，重开条件只见 [Backlog](../product/backlog.md#not-now)。雷达及 VAD 来源的未校准标记保持不变。
+
+## 14. M3 comparison and review
+
+M3 首版按用户选择交付可靠指标变化与两侧证据复盘。实现见 [Comparison Core](../../lib/session-comparison.js)、[共享报告选择](../../shared/report-selection.js) 和 [Comparison Renderer](../../src/comparison.js)；产品与数据规则仍由 Training Flow §13.2–§13.4、Data Model §10.1 定义，自动跨录音 Finding 语义变化判断按 R-R02 / Backlog B-25 延期。
+
+- Application 的 `compare` 经既有主窗口 IPC / Preload 暴露。命令为 `{requestId, sessionIds:[id1,id2], snapshots?}`；固定引用每侧包含 `{sessionId,inputRevision,reportId}`，无结构化报告时 `reportId=null`。重复 ID、额外字段或非法引用拒绝；消失/删除输入返回 `SESSION_NOT_FOUND`，固定版本/报告失效返回 `COMPARISON_STALE`。未新增 SQLite 表或远程调用。
+- Core 与 Report 共用稳定选择函数，并逐侧固定 Session、transcript revision 和精确 Source/Metric/Diagnosis/Report。使用保存输入及已知 V1 定义校验测量，不重新分词、不运行模型、不以今日设置补值或回写历史结果。词表、ASR/VAD 来源、Source 执行状态/producer、分母或引用不满足条件时局部降级；未知不是零，雷达仍不可用。
+- History 增加 0–2 条 checkbox 和显式对比按钮；Comparison 展示两侧身份、Finding 复盘、指标原值/差值/限制与就近按需展开的证据。证据播放经受控音频 API 再次读取；旧记录使用 WAV 音轨时钟，不将历史墙钟时长当作音频终点。
+- 复用既有 Report，返回时恢复原比较快照、展开态、滚动位置与焦点。History 恢复选择/位置；Help 关闭保持对比上下文。异步读取和播放按任务与操作序号隔离；音频读取期间删除再次复核，迟到响应不复活已删记录。离开对比释放播放 URL 和临时投影。
+
+2026-09-19 使用 Node 24.20.0 / npm 11.19.0 执行最终 `npm test`：742 项，740 通过、0 失败、2 项因 Windows 文件符号链接权限跳过。Windows x64 `npm run package` 成功，`npm run smoke:package` 返回 `PACKAGED_APP_SMOKE_OK`。未修改依赖、全局工具链或用户训练数据。
+
+证据包括纯函数 fixture 的版本/来源/单位/词表变化、零分母、旧记录、局部缺损、跨 Framework、Source 失败/未知版本与精确证据归属；Application/IPC 的只读/参数/权限与删除竞态；Renderer 的迟到读取、音频竞态、固定输入、失败重试身份及安全文本。真实 Electron 和包内产品流覆盖两条勾选/取消、显式进入、双方报告入口、对比内音频解码播放、Report 返回原 600px 滚动位置/展开/焦点、Help 返回、重启后的历史和无 AI 配置/断网复盘。源码产品流另验证删除 WAV 后的局部降级。
+
+上述产品流使用隔离 userData、确定性音频与 Fake ASR/LLM；本轮未新增真实麦克风采样或用户人工交互验收，不据此评价真实语义判断、VAD 准确率或跨设备效果。M2 的既有人工结论保持原边界；M3 首版验收映射见 [M3 milestone](../milestones/m3-comparison-and-review.md#acceptance-matrix)。

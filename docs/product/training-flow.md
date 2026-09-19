@@ -416,6 +416,8 @@ M3 的唯一完整对比发起路径是 **History 普通列表 → checkbox 勾�
 
 不同 Framework 仍允许选择并进入 Comparison；[对比] 附近可轻提示“部分结构化指标可能无法直接比较”，不以框架不同替用户禁止选择。具体可比性按 §11 / §13.3 逐项说明。
 
+首版以创建时间较早的 Session 为基线、较晚的为目标；同一时刻按稳定 Session ID 排序。选择顺序不改变角色，Header 始终明示角色，差值为目标减基线。对比仅读取进入时的稳定快照；离开后重新发起才选择当时的快照。
+
 Report 不提供“选择另一条历史记录来对比”的完整 Comparison 发起入口。Report 内针对性练习结果的当前轮/上一轮轻量对比按 §10 保留，它不需要用户从历史选择另一条记录，也不因此变成独立 Comparison 的第二入口。
 
 ### 13.3 Comparison Workspace 信息结构
@@ -430,6 +432,8 @@ Comparison 是固定两个 Session 的完整差异工作区，回答“这两次
 | Metrics Comparison | 展示可用训练事实/指标的两侧值、可解释的差异及必要归一化口径；逐项说明缺失或不可比，不强制每项生成差值 |
 
 Evidence 就近附着在它支持的 Finding 或指标比较项下，按需查看两侧原文、时间位置和可用音频；不设一个脱离比较项的页面尾部 Evidence 总区。无 Finding、AI 不可用或分析不完整时，已有时长、逐字稿、音频及可靠指标仍可比较/查看；分析缺失明确标识，不等于“没有问题”。“不再出现”不能仅由另一侧未分析或证据缺失推断，更不自动等同已经解决。
+
+M3 首版采用可靠指标变化与两侧证据复盘：Analysis Comparison 按类别组织两侧已保存 Finding，明确未建立跨录音问题对应，不自动标注改善、持续或新出现；该能力按 R-R02 / Backlog B-25 延期。打开对比不触发 AI、ASR、VAD 或历史重算。指标变化只陈述观察，不自动评价好坏；雷达继续显示未校准/不可用。旧记录没有结构化分析时仍可查看原文、录音和可用事实。
 
 比较状态与限制遵循 §11；不能以某个可比指标推断整体可比。针对性练习的轻量对比与这里的完整对比共用底层 comparison 概念、证据引用和可比性规则，展示层不同。Application Core 与数据职责分别见 [Target Architecture §7](../architecture/target.md#7-analysis-architecture) 和 [Data Model §10](../architecture/data-model.md#10-comparison-invariants)。
 

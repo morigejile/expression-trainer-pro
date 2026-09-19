@@ -130,7 +130,7 @@ M1 完成录音的音频随 Session 保留至用户明确删除；不按条数�
 | ID | 需求 | Acceptance Criteria | Priority | Status | Target Milestone |
 |---|---|---|---|---|---|
 | R-R01 | 用户可比较两次训练。 | 按 [Training Flow §13.2–§13.4](training-flow.md#132-history-与-comparison--review) 验收 History 的 0–2 条选择与显式对比入口、Comparison 信息结构/可用性、单侧 Report 下钻与上下文恢复、固定比较对象边界；读取生成时稳定快照，复用 [Data Model §10](../architecture/data-model.md#10-comparison-invariants) 的 comparison 约束，能区分可比、需归一化和不可可靠比较，并用证据说明变化与限制。 | P1 | Accepted | M3 |
-| R-R02 | 用户可复盘一次或一组训练。 | 可从问题或建议跳回原文/时间位置；展示已经改善、持续存在和新出现的问题；不把模型版本变化冒充用户进步。 | P1 | Accepted | M3 |
+| R-R02 | 用户可复盘一次或一组训练。 | M3 首版展示可靠指标变化及两侧已保存的 Finding/Evidence，可从问题或建议查看所属原文、时间位置与可用音频；不能建立可靠语义对应时明确限制，不把另一侧未返回 Finding 或模型版本变化解释为问题解决/用户进步。自动判断问题已经改善、持续存在和新出现明确延期至 Backlog B-25，不作为首版验收条件。 | P1 | Accepted；语义变化判断 deferred | M3 首版；扩展见 B-25 |
 | R-R03 | 用户可围绕 Finding 与 AI 直接对话（deferred）。 | 未来优先 Finding-scoped；上下文须声明来源 Session / Report、Finding 及 Evidence，用户可知使用内容；失败不修改事实与分析，会话可继续查看和删除。当前不新增通用 Chat Screen；重开见 Backlog B-17 / D-05。 | P1 | Not Now | M3 候选，重开后排期 |
 | R-R04 | 用户可查看长期趋势（deferred）。 | Common 指标可跨训练方式形成趋势，但仅比较定义一致的指标；framework-specific 趋势按 framework 分组；版本变化时重新计算或分段展示；没有足够样本时不声称趋势；当前不新增 Progress Screen / 一级导航，重开见 Backlog B-16。 | P2 | Not Now | M3 候选，重开后排期 |
 

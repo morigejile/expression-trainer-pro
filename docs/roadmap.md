@@ -31,7 +31,7 @@ flowchart LR
   U1 --> U2[ASR-U02 FireRedASR2]
 ```
 
-M1 持久化及 M2 稳定快照已构成后续基础。M2 已完成最终 Closeout，默认真实录音/播放/恢复、有限 VAD/Evidence 和真实 AI E2E 验收通过，详见 M2 矩阵。SenseVoice 下载及实机验收按 B-23 延期，不再作为 M2 → M3 的门禁；M3 可进入下一阶段，既有设计草案保持独立。ASR-M04 公开再分发许可、签名及扩展设备/平台资格仍独立跟进。
+M1 持久化及 M2 稳定快照已构成后续基础。M2 已完成最终 Closeout，默认真实录音/播放/恢复、有限 VAD/Evidence 和真实 AI E2E 验收通过，详见 M2 矩阵。SenseVoice 下载及实机验收按 B-23 延期，不再作为 M2 → M3 的门禁；M3 首版指标与证据复盘已实现并通过自动化/制品验证，边界见 Current §14。ASR-M04 公开再分发许可、签名及扩展设备/平台资格仍独立跟进。
 
 ## 3. 已完成基线
 
@@ -89,6 +89,10 @@ M0 的 Complete 记录上述历史完成事件；[当时的审查](archive/revie
 | OPS-04 | P1 | Planned | 模型生命周期 | 定义 current/deprecated/removed、兼容期和回退 |
 | OPS-06 | P2 | Deferred | 自动更新评估 | 至少两个稳定手工发布后用 ADR 决定是否采用 |
 
+### 4.5 M3 comparison and review
+
+M3 首版已完成可靠指标变化、两侧 Finding/Evidence 复盘与 History → Comparison → Report。D-13 已按 [Data Model §10.1](architecture/data-model.md#101-m3-compatibility) 关闭；验收映射见 [M3 milestone](milestones/m3-comparison-and-review.md)，执行证据及人工/设备限制见 [Current §14](architecture/current.md#14-m3-comparison-and-review)。自动跨录音 Finding 语义变化判断明确延期至 B-25；首版不新增远程比较调用。
+
 ## 5. 里程碑
 
 | 里程碑 | 状态 | 包含 | 结果 |
@@ -96,14 +100,14 @@ M0 的 Complete 记录上述历史完成事件；[当时的审查](archive/revie
 | M0 Architecture & Requirements Baseline | Complete | Gap、Requirements、Data Model、Training Flow、Speech Contract、Target、Backlog、M1、Consistency Review | M1 有稳定、可追踪的实施边界 |
 | M1 Training Persistence | Implementation complete / default-path manual evidence accepted | R-P01～R-P09 | 默认录音、播放与保存恢复已在本轮 M2 人工验收确认；扩展设备限制见 Current，未单独新增 M1 Closeout |
 | M2 Speech Evidence & AI Diagnosis | **Complete — 2026-09-19** | R-A01～R-A11（R-A10 实机验收明确延期） | [M2 最终验收](milestones/m2-speech-evidence-and-ai-diagnosis.md#acceptance-criteria) 通过，最终回归与制品证据见 Current §13；B-20/B-22/B-23/B-24 不阻塞 Closeout，可进入 M3 |
-| M3 Comparison & Review | Planned | R-R01～R-R02；R-R03/R-R04 deferred | 按 [Training Flow §13.2–§13.4](product/training-flow.md#132-history-与-comparison--review) 交付 History 发起的 Comparison 与 Report 下钻返回；Comparison Compatibility 细化见 D-13；趋势与 Finding-scoped AI 对话按 B-16/B-17 重开，不作为当前 Comparison 完成依赖 |
+| M3 Comparison & Review | First release implemented / automated and packaged verification passed | R-R01～R-R02 首版；语义变化判断 B-25、R-R03/R-R04 deferred | [M3 首版验收](milestones/m3-comparison-and-review.md#acceptance-matrix) 与 [Current §14](architecture/current.md#14-m3-comparison-and-review) 记录实际证据；未新增用户人工验收。趋势、Finding 对话和自动问题变化按 B-16/B-17/B-25 重开，不作为首版完成依赖 |
 | M4 Structured Training | Planned | R-F01～R-F08 | Free/Structured 选择、PREP/STAR/Pyramid、Framework Analysis 与问题重练闭环（复用 M3 比较能力；重练不强制选择框架） |
 | Streaming ASR public delivery | In progress | ASR-M01～M04（含 M04a 内部资格） | 已完成部分见 §3；剩余公开交付任务及门槛见 §4.2；这是并行交付轨道，不占用产品里程碑编号 |
 | Public desktop delivery | External gate | PKG-05、PKG-06 | 签名、许可和目标平台证据满足公开发布；这是外部门禁，不是 M4 的后续产品里程碑 |
 
 ## 6. 明确不做
 
-当前阶段排除项见 [M1 Out of Scope](milestones/m1-training-persistence.md#out-of-scope) 与 [M2 Out of Scope](milestones/m2-speech-evidence-and-ai-diagnosis.md#out-of-scope)；长期暂缓事项与重开条件只由 [Backlog](product/backlog.md#not-now) 维护。不得因排期或文档整理新增产品/技术范围。
+当前阶段排除项见 [M1 Out of Scope](milestones/m1-training-persistence.md#out-of-scope)、[M2 Out of Scope](milestones/m2-speech-evidence-and-ai-diagnosis.md#out-of-scope) 与 [M3 Out of Scope](milestones/m3-comparison-and-review.md#out-of-scope)；长期暂缓事项与重开条件只由 [Backlog](product/backlog.md#not-now) 维护。不得因排期或文档整理新增产品/技术范围。
 
 ## 7. 外部跟进
 

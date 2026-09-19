@@ -70,6 +70,7 @@ const ASR_LOADING_MESSAGE = '语音模型加载中，预计数秒至数分钟（
 
 const Persistence = typeof module !== 'undefined' && module.exports ? require('./training-persistence') : window.TrainingPersistence;
 const StructuredReport = typeof module !== 'undefined' && module.exports ? require('./structured-report') : window.StructuredReport;
+const SessionComparison = typeof module !== 'undefined' && module.exports ? require('./comparison') : window.SessionComparison;
 const {checkMicrophoneReadiness} = typeof module !== 'undefined' && module.exports ? require('./microphone-readiness') : window.MicrophoneReadiness;
 
 class ExpressionTrainer {
@@ -123,6 +124,7 @@ class ExpressionTrainer {
     this.microphoneState = 'checking';
     this.historyOffset = 0;
     this.initElements();
+    this.comparison = SessionComparison.createComparisonController({trainer:this,api:window.api,document});
     this.bindEvents();
     if (!this.showFirstRunHelp()) void this.showFirstRunRecordingPolicy();
     void this.prepareSpeechModel();
@@ -187,7 +189,8 @@ class ExpressionTrainer {
     document.getElementById('btn-history')?.addEventListener('click', () => this.showHistory());
     document.getElementById('btn-history-start')?.addEventListener('click', () => this.showTraining());
     this.historyMore?.addEventListener('click', () => this.loadHistory(true));
-    this.reportBack?.addEventListener('click', () => this.showHistory({restore:true}));
+    this.reportBack?.addEventListener('click', () => this.reportSource === 'comparison'
+      ? this.comparison.restore() : this.showHistory({restore:true}));
     this.retrySave?.addEventListener('click', () => this.retryTrainingSave());
     this.btnStart.addEventListener('click', () => this.startRecording());
     this.btnPause.addEventListener('click', () => this.pauseRecording());
@@ -1471,6 +1474,7 @@ class ExpressionTrainer {
 
   showTraining() {
     if (this.isRecording || this.asrStartAttempt || this.recordingStopOperation) return;
+    this.comparison?.leave(true);
     this.audioPlayer?.pause?.();
     this.viewingTrainingRecordId = null;
     this.releaseSavedRecordCache();
@@ -1484,7 +1488,8 @@ class ExpressionTrainer {
     this.reportSource = source;
     this.selectTrainingRecord(record.id);
     this.setScreen('report');
-    this.reportBack?.classList.toggle('hidden', source !== 'history');
+    this.reportBack?.classList.toggle('hidden', !['history','comparison'].includes(source));
+    if (this.reportBack) this.reportBack.textContent = source === 'comparison' ? '← 返回对比' : '← 训练历史';
     if (!record.structuredReport) this.reportAiStatus && (this.reportAiStatus.textContent = record.reportStatus === 'failed' ? '上次 AI 报告生成失败，可重试；已有结果保留。' : '');
     const structuredAnalysis = record.factsSaved && typeof window.api.analyzeTrainingSession === 'function';
     this.btnReport.disabled = Boolean(record.reportPending) || !record.fullText.trim() ||
@@ -1505,13 +1510,15 @@ class ExpressionTrainer {
 
   async showHistory({restore = false} = {}) {
     if (this.isRecording || this.asrStartAttempt || this.recordingStopOperation) return;
+    this.comparison?.leave(!restore);
     this.audioPlayer?.pause?.();
     this.releaseSavedRecordCache();
     this.setScreen('history');
     if (restore && this.historyList?.children.length) {
       const area = document.getElementById('history-screen');
       area.scrollTop = this.historyScroll || 0;
-      this.historyList.querySelector(`[data-record-id="${this.historyOpenedId}"]`)?.focus();
+      if (this.historyReturnFocus) document.getElementById(this.historyReturnFocus)?.focus({preventScroll:true});
+      else this.historyList.querySelector(`[data-record-id="${this.historyOpenedId}"]`)?.focus({preventScroll:true});
       return;
     }
     await this.loadHistory();
@@ -1528,6 +1535,7 @@ class ExpressionTrainer {
       if (!response?.ok) throw new Error(response?.error?.message || '无法读取训练历史');
       for (const item of response.value) {
         const row = document.createElement('div'); row.className = 'history-row';
+        this.comparison?.addChoice(row,item);
         const open = document.createElement('button'); open.className = 'history-row-main'; open.dataset.recordId = item.id;
         const state = item.deletionPending ? '删除未完成' : ({completed:'已保存',incomplete:'未完成',corrupt:'记录损坏',recording:'录音中',finalizing:'保存中'}[item.status] || item.status);
         open.textContent = `${new Date(item.createdAt).toLocaleString()} · ${Math.round((item.durationMs || 0)/1000)} 秒 · 自由表达 · ${state}${item.summary ? '\n'+item.summary : ''}`;
@@ -1537,6 +1545,7 @@ class ExpressionTrainer {
         row.appendChild(open); row.appendChild(remove); this.historyList.appendChild(row);
       }
       this.historyOffset += response.value.length;
+      this.comparison?.syncSelection();
       this.historyStatus.textContent = this.historyOffset ? '' : '暂无训练记录。完成一次表达后会自动保存在这里。';
       this.historyMore.classList.toggle('hidden',response.value.length < 50);
       document.getElementById('btn-history-start')?.classList.toggle('hidden',this.historyOffset > 0);
@@ -1550,6 +1559,7 @@ class ExpressionTrainer {
     const navigation = this.navigationGeneration;
     this.historyScroll = document.getElementById('history-screen')?.scrollTop || 0;
     this.historyOpenedId = id;
+    this.historyReturnFocus = null;
     try {
       let record = this.getTrainingRecordStore().list().find(item => item.id === id);
       if (!record || record.saveState === 'saved') {
@@ -1578,6 +1588,7 @@ class ExpressionTrainer {
     if (!response?.ok) { this.historyStatus.textContent = response?.error?.message || '删除失败，请重试'; return; }
     this.deletedSessionIds ||= new Set();
     this.deletedSessionIds.add(id);
+    this.comparison?.remove(id);
     this.navigationGeneration = (this.navigationGeneration || 0) + 1;
     const record = this.getTrainingRecordStore().list().find(item => item.id === id);
     if (record) record.deleted = true;
