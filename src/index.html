@@ -97,7 +97,25 @@
         <div id="comparison-content"></div>
       </section>
 
-      <div id="training-context" class="training-context">自由表达</div>
+      <div id="training-context" class="training-context">
+        <p id="training-context-label">自由表达</p>
+        <h1 id="training-setup-title" class="visually-hidden" tabindex="-1">表达准备</h1>
+        <p id="training-practice-focus" class="practice-focus" hidden></p>
+        <div id="training-settings" class="training-settings">
+          <button id="training-settings-anchor" class="training-settings-anchor" type="button" aria-label="练习设置" aria-expanded="false" aria-controls="training-capsules" title="练习设置"><span aria-hidden="true"></span></button>
+          <div id="training-capsules" class="training-capsules" hidden>
+            <button id="training-framework" class="training-capsule" type="button" aria-label="选择表达框架" aria-haspopup="dialog" aria-expanded="false" aria-controls="training-picker">自由表达</button>
+            <button id="training-topic" class="training-capsule" type="button" aria-label="选择主题" aria-haspopup="dialog" aria-expanded="false" aria-controls="training-picker">主题 · 可选</button>
+            <button id="training-scenario" class="training-capsule" type="button" aria-label="选择场景" aria-haspopup="dialog" aria-expanded="false" aria-controls="training-picker">场景 · 可选</button>
+          </div>
+        </div>
+        <section id="training-picker" class="training-picker" popover="auto" role="dialog" aria-labelledby="training-picker-title">
+          <header class="training-picker-header"><h2 id="training-picker-title" tabindex="-1"></h2><button id="training-picker-close" type="button" aria-label="关闭选项">×</button></header>
+          <p id="training-picker-hint" class="training-picker-hint"></p>
+          <div id="training-picker-content"></div>
+        </section>
+        <p id="training-context-status" role="status" aria-live="polite"></p>
+      </div>
 
       <header id="report-header" class="report-header">
         <button id="btn-report-back" class="btn-support btn-support-secondary hidden" type="button">← 训练历史</button>
@@ -188,7 +206,7 @@
           <li>流式模型每次最长 20 分钟，整段识别模型最长 5 分钟；记录不会因为数量增加而自动淘汰；</li>
           <li>原始录音留在本机，用于回放和字幕同步，不发送给远程 AI；</li>
           <li>本地统计可离线使用；语音活动模型首次需要联网安装。自动 AI 诊断须在设置中明确启用，回放分析由你主动发起；</li>
-          <li>使用已启用的远程 AI 时，会发送本次逐字稿、片段标识与时间、语音区间、质量状态、统计指标和分析指令；不会发送原始录音。</li>
+          <li>使用已启用的远程 AI 时，会发送本次逐字稿、片段标识与时间、语音区间、质量状态、统计指标、分析指令、可选题目和所选框架；针对性练习还会发送目标与上一轮转写用于比较，不发送原始录音或无关历史。</li>
         </ul>
         <div class="recording-policy-actions">
           <button id="btn-recording-policy-cancel" class="btn-support btn-support-secondary">暂不录音</button>
@@ -232,7 +250,7 @@
             <li>流式模型每次最长 20 分钟，整段识别模型最长 5 分钟；记录不会因为数量增加而自动淘汰；</li>
             <li>原始录音留在本机，用于回放和字幕同步，不发送给远程 AI；</li>
             <li>本地统计可离线使用；语音活动模型首次需要联网安装。自动 AI 诊断须在设置中明确启用，回放分析由你主动发起；</li>
-            <li>使用已启用的远程 AI 时，会发送本次逐字稿、片段标识与时间、语音区间、质量状态、统计指标和分析指令；不会发送原始录音。</li>
+            <li>使用已启用的远程 AI 时，会发送本次逐字稿、片段标识与时间、语音区间、质量状态、统计指标、分析指令、可选题目和所选框架；针对性练习还会发送目标与上一轮转写用于比较，不发送原始录音或无关历史。</li>
           </ul>
         </section>
 
@@ -253,6 +271,8 @@
   <script src="../shared/expression-rules.js"></script>
   <script src="../shared/text-statistics.js"></script>
   <script src="../shared/support-links.js"></script>
+  <script src="../shared/training-frameworks.js"></script>
+  <script src="../shared/training-context.js"></script>
   <script src="safe-rendering.js"></script>
   <script src="asr-event-state.js"></script>
   <script src="audio-capture.js"></script>
@@ -260,8 +280,10 @@
   <script src="pcm-wav.js"></script>
   <script src="training-records.js"></script>
   <script src="../shared/report-selection.js"></script>
+  <script src="practice-report.js"></script>
   <script src="structured-report.js"></script>
   <script src="training-persistence.js"></script>
+  <script src="training-setup.js"></script>
   <script src="comparison.js"></script>
   <script src="microphone-readiness.js"></script>
   <script src="appearance.js"></script>

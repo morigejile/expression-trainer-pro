@@ -96,13 +96,17 @@ Field names in this M1 section are logical domain names. Implemented SQL/storage
 
 Training Workspace 的 Preparing / Recording / Processing，以及 Report / Comparison 的可用性是展示或任务结果状态，不直接映射为 Session 持久化状态。报告分析超时或局部失败不能把已完成、已保存的 Session 改成 incomplete/corrupt；保存失败也不能被 Report 状态掩盖。重试基于同一 Session 追加版本化结果，不重复创建训练事实。
 
-`TrainingPromptSnapshot` has only the fields needed to reproduce the user-visible topic/scenario context:
+`TrainingPromptSnapshot` 为可空的版本化上下文。当前编辑产生 v2，分别保存主题和场景：
 
 | Field | Type/shape | Rule |
 |---|---|---|
-| `source` | `user` \| `generated` | Who supplied the training prompt; absence is represented by `trainingPrompt = null` |
-| `kind` | `topic` \| `scenario` | What kind of context was supplied |
-| `text` | non-empty text | Exact text shown for this session |
+| `schemaVersion` | `2` | 训练上下文载荷版本，不等于 SQLite/Session schema |
+| `topic` | `{source, text}` or null | 本次讲什么；独立保留主题来源与完整文本 |
+| `scenario` | `{source, text}` or null | 向谁、在什么情况下表达；独立保留场景来源与完整文本 |
+
+每一项的 `source` 为 `user` / `bank` / `generated`；M4 首版产生 user/bank，generated 保留兼容。每项文本独立限制为 2000 个字符并保留原始非空内容；编辑时清空或仅有空白表示该项为 null，两项皆空时整个 `trainingPrompt = null`。不接受未知版本、多余字段或无效来源。
+
+兼容早期未带版本的 `{source, kind, text}`，其中 kind 为 topic/scenario。读取与重分析保留原形，不改写旧记录；准备界面将它映射到对应胶囊，修改任一主题/场景后使用 v2。准备偏好只在实际采用该上下文创建录音记录后更新，独立于 Session 删除；偏好恢复/写入失败不使录音事实失效，也不阻止无题目开始。
 
 The consistency rules are:
 
@@ -114,7 +118,7 @@ trainingPrompt             -> independent of trainingMode and framework
 
 产品中的 Training Context（主题/场景）对应可空的 `trainingPrompt`，Practice Focus 是本轮练习目标；来自 Finding 时通过 §6 的来源关系识别。二者正交，Finding 标题不能写入 `trainingPrompt` 代替主题，空主题也不妨碍保留练习目标。`trainingMode`/framework、分析指令继续保持各自独立语义；不新增平行的题目或 Focus 事实副本。
 
-上次 Framework / Topic / Scenario 配置属于可复用的准备偏好，恢复行为由 [Training Flow §3.1](../product/training-flow.md#31-默认状态) 定义；它不是当前 Session 的事实引用。Practice Focus 由 §6 的 Finding / 练习链来源识别，不进入普通上次配置。新 Session 开始时复制实际采用的上下文快照，之后偏好或来源变化不得改写旧事实。当前 `TrainingPromptSnapshot` 是逻辑示意，M4 若同时提供 Topic 与 Scenario 须完整保留二者语义及来源，具体表示待实施细化，不提前扩张 M1 schema。
+上次 Framework / Topic / Scenario 配置属于可复用的准备偏好，恢复行为由 [Training Flow §3.1](../product/training-flow.md#31-默认状态) 定义；它不是当前 Session 的事实引用。Practice Focus 由 §6 的 Finding / 练习链来源识别，不进入普通上次配置。新 Session 开始时复制实际采用的上下文快照，之后偏好或来源变化不得改写旧事实。
 
 The setup values may change while the UI is preparing a session. Once recording begins, the session snapshots and freezes `trainingMode`, `framework`, `frameworkDefinitionVersion`, and `trainingPrompt`. M1 exposes no topic/scenario input, so every M1 session uses `trainingPrompt = null`; the nullable field is reserved for the accepted M4 flow rather than produced early.
 
@@ -315,9 +319,13 @@ AI 解释已测事实，不重算时长、频次、比例或给出雷达/总分�
 - 每次继续练习/重练均创建新的 `TrainingSession`，包括句子/片段/完整表达范围的 Free 重练；自动保存新事实与新结果，不复用源 Session identity，不覆盖原表达、原分析或此前 attempts。
 - Finding-aware 重练的新 Session 必须持久化来源 Session 与来源 Finding 的关系。Finding 引用应能定位其所属来源 Session 和分析结果/版本，不能仅靠显示名称或当前页面状态识别。
 - 来源关系记录训练意图与前后关联，独立于 `trainingMode`、framework 和训练题目，不产生独立 Session 类型；继承的准备值在新 Session 开始时形成它自己的事实快照，不引用一个可变的源上下文替代快照。继承与用户调整流程由 [Training Flow §9](../product/training-flow.md#9-带上下文再次进入-training-workspace) 定义。History 不展示上/下游报告不取消这些关系或持久化义务。
-- 此处冻结逻辑关系和持久化义务，不提前冻结 SQL 字段或新建 M1 重练表。Practice Chain 的产品语义由 [Training Flow §10.2](../product/training-flow.md#102-多轮练习历程) 定义；数据关系需支持恢复目标、轮次与相邻比较双方，不能只按时间邻近或 Finding 显示名推测。是否引入独立实体及其关系表达见 §12。
-- Session identity 不等于链成员 identity；不得用“每个 Session 只能属于一条链”的存储约束排除同一 Session 在不同练习目标下的角色。跨轮 Finding 关联须保留各自分析版本/证据引用，而非要求重用同一 Finding ID。来源记录删除后的引用与历程降级语义仍待细化，不得把持久化关系退回为可选 UI 参数。
+- Practice Chain 的产品语义由 [Training Flow §10.2](../product/training-flow.md#102-多轮练习历程) 定义。M4 用每轮不可变的 `practice` 关系快照恢复目标、轮次和前轮，不新增通用链实体。快照含 `chainId`、`round`、`scope`、`goal`（来源观察/建议/类别）、`origin`（来源 Session/Report/Analysis/Finding ID 与定义版本）、`previousSessionId` / `previousReportId`，以及按轮次排列的 `history`（Session/Report ID、轮次）。第一轮为基准；历史只存定位元数据，不复制来源录音或逐字稿。Main 从真实已保存的来源 Finding 构造快照，不接受 Renderer 自报轮次或链事实。
+- Session identity 不等于链成员 identity：某记录可在旧链是末轮，同时被新链历史引用为第 1 轮。沿当前目标继续时保留链和 origin，更新相邻 Session/Report 引用；改选 Finding 新建链。来源删除后保留最小定位元数据及本轮练习目标，不级联后续练习；缺失来源按 Flow §10.2 降级，不能用另一条记录补位。
 - Training-time Guidance is framework-definition content shown before a session. Post-training Framework Analysis is versioned derived output. They may share a definition but not a storage record or UI responsibility.
+
+M4 的专项结果嵌入不可变 `diagnosis.value.frameworkAnalysis`，记录 framework、definitionVersion、summary 和带引用的 findings，复用所属 run 的 status/analyzerVersion/inputRevision。`analysisTarget` 与 Session 的训练方式分开；显式框架重分析追加 Diagnosis / Report snapshot，复用已有 Speech Evidence / Common Analysis 的确切 ID。Free 推荐记录在 `frameworkRecommendation`，只提供选择建议。
+
+针对性练习的 `practiceFeedback` 保存状态、结论、前一轮和本轮转写引用；非 unavailable 结论必须两侧有证据。它只回答已选目标，不承担 B-25 的任意历史 Finding 自动对应。删除来源后既有派生快照保持不可变，展示时检查引用可用性并降级，不能把不可复核的历史结论继续作为当前改善证明。
 
 ## 7. Persistence boundary
 
@@ -417,4 +425,4 @@ M3 首版依据可靠指标解释客观变化，两侧 Findings 保留来源与 
 - 后续容量提醒的统计/计量、检测与提醒档位状态细节见 Backlog D-01；提醒原则已在 Requirements §9.1 确认，M1 继续保留音频直到明确删除。
 - Whether transcript correction is included in a later milestone; M1 treats the completed transcript as revision 1.
 
-- Practice Chain 的实体选择与关系表达：是否独立建模，或由来源关系恢复链/轮次；M4 闭环实现前依据 Training Flow §10.2 的产品语义决定，M3 comparison 不依赖先建链表。还需细化跨轮 Finding/目标关联、来源删除后的引用与历程降级；不在本轮锁定表或字段。
+- D-12 已在 M4 按 §6 的来源关系快照收口，不再作为开放决策；独立通用链实体没有当前需求，不预建。

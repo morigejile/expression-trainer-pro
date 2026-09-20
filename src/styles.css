@@ -813,28 +813,66 @@ body[data-screen="training"][data-training-state="processing"] .layout {
   grid-template-rows: auto minmax(0, 1fr);
   grid-template-areas: "header" "stage";
 }
+/* Preparing keeps its primary action fixed while the optional settings float. */
+body[data-screen="training"][data-training-state="preparing"] .main-area {
+  position: relative; display: grid; place-items: center; overflow: hidden;
+  padding: 24px; border: 0; -webkit-app-region: no-drag;
+}
+:root[data-layout="focus-hud"] body[data-screen="training"][data-training-state="preparing"] .main-area { border: 0; }
 body[data-screen="training"][data-training-state="preparing"] .training-context {
-  display: block;
-  color: var(--color-text-muted);
-  font-size: 14px;
-  margin-top: clamp(36px, 12vh, 140px);
-  text-align: center;
+  display: block; position: absolute; width: min(620px, calc(100% - 40px));
+  top: calc(50% - 126px); left: 50%; transform: translateX(-50%);
+  font-size: 14px; line-height: 1.65;
 }
-body[data-screen="training"][data-training-state="preparing"] .start-control-area,
-body[data-screen="training"][data-training-state="processing"] .start-control-area {
-  margin-block: auto;
-  padding: 28px 16px;
+body[data-screen="training"][data-training-state="preparing"] .start-control-area {
+  grid-area: 1 / 1; width: min(100%, 600px); margin: 0; padding: 0; z-index: 1;
 }
-body[data-screen="training"][data-training-state="preparing"] .operation-status {
-  color: var(--color-text-subtle);
-  line-height: 1.7;
-  max-width: 560px;
-  margin-inline: auto;
-}
-body[data-screen="training"][data-training-state="preparing"] .btn-start {
-  padding: 13px 30px;
-  border-radius: 28px;
-}
+body[data-screen="training"][data-training-state="preparing"] .action-bar { padding: 10px 0 0; }
+body[data-screen="training"][data-training-state="processing"] .start-control-area { margin-block: auto; padding: 28px 16px; }
+.training-context { width: min(100%, 600px); margin-inline: auto; overflow-wrap: anywhere; }
+#training-context-label { margin: 0 0 10px; white-space: pre-wrap; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+body[data-training-state="preparing"] #training-context-label { display: none; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.training-settings { position: relative; width: fit-content; margin-inline: auto; z-index: 2; }
+.training-settings-anchor { display: block; width: 80px; height: 32px; padding: 0; margin-inline: auto; border: 0; background: transparent; cursor: pointer; border-radius: 16px; }
+.training-settings-anchor span { display: block; width: 32px; height: 4px; margin-inline: auto; border-radius: 4px; background: var(--color-text-subtle); opacity: .65; transition: background-color 140ms ease, opacity 140ms ease; }
+.training-settings-anchor:hover span, .training-settings-anchor:focus-visible span, .training-settings-anchor[aria-expanded="true"] span { background: var(--color-accent); opacity: 1; }
+.training-capsules { display: flex; align-items: center; justify-content: center; gap: 8px; position: absolute; top: 100%; left: 50%; transform: translateX(-50%); width: max-content; max-width: min(620px, calc(100vw - 48px)); padding-top: 4px; }
+.training-capsules[hidden] { display: none; }
+.training-capsule { min-width: 0; max-width: 210px; min-height: 36px; padding: 7px 14px; border-radius: 24px; border: 1px solid var(--color-border); background: var(--color-surface); color: var(--color-text-muted); font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.training-capsule::after { content: '⌄'; margin-left: 8px; color: var(--color-text-subtle); }
+.training-capsule:hover, .training-capsule[aria-expanded="true"] { border-color: var(--color-accent); color: var(--color-text); }
+.training-picker { position: fixed; inset: auto; margin: 0; width: min(360px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow-y: auto; padding: 18px; border: 1px solid var(--color-border); border-radius: 14px; color: var(--color-text); background: var(--color-surface-raised); box-shadow: var(--shadow-panel); font-size: 14px; line-height: 1.65; -webkit-app-region: no-drag; overflow-wrap: anywhere; }
+.training-picker::backdrop { background: transparent; }
+.training-picker-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.training-picker-header h2 { font-size: 16px; font-weight: 600; }
+.training-picker-header h2:focus { outline: none; }
+#training-picker-close { flex-shrink: 0; width: 30px; height: 30px; border: 0; border-radius: 50%; color: var(--color-text-muted); background: transparent; cursor: pointer; font-size: 22px; }
+#training-picker-close:hover { background: var(--color-surface); }
+.training-picker-hint { margin: 6px 0 14px; font-size: 12px; color: var(--color-text-muted); }
+.picker-options { list-style: none; margin: 0 0 10px; padding: 0; }
+.picker-option { display: flex; align-items: center; gap: 6px; border-radius: 8px; margin-block: 3px; }
+.picker-option-select { display: flex; justify-content: space-between; align-items: center; flex: 1; min-width: 0; gap: 12px; text-align: left; padding: 9px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--color-text); cursor: pointer; font: inherit; }
+.picker-option-select:hover, .picker-option-select[aria-pressed="true"] { background: var(--color-surface); }
+.picker-check { color: var(--color-accent); }
+.picker-help { width: 30px; height: 30px; flex-shrink: 0; border: 1px solid var(--color-border); border-radius: 50%; color: var(--color-text-muted); background: transparent; font: inherit; font-size: 12px; cursor: pointer; }
+.picker-help:hover { color: var(--color-text); border-color: var(--color-accent); }
+.picker-action { padding: 8px 12px; min-height: 36px; border: 1px solid var(--color-border); border-radius: 8px; background: var(--color-surface); color: var(--color-text); font: inherit; font-size: 13px; cursor: pointer; }
+.picker-action:hover { border-color: var(--color-accent); }
+.picker-primary { background: var(--color-accent); border-color: var(--color-accent); color: var(--color-accent-contrast); }
+.picker-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.picker-structure { font-weight: 500; }
+.picker-description { margin: 12px 0; }
+.picker-example { margin: 12px 0 18px; padding-left: 12px; border-left: 2px solid var(--color-accent); color: var(--color-text-muted); }
+#training-custom-text { display: block; width: 100%; min-height: 112px; max-height: 220px; resize: vertical; border: 1px solid var(--color-border); border-radius: 8px; padding: 10px 12px; color: var(--color-text); background: var(--color-surface); font: inherit; line-height: 1.65; -webkit-app-region: no-drag; }
+#training-context-status { position: absolute; top: 170px; left: 0; right: 0; color: var(--color-text-muted); font-size: 12px; text-align: center; }
+#training-context-status:empty { display: none; }
+body[data-training-state="preparing"] #training-practice-focus:not([hidden]) { position: absolute; left: 0; right: 0; bottom: 48px; max-height: 120px; overflow-y: auto; font-size: 13px; background: var(--color-panel); }
+body[data-training-state="recording"] #training-settings { display: none; }
+body[data-screen="training"][data-training-state="recording"] .training-context { display: block; font-size: 12px; color: var(--color-text-muted); }
+.record-identity { overflow-wrap: anywhere; white-space: pre-wrap; }
+body[data-screen="training"][data-training-state="preparing"] .operation-status { color: var(--color-text-subtle); font-size: 13px; text-align: center; line-height: 1.7; max-width: 560px; margin-inline: auto; }
+body[data-screen="training"][data-training-state="preparing"] .btn-start { padding: 13px 30px; border-radius: 28px; }
 body[data-screen="training"][data-training-state="preparing"] .btn-start .btn-label { font-size: 16px; }
 body[data-screen="history"] .history-screen { display: block; }
 body[data-screen="comparison"] .comparison-screen { display: block; }
@@ -918,3 +956,33 @@ body[data-screen="report"] .subtitle-line { font-size: clamp(18px, 1.6vw, 26px);
   body[data-screen="report"] .playback-controls audio { grid-column: 1 / -1; }
   .history-row { align-items: flex-start; flex-direction: column; }
 }
+.framework-guidance {
+  line-height: 1.65;
+  color: var(--color-text-muted);
+  background: var(--color-panel);
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  padding: 16px 18px;
+  margin-top: 14px;
+}
+.framework-structure { color: var(--color-text); font-weight: 500; margin-top: 5px; }
+.framework-guidance details { margin-top: 10px; font-size: 14px; }
+.framework-guidance summary { cursor: pointer; width: fit-content; padding: 3px 0; }
+.framework-guidance summary:focus-visible, #training-prompt-editor > summary:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; border-radius: 3px; }
+.framework-guidance details p { margin-top: 10px; }
+.framework-guidance blockquote { margin-top: 12px; padding-left: 12px; border-left: 2px solid var(--color-accent); }
+.practice-focus, .practice-result { border: 1px solid var(--color-border); border-radius: 10px; padding: 12px; }
+.practice-result { display: grid; gap: 12px; }
+.practice-scope-label { display: inline-flex; align-items: center; gap: 6px; margin: 10px 12px 10px 0; }
+.practice-round { border-bottom: 1px solid var(--color-border); padding: 8px 0; }
+.practice-result details > summary, .framework-reanalysis > summary { cursor: pointer; padding: 8px 0; }
+.practice-evidence audio { display: block; max-width: 100%; margin: 12px 0; }
+.structured-report button, .structured-report select {
+  font: inherit; color: var(--color-text); background: var(--color-surface);
+  border: 1px solid var(--color-border); border-radius: 6px; padding: 6px 10px;
+}
+.structured-report button { cursor: pointer; margin-right: 6px; }
+.structured-report button:disabled { cursor: default; opacity: .55; }
+body[data-training-state="recording"] #training-framework,
+body[data-training-state="recording"] label[for="training-framework"],
+body[data-training-state="recording"] #training-framework-guidance { display: none; }

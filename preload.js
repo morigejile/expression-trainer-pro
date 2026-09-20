@@ -42,7 +42,9 @@ contextBridge.exposeInMainWorld('api', {
 
   // 训练记录：稳定 ID 与有界完成 WAV，绝对路径/SQL 不跨边界。
   createTrainingSession: command => ipcRenderer.invoke('training-session:create', command),
+  getTrainingSetup: command => ipcRenderer.invoke('training-session:getSetup', command),
   analyzeTrainingSession: command => ipcRenderer.invoke('training-session:analyze', command),
+  getPracticeHistory: command => ipcRenderer.invoke('training-session:practiceHistory', command),
   cancelTrainingAnalysis: command => ipcRenderer.invoke('training-session:cancelAnalysis', command),
   finalizeTrainingSession: command => ipcRenderer.invoke('training-session:finalize', command),
   listTrainingSessions: command => ipcRenderer.invoke('training-session:list', command),

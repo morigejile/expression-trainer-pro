@@ -38,6 +38,56 @@ test('completed facts receive immutable local evidence and metric/report snapsho
   await analyzer.close();
 });
 
+test('explicit framework reanalysis reuses saved evidence and appends results without changing original training facts', async t => {
+  const {createSessionAnalysis} = require('../lib/session-analysis');
+  const {store,id} = await fixture(t);
+  let calls = 0;
+  const frameworks = [];
+  const analyzer = createSessionAnalysis({store,runSpeechEvidence:async () => {calls++;return {schemaVersion:1,status:'unavailable',segments:[]};},
+    getDiagnosisProfile:() => ({profile:{id:'test',provider:'local',model:'fixture'}}),
+    diagnose:async ({framework}) => {frameworks.push(framework);return {schemaVersion:1,summary:'分析结果',findings:[]};}});
+  await analyzer.start(id);
+  const original = await store.get(id);
+  await analyzer.start(id,{framework:'prep'});
+  const after = await store.get(id);
+  assert.equal(after.results.length,6);
+  assert.deepEqual(after.results.slice(0,4),original.results);
+  assert.equal(after.trainingMode,'free');
+  assert.equal(after.framework,null);
+  assert.deepEqual(after.transcript,original.transcript);
+  assert.deepEqual(frameworks,[null,'prep']);
+  assert.equal(calls,1);
+  assert.equal(after.results.at(-2).value.analysisTarget.framework,'prep');
+  assert.equal(after.results.at(-2).value.metricRunId,original.results[1].id);
+  await assert.rejects(analyzer.start(id,{framework:'unknown'}),{code:'INVALID_SESSION'});
+  await analyzer.close();
+});
+
+test('retry after a failed framework reanalysis preserves the requested framework and saved local evidence', async t => {
+  const {createSessionAnalysis} = require('../lib/session-analysis');
+  const {store,id} = await fixture(t);const targets=[];let vad=0;
+  const analyzer = createSessionAnalysis({store,runSpeechEvidence:async () => {vad++;return {schemaVersion:1,status:'unavailable',segments:[]};},
+    getDiagnosisProfile:() => ({profile:{id:'p'}}),diagnose:async ({framework}) => {
+      targets.push(framework);if(targets.length===2) throw Object.assign(new Error('temporary'),{code:'network'});
+      return {schemaVersion:1,summary:'可用报告',findings:[]};
+    }});
+  await analyzer.start(id);await analyzer.start(id,{framework:'star'});await analyzer.start(id,{retry:true});
+  assert.deepEqual(targets,[null,'star','star']);assert.equal(vad,1);
+  assert.equal((await store.get(id)).results.at(-2).value.analysisTarget.framework,'star');await analyzer.close();
+});
+
+test('revoking AI during previous-round reads prevents the subsequent remote diagnosis', async t => {
+  const {createSessionAnalysis} = require('../lib/session-analysis');
+  const {store,id} = await fixture(t);let enabled=true,calls=0;
+  const analyzer = createSessionAnalysis({store:{...store,get:async sessionId => {
+    if (sessionId===id) return {...await store.get(id),practice:{previousSessionId:'previous',previousReportId:'report'}};
+    enabled=false;return null;
+  }},getDiagnosisProfile:() => ({profile:enabled?{id:'p'}:null,reason:'not-enabled'}),
+  diagnose:async () => {calls++;return {schemaVersion:1,summary:'should not send',findings:[]};}});
+  await analyzer.start(id);assert.equal(calls,0);
+  assert.equal((await store.get(id)).results.at(-2).value.reason,'not-enabled');await analyzer.close();
+});
+
 test('deletion cancels slow inference and late output never revives a deleted session', async t => {
   const {createSessionAnalysis} = require('../lib/session-analysis');
   const {store,id} = await fixture(t);

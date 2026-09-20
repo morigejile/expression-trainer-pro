@@ -1,6 +1,6 @@
 # 当前架构（As-Is）
 
-> 状态：Verified from Source + Electron 43；内部开发/测试，M2 已按有限人工验收边界关闭；SenseVoice 下载与实机验收延期，M2 证据见 §13，M3 首版实现与自动化/制品证据见 §14；公开模型分发仍受外部门禁约束
+> 状态：Verified from Source + Electron 43；内部开发/测试，M2 已按有限人工验收边界关闭；SenseVoice 下载与实机验收延期，M2 证据见 §13，M3 首版实现与自动化/制品证据见 §14，M4 自填训练上下文切片见 §15；公开模型分发仍受外部门禁约束
 > 运行时基线日期：2026-09-01；存储基础证据：2026-09-16；M1 产品集成证据：2026-09-19
 > 仓库：`https://github.com/morigejile/expression-trainer-pro.git`
 > 描述对象：当前集成分支的产品运行时、开发工具边界与已验证的内部安装基线
@@ -313,6 +313,7 @@ Settings/Prompt Renderer 通过 Preload 调用 Main 中的 userData JSON store�
 | Preload API | 行为 |
 |---|---|
 | createTrainingSession | 建立稳定 ID、冻结 Main 提供的真实应用/ASR 来源，返回 recording |
+| getTrainingSetup | 读取独立的上次实际使用配置，失败时允许无题目开始；见 §15 |
 | finalizeTrainingSession | 同一 ID 保存事实和有界 WAV，重复完成不覆盖已完成数据 |
 | interruptTrainingSession | recording 标记 incomplete；不覆写已完成或复活已删除记录 |
 | appendTrainingResult | 幂等追加已有统计/报告/回放快照，拒绝过期输入版本及已删 Session |
@@ -329,13 +330,14 @@ Settings/Prompt Renderer 通过 Preload 调用 Main 中的 userData JSON store�
 ```text
 training/
   sessions.sqlite
+  training-setup.json
   audio/<session-id>.wav
   staging/<session-id>.part
 ```
 
-SQLite `user_version` 0→1 事务创建 sessions/transcripts/artifacts，1→2 增加 results（不可变快照 JSON，Session 外键级联删除）。打开前只读检查版本；大于 2 的数据库拒绝降级，保持字节不变。没有旧版运行期记录可导入。
+SQLite `user_version` 0→1 事务创建 sessions/transcripts/artifacts，1→2 增加 results（不可变快照 JSON，Session 外键级联删除），2→3 支持非空训练题目，3→4 支持 Structured 定义版本、本地题库和练习来源快照，4→5 支持独立主题与场景（均复用 facts_json，不改写历史事实）。打开前只读检查版本；大于 5 的数据库拒绝降级，保持字节不变。旧应用拒绝超出其支持版本的数据库，避免将新语义记录误判为损坏或丢失上下文/练习关系。没有旧版运行期内存记录可导入。
 
-Session 只接受 microphone/free、null framework/trainingPrompt，title 显式为 null。音频时长从校验后的固定 PCM 格式推算，独立 createdAt 未采集时为 null。片段保留稳定 ID、顺序和 estimated timing，未知 startSample/endSample/confidence 为 null，不冒充精确时间证据。
+M1 初始 Session 只接受 microphone/free、null framework/trainingPrompt，title 显式为 null；M4 的自填 trainingPrompt 扩展见 §15。音频时长从校验后的固定 PCM 格式推算，独立 createdAt 未采集时为 null。片段保留稳定 ID、顺序和 estimated timing，未知 startSample/endSample/confidence 为 null，不冒充精确时间证据。
 
 结果保留生成时间、输入修订、证据引用、定义/分析器版本以及实际使用的来源。统计标识为 expression-rules-v1/lexicon-v1；AI 来源在 Main 发起请求时捕获，只保存实际参与该类请求的分析指令及 provider/model/profileId，排除 Key、endpoint 和凭据。未知字段为 null，不用之后的设置重建历史来源。失败快照不覆盖上一份成功结果；损坏结果单独标记，健康事实继续可读。
 
@@ -435,3 +437,34 @@ M3 首版按用户选择交付可靠指标变化与两侧证据复盘。实现�
 证据包括纯函数 fixture 的版本/来源/单位/词表变化、零分母、旧记录、局部缺损、跨 Framework、Source 失败/未知版本与精确证据归属；Application/IPC 的只读/参数/权限与删除竞态；Renderer 的迟到读取、音频竞态、固定输入、失败重试身份及安全文本。真实 Electron 和包内产品流覆盖两条勾选/取消、显式进入、双方报告入口、对比内音频解码播放、Report 返回原 600px 滚动位置/展开/焦点、Help 返回、重启后的历史和无 AI 配置/断网复盘。源码产品流另验证删除 WAV 后的局部降级。
 
 上述产品流使用隔离 userData、确定性音频与 Fake ASR/LLM；本轮未新增真实麦克风采样或用户人工交互验收，不据此评价真实语义判断、VAD 准确率或跨设备效果。M2 的既有人工结论保持原边界；M3 首版验收映射见 [M3 milestone](../milestones/m3-comparison-and-review.md#acceptance-matrix)。
+
+## 15. M4 training context
+
+[M4 首版功能](../milestones/m4-structured-training.md#delivery-slices) 已接入 Free / PREP / STAR / 金字塔、轻量 Guidance、自填或本地题库选题。Preparing 可修改，Recording / Processing 冻结，History / Report / Comparison 使用独立快照。开始失败可恢复编辑；采集中断保留错误提示。实现见 [Training Setup](../../src/training-setup.js)、[版本化框架与题库](../../shared/training-frameworks.js)、[Context 校验](../../shared/training-context.js) 与 [独立偏好存储](../../lib/training-setup-store.js)。产品定义只由 Flow §3 / §5、Data Model §4.1 维护。
+
+- `getTrainingSetup({requestId})` 经既有主窗口 IPC 白名单读取准备偏好。恢复期间用户已经输入时，不用迟到的旧配置覆盖草稿；开始录音前等待该读取结束，并取独立上下文快照。
+- Main 在成功创建录音记录后原子更新 `training/training-setup.json`（写入 schemaVersion 2，兼容读取 1）。该文件只保存准备配置，不保存 Practice Focus、凭据或音频。创建响应附 `setupSaved`，偏好写入失败不撤销已创建 Session；无法读取或未来版本的偏好文件保持原样。
+- Preparing 使用默认隐藏的框架/主题/场景胶囊与轻量锚点，支持悬停、点击和键盘焦点展开。原生 Popover 承载选项、独立问号说明及自定义编辑，根据可用空间定位；主操作保持居中。主题与场景可独立选取六项预设或自填，v2 上下文分别保存来源和文本。Recording 保留只读上下文，不展示准备控件；历史单项上下文保持原形读取。
+- Session 上下文和 `practice` 来源关系复用 facts_json；完成、分析或更改下次准备值不重写旧事实。SQLite 迁移/旧应用拒读见 §10。只读 VAD 检查脚本兼容 schema 2 / 3 / 4 / 5，不执行迁移。
+- `AnalysisContext` 增加题目、原训练方式、单独的分析目标与对应 v1 定义；针对性练习只补充所选目标和前轮转写/质量。原始音频留本机。设置、首次说明/帮助和练习准备区披露发送内容；远程请求前重新核对启用配置。`structured-diagnosis-v3` 提示词区分独立主题/场景及旧单项表示；解析保留 Common findings、所选 Framework Analysis、可选 Free 推荐和 Practice Feedback。错误框架/版本、未知引用、仅单侧证据的改善结论均拒绝。
+- 显式框架重分析复用已保存的 Speech Evidence / Common Analysis，追加 Diagnosis / Report snapshot；重试保持原请求框架。报告保留原训练身份与之前结果。推荐只在用户点击后进入准备页，不自动录音。
+- `practice-chain.js` 从来源报告的真实 Finding 建立关系快照；Renderer 不能写入链事实。报告展示目标、轮次、前后证据、前轮录音与内联历程；深入某轮报告后可以返回本轮。普通首页清除 Practice Focus，保留上次题目/框架。
+- 删除来源不级联后续练习；历程保留删除位置，当前反馈及历程中的相关结论降级为不可复核。保存新诊断时在事务内检查前轮仍可用，防止等待 AI 期间删除来源后写入新的改善结论。
+
+2026-09-19 在 Node 24.20.0 / npm 11.19.0 下运行 `npm test`：752 项，750 通过、0 失败、2 项 Windows 文件符号链接权限跳过。新增验证覆盖上下文快照与重启恢复、空值、删除独立性、非法输入、损坏/未来偏好、v2→v3 不改写历史事实、迟到恢复、录音异常后解锁，以及只读检查兼容性。Electron 产品流验证自填/清空、录音锁定、文本安全、报告与历史快照、重启恢复、无 AI/断网保存及既有 M3 对比；已检查 Preparing 输入展开截图。
+
+2026-09-20 新增定向测试及 Electron M4 产品流，覆盖题库来源、框架版本/冻结、证据绑定与拒绝非法结果、原证据重分析、相邻轮比较、重启恢复、来源删除占位、继续练习和报告返回。独立代码审查发现的框架重试丢失、前轮读取期间撤销 AI、来源删除后残留改善结论均已补回归测试并修复。修复后在 Node 24.20.0 / npm 11.19.0 下执行最终 `npm test`：773 项，771 通过、0 失败、2 项因 Windows 文件符号链接权限跳过。
+
+用户此前确认基础录音/保存/报告查看正常。上述新功能自动化使用隔离 userData、模拟音频和 Fake ASR/LLM，不能据此认定真实模型反馈质量或请求稳定性已验收。新增人工结果见本节末；未重新打包，不宣称 M4 已完成。
+
+2026-09-20 胶囊首页与独立主题/场景整理后的验证：Node 24.20.0 / npm 11.19.0 下执行 `npm test`，共 775 项，773 通过、0 失败、2 项因 Windows 文件符号链接权限跳过。Electron 检查 960×640、1440×900、1920×1200 的默认收起、悬停展开、独立问号说明、自定义编辑/取消、清空单项、移开收起和键盘 Escape；浮层处于窗口内，主操作位置保持不变。另验证录音冻结、双项报告/重启恢复、离线保存、重分析及练习链，复核截图和重练目标首屏可见。
+
+独立审查发现的迟到配置恢复与自定义取消冲突已补回归并修复；v4 单项事实和 v1 偏好迁移测试确认历史 JSON 不改写、只在实际录音后更新准备偏好。该轮未重新打包，桌面交互手感及真实 AI 质量仍待人工体验确认。
+
+2026-09-20 用户补充的人工测试结果：
+
+- 从 Finding 选择练习目标的功能流程已闭环；对应过程仍有多处 UI/交互待优化，未逐项提供具体问题，不视为体验验收完成。该目标仍属于 Practice Focus，不改变主题/场景的独立语义。
+- 前后证据与练习历程显示正常；重启后轮次正确。使用专门测试记录删除中间轮后，有删除占位，后续轮次不变，仍能继续练习。本组恢复与删除降级路径已有用户人工通过证据。
+- 改用不同表达框架重新分析不稳定、失败率高，待优化。当前是用户报告的问题，尚未记录具体失败率、错误类型、模型/Provider 或复现条件，根因待定位；不能把已有 Fake LLM 自动化通过视为该问题已解决。
+
+M4 仍需完成重分析稳定性修复、重练过程 UI 整理与真实 AI 反馈质量验收；任务顺序及阶段阻塞判断由 [M4 剩余任务](../milestones/m4-structured-training.md#remaining-work-and-blockers) 维护。

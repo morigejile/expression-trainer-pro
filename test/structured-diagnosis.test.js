@@ -25,6 +25,48 @@ function parse(value,input = context()) {
 function apiResponse(content) { return {ok:true,status:200,async json() { return {choices:[{message:{content}}]}; }}; }
 const profile = {provider:'openai',apiKey:'test-secret-key',model:'fixture-model'};
 
+test('selected framework feedback retains common findings and rejects another framework, version or unsupported evidence', () => {
+  const source = context();
+  source.trainingContext = {trainingMode:'structured',framework:'star',frameworkDefinitionVersion:'star-v1',trainingPrompt:null};
+  const data = {...response(),frameworkAnalysis:{framework:'star',definitionVersion:'star-v1',summary:'行动清楚，结果未交代。',
+    findings:[{...response().findings[0],id:'framework-1'}]}};
+  assert.deepEqual(parse(JSON.stringify(data),source),data);
+  for (const change of [d => {delete d.frameworkAnalysis;}, d => {d.frameworkAnalysis.framework='prep';},
+    d => {d.frameworkAnalysis.definitionVersion='star-v2';},d => {d.frameworkAnalysis.findings[0].evidenceRefs=['unknown'];},
+    d => {d.frameworkAnalysis.findings[0].evidenceRefs=['metric:text-character-count'];},
+    d => {d.frameworkAnalysis.findings[0].id='finding-1';}, d => {d.frameworkAnalysis.score=90;}]) {
+    const invalid = structuredClone(data); change(invalid);
+    assert.throws(() => parse(JSON.stringify(invalid),source),{code:'invalid-response'});
+  }
+});
+
+test('Free recommendations require an explained supported framework and never become framework analysis', () => {
+  const source = context();
+  const data = {...response(),frameworkRecommendation:{framework:'prep',reason:'观点清楚，可以练习补充理由和例子。',evidenceRefs:['segment-1']}};
+  assert.deepEqual(parse(JSON.stringify(data),source),data);
+  for (const change of [d => {d.frameworkRecommendation.framework='unknown';},d => {d.frameworkRecommendation.reason='';},
+    d => {d.frameworkRecommendation.evidenceRefs=['invented'];}, d => {d.frameworkAnalysis={framework:'prep'};}]) {
+    const invalid = structuredClone(data); change(invalid);
+    assert.throws(() => parse(JSON.stringify(invalid),source),{code:'invalid-response'});
+  }
+});
+
+test('practice improvement requires evidence from both adjacent rounds and cannot compare a deleted source', () => {
+  const source = context();
+  source.practiceComparison = {status:'available',previous:{transcript:{segments:[{id:'previous-1',text:'原来先铺垫'}]}}};
+  const data = {...response(),practiceFeedback:{status:'improved',summary:'本轮先说明了结论。',previousEvidenceRefs:['previous-1'],currentEvidenceRefs:['segment-1']}};
+  assert.deepEqual(parse(JSON.stringify(data),source),data);
+  for (const change of [d => {d.practiceFeedback.previousEvidenceRefs=[];},d => {d.practiceFeedback.currentEvidenceRefs=['previous-1'];},
+    d => {d.practiceFeedback.status='perfect';},d => {delete d.practiceFeedback;}]) {
+    const invalid = structuredClone(data); change(invalid);
+    assert.throws(() => parse(JSON.stringify(invalid),source),{code:'invalid-response'});
+  }
+  source.practiceComparison = {status:'unavailable',reason:'source-deleted'};
+  assert.throws(() => parse(JSON.stringify(data),source),{code:'invalid-response'});
+  data.practiceFeedback = {status:'unavailable',summary:'来源报告已删除，无法可靠比较。',previousEvidenceRefs:[],currentEvidenceRefs:[]};
+  assert.deepEqual(parse(JSON.stringify(data),source),data);
+});
+
 test('diagnosis accepts the four approved categories with explicit evidence-linked observation, interpretation and recommendation', () => {
   const data = response();
   data.findings = ['organization','argument','delivery','wording'].map((category,index)=>({...data.findings[0],id:`finding-${index}`,category}));
@@ -103,6 +145,24 @@ test('structured request snapshots the allowed references before awaiting extern
     source.allowedEvidenceRefs.push('invented');
     return apiResponse(JSON.stringify(data));
   }}),error=>error.code === 'invalid-response');
+});
+
+test('provider response validation pins the selected framework and both practice evidence sets before awaiting HTTP', async () => {
+  const {sendStructuredDiagnosis} = require('../lib/ai-feedback');
+  const source = context();
+  source.analysisTarget = {framework:'star',definitionVersion:'star-v1'};
+  source.practiceComparison = {status:'available',goal:{observation:'结果不清楚'},scope:'full',
+    previous:{transcript:{segments:[{id:'previous-1',text:'之前的表达'}]}}};
+  const data = {...response(),frameworkAnalysis:{framework:'star',definitionVersion:'star-v1',summary:'结果仍需补充',findings:[]},
+    practiceFeedback:{status:'unchanged',summary:'继续练习说明结果',previousEvidenceRefs:['previous-1'],currentEvidenceRefs:['segment-1']}};
+  const result = await sendStructuredDiagnosis(source,profile,{fetchImpl:async (_url,options) => {
+    const body=JSON.parse(options.body), sent=JSON.parse(body.messages[1].content);
+    assert.equal(sent.analysisTarget.framework,'star');assert.equal(sent.trainingContext.trainingMode,'free');
+    assert.equal(sent.practiceComparison.previous.transcript.segments[0].text,'之前的表达');
+    source.analysisTarget.framework='prep';source.practiceComparison.previous.transcript.segments=[];
+    return apiResponse(JSON.stringify(data));
+  }});
+  assert.deepEqual(result,data);
 });
 
 test('structured invalid output uses the existing safe invalid-response envelope', async () => {

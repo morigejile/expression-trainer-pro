@@ -60,13 +60,13 @@ These are not architecture projects. Decisions close before the named delivery s
 | D-03 | Timing-capable model support policy | M2 | Per-model capability matrix and graceful-degradation examples |
 | D-04 | Finding categories and Radar dimensions/scales | M2 类别与未校准边界已收口；完整校准归 B-20 | 初始 Finding 类别按 Training Flow §7.1；M2 不要求完成雷达定义、映射、量程或校准 |
 | D-05 | Finding-scoped AI context boundary | B-17 重开时；M3 候选 | 明确来源 Finding / Evidence / Report / Session 的最小上下文、用户可见范围、删除与 token budget；不作为当前 Comparison 交付依赖 |
-| D-06 | Framework definitions and scoring | M4 | Versioned PREP/STAR/Pyramid definitions, examples, and evidence rules |
+| D-06 | Framework definitions and scoring | M4 首版决策已关闭 | 版本化定义、示例与证据边界见 [Training Flow §3.3](training-flow.md#33-训练前-guidance)；首版定性反馈，不提供未校准框架分数。实际验证边界见 M4 / Current。 |
 | D-07 | Neural VAD model, thresholds, and resource budget | M2 有限验收已关闭；扩大验证归 B-24 | 现有单一 Silero 的工程证据与有限人工复核满足本阶段；不将其写成统计准确率、完整阈值或资格线资源预算认证。 |
 | D-08 | SenseVoiceSmall 可选主 ASR 的集成与资源验证 | 集成证据保留；下载/实机验收延期至 B-23 | 沿用 ADR-0009 的 utterance/5 分钟有界缓冲基线；下载修复、真实等待/资源、取消恢复和离线使用按 B-23 一并验收，公开分发许可独立跟进。 |
 | D-09 | Default AI onboarding and initial profile availability | M2 | Fresh-install flow defining how local and remote profiles are distinguished, when a profile becomes active, and how the accepted R-A11 disclosure/enablement boundary is presented |
 | D-10 | M2 本地实时规则与结束后 AI 的分工 | M2；决策已关闭 | 按 Training Flow §4 实施并验证；后续可选实时 AI 的上下文、触发、延迟/成本与独立启用归 B-19，不重开当前阶段选择。 |
 | D-11 | 报告复制／导出／分享、备份 | After M1；后续待办，未指定里程碑 | 先明确报告/详情入口、格式与数据范围、分享方式、备份及恢复边界；不预设云分享或账号。M1 首页移除复制/保存不等于永久禁止这些能力，也不将诊断 JSON 导出误并为训练内容导出。 |
-| D-12 | Practice Chain 的实体与关系表达 | M4；不作为 M1/M3 前置依赖 | 产品语义已确认于 [Training Flow §10.2](training-flow.md#102-多轮练习历程)；数据未决项只在 [Data Model §12](../architecture/data-model.md#12-open-decisions-carried-forward) 维护。实现前验证既定轮次/来源语义能恢复，再选择最小数据表示；不预建通用链框架。 |
+| D-12 | Practice Chain 的实体与关系表达 | M4 首版决策已关闭 | 产品语义见 [Training Flow §10.2](training-flow.md#102-多轮练习历程)，最小来源关系快照见 [Data Model §6](../architecture/data-model.md#6-analysis-and-retraining-invariants)。轮次恢复和来源删除占位的自动化/人工证据见 [Current §15](../architecture/current.md#15-m4-training-context)，不预建通用链框架。 |
 | D-13 | Comparison Compatibility | M3 首版规则已关闭 | 按 [Data Model §10.1](../architecture/data-model.md#101-m3-compatibility) 逐项判断定义、来源、词表和分母兼容性；不同 Framework 不阻止整对选择。用户已选择指标与证据复盘，R-R02 的自动语义变化判断延期至 B-25；交付证据见 [M3](../milestones/m3-comparison-and-review.md)。 |
 
 ### M2 decision state
@@ -86,7 +86,7 @@ These are not architecture projects. Decisions close before the named delivery s
 
 当前 Screen / State 结构已收口；deferred Screen 定位只在 [Training Flow §13.5](training-flow.md#135-尚未确定的-screen-事项) 维护；不在 Backlog 重开已经确认的结构和导航。
 
-[Training Flow §14](training-flow.md#14-interaction-tbd) 集中维护主动提示形式、超长静音阈值、实时提醒冷却时间、重练范围选择器、Processing timeout 预算/恢复细节，以及检查/异常文案和导航焦点恢复实现。它们是已确认体验的待细化项，不是 Focus Mode 一类的 Not Now 功能，也不因列入此处而成为 M1 工作。
+[Training Flow §14](training-flow.md#14-interaction-tbd) 集中维护主动提示形式、超长静音阈值、实时提醒冷却时间、Processing timeout 预算/恢复细节，以及检查/异常文案和导航焦点恢复实现。重练范围选择器已在该文档 §9 收口。剩余项是已确认体验的待细化项，不是 Focus Mode 一类的 Not Now 功能，也不因列入此处而成为 M1 工作。
 
 Progressive Report Rendering 不列为本轮 Backlog 或当前方案；Processing 使用 [Training Flow §6](training-flow.md#6-自动持久化与分析状态) 的完成等待与合理 timeout。已有报告内容按需展开不属于渐进生成。
 

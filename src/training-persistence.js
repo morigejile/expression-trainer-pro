@@ -12,6 +12,9 @@
     const success = kind => results.filter(result => result.kind === kind && result.status === 'completed').at(-1);
     return {
       id:session.id, createdAt:session.createdAt, durationMs:session.durationMs || 0,
+      trainingMode:session.trainingMode ?? 'free', framework:session.framework ?? null,
+      frameworkDefinitionVersion:session.frameworkDefinitionVersion ?? null, trainingPrompt:session.trainingPrompt ?? null,
+      practice:session.practice ?? null,
       status:session.status, deletionPending:session.deletionPending, sourceSnapshot:session.sourceSnapshot,
       timing:session.timing ?? null, dataQuality:session.dataQuality || [],
       fullText:session.transcript?.text || '', segments:session.transcript?.segments || [],
@@ -31,7 +34,7 @@
     async function start(input) {
       const response = await command('createTrainingSession', null, input);
       if (!response?.ok) throw new Error(response?.error?.message || '无法建立训练记录，请重试');
-      return response.value;
+      return {...response.value, setupSaved:response.setupSaved};
     }
     function result(record, input) {
       return {id:id(),inputRevision:1,definitionVersion:null,analyzerVersion:null,

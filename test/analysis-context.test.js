@@ -24,6 +24,48 @@ function unavailable(code) {
   return error => error.name === 'AnalysisContextUnavailableError' && error.status === 'unavailable' && error.code === code;
 }
 
+test('analysis receives a detached topic and selected versioned framework with no raw audio', () => {
+  const source = input();
+  Object.assign(source.session,{trainingMode:'structured',framework:'star',frameworkDefinitionVersion:'star-v1',
+    trainingPrompt:{source:'bank',kind:'scenario',text:'讲一次失败的经历'}});
+  const context = build(source);
+  assert.equal(context.trainingContext.framework,'star');
+  assert.equal(context.frameworkDefinition.version,'star-v1');
+  assert.match(context.frameworkDefinition.structure,/行动/);
+  assert.equal(context.trainingContext.trainingPrompt.text,'讲一次失败的经历');
+  source.session.trainingPrompt.text = '后来改动';
+  assert.equal(context.trainingContext.trainingPrompt.text,'讲一次失败的经历');
+  source.session.frameworkDefinitionVersion = 'unknown';
+  assert.throws(() => build(source),unavailable('analysis-context-invalid'));
+});
+
+test('analysis preserves independent topic and scenario without merging their meaning or source', () => {
+  const source = input();
+  source.session.trainingPrompt = {schemaVersion:2,topic:{source:'bank',text:'延迟上线'},scenario:{source:'user',text:'向负责人汇报'}};
+  const result = build(source);
+  assert.deepEqual(result.trainingContext.trainingPrompt,source.session.trainingPrompt);
+  source.session.trainingPrompt.scenario.text = 'changed';
+  assert.equal(result.trainingContext.trainingPrompt.scenario.text,'向负责人汇报');
+});
+
+test('practice context includes only the pinned previous evidence and degrades when its source is deleted', () => {
+  const source = input();
+  source.session.practice = {goal:{observation:'结论出现较晚',recommendation:'先说结论',category:'organization'},scope:'full'};
+  const previous = input(); previous.session.id = 'previous';
+  previous.commonAnalysis = computeCommonAnalysis(previous);
+  const practiceSource = {status:'available',session:previous.session,report:{snapshot:{id:'previous-report'},
+    metricRun:{value:previous.commonAnalysis},evidenceRun:{value:previous.speechEvidence}}};
+  const result = build({...source,practiceSource});
+  assert.equal(result.practiceComparison.previous.sessionId,'previous');
+  assert.equal(result.practiceComparison.previous.reportId,'previous-report');
+  assert.equal(result.practiceComparison.previous.transcript.segments[0].text,'这是一段表达。');
+  assert.equal(result.practiceComparison.previous.results,undefined);
+  const deleted = build({...source,practiceSource:{status:'unavailable',reason:'source-deleted'}});
+  assert.equal(deleted.practiceComparison.status,'unavailable');
+  assert.equal(deleted.practiceComparison.reason,'source-deleted');
+  assert.equal(deleted.practiceComparison.previous,undefined);
+});
+
 test('context carries only bounded current facts with resolvable transcript, metric and speech references', () => {
   const source = input(); const before = structuredClone(source);
   const context = build(source);

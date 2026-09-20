@@ -160,3 +160,16 @@ test('a changed WAV cannot masquerade as the recording behind saved evidence', a
   assert.equal(result.data.gaps,null);
   assert.equal(result.data.rawSourceResult.value.segments.length,2);
 });
+
+test('read-only inspection supports legacy v2 without migration and rejects future schemas unchanged', async t => {
+  const f = await fixture(t); await f.report('original');
+  const filename = path.join(f.root,'sessions.sqlite');
+  for (const version of [2,99]) {
+    const db = new DatabaseSync(filename);
+    db.exec(`PRAGMA user_version = ${version}`); db.close();
+    const before = hash(filename);
+    const result = run('--root',f.root,'--session',f.session.id);
+    assert.equal(result.status,version === 2 ? 0 : 1,result.stderr);
+    assert.equal(hash(filename),before);
+  }
+});

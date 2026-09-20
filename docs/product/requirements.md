@@ -139,7 +139,7 @@ M1 完成录音的音频随 Session 保留至用户明确删除；不按条数�
 | ID | 需求 | Acceptance Criteria | Priority | Status | Target Milestone |
 |---|---|---|---|---|---|
 | R-F01 | Free 是默认训练方式，PREP、STAR 和 Pyramid 是 Structured frameworks。 | 首次无配置时无需额外配置即可以 Free 开始；之后按 [Training Flow §3.1](training-flow.md#31-默认状态) 恢复上次配置，开始前可改选 Free / Structured framework；产品与数据层不把四者实现为四套互不相干的训练系统。 | P1 | Accepted | M4 |
-| R-F02 | topic/scenario 初次无配置时不存在，后续继承上次配置，始终不是开始训练的必填项。 | 用户可无 training prompt、使用自己提供的 topic/scenario，或按需请求应用生成；生成失败不阻止开始；training prompt 与 framework 独立，Free/Structured 均支持这些来源；配置继承与 Training Context / Practice Focus 的正交语义按 [Training Flow §3.1–§3.4](training-flow.md#31-默认状态) 验收，不把 Practice Focus 当上次配置恢复。 | P1 | Accepted | M4 |
+| R-F02 | topic/scenario 初次无配置时不存在，后续继承上次配置，始终不是开始训练的必填项。 | 用户可无 training prompt、自行填写或按需从本地题库换题；题目可修改或清空，离线可用。M4 首版采用固定题库，LLM 实时生成不是本阶段必交付项。training prompt 与 framework 独立，Free/Structured 均支持这些来源；配置继承与 Training Context / Practice Focus 的正交语义按 [Training Flow §3.1–§3.4](training-flow.md#31-默认状态) 验收，不把 Practice Focus 当上次配置恢复。 | P1 | Accepted | M4 |
 | R-F03 | Session 开始后，其训练上下文冻结。 | Preparing 阶段可切换；进入 Recording 或 Processing 后不得修改当前 Session 的 mode/framework 或 Topic/Scenario；改用其他 framework 必须开始新 Session。 | P1 | Accepted | M4 |
 | R-F04 | 训练前 Framework Guidance 是辅助，不是必填表单。 | 选择 Structured framework 后可展示步骤、适用场景和轻量提示，但不得要求用户先填写每个框架槽位；训练前 Guidance 与训练后 Analysis 使用不同文案和职责。 | P1 | Accepted | M4 |
 | R-F05 | Structured Session 在 Common Analysis 之外增加对应 Framework Analysis。 | PREP、STAR 或 Pyramid 只加载与所选 framework 对应的专项判断；专项 finding 指出缺失、顺序、比例或支撑问题，并尽可能锚定 transcript segment/timestamp；training mode 与 analysis mode 分别记录。 | P1 | Accepted | M4 |

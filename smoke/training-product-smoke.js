@@ -4,14 +4,17 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 async function run({app, mainWindow, BrowserWindow, phase}) {
-  assert.ok(['write', 'read', 'offline', 'offline-read', 'degraded'].includes(phase));
+  assert.ok(['write', 'read', 'offline', 'offline-read', 'degraded','m4','m4-read'].includes(phase));
   const offline = phase.startsWith('offline');
   if (offline) {
     mainWindow.webContents.session.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']}, (_details, done) => done({cancel:true}));
     globalThis.fetch = async () => { throw new Error('Offline product smoke'); };
   }
   const {calls} = require('./electron-smoke-runner');
-  const evaluate = code => mainWindow.webContents.executeJavaScript(code);
+  const evaluate = async code => {
+    try { return await mainWindow.webContents.executeJavaScript(code); }
+    catch (cause) { throw new Error(`Renderer evaluation failed: ${code}`, {cause}); }
+  };
   const wait = async (label, code) => {
     const deadline = Date.now() + 10000;
     while (Date.now() < deadline) {
@@ -20,6 +23,7 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
       await new Promise(resolve => setTimeout(resolve, 30));
     }
     const state = await evaluate(`({screen:document.body.dataset.screen,status:document.getElementById('training-status')?.textContent,message:document.getElementById('user-message-text')?.textContent,history:document.getElementById('history-status')?.textContent,save:document.getElementById('record-save-status')?.textContent})`);
+    await capture('failure');
     throw new Error(`Timed out: ${label}: ${JSON.stringify(state)}`);
   };
   const invoke = (method, command) => evaluate(`window.api[${JSON.stringify(method)}](${JSON.stringify(command)})`);
@@ -71,6 +75,8 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
     window.confirm = () => true;
   })()`);
   await wait('renderer prepared', `window.__trainingProductTrainer.asrPreparationState==='ready' && !window.__trainingProductTrainer.firstRunRecordingPolicyPending && !window.__trainingProductTrainer.firstRunRecordingPolicyRunning`);
+  assert.equal(await evaluate(`Boolean(document.getElementById('training-topic') && document.getElementById('training-scenario'))`), true, 'Preparing offers independent topic/scenario capsules');
+  await evaluate('window.__trainingProductTrainer.trainingSetup.ready');
   if (offline) assert.equal((await evaluate('window.api.getLlmProfileSummaries()')).profiles.length, 0);
 
   if (phase === 'write') await capture('preparing');
@@ -92,11 +98,53 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
     settingsWindow.close();
   };
 
-  const recordOnce = async () => {
-    await evaluate(`document.getElementById('btn-home').click()`);
+  const click = async selector => {
+    const point = await evaluate(`(() => {const element=document.querySelector(${JSON.stringify(selector)});element.scrollIntoView({block:'nearest'});const r=element.getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};})()`);
+    mainWindow.webContents.sendInputEvent({type:'mouseMove',...point});
+    mainWindow.webContents.sendInputEvent({type:'mouseDown',button:'left',clickCount:1,...point});
+    mainWindow.webContents.sendInputEvent({type:'mouseUp',button:'left',clickCount:1,...point});
+  };
+  const choose = async (kind,id) => {
+    await click('#training-settings-anchor');
+    await wait('capsules visible',`!document.getElementById('training-capsules').hidden`);
+    await click(`#training-${kind}`);
+    await wait('picker options',`document.getElementById('training-picker').matches(':popover-open') && document.querySelector('[data-setup-select="${id}"]')`);
+    await click(`[data-setup-select="${id}"]`);
+    await wait('picker closed',`!document.getElementById('training-picker').matches(':popover-open')`);
+  };
+  const setCustom = async (kind,text) => {
+    await click('#training-settings-anchor');
+    await wait('capsules visible',`!document.getElementById('training-capsules').hidden`);
+    await click(`#training-${kind}`);
+    await wait('custom entry',`document.querySelector('[data-setup-custom]') && document.getElementById('training-picker').matches(':popover-open')`);
+    await click('[data-setup-custom]');
+    await wait('custom input',`document.getElementById('training-custom-text')`);
+    await evaluate(`(()=>{const input=document.getElementById('training-custom-text');input.value=${JSON.stringify(text)};input.dispatchEvent(new Event('input'));document.querySelector('[data-setup-done]').click();})()`);
+    await wait('custom picker closed',`!document.getElementById('training-picker').matches(':popover-open')`);
+  };
+  const recordOnce = async (prompt,{framework = 'free',practice = false,bank = false} = {}) => {
+    if (!practice) await evaluate(`document.getElementById('btn-home').click()`);
     await wait('start enabled', `!document.getElementById('btn-start').disabled && document.body.dataset.screen==='training'`);
+    if (!practice) await choose('framework',framework);
+    if (bank) {
+      await choose('topic','meeting-free-day'); await choose('scenario','work-report');
+      prompt = await evaluate('window.__trainingProductTrainer.trainingSetup.snapshot().trainingPrompt');
+    } else if (!practice) {
+      const parts = require('../shared/training-context').getPromptParts(prompt);
+      for (const kind of ['topic','scenario']) {
+        if (parts[kind]) await setCustom(kind,parts[kind].text); else await choose(kind,'none');
+      }
+      prompt = await evaluate('window.__trainingProductTrainer.trainingSetup.snapshot().trainingPrompt');
+    }
+    if (phase === 'write' && prompt?.topic) await capture('preparing-context');
     await evaluate(`document.getElementById('btn-start').click()`);
     await wait('normal renderer captures and feeds audio', `window.__trainingProductTrainer.isRecording && window.__trainingProductTrainer.audioFeedTracker?.queue.snapshot().completed===1`);
+    assert.equal(await evaluate(`document.getElementById('training-topic').disabled`),true);
+    assert.equal(await evaluate(`document.getElementById('training-scenario').disabled`),true);
+    assert.equal(await evaluate(`document.getElementById('training-framework').disabled`),true);
+    for (const part of Object.values(require('../shared/training-context').getPromptParts(prompt)).filter(Boolean)) assert.ok((await evaluate(`document.getElementById('training-context-label').textContent`)).includes(part.text));
+    // Even a synthetic edit cannot change the context captured for this recording.
+    assert.equal(await evaluate(`window.__trainingProductTrainer.trainingSetup.configure({trainingPrompt:null})`),false);
     await evaluate(`document.getElementById('btn-stop').click()`);
     await wait('normal renderer saves and enters report', `document.body.dataset.screen==='report' && !window.__trainingProductTrainer.recordingStopOperation && window.__trainingProductTrainer.trainingRecords?.selected()?.saveState==='saved'`);
     const record = await evaluate(`(() => {const r=window.__trainingProductTrainer.trainingRecords.selected();return {id:r.id,text:r.fullText,duration:r.durationMs,status:r.saveState,audio:r.audioState,stats:r.stats};})()`);
@@ -104,7 +152,12 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
     assert.equal(record.duration, 10);
     assert.equal(record.audio, 'available');
     assert.ok(record.stats.totalWords > 0);
-    assertTiming((await invoke('getTrainingSession',{requestId:'timing-facts',sessionId:record.id})).value);
+    const saved=(await invoke('getTrainingSession',{requestId:'timing-facts',sessionId:record.id})).value;
+    assertTiming(saved);
+    assert.deepEqual(saved.trainingPrompt,prompt);
+    assert.deepEqual(await evaluate('window.__trainingProductTrainer.trainingRecords.selected().trainingPrompt'),prompt);
+    for (const part of Object.values(require('../shared/training-context').getPromptParts(prompt)).filter(Boolean)) assert.ok((await evaluate(`document.getElementById('record-identity').textContent`)).includes(part.text));
+    assert.equal(await evaluate('Boolean(window.__topicInjected)'),false);
     assert.equal(calls.llmReport, initialCalls.report, 'stop must not automatically request a report');
     assert.equal(calls.llmPlayback, initialCalls.playback, 'stop must not automatically analyze playback');
     return record.id;
@@ -161,13 +214,86 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
     assert.deepEqual(aiCalls(),before,'comparison and report drill-down must not request AI');
   };
 
+  if (phase === 'm4' || phase === 'm4-read') {
+    const m4Path = path.join(app.getPath('userData'),'m4-fixture.json');
+    const current = () => evaluate('(()=>{const r=window.__trainingProductTrainer.trainingRecords.selected();return {id:r.id,practice:r.practice,trainingPrompt:r.trainingPrompt};})()');
+    const startPractice = async continuing => {
+      await evaluate(continuing
+        ? `document.querySelector('.practice-goal .practice-start').click()`
+        : `(()=>{const card=document.querySelector('.finding-details');card.open=true;card.querySelector('.practice-start').click();})()`);
+      await wait('practice preparation',`document.body.dataset.screen==='training' && !document.getElementById('training-practice-focus').hidden`);
+      assert.equal(await evaluate('window.__trainingProductTrainer.trainingSetup.snapshot().practiceRequest.continueChain'),continuing);
+      assert.equal(await evaluate(`(() => {const rect=document.getElementById('training-practice-focus').getBoundingClientRect();return rect.top>=document.querySelector('.main-area').getBoundingClientRect().top&&rect.bottom<=innerHeight;})()`),true,'entering practice shows the goal before scrolling to Start');
+    };
+    if (phase === 'm4') {
+      await require('./training-preparation-smoke').run({mainWindow,evaluate,wait,capture,choose,setCustom});
+      await saveProfile('smoke-model');
+      const a = await recordOnce(null,{framework:'prep',bank:true});
+      await wait('selected framework analysis',`document.getElementById('report-body').textContent.includes('PREP 专项分析')`);
+      const original = (await invoke('getTrainingSession',{requestId:'original',sessionId:a})).value;
+      const prompt = original.trainingPrompt;
+      assert.equal(prompt.topic.source,'bank');assert.equal(prompt.scenario.source,'bank');assert.equal(original.framework,'prep');
+      await capture('m4-prep-report');
+      await evaluate(`(()=>{const detail=document.querySelector('.framework-reanalysis');detail.open=true;detail.querySelectorAll('button')[1].click();})()`);
+      await wait('explicit STAR reanalysis',`!window.__trainingProductTrainer.trainingRecords.selected().reportPending && document.getElementById('report-body').textContent.includes('STAR 专项分析')`);
+      const revised = (await invoke('getTrainingSession',{requestId:'revised',sessionId:a})).value;
+      assert.equal(revised.framework,'prep');assert.deepEqual(revised.transcript,original.transcript);
+      assert.equal(revised.results.filter(run=>run.kind==='speech-evidence').length,1);
+      await startPractice(false);await capture('m4-practice-preparing');
+      const b = await recordOnce(prompt,{practice:true});
+      assert.equal((await current()).practice.round,2);
+      await startPractice(true);
+      const c = await recordOnce(prompt,{practice:true});
+      assert.equal((await current()).practice.round,3);
+      await evaluate(`document.querySelector('.practice-evidence').open=true`);
+      await wait('adjacent practice evidence',`document.querySelector('.practice-evidence').textContent.includes('上一轮') && document.querySelector('.practice-play-previous')`);
+      await evaluate(`document.querySelector('.practice-play-previous').click()`);
+      await wait('previous WAV decoded',`document.querySelector('.practice-evidence audio')?.readyState>=2`);
+      await evaluate(`window.__previousPracticePlayer=document.querySelector('.practice-evidence audio');document.querySelector('.practice-evidence').open=false`);
+      await wait('collapsed evidence releases its player',`!window.__previousPracticePlayer.getAttribute('src') && window.__previousPracticePlayer.paused`);
+      await evaluate(`document.querySelector('.practice-evidence').open=true`);
+      await wait('evidence can reopen without a stale player',`document.querySelector('.practice-play-previous') && !document.querySelector('.practice-evidence audio')`);
+      await evaluate(`document.querySelector('.practice-history').open=true`);
+      await wait('three persisted rounds',`document.querySelectorAll('.practice-round').length===3`);
+      await capture('m4-practice-report');
+      assert.equal((await invoke('deleteTrainingSession',{requestId:'delete-middle',sessionId:b})).ok,true);
+      fs.writeFileSync(m4Path,JSON.stringify({a,b,c,prompt}));
+    } else {
+      const f = JSON.parse(fs.readFileSync(m4Path,'utf8'));
+      assert.equal(await evaluate('window.__trainingProductTrainer.trainingSetup.snapshot().practiceRequest'),undefined);
+      assert.equal(await evaluate('window.__trainingProductTrainer.trainingSetup.snapshot().framework'),'prep');
+      await openHistory(f.c);
+      await wait('deleted source disclosure',`document.querySelector('.practice-source-status')?.textContent.includes('来源报告已删除')`);
+      await evaluate(`document.querySelector('.practice-history').open=true`);
+      await wait('deleted middle round',`document.querySelectorAll('.practice-round').length===3 && document.querySelectorAll('.practice-round')[1].textContent.includes('来源报告已删除')`);
+      await capture('m4-deleted-source');
+      await startPractice(true);
+      await recordOnce(f.prompt,{practice:true});
+      assert.equal((await current()).practice.round,4);
+      assert.equal((await current()).practice.previousSessionId,f.c);
+      await evaluate(`document.querySelector('.practice-history').open=true`);
+      await wait('four persisted rounds',`document.querySelectorAll('.practice-round').length===4`);
+      await evaluate(`document.querySelector('.practice-round button').click()`);
+      await wait('original pinned report',`window.__trainingProductTrainer.viewingTrainingRecordId===${JSON.stringify(f.a)} && window.__trainingProductTrainer.reportSource==='practice'`);
+      assert.match(await evaluate(`document.getElementById('report-body').textContent`),/STAR 专项分析/);
+      await evaluate(`document.getElementById('btn-report-back').click()`);
+      await wait('return to current practice',`window.__trainingProductTrainer.trainingRecords.selected()?.practice?.round===4`);
+    }
+    console.log(`TRAINING_PRODUCT_${phase.toUpperCase()}_OK`);app.quit();return;
+  }
+
   if (phase === 'write' || phase === 'offline') {
     if (phase === 'write') await saveProfile('fake-model');
     else assert.equal((await evaluate('window.api.getLlmProfileSummaries()')).profiles.length, 0);
     const ids=[];
-    for (let i=0;i<(phase==='write'?7:2);i++) ids.push(await recordOnce());
+    let lastPrompt=null;
+    for (let i=0;i<(phase==='write'?7:2);i++) {
+      lastPrompt=i===1?null:{schemaVersion:2,topic:i===0?{source:'user',text:'<img src=x onerror="window.__topicInjected=true">介绍你的观点'}:null,scenario:i===0?null:{source:'user',text:'向同事解释项目进度与下一步安排。'}};
+      ids.push(await recordOnce(lastPrompt));
+    }
     const listed = await invoke('listTrainingSessions',{requestId:'verify-count'});
     assert.equal(listed.value.length, ids.length, 'no five-record eviction');
+    assert.deepEqual(listed.value.find(row=>row.id===ids.at(-1)).trainingPrompt,lastPrompt);
     if (phase === 'write') {
       await wait('automatic structured report saved', `window.__trainingProductTrainer.trainingRecords.selected().structuredReport?.analysisRun?.status==='completed' && !window.__trainingProductTrainer.trainingRecords.selected().reportPending`);
       assert.equal(calls.llmDiagnosis,initialCalls.diagnosis+7);
@@ -184,18 +310,19 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
       const report = saved.value.results.find(result=>result.kind==='diagnosis');
       const playback = saved.value.results.find(result=>result.kind==='playback');
       await saveProfile('changed-model');
-      fs.writeFileSync(fixturePath, JSON.stringify({ids,report,playback}));
+      fs.writeFileSync(fixturePath, JSON.stringify({ids,report,playback,lastPrompt}));
       await capture('report');
     } else {
       const saved = await invoke('getTrainingSession',{requestId:'verify-local-results',sessionId:ids[0]});
       assert.ok(saved.value.results.some(result=>result.kind==='common-analysis' && result.status==='completed'));
       assert.equal(saved.value.results.find(result=>result.kind==='diagnosis').value.reason,'not-configured');
       assert.deepEqual(aiCalls(),initialCalls,'offline recording must not request any AI');
-      fs.writeFileSync(fixturePath, JSON.stringify({ids}));
+      fs.writeFileSync(fixturePath, JSON.stringify({ids,lastPrompt}));
     }
     await compareHistory(ids);
   } else {
     const fixture = JSON.parse(fs.readFileSync(fixturePath,'utf8'));
+    assert.deepEqual(await evaluate('window.__trainingProductTrainer.trainingSetup.snapshot().trainingPrompt'),fixture.lastPrompt);
     const listed = await invoke('listTrainingSessions',{requestId:'after-restart'});
     assert.equal(listed.value.length,fixture.ids.length);
     await compareHistory(fixture.ids);

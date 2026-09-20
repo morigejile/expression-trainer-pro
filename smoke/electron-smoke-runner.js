@@ -94,10 +94,20 @@ const fakeLlm = {
   async sendStructuredDiagnosis(context) {
     calls.llmDiagnosis += 1;
     const {parseStructuredDiagnosisResponse} = require('../lib/structured-diagnosis');
-    return parseStructuredDiagnosisResponse(JSON.stringify({schemaVersion:1,summary:'先说明目标，再给出支持理由。',
+    const data = {schemaVersion:1,summary:'先说明目标，再给出支持理由。',
       findings:context.transcript.segments.length ? [{id:'finding-1',category:'organization',observation:'表达可以先说明目标。',
         interpretation:'先给出重点可以帮助听者理解。',recommendation:'下一次先用一句话说明重点。',
-        evidenceRefs:[context.transcript.segments[0].id]}] : []}),context);
+        evidenceRefs:[context.transcript.segments[0].id]}] : []};
+    if (context.analysisTarget) data.frameworkAnalysis = {...context.analysisTarget,summary:'先说明观点，再补充与观点相关的具体支撑。',
+      findings:data.findings.map(finding => ({...finding,id:'framework-1'}))};
+    if (context.practiceComparison) {
+      const previous = context.practiceComparison.previous?.transcript.segments[0];
+      const current = context.transcript.segments[0];
+      data.practiceFeedback = previous && current
+        ? {status:'unchanged',summary:'前后都保留了同一表达目标，可以继续练习清晰开场。',previousEvidenceRefs:[previous.id],currentEvidenceRefs:[current.id]}
+        : {status:'unavailable',summary:'来源证据不可用，暂时无法可靠比较。',previousEvidenceRefs:[],currentEvidenceRefs:[]};
+    }
+    return parseStructuredDiagnosisResponse(JSON.stringify(data),context);
   },
   createRequestCoordinator,
   runCoordinatedRequest,

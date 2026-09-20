@@ -71,6 +71,8 @@ const ASR_LOADING_MESSAGE = '语音模型加载中，预计数秒至数分钟（
 const Persistence = typeof module !== 'undefined' && module.exports ? require('./training-persistence') : window.TrainingPersistence;
 const StructuredReport = typeof module !== 'undefined' && module.exports ? require('./structured-report') : window.StructuredReport;
 const SessionComparison = typeof module !== 'undefined' && module.exports ? require('./comparison') : window.SessionComparison;
+const TrainingSetup = typeof module !== 'undefined' && module.exports ? require('./training-setup') : window.TrainingSetup;
+const TrainingContext = typeof module !== 'undefined' && module.exports ? require('../shared/training-context') : window.TrainingContext;
 const {checkMicrophoneReadiness} = typeof module !== 'undefined' && module.exports ? require('./microphone-readiness') : window.MicrophoneReadiness;
 
 class ExpressionTrainer {
@@ -124,6 +126,7 @@ class ExpressionTrainer {
     this.microphoneState = 'checking';
     this.historyOffset = 0;
     this.initElements();
+    this.trainingSetup = TrainingSetup.createTrainingSetup({api:window.api,document});
     this.comparison = SessionComparison.createComparisonController({trainer:this,api:window.api,document});
     this.bindEvents();
     if (!this.showFirstRunHelp()) void this.showFirstRunRecordingPolicy();
@@ -190,7 +193,9 @@ class ExpressionTrainer {
     document.getElementById('btn-history-start')?.addEventListener('click', () => this.showTraining());
     this.historyMore?.addEventListener('click', () => this.loadHistory(true));
     this.reportBack?.addEventListener('click', () => this.reportSource === 'comparison'
-      ? this.comparison.restore() : this.showHistory({restore:true}));
+      ? this.comparison.restore() : this.reportSource === 'practice' && this.practiceReturn
+        ? this.openHistoryRecord(this.practiceReturn.id,{reportId:this.practiceReturn.reportId,source:this.practiceReturn.source,
+          returnTo:this.practiceReturn.returnTo}) : this.showHistory({restore:true}));
     this.retrySave?.addEventListener('click', () => this.retryTrainingSave());
     this.btnStart.addEventListener('click', () => this.startRecording());
     this.btnPause.addEventListener('click', () => this.pauseRecording());
@@ -378,6 +383,16 @@ class ExpressionTrainer {
     this.btnStart.disabled = true;
     const startAttempt = {};
     this.asrStartAttempt = startAttempt;
+    this.trainingSetup?.lock(true);
+    await this.trainingSetup?.ready;
+    if (this.asrStartAttempt !== startAttempt) return;
+    try { startAttempt.context = this.trainingSetup?.snapshot() || TrainingContext.normalizeTrainingContext(); }
+    catch {
+      this.asrStartAttempt = null;
+      this.finishTrainingPreparation();
+      this.showUserMessage('请检查主题或场景，最多可填写 2000 个字符。');
+      return;
+    }
     let policyAccepted;
     try {
       policyAccepted = await this.ensureRecordingPolicyAcknowledged();
@@ -518,7 +533,7 @@ class ExpressionTrainer {
 
     let durableSession = null;
     if (this.persistence) {
-      try { durableSession = await this.persistence.start({createdAt:new Date().toISOString(),source:'microphone'}); }
+      try { durableSession = await this.persistence.start({createdAt:new Date().toISOString(),source:'microphone',...startAttempt.context}); }
       catch (error) {
         tracker.queue.cancel();
         this.audioFeedTracker = null;
@@ -535,6 +550,7 @@ class ExpressionTrainer {
       return;
     }
     this.durableSession = durableSession;
+    this.trainingSetup?.started(durableSession || startAttempt.context);
     this.asrStartAttempt = null;
 
     this.isRecording = true;
@@ -774,6 +790,9 @@ class ExpressionTrainer {
     this.trainingStatus.textContent = '语音识别处理失败，录音已停止，请重新开始';
     const retainedRecord = this.trainingRecords?.selected();
     if (retainedRecord) this.selectTrainingRecord(retainedRecord.id);
+    // A stop operation owns its final navigation; an active-capture failure must
+    // restore editable preparation itself, without replacing the error message.
+    if (!this.recordingStopOperation) this.setScreen('training');
     this.showError('语音识别处理失败，录音已停止，请重新开始');
     return this.cancelActiveAsrSession(sessionId, () => false).then(() => true);
   }
@@ -1229,12 +1248,13 @@ class ExpressionTrainer {
     await this.loadHistory();
   }
 
-  async awaitTrainingAnalysis(record,retry = false) {
+  async awaitTrainingAnalysis(record,retry = false,framework) {
     if (record.reportPending) return false;
     record.reportPending=true;
     if (this.viewingTrainingRecordId===record.id) this.btnReport.disabled=true;
     try {
-      const result=await window.api.analyzeTrainingSession({requestId:globalThis.crypto.randomUUID(),sessionId:record.id,retry});
+      const result=await window.api.analyzeTrainingSession({requestId:globalThis.crypto.randomUUID(),sessionId:record.id,retry,
+        ...(framework ? {framework} : {})});
       if (!result?.ok) throw new Error(result?.error?.message || '分析暂不可用，可重试；已保存训练保持不变。');
       return await this.refreshTrainingRecord(record);
     } catch (error) {
@@ -1277,9 +1297,25 @@ class ExpressionTrainer {
   }
 
   renderCurrentReport(record) {
+    this.reportCleanup?.();this.reportCleanup = null;
     if (record.structuredReport) {
-      StructuredReport.renderStructuredReport(this.reportBody,record.structuredReport,{segments:record.segments,
-        onEvidence:ref => this.focusReportEvidence(record,ref)});
+      this.reportCleanup = StructuredReport.renderStructuredReport(this.reportBody,record.structuredReport,{segments:record.segments,record,api:window.api,
+        onEvidence:ref => this.focusReportEvidence(record,ref),
+        onPractice:(finding,scope,continueChain = false) => {
+          const practiceRequest = {sessionId:record.id,reportId:record.structuredReport.snapshot.id,
+            findingId:continueChain ? null : finding.id,scope,continueChain};
+          this.showTraining();
+          this.trainingSetup.configure(record,{practiceRequest,practiceLabel:finding.observation});
+        },
+        onOpen:(id,reportId) => this.openHistoryRecord(id,{reportId,returnTo:{id:record.id,
+          reportId:record.structuredReport.snapshot.id,source:this.reportSource,returnTo:this.practiceReturn}}),
+        onReanalyze:framework => this.trackAnalysis(() => this.awaitTrainingAnalysis(record,true,framework)),
+        onFramework:framework => {
+          const definition = TrainingFrameworks.getFramework(framework);
+          if (!definition) return;
+          this.showTraining();
+          this.trainingSetup.configure({...record,trainingMode:'structured',framework,frameworkDefinitionVersion:definition.version});
+        }});
       this.reportAiStatus.textContent=record.dataQuality?.includes('asr-error') ? '转写未完成，已保存录音及可用证据；可改选模型进行新训练。' : '';
       this.btnReport.querySelector?.('.btn-label') && (this.btnReport.querySelector('.btn-label').textContent='重试诊断');
     } else this.renderReport(record.report || '训练已保存；暂无结构化诊断，可在设置中启用自动诊断后重试。');
@@ -1448,6 +1484,7 @@ class ExpressionTrainer {
   }
 
   finishTrainingPreparation() {
+    this.trainingSetup?.lock(this.currentScreen !== 'training' || this.isRecording || this.asrStartAttempt || this.recordingStopOperation);
     if (this.trainingStatus.dataset) this.trainingStatus.dataset.microphoneState = this.microphoneState || 'unknown';
     const loading = this.asrPreparationState === 'loading';
     this.trainingStatus.textContent = loading ? ASR_LOADING_MESSAGE
@@ -1459,6 +1496,7 @@ class ExpressionTrainer {
   }
 
   setScreen(screen, state = 'preparing') {
+    if (screen !== 'report') {this.reportCleanup?.();this.reportCleanup = null;}
     this.currentScreen = screen;
     this.navigationGeneration = (this.navigationGeneration || 0) + 1;
     if (document.body?.dataset) {
@@ -1466,6 +1504,7 @@ class ExpressionTrainer {
       document.body.dataset.trainingState = state;
     }
     const busy = this.isRecording || this.asrStartAttempt || this.recordingStopOperation;
+    this.trainingSetup?.lock(screen !== 'training' || state !== 'preparing' || busy);
     for (const name of ['btn-home','btn-history']) {
       const button = document.getElementById?.(name);
       if (button) button.disabled = Boolean(busy);
@@ -1480,16 +1519,19 @@ class ExpressionTrainer {
     this.releaseSavedRecordCache();
     this.fullText = '';
     this.setScreen('training');
+    this.trainingSetup?.clearPractice();
     this.finishTrainingPreparation();
-    this.btnStart.focus?.();
+    const area = document.querySelector('.main-area');
+    if (area) area.scrollTop = 0;
+    document.getElementById('training-setup-title')?.focus({preventScroll:true});
   }
 
   showRecord(record, source = null) {
     this.reportSource = source;
     this.selectTrainingRecord(record.id);
     this.setScreen('report');
-    this.reportBack?.classList.toggle('hidden', !['history','comparison'].includes(source));
-    if (this.reportBack) this.reportBack.textContent = source === 'comparison' ? '← 返回对比' : '← 训练历史';
+    this.reportBack?.classList.toggle('hidden', !['history','comparison','practice'].includes(source));
+    if (this.reportBack) this.reportBack.textContent = source === 'comparison' ? '← 返回对比' : source === 'practice' ? '← 返回本轮报告' : '← 训练历史';
     if (!record.structuredReport) this.reportAiStatus && (this.reportAiStatus.textContent = record.reportStatus === 'failed' ? '上次 AI 报告生成失败，可重试；已有结果保留。' : '');
     const structuredAnalysis = record.factsSaved && typeof window.api.analyzeTrainingSession === 'function';
     this.btnReport.disabled = Boolean(record.reportPending) || !record.fullText.trim() ||
@@ -1499,7 +1541,7 @@ class ExpressionTrainer {
 
   renderRecordStatus(record) {
     if (this.viewingTrainingRecordId !== record.id || !this.recordSaveStatus) return;
-    this.recordIdentity.textContent = `${new Date(record.createdAt).toLocaleString()} · ${Math.round(record.durationMs / 1000)} 秒 · 自由表达`;
+    this.recordIdentity.textContent = `${new Date(record.createdAt).toLocaleString()} · ${Math.round(record.durationMs / 1000)} 秒 · ${TrainingContext.formatTrainingContext(record)}`;
     const states = {saving:'正在保存…',saved:'这次训练已经保存',failed:record.factsSaved ? '训练已保存，部分分析结果保存失败，请重试。' : '训练保存失败，请重试；关闭应用将丢失未保存内容。',incomplete:'这条记录未完成或已损坏，现有可读内容仍可查看。'};
     const audio = record.audioState === 'missing' ? '音频缺失，无法播放。' : record.audioState === 'corrupt' ? '音频损坏，无法播放。' : '';
     this.recordSaveStatus.textContent = [states[record.saveState] || '记录状态未知',audio,record.resultIntegrity === 'corrupt' ? '部分分析结果损坏。' : '', record.metricsAvailable === false ? '本地统计未保存，无法生成原有 AI 报告。' : '', record.segments.length ? '片段时间为估计值。' : ''].filter(Boolean).join(' ');
@@ -1538,7 +1580,7 @@ class ExpressionTrainer {
         this.comparison?.addChoice(row,item);
         const open = document.createElement('button'); open.className = 'history-row-main'; open.dataset.recordId = item.id;
         const state = item.deletionPending ? '删除未完成' : ({completed:'已保存',incomplete:'未完成',corrupt:'记录损坏',recording:'录音中',finalizing:'保存中'}[item.status] || item.status);
-        open.textContent = `${new Date(item.createdAt).toLocaleString()} · ${Math.round((item.durationMs || 0)/1000)} 秒 · 自由表达 · ${state}${item.summary ? '\n'+item.summary : ''}`;
+        open.textContent = `${new Date(item.createdAt).toLocaleString()} · ${Math.round((item.durationMs || 0)/1000)} 秒 · ${TrainingContext.formatTrainingContext(item)} · ${state}${item.summary ? '\n'+item.summary : ''}`;
         open.addEventListener('click',() => this.openHistoryRecord(item.id));
         const remove = document.createElement('button'); remove.className = 'history-row-actions'; remove.textContent = item.deletionPending ? '重试删除' : '删除';
         remove.addEventListener('click',() => this.deleteHistoryRecord(item.id));
@@ -1555,7 +1597,7 @@ class ExpressionTrainer {
     } finally { this.historyLoading = false; this.historyMore.disabled = false; }
   }
 
-  async openHistoryRecord(id) {
+  async openHistoryRecord(id,{reportId = null,returnTo = null,source = 'history'} = {}) {
     const navigation = this.navigationGeneration;
     this.historyScroll = document.getElementById('history-screen')?.scrollTop || 0;
     this.historyOpenedId = id;
@@ -1578,8 +1620,17 @@ class ExpressionTrainer {
         }
       }
       if (this.navigationGeneration !== navigation || this.deletedSessionIds?.has(id)) return;
-      this.showRecord(record,'history');
-    } catch (error) { this.historyStatus.textContent = error.message; }
+      if (reportId) {
+        const pinned = StructuredReport.selectStructuredReport(record.results,{snapshotId:reportId});
+        if (!pinned) throw new Error('这轮报告暂不可用，原录音仍可从历史查看。');
+        record.structuredReport = pinned;
+      }
+      this.practiceReturn = returnTo;
+      this.showRecord(record,returnTo ? 'practice' : source);
+    } catch (error) {
+      this.historyStatus.textContent = error.message;
+      if (this.currentScreen !== 'history') this.showUserMessage(error.message);
+    }
   }
 
   async deleteHistoryRecord(id) {
@@ -1649,6 +1700,8 @@ class ExpressionTrainer {
       audioUrl = this.getObjectUrlApi().createObjectURL(blob);
       record = {
         id: this.durableSession?.id || `record-${this.recordingSessionId}`,
+        ...TrainingContext.normalizeTrainingContext(this.durableSession || {}),
+        practice:this.durableSession?.practice ?? null,
         completedAt: new Date().toISOString(),
         audioBlob: blob,
         saveState: 'saving',

@@ -50,6 +50,61 @@ function descendants(node,predicate) {
 function byClass(node,name) {return descendants(node,child=>child.className.split(' ').includes(name));}
 function container() {return new Document().createElement('div');}
 
+test('framework report keeps common advice and evidence while recommendation requires an explicit click', () => {
+  const source = runs();
+  source[2].value.frameworkAnalysis = {framework:'star',definitionVersion:'star-v1',summary:'需要补充结果',
+    findings:[{...source[2].value.findings[0],id:'framework-1',observation:'未交代处理结果'}]};
+  const target = container(); const clicked = [];
+  api().renderStructuredReport(target,api().selectStructuredReport(source),{onFramework:id => clicked.push(id)});
+  assert.match(target.textContent,/STAR.*专项分析/);
+  assert.match(target.textContent,/未交代处理结果/);
+  assert.match(target.textContent,/观察 0/);
+  assert.equal(byClass(target,'finding').length,2);
+  delete source[2].value.frameworkAnalysis;
+  source[2].value.frameworkRecommendation = {framework:'prep',reason:'适合练习观点支撑',evidenceRefs:['segment-1']};
+  api().renderStructuredReport(target,api().selectStructuredReport(source),{onFramework:id => clicked.push(id)});
+  assert.deepEqual(clicked,[]);
+  const button = byClass(target,'framework-recommendation')[0];
+  assert.match(button.textContent,/PREP/); button.click();
+  assert.deepEqual(clicked,['prep']);
+});
+
+test('finding practice actions expose adjustable scope and the current goal keeps a distinct continuation action', () => {
+  const source = runs(); const target = container(); const clicks = [];
+  const record = {id:'session-1',practice:{round:3,scope:'full',goal:{category:'organization',observation:'先说明结论',recommendation:'用一句话开场'}}};
+  api().renderStructuredReport(target,api().selectStructuredReport(source),{record,onPractice:(...args) => clicks.push(args)});
+  assert.match(target.textContent,/第 3 轮/);
+  assert.match(target.textContent,/相比上一轮/);
+  const scopes = byClass(target,'practice-scope'); assert.equal(scopes.length,2);
+  scopes[1].value = 'sentence';
+  const buttons = byClass(target,'practice-start'); assert.equal(buttons.length,2);
+  buttons[1].click();
+  assert.equal(clicks[0][0].id,'finding-1-0'); assert.equal(clicks[0][1],'sentence');
+  buttons[0].click();
+  assert.equal(clicks[1][2],true);
+});
+
+test('damaged optional framework or practice results cannot replace an earlier readable report', () => {
+  for (const value of [{frameworkAnalysis:{framework:'star',summary:'x',findings:'broken'}},
+    {frameworkRecommendation:{framework:'unknown',reason:'x'}},{practiceFeedback:{status:'improved',summary:'x',previousEvidenceRefs:7}}]) {
+    const before = runs(); const after = runs('2');Object.assign(after[2].value,value);
+    assert.equal(api().selectStructuredReport([...before,...after]).snapshot.id,'report-snapshot-1');
+  }
+});
+
+test('a deleted practice source hides the old improvement claim while retaining the current goal', async () => {
+  const source = runs();const target = container();
+  source[2].value.practiceFeedback = {status:'improved',summary:'旧结论声称明显改善',previousEvidenceRefs:['segment-1'],currentEvidenceRefs:['segment-1']};
+  const record = {id:'current',practice:{round:3,previousSessionId:'deleted',scope:'full',
+    goal:{category:'organization',observation:'先说明结论',recommendation:'用一句话开场'}}};
+  const dispose = api().renderStructuredReport(target,api().selectStructuredReport(source),{record,
+    api:{getTrainingSession:async () => ({ok:true,value:null})}});
+  await new Promise(resolve => setImmediate(resolve));
+  assert.match(target.textContent,/来源报告已删除/);
+  assert.doesNotMatch(target.textContent,/旧结论声称明显改善/);
+  assert.match(target.textContent,/先说明结论/);dispose();
+});
+
 test('report selection resolves each exact referenced run instead of mixing later orphaned metrics or diagnoses', () => {
   const source = runs();
   const later = runs('2');

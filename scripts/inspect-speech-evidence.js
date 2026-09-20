@@ -26,7 +26,7 @@ function readSaved(root,sessionId) {
   const db = new DatabaseSync(path.join(root,'sessions.sqlite'), {readOnly:true});
   try {
     db.exec('PRAGMA query_only = ON; PRAGMA busy_timeout = 3000; BEGIN;');
-    if (db.prepare('PRAGMA user_version').get().user_version !== 2) throw new Error('Expected training schema v2; no migration performed.');
+    if (![2,3,4,5].includes(db.prepare('PRAGMA user_version').get().user_version)) throw new Error('Expected training schema v2–v5; no migration performed.');
     if (!sessionId) return db.prepare(`SELECT s.id,s.created_at AS createdAt,s.duration_ms AS durationMs,
       s.status,substr(t.text,1,60) AS preview FROM sessions s LEFT JOIN transcripts t ON t.session_id=s.id
       WHERE s.deletion_pending=0 ORDER BY s.created_at DESC,s.id DESC`).all();

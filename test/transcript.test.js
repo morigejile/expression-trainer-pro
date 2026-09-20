@@ -41,6 +41,8 @@ function createElement(tagName = 'div') {
     value: '',
     dataset: {},
     disabled: false,
+    matches() { return false; },
+    contains() { return false; },
     children: [],
     get firstChild() {
       return this.children[0] ?? null;
@@ -121,6 +123,9 @@ test('utterance capability bounds saved PCM to five minutes and retains quality 
 function createTrainer() {
   global.document ??= {};
   global.document.createElement ??= createElement;
+  global.document.defaultView ??= {addEventListener(){}};
+  global.document.addEventListener ??= () => {};
+  global.document.querySelector ??= () => null;
   global.document.body ??= {dataset: {}};
   const elements = new Map();
   global.document.getElementById ??= id => {
@@ -440,8 +445,10 @@ function startupTrainer(t, prepare, {
   const elements = new Map();
   const html = require('node:fs').readFileSync(require.resolve('../src/index.html'), 'utf8');
   global.document = {
+    defaultView: {addEventListener(){}},
     addEventListener() {},
     createElement,
+    querySelector() { return null; },
     getElementById(id) {
       if (!elements.has(id)) {
         const opening = new RegExp(`<([\\w-]+)[^>]*\\bid="${id}"[^>]*>`).exec(html);
@@ -3810,4 +3817,29 @@ test('microphone failure during delayed durable creation interrupts the new shel
   assert.equal(audio.calls.enabled.includes(true), false);
   assert.equal(audio.calls.stop.length, 1);
   assert.notEqual(trainer.trainingStatus.textContent, '正在录音');
+});
+
+test('recording failure returns to editable Preparing context while retaining the failure message', async t => {
+  global.document = {createElement};
+  global.window = {api:{
+    cancelLLMRequests:async () => ({success:true}),
+    startASR:async ({sessionId}) => ({ok:true,events:[{type:'ready',sessionId,sequence:0}]}),
+    cancelASR:async () => ({ok:true,events:[]})
+  }};
+  const trainer = createTrainer();
+  trainer.isRecording = false; trainer.fullText = '';
+  trainer.audioCaptureFactory = createAudioCaptureFactoryFake().factory;
+  trainer.trainingSetup = require('../src/training-setup').createTrainingSetup({document,api:{
+    getTrainingSetup:async () => ({ok:true,value:{trainingPrompt:{source:'user',kind:'topic',text:'录音前题目'}}})
+  }});
+  t.after(() => { clearInterval(trainer.timerInterval); delete global.document; delete global.window; });
+  await trainer.startRecording();
+  assert.equal(document.getElementById('training-topic').disabled,true);
+  await trainer.failActiveRecording(trainer.asrEventState.activeSessionId);
+  assert.equal(document.body.dataset.trainingState,'preparing');
+  assert.equal(document.getElementById('btn-home').disabled,false);
+  assert.equal(document.getElementById('training-topic').disabled,false);
+  assert.match(trainer.trainingStatus.textContent,/失败/);
+  assert.equal(trainer.trainingSetup.configure({trainingPrompt:null}),true);
+  assert.equal(trainer.trainingSetup.snapshot().trainingPrompt,null);
 });
