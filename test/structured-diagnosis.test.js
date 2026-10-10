@@ -25,6 +25,98 @@ function parse(value,input = context()) {
 function apiResponse(content) { return {ok:true,status:200,async json() { return {choices:[{message:{content}}]}; }}; }
 const profile = {provider:'openai',apiKey:'test-secret-key',model:'fixture-model'};
 
+test('flat framework output becomes the existing snapshot shape using the requested target, not the original training framework', () => {
+  for (const framework of ['prep','star','pyramid']) {
+    const source = context();
+    source.trainingContext = {trainingMode:'structured',framework:'star',frameworkDefinitionVersion:'star-v1'};
+    source.analysisTarget = {framework,definitionVersion:`${framework}-v1`};
+    const data = {...response(),frameworkSummary:'专项反馈',frameworkFindings:[{...response().findings[0],id:'framework-1'}],frameworkRecommendation:null};
+    assert.deepEqual(parse(JSON.stringify(data),source),{...response(),frameworkRecommendation:null,
+      frameworkAnalysis:{framework,definitionVersion:`${framework}-v1`,summary:'专项反馈',findings:data.frameworkFindings}});
+    for (const change of [d=>{d.frameworkFindings[0].evidenceRefs=['invented'];},
+      d=>{d.frameworkFindings[0].evidenceRefs=['metric:text-character-count'];},
+      d=>{d.frameworkFindings[0].id='finding-1';},d=>{d.frameworkFindings[0].category='score';},
+      d=>{d.frameworkSummary=null;},d=>{d.frameworkAnalysis={framework:'star'};},
+      d=>{d.frameworkRecommendation={framework:'prep',reason:'推荐',evidenceRefs:['segment-1']};},
+      d=>{d.score=90;}]) {
+      const invalid=structuredClone(data);change(invalid);
+      assert.throws(()=>parse(JSON.stringify(invalid),source),{code:'invalid-response'});
+    }
+  }
+});
+
+test('flat Free output and practice feedback keep their existing evidence and availability rules', () => {
+  const source=context();
+  const data={...response(),frameworkSummary:null,frameworkFindings:[],frameworkRecommendation:null,
+    practiceFeedback:{status:'improved',summary:'本轮先说结论',previousEvidenceRefs:['previous-1'],currentEvidenceRefs:['segment-1']}};
+  source.practiceComparison={status:'available',previous:{transcript:{segments:[{id:'previous-1'}]}}};
+  assert.deepEqual(parse(JSON.stringify(data),source),{...response(),frameworkAnalysis:null,frameworkRecommendation:null,practiceFeedback:data.practiceFeedback});
+  for (const change of [d=>{d.frameworkSummary='不应有专项分析';},d=>{d.frameworkFindings=[response().findings[0]];},
+    d=>{d.practiceFeedback.previousEvidenceRefs=['invented'];},
+    d=>{d.practiceFeedback.previousEvidenceRefs=['我觉得这个事情再看看。'];},
+    d=>{d.practiceFeedback.currentEvidenceRefs=['这是观点。'];}]) {
+    const invalid=structuredClone(data);change(invalid);
+    assert.throws(()=>parse(JSON.stringify(invalid),source),{code:'invalid-response'});
+  }
+  source.practiceComparison={status:'unavailable'};
+  assert.throws(()=>parse(JSON.stringify(data),source),{code:'invalid-response'});
+});
+
+test('prompt examples teach parallel Finding arrays and remain consumable by the snapshot parser', () => {
+  const {getStructuredDiagnosisPrompt}=require('../lib/structured-diagnosis');
+  for (const framework of [null,'prep','star','pyramid']) {
+    const source=context();
+    if (framework) source.analysisTarget={framework,definitionVersion:`${framework}-v1`};
+    for (const practice of [false,true]) {
+      if (practice) source.practiceComparison={status:'unavailable'};
+      const {system}=getStructuredDiagnosisPrompt(source);
+      const template=JSON.parse(system.match(/\n(\{\n[\s\S]+?\n\})\n/)[1]);
+      assert.deepEqual(Object.keys(template).sort(),['schemaVersion','summary','findings','frameworkSummary',
+        'frameworkFindings','frameworkRecommendation',...(practice?['practiceFeedback']:[])].sort());
+      assert.equal(template.frameworkSummary===null,!framework);
+      // Replace only the declared placeholder citations with supplied source IDs.
+      // All other example fields must satisfy the same parser used for real output.
+      for (const finding of [...template.findings,...template.frameworkFindings]) finding.evidenceRefs=['segment-1'];
+      const parsed=parse(JSON.stringify(template),source);
+      assert.equal(parsed.frameworkAnalysis?.framework ?? null,framework);
+      assert.equal(parsed.practiceFeedback?.status ?? null,practice?'unavailable':null);
+    }
+  }
+});
+
+test('DeepSeek diagnosis requests JSON output for Free and each reanalysis target while still validating evidence', async () => {
+  const {sendStructuredDiagnosis} = require('../lib/ai-feedback');
+  for (const framework of [null,'prep','star','pyramid']) {
+    const source = context();
+    if (framework) source.analysisTarget = {framework,definitionVersion:`${framework}-v1`};
+    const data = {...response(),frameworkAnalysis:null,frameworkRecommendation:null};
+    if (framework) data.frameworkAnalysis = {framework,definitionVersion:`${framework}-v1`,summary:'专项反馈',findings:[]};
+    let request;
+    const fetchImpl = async (_url,options) => {
+      request = JSON.parse(options.body);
+      const {frameworkAnalysis,...common}=data;
+      return apiResponse(JSON.stringify({...common,frameworkSummary:frameworkAnalysis?.summary ?? null,frameworkFindings:frameworkAnalysis?.findings ?? []}));
+    };
+    assert.deepEqual(await sendStructuredDiagnosis(source,{...profile,provider:'deepseek'},{fetchImpl}),data);
+    assert.deepEqual(request.response_format,{type:'json_object'});
+    assert.equal(JSON.parse(request.messages[1].content).trainingContext.trainingMode,'free');
+    data.findings[0].evidenceRefs = ['invented'];
+    await assert.rejects(sendStructuredDiagnosis(source,{...profile,provider:'deepseek'},{fetchImpl}),{code:'invalid-response'});
+  }
+});
+
+test('JSON output is limited to the known DeepSeek structured endpoint and does not change text feedback', async () => {
+  const {sendStructuredDiagnosis,sendFeedback} = require('../lib/ai-feedback');
+  const requests = [];
+  for (const provider of ['openai','custom','ollama']) {
+    await sendStructuredDiagnosis(context(),{...profile,provider,baseUrl:'https://example.test/v1'},
+      {fetchImpl:async (_url,options) => {requests.push(JSON.parse(options.body));return apiResponse(JSON.stringify(response()));}});
+  }
+  assert.equal(await sendFeedback('测试表达',{...profile,provider:'deepseek'},null,
+    {fetchImpl:async (_url,options) => {requests.push(JSON.parse(options.body));return apiResponse('补充例子。');}}),'补充例子。');
+  assert.ok(requests.every(request => !Object.hasOwn(request,'response_format')));
+});
+
 test('selected framework feedback retains common findings and rejects another framework, version or unsupported evidence', () => {
   const source = context();
   source.trainingContext = {trainingMode:'structured',framework:'star',frameworkDefinitionVersion:'star-v1',trainingPrompt:null};
@@ -160,9 +252,11 @@ test('provider response validation pins the selected framework and both practice
     assert.equal(sent.analysisTarget.framework,'star');assert.equal(sent.trainingContext.trainingMode,'free');
     assert.equal(sent.practiceComparison.previous.transcript.segments[0].text,'之前的表达');
     source.analysisTarget.framework='prep';source.practiceComparison.previous.transcript.segments=[];
-    return apiResponse(JSON.stringify(data));
+    const {frameworkAnalysis,...common}=data;
+    return apiResponse(JSON.stringify({...common,frameworkSummary:frameworkAnalysis.summary,
+      frameworkFindings:frameworkAnalysis.findings,frameworkRecommendation:null}));
   }});
-  assert.deepEqual(result,data);
+  assert.deepEqual(result,{...data,frameworkRecommendation:null});
 });
 
 test('structured invalid output uses the existing safe invalid-response envelope', async () => {
