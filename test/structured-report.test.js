@@ -252,3 +252,15 @@ test('clearing the projection removes the previous report without leaving stale 
   api().renderStructuredReport(target,null);
   assert.equal(target.children.length,0);
 });
+
+test('common and framework expression references are optional suggestions separate from original evidence',()=>{
+  for (const example of [undefined,null,'建议参考，不是原文 <script>evil()</script>']) {
+    const source=runs();if (example!==undefined) source[2].value.findings[0].example=example;
+    source[2].value.frameworkAnalysis={framework:'prep',definitionVersion:'prep-v1',summary:'框架摘要',findings:[{...source[2].value.findings[0],id:'framework-example'}]};
+    const target=container();api().renderStructuredReport(target,api().selectStructuredReport(source),{segments:[{id:'segment-1',text:'用户原文'}]});
+    const references=byClass(target,'example');assert.equal(references.length,typeof example==='string'?2:0);
+    assert.ok(byClass(target,'evidence-quote').every(node=>node.textContent==='用户原文'));
+    assert.equal(descendants(target,node=>node.tagName==='SCRIPT').length,0);
+    assert.match(target.textContent,/建议 0/);
+  }
+});

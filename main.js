@@ -10,15 +10,11 @@ const {customWordsToFillers} = require('./lib/custom-prompt-config');
 const {createCustomPromptStore} = require('./lib/custom-prompt-store');
 const {formatSafeError} = require('./lib/safe-log');
 const {createDiagnosticSnapshot} = require('./lib/diagnostics');
-const {isAllowedSupportUrl} = require('./shared/support-links');
+const {isTrustedUtilityEvent, registerTrustedUtilityIpc, registerTrainingCloseDecisionIpc} = require('./lib/trusted-utility-ipc');
 const { loadLexicon, analyzeText } = require('./lib/lexicon');
-const {
-  getSelectedLlmProviderSettings,
-  getLlmProfile,
-  summarizeLlmProfiles,
-  selectActiveLlmProfile
-} = require('./lib/llm-provider-config');
-const {resolveAutomaticDiagnosisProfile} = require('./lib/llm-provider-config');
+const {createAiAnalysisGate} = require('./lib/ai-analysis-gate');
+const {loadAiDisclosure,acknowledgeAiDisclosure} = require('./lib/ai-disclosure-store');
+const {registerAiDisclosureIpc} = require('./lib/ai-disclosure-ipc');
 const {buildSessionAnalysisInputs} = require('./lib/session-analysis-inputs');
 const {createSpeechEvidenceRunner} = require('./lib/speech-evidence-model');
 const {buildAnalysisContext} = require('./lib/analysis-context');
@@ -33,6 +29,7 @@ const {
 } = require('./lib/recording-policy-store');
 const {calculateInitialWindowSize} = require('./lib/window-bounds');
 const { createAsrIpcRouter } = require('./lib/asr-ipc');
+const {createAsrRecordingScheduler} = require('./lib/asr-recording-scheduler');
 const { createAsrProcessController } = require('./lib/asr-process-controller');
 const {createAsrSelectionStore} = require('./lib/asr-selection-store');
 const {createModelManager} = require('./lib/model-manager');
@@ -239,7 +236,21 @@ app.setName('宇宙无敌表达训练');
 let mainWindow;
 let settingsWindow;
 let promptEditorWindow;
+const recordingScheduler=createAsrRecordingScheduler({getWebContents:()=>mainWindow?.webContents});
 const llmRequests = createRequestCoordinator();
+const aiAnalysisGate=createAiAnalysisGate({
+  loadSettings:()=>loadLlmProviderSettings(app.getPath('userData')),
+  loadDisclosure:()=>loadAiDisclosure(app.getPath('userData'))
+});
+function selectAnalysisProfile(options) {
+  try{return aiAnalysisGate.resolve(options);}catch{return {profile:null,reason:'configuration-unavailable'};}
+}
+function blockedAnalysis(reason) {
+  const messages={'disclosure-required':'请先阅读并确认 AI 分析数据说明。','not-enabled':'当前配置未开启自动分析。',
+    'not-configured':'请先选择有效的 AI 模型配置。','configuration-unavailable':'AI 配置暂时无法读取，请重试。'};
+  return {success:false,error:messages[reason] || 'AI 分析暂不可用。',
+    errorCode:reason==='disclosure-required'?'ai-disclosure-required':reason};
+}
 let applicationShutdownStarted = false;
 let applicationShutdownComplete = false;
 let trainingSessions;
@@ -253,8 +264,10 @@ app.on('second-instance', () => {
 });
 
 function publishAsrModelState(state) {
-  if (settingsWindow && !settingsWindow.isDestroyed()) {
-    settingsWindow.webContents.send('asr-model-state-changed', state);
+  for (const window of [mainWindow, settingsWindow]) {
+    if (window && !window.isDestroyed() && !window.webContents.isDestroyed()) {
+      window.webContents.send('asr-model-state-changed', state);
+    }
   }
 }
 
@@ -266,7 +279,8 @@ async function refreshAsrModelState() {
 registerAsrModelManagementIpc({
   ipcMain,
   router: asrModelManagement,
-  isAllowedSender: sender => settingsWindow?.webContents === sender,
+  isAllowedEvent: event => isTrustedUtilityEvent(event, mainWindow?.webContents,
+    pathToFileURL(path.join(__dirname, 'src', 'index.html')).href),
   publishState: publishAsrModelState
 });
 
@@ -326,6 +340,18 @@ function saveCustomPrompt(data) {
   return customPromptStore.save(app.getPath('userData'), data);
 }
 
+function armTrainingCloseTimer(window) {
+  clearTimeout(window.trainingCloseTimer);
+  // A hung renderer must never turn an unconfirmed save into a silent success.
+  window.trainingCloseTimer = setTimeout(() => {
+    if (mainWindow !== window || window.isDestroyed() || !window.trainingClosePending) return;
+    window.trainingClosePending = false;
+    const choice = dialog.showMessageBoxSync(window, {type:'warning',buttons:['继续等待','退出'],defaultId:0,cancelId:0,
+      message:'尚未确认训练保存完成，退出可能丢失未保存内容。'});
+    if (choice === 1) { window.trainingCloseApproved = true; window.close(); }
+  }, 10000);
+}
+
 function createMainWindow() {
   const initialSize = calculateInitialWindowSize(screen.getPrimaryDisplay().workAreaSize);
   mainWindow = new BrowserWindow({
@@ -335,7 +361,9 @@ function createMainWindow() {
     minHeight: 640,
     backgroundColor: '#000000',
     title: '宇宙无敌表达训练',
-    titleBarStyle: 'hiddenInset',
+    titleBarStyle: process.platform === 'win32' ? 'hidden' : 'hiddenInset',
+    titleBarOverlay: process.platform === 'win32'
+      ? {color: '#00000000', symbolColor: '#756d5b', height: 32} : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -351,15 +379,9 @@ function createMainWindow() {
     event.preventDefault();
     if (mainWindow.trainingClosePending) return;
     mainWindow.trainingClosePending = true;
+    mainWindow.trainingCloseDecisionPending = false;
     mainWindow.webContents.send('training:prepare-close');
-    // A hung renderer must never turn an unconfirmed save into a silent success.
-    mainWindow.trainingCloseTimer = setTimeout(() => {
-      if (!mainWindow || mainWindow.isDestroyed() || !mainWindow.trainingClosePending) return;
-      mainWindow.trainingClosePending = false;
-      const choice = dialog.showMessageBoxSync(mainWindow, {type:'warning',buttons:['继续等待','退出'],defaultId:0,cancelId:0,
-        message:'尚未确认训练保存完成，退出可能丢失未保存内容。'});
-      if (choice === 1) { mainWindow.trainingCloseApproved = true; mainWindow.close(); }
-    }, 10000);
+    armTrainingCloseTimer(mainWindow);
   });
 
   mainWindow.on('closed', () => {
@@ -383,12 +405,6 @@ function broadcastLlmProviderSettingsChanged() {
       window.webContents.send('llm-provider-settings-changed');
     }
   }
-}
-
-function rejectNonSettingsSender(event) {
-  if (settingsWindow && !settingsWindow.isDestroyed()
-      && settingsWindow.webContents === event.sender) return null;
-  return {success: false, error: '仅设置窗口可访问完整 LLM 配置'};
 }
 
 function createPromptEditorWindow() {
@@ -510,10 +526,11 @@ app.whenReady().then(async () => {
         userDataPath:app.getPath('userData'),modelRoot:path.join(modelRoot,'speech-evidence'),appVersion:app.getVersion(),
         spawn:entry => utilityProcess.fork(entry,[],{serviceName:'expression-trainer-speech-evidence',stdio:'pipe'})
       }).run,
-      getDiagnosisProfile:() => resolveAutomaticDiagnosisProfile(loadLlmProviderSettings(app.getPath('userData'))),
+      getDiagnosisProfile:options => aiAnalysisGate.resolve(options),
       getAnalysisInputs:(session,options) => buildSessionAnalysisInputs(session,loadCustomPrompt(),options),
-      diagnose:({profile,signal,...input}) => {
+      diagnose:({profile,signal,trigger,...input}) => {
         const context=buildAnalysisContext(input);
+        aiAnalysisGate.requireUnchanged(profile,{trigger});
         return (isSmokeTest ? smokeTest.fakeLlm.sendStructuredDiagnosis : require('./lib/ai-feedback').sendStructuredDiagnosis)(context,profile,{signal});
       }
     },
@@ -533,6 +550,10 @@ app.whenReady().then(async () => {
     ipcMain, application: trainingSessions, getMainWebContents: () => mainWindow?.webContents,
     mainUrl: pathToFileURL(path.join(__dirname, 'src', 'index.html')).href
   });
+  registerAiDisclosureIpc({ipcMain,getMainWebContents:()=>mainWindow?.webContents,
+    mainUrl:pathToFileURL(path.join(__dirname,'src','index.html')).href,
+    getState:options=>aiAnalysisGate.getState(options),
+    acknowledge:options=>acknowledgeAiDisclosure(app.getPath('userData'),options)});
   if (process.platform === 'darwin') {
     Menu.setApplicationMenu(Menu.buildFromTemplate([
       {
@@ -618,56 +639,6 @@ ipcMain.handle('save-appearance', (event, appearance) => {
   }
 });
 
-// LLM Provider 设置
-ipcMain.handle('get-llm-provider-settings', event => {
-  const rejection = rejectNonSettingsSender(event);
-  if (rejection) return rejection;
-  return loadLlmProviderSettings(app.getPath('userData'));
-});
-
-ipcMain.handle('save-llm-provider-settings', (event, settings) => {
-  const rejection = rejectNonSettingsSender(event);
-  if (rejection) return rejection;
-  try {
-    saveLlmProviderSettings(app.getPath('userData'), settings);
-    broadcastLlmProviderSettingsChanged();
-    return { success: true };
-  } catch (error) {
-    if (error.code === 'unsupported-schema-version') {
-      return { success: false, error: '当前版本无法保存更高版本的 LLM Provider 配置' };
-    }
-    throw error;
-  }
-});
-
-ipcMain.handle('get-llm-profile-summaries', () => {
-  return summarizeLlmProfiles(loadLlmProviderSettings(app.getPath('userData')));
-});
-
-ipcMain.handle('select-llm-profile', (event, profileId) => {
-  if (typeof profileId !== 'string' || !profileId.trim() || profileId.length > 128) {
-    return {success: false, error: 'Invalid LLM profile ID'};
-  }
-
-  try {
-    const selected = selectActiveLlmProfile(
-      loadLlmProviderSettings(app.getPath('userData')),
-      profileId
-    );
-    const saved = saveLlmProviderSettings(app.getPath('userData'), selected);
-    broadcastLlmProviderSettingsChanged();
-    return {success: true, summary: summarizeLlmProfiles(saved)};
-  } catch (error) {
-    if (error.code === 'unsupported-schema-version') {
-      return {success: false, error: '当前版本无法保存更高版本的 LLM Provider 配置'};
-    }
-    if (error.code === 'invalid-profile-id') {
-      return {success: false, error: 'Unknown LLM profile ID'};
-    }
-    throw error;
-  }
-});
-
 ipcMain.handle('get-recording-policy', () => {
   return {acknowledged: loadRecordingPolicy(app.getPath('userData')).acknowledged};
 });
@@ -687,24 +658,6 @@ ipcMain.handle('acknowledge-recording-policy', () => {
   }
 });
 
-ipcMain.handle('open-settings', () => {
-  createSettingsWindow();
-});
-
-// Prompt编辑器相关
-ipcMain.handle('open-prompt-editor', () => {
-  createPromptEditorWindow();
-});
-
-ipcMain.handle('get-custom-prompt', () => {
-  return loadCustomPrompt();
-});
-
-ipcMain.handle('save-custom-prompt', (event, data) => {
-  saveCustomPrompt(data);
-  return { success: true };
-});
-
 ipcMain.handle('close-current-window', (event) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   if (win) win.close();
@@ -714,7 +667,9 @@ ipcMain.handle('close-current-window', (event) => {
 ipcMain.handle('prepare-asr', () => trackAsrResult(asrIpc.prepare()));
 
 ipcMain.handle('start-asr', async (event, command) => {
+  const contents=mainWindow?.webContents;
   const result = await trackAsrResult(asrIpc.start(command));
+  if (result?.ok) recordingScheduler.started(command.sessionId,contents);
   if (isSmokeTest && result?.ok) fallbackManagementState.activeSession = true;
   return result;
 });
@@ -742,7 +697,15 @@ ipcMain.on('training:close-ready', (event, ready) => {
   if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) return;
   clearTimeout(mainWindow.trainingCloseTimer);
   mainWindow.trainingClosePending = false;
+  mainWindow.trainingCloseDecisionPending = false;
   if (ready === true) { mainWindow.trainingCloseApproved = true; mainWindow.close(); }
+});
+
+registerTrainingCloseDecisionIpc({
+  ipcMain,
+  getMainWindow: () => mainWindow,
+  mainUrl: pathToFileURL(path.join(__dirname, 'src', 'index.html')).href,
+  armCloseTimer: armTrainingCloseTimer
 });
 
 // 接收渲染进程发来的音频数据
@@ -751,36 +714,19 @@ ipcMain.handle('feed-audio', (event, command) => {
 });
 
 ipcMain.handle('stop-asr', async (event, command) => {
-  const result = await trackAsrResult(asrIpc.stop(command));
-  if (isSmokeTest && result?.ok) fallbackManagementState.activeSession = false;
-  return result;
+  try {
+    const result = await trackAsrResult(asrIpc.stop(command));
+    if (isSmokeTest && result?.ok) fallbackManagementState.activeSession = false;
+    return result;
+  } finally { recordingScheduler.finished(command); }
 });
 
 ipcMain.handle('cancel-asr', async (event, command) => {
-  const result = await trackAsrResult(asrIpc.cancel(command));
-  if (isSmokeTest && result?.ok) fallbackManagementState.activeSession = false;
-  return result;
-});
-
-// LLM 连通性测试
-ipcMain.handle('test-llm-connection', async (event, settings) => {
-  const rejection = rejectNonSettingsSender(event);
-  if (rejection) return rejection;
-  const providerConfig = getSelectedLlmProviderSettings(settings);
-  const request = llmRequests.begin(event.sender.id, 'connection');
   try {
-    return await testConnection(
-      { ...settings, ...providerConfig },
-      { signal: request.signal }
-    );
-  } finally {
-    request.finish();
-  }
-});
-
-ipcMain.handle('cancel-llm-requests', (event) => {
-  llmRequests.cancelAll(event.sender.id);
-  return { success: true };
+    const result = await trackAsrResult(asrIpc.cancel(command));
+    if (isSmokeTest && result?.ok) fallbackManagementState.activeSession = false;
+    return result;
+  } finally { recordingScheduler.finished(command); }
 });
 
 // 词库分析
@@ -807,7 +753,7 @@ ipcMain.handle('save-file', async (event, content, filename) => {
   return { success: false };
 });
 
-ipcMain.handle('export-diagnostics', async (event, audioRates) => {
+async function exportDiagnostics(audioRates) {
   const {dialog} = require('electron');
   const controller = asrProvider.snapshot();
   const diagnosticModelId = controller.effectiveModelId || controller.selectedModelId || modelRegistry.defaultModelId;
@@ -833,73 +779,79 @@ ipcMain.handle('export-diagnostics', async (event, audioRates) => {
   if (result.canceled || !result.filePath) return {success: false};
   fs.writeFileSync(result.filePath, `${JSON.stringify(snapshot, null, 2)}\n`, 'utf8');
   return {success: true, path: result.filePath};
-});
+}
 
-ipcMain.handle('open-support-link', async (event, rawUrl) => {
-  if (!isAllowedSupportUrl(rawUrl)) {
-    return {success: false, error: '不支持的反馈目标'};
-  }
-  try {
-    await shell.openExternal(rawUrl);
-    return {success: true};
-  } catch {
-    return {success: false, error: '无法打开问题和建议文档'};
-  }
+registerTrustedUtilityIpc({
+  ipcMain,
+  getMainWebContents: () => mainWindow?.webContents,
+  mainUrl: pathToFileURL(path.join(__dirname, 'src', 'index.html')).href,
+  openUtility: target => mainWindow.webContents.send('utility-open', target),
+  getAppInfo: () => ({name: app.getName(), version: app.getVersion()}),
+  loadSettings: () => loadLlmProviderSettings(app.getPath('userData')),
+  saveSettings: settings => saveLlmProviderSettings(app.getPath('userData'), settings),
+  publishSettings: broadcastLlmProviderSettingsChanged,
+  loadPrompt: loadCustomPrompt,
+  savePrompt: saveCustomPrompt,
+  requests: llmRequests,
+  testConnection,
+  exportDiagnostics,
+  openSupportLink: async url => {await shell.openExternal(url); return {success: true};}
 });
 
 // AI反馈（传入customPrompt）
 ipcMain.handle('get-realtime-feedback', async (event, text) => {
   const normalizedText = requireBoundedText(text, {label: 'text'});
-  const settings = loadLlmProviderSettings(app.getPath('userData'));
-  const providerConfig = getSelectedLlmProviderSettings(settings);
+  const {profile:providerConfig,reason}=selectAnalysisProfile({trigger:'automatic'});
+  if (!providerConfig) return blockedAnalysis(reason);
   const customPrompt = loadCustomPrompt();
   return runCoordinatedRequest(
     llmRequests,
     event.sender.id,
     'realtime',
     'feedback',
-    (signal) => sendFeedback(
+    (signal) => {aiAnalysisGate.requireUnchanged(providerConfig,{trigger:'automatic'});return sendFeedback(
       normalizedText,
-      { ...settings, ...providerConfig },
+      providerConfig,
       customPrompt,
       { signal }
-    )
+    );}
   );
 });
 
 ipcMain.handle('get-final-report', async (event, payload) => {
   const {fullText, stats} = validateFinalReportPayload(payload);
-  const settings = loadLlmProviderSettings(app.getPath('userData'));
-  const providerConfig = getSelectedLlmProviderSettings(settings);
+  const {profile:providerConfig,reason}=selectAnalysisProfile({trigger:'manual'});
+  if (!providerConfig) return blockedAnalysis(reason);
   const customPrompt = loadCustomPrompt();
   const result = await runCoordinatedRequest(
     llmRequests,
     event.sender.id,
     'report',
     'report',
-    (signal) => sendReport(
+    (signal) => {aiAnalysisGate.requireUnchanged(providerConfig,{trigger:'manual'});return sendReport(
       fullText,
       stats,
-      { ...settings, ...providerConfig },
+      providerConfig,
       customPrompt,
       { signal }
-    )
+    );}
   );
   return {...result, createdAt:new Date().toISOString(), provenance:analysisProvenance(providerConfig, customPrompt, 'report-v1')};
 });
 
 ipcMain.handle('analyze-playback', async (event, payload) => {
   const requestPayload = validatePlaybackAnalysisPayload(payload);
-  const settings = loadLlmProviderSettings(app.getPath('userData'));
-  const profile = getLlmProfile(settings, requestPayload.profileId);
-  if (!profile) return {success: false, error: '所选模型配置不存在', errorCode: 'invalid-profile-id'};
+  const {profile,reason}=selectAnalysisProfile({trigger:'manual',profileId:requestPayload.profileId});
+  if (!profile) return reason==='not-configured'
+    ? {success:false,error:'所选模型配置不存在或不可用',errorCode:'invalid-profile-id'} : blockedAnalysis(reason);
   const customPrompt = loadCustomPrompt();
   const result = await runCoordinatedRequest(
     llmRequests,
     event.sender.id,
     'playback',
     'analysis',
-    signal => sendPlaybackAnalysis(requestPayload.segments, profile, customPrompt, {signal})
+    signal => {aiAnalysisGate.requireUnchanged(profile,{trigger:'manual',profileId:requestPayload.profileId});
+      return sendPlaybackAnalysis(requestPayload.segments, profile, customPrompt, {signal});}
   );
   const metadata = {createdAt:new Date().toISOString(), provenance:analysisProvenance(profile, customPrompt, 'playback-v1')};
   if (!result.success) return {...result,...metadata};

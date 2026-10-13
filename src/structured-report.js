@@ -9,7 +9,9 @@
     ? require('../shared/report-selection') : globalThis.ReportSelection;
   const REASONS = {
     'not-configured':'尚未配置 AI 服务，可在设置中添加配置后重试',
-    'not-enabled':'自动 AI 诊断尚未启用，可在设置中启用后重试',
+    'not-enabled':'自动 AI 诊断尚未启用，可主动分析这一次',
+    'disclosure-required':'尚未完成 AI 数据告知，确认说明后可分析这一次',
+    'configuration-changed':'分析配置已改变，请检查当前配置后重试',
     'network':'网络连接失败，可重试',timeout:'分析等待超时，可重试',cancelled:'分析已取消',
     'unauthorized':'AI 服务认证失败，请检查配置','rate-limited':'AI 服务暂时限流，可稍后重试',
     'invalid-response':'AI 结果未通过校验，可重试','invalid-json':'AI 结果格式无效，可重试',
@@ -29,7 +31,7 @@
     'occurrences/recorded-minute':'次/录音分钟'};
   const reasonText = reason => REASONS[reason] || '当前证据或分析不可用';
 
-  function renderStructuredReport(container,projection,{onEvidence,onFramework,onReanalyze,onPractice,onOpen,record,api,segments = []} = {}) {
+  function renderStructuredReport(container,projection,{onEvidence,onFramework,onReanalyze,onPractice,onOpen,onLayout,record,api,frozen:useFrozen=false,segments = []} = {}) {
     container.replaceChildren();
     if (!projection) return;
     const document = container.ownerDocument;
@@ -41,9 +43,10 @@
     }
     const {evidenceRun,metricRun,analysisRun,latestAttempt} = projection;
     const root = element('section','structured-report');
+    const frozen=useFrozen || document.body?.dataset?.frozenUi==='report';
     root.setAttribute('aria-label','本次表达报告');
     const practiceView = typeof module === 'object' && module.exports ? require('./practice-report') : globalThis.PracticeReport;
-    const dispose = record?.practice ? practiceView.renderPractice(element,root,{record,projection,api,onPractice,onOpen,onEvidence}) : () => {};
+    const dispose = record?.practice ? practiceView.renderPractice(element,root,{record,projection,api,onPractice,onOpen,onEvidence,frozen,onLayout}) : () => {};
     const successful = analysisRun.status === 'completed';
     root.appendChild(element('h2','report-title','本次表现摘要'));
     root.appendChild(element('p','report-summary',successful ? analysisRun.value.summary : '本地分析已保留，AI 诊断暂不可用。'));
@@ -82,16 +85,25 @@
     }
     table.appendChild(body);metricDetails.appendChild(table);
 
+    let findingIndex=0;
     function findingCard(finding) {
       const card = element('article','finding');
-      card.appendChild(element('p','finding-category',CATEGORIES[finding.category]));
-      card.appendChild(element('h3','finding-observation',finding.observation));
       const details = element('details','finding-details');
-      details.appendChild(element('summary',null,'解释、建议与证据'));
-      details.appendChild(element('h4',null,'解释'));
-      details.appendChild(element('p','finding-interpretation',finding.interpretation));
-      details.appendChild(element('h4',null,'建议'));
-      details.appendChild(element('p','finding-recommendation',finding.recommendation));
+      details.setAttribute('data-finding-id',finding.id);
+      details.appendChild(element('summary',frozen?'visually-hidden':null,'解释、建议与证据'));
+      let content=details;
+      if (frozen) {
+        card.className+=' frozen-finding';
+        const row=element('div','finding-row');row.appendChild(element('span','finding-index',String(++findingIndex).padStart(2,'0')));
+        const title=element('div');title.append(element('h3','finding-observation',finding.observation),element('p','finding-category',CATEGORIES[finding.category]));
+        const toggle=element('button','finding-open');toggle.type='button';toggle.setAttribute('aria-label',`展开：${finding.observation}`);
+        details.id=`finding-detail-${finding.id}`;toggle.setAttribute('aria-controls',details.id);toggle.setAttribute('aria-expanded','false');
+        const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');
+        const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d','m6 9 6 6 6-6');svg.appendChild(path);toggle.appendChild(svg);
+        toggle.addEventListener('click',()=>{details.open=!details.open;toggle.setAttribute('aria-expanded',String(details.open));});
+        details.addEventListener('toggle',()=>toggle.setAttribute('aria-expanded',String(details.open)));
+        row.append(title,toggle);card.appendChild(row);content=element('div','finding-detail');details.appendChild(content);
+      } else card.append(element('p','finding-category',CATEGORIES[finding.category]),element('h3','finding-observation',finding.observation));
       const evidence = element('div','finding-evidence');
       for (const ref of finding.evidenceRefs) {
         const metric = ref.startsWith('metric:') ? metricById.get(ref.slice(7)) : null;
@@ -105,36 +117,50 @@
           if (metric) metricDetails.open = true;
           if (typeof onEvidence === 'function') onEvidence(ref);
         });
-        evidence.appendChild(button);
-        if (transcript) evidence.appendChild(element('blockquote','evidence-quote',transcript.text));
+        const block=frozen?element('div','evidence-block'):evidence;
+        if (frozen) {
+          const seconds=Number.isFinite(transcript?.startMs)?Math.floor(transcript.startMs/1000):null;
+          block.appendChild(element('span',null,transcript ? `你的原话${seconds===null?'':` · ${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`}` : metric?'本地指标证据':'语音活动证据'));
+        }
+        if (transcript) block.appendChild(element('blockquote','evidence-quote',transcript.text));
         if (speech) {
-          evidence.appendChild(element('p','speech-interval',
+          block.appendChild(element('p','speech-interval',
             `VAD 模型估计区间：samples ${speech.startSample}–${speech.endSample}（终点不含在区间内），不表示词语起止。`));
         }
+        block.appendChild(button);if (frozen) evidence.appendChild(block);
       }
-      details.appendChild(evidence);card.appendChild(details);
-      practiceView?.practiceAction(element,details,finding,onPractice,
+      content.appendChild(evidence);
+      content.append(element('h4',null,frozen?'为什么值得练':'解释'),element('p','finding-interpretation',finding.interpretation));
+      if (typeof finding.example==='string' && finding.example.trim()) content.append(element('h4',null,'一种表达参考'),element('p','example',finding.example));
+      content.append(element('h4',null,frozen?'下一轮怎么练':'建议'),element('p','finding-recommendation',finding.recommendation));
+      card.appendChild(details);
+      const controls=frozen?element('div','practice-controls'):content;
+      practiceView?.practiceAction(element,controls,finding,onPractice,
         ['organization','argument'].includes(finding.category) ? 'full' : finding.evidenceRefs.length === 1 ? 'sentence' : 'segment');
+      if (frozen && typeof onPractice==='function') {controls.querySelector('button').textContent='练习这一点';controls.querySelector('button').className+=' practice-action';content.appendChild(controls);}
       return card;
     }
     if (successful) {
-      const findings = analysisRun.value.findings;
+      const framework = analysisRun.value.frameworkAnalysis;
+      const findings = frozen ? [...analysisRun.value.findings,...(framework?.findings || [])] : analysisRun.value.findings;
+      const priorityCount=frozen?2:3;
       root.appendChild(element('h2',null,'优先改善'));
-      for (const finding of findings.slice(0,3)) root.appendChild(findingCard(finding));
-      if (findings.length > 3) {
-        const more = element('details','more-findings');
-        more.appendChild(element('summary',null,`更多发现（${findings.length - 3}）`));
-        for (const finding of findings.slice(3)) more.appendChild(findingCard(finding));
+      for (const finding of findings.slice(0,priorityCount)) root.appendChild(findingCard(finding));
+      if (findings.length > priorityCount) {
+        const more = element('details',frozen?'more-findings report-disclosure':'more-findings');
+        more.appendChild(element('summary',null,`更多发现（${findings.length - priorityCount}）`));
+        for (const finding of findings.slice(priorityCount)) more.appendChild(findingCard(finding));
         root.appendChild(more);
       } else if (!findings.length) {
-        root.appendChild(element('p','report-status','本次分析未形成有充分证据的改善建议。'));
+        root.appendChild(element('p','report-empty-state','本次分析未形成有充分证据的改善建议。'));
       }
       const labels = {prep:'PREP',star:'STAR',pyramid:'金字塔'};
-      const framework = analysisRun.value.frameworkAnalysis;
       if (framework) {
-        root.appendChild(element('h2',null,`${labels[framework.framework]} 专项分析`));
-        root.appendChild(element('p','framework-summary',framework.summary));
-        for (const finding of framework.findings) root.appendChild(findingCard(finding));
+        const target=frozen?element('details','framework-analysis'):root;
+        target.appendChild(element(frozen?'summary':'h2',null,`${labels[framework.framework]} 专项分析`));
+        target.appendChild(element('p','framework-summary',framework.summary));
+        if (frozen) root.appendChild(target);
+        else for (const finding of framework.findings) root.appendChild(findingCard(finding));
       }
       const rec = analysisRun.value.frameworkRecommendation;
       if (rec) {

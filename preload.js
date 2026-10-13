@@ -7,6 +7,12 @@ contextBridge.exposeInMainWorld('api', {
   getLlmProfileSummaries: () => ipcRenderer.invoke('get-llm-profile-summaries'),
   selectLlmProfile: profileId => ipcRenderer.invoke('select-llm-profile', profileId),
   openSettings: () => ipcRenderer.invoke('open-settings'),
+  getAppInfo: () => ipcRenderer.invoke('get-app-info'),
+  onUtilityOpen: (callback) => {
+    const listener = (_event, target) => callback(target);
+    ipcRenderer.on('utility-open', listener);
+    return () => ipcRenderer.removeListener('utility-open', listener);
+  },
   onLlmProviderSettingsChanged: (listener) => {
     const wrapped = () => listener();
     ipcRenderer.on('llm-provider-settings-changed', wrapped);
@@ -18,6 +24,8 @@ contextBridge.exposeInMainWorld('api', {
   saveAppearance: (appearance) => ipcRenderer.invoke('save-appearance', appearance),
   getRecordingPolicy: () => ipcRenderer.invoke('get-recording-policy'),
   acknowledgeRecordingPolicy: () => ipcRenderer.invoke('acknowledge-recording-policy'),
+  getAiDisclosureState: options => ipcRenderer.invoke('get-ai-disclosure-state', options),
+  acknowledgeAiDisclosure: options => ipcRenderer.invoke('acknowledge-ai-disclosure', options),
   onAppearanceChanged: (listener) => {
     const wrapped = (_event, appearance) => listener(appearance);
     ipcRenderer.on('appearance-changed', wrapped);
@@ -60,6 +68,7 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeListener('training:prepare-close', listener);
   },
   finishTrainingClose: ready => ipcRenderer.send('training:close-ready', ready === true),
+  trainingCloseDecisionPending: pending => ipcRenderer.send('training:close-decision-pending', pending),
 
   // 受信任 ASR 模型管理
   getAsrModelState: () => ipcRenderer.invoke('get-asr-model-state'),

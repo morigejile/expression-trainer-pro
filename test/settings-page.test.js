@@ -139,11 +139,20 @@ test('privacy disclosure distinguishes a remote Ollama endpoint from local proce
   assert.match(page.autoDiagnosisDisclosure.textContent,/语音证据/);
   assert.match(page.autoDiagnosisDisclosure.textContent,/指标/);
   assert.match(page.autoDiagnosisDisclosure.textContent,/分析指令/);
+  assert.match(page.autoDiagnosisDisclosure.textContent,/首次.*告知/);
+  assert.match(page.autoDiagnosisDisclosure.textContent,/报告.*确认/);
   assert.doesNotMatch(page.autoDiagnosisDisclosure.textContent,/password|do-not-display/);
   page.ollamaUrlInput.value = 'http://127.0.0.1:11434';
   page.onAutoDiagnosisProfileChange();
   assert.match(page.autoDiagnosisDisclosure.textContent,/本机处理/);
   assert.doesNotMatch(page.autoDiagnosisDisclosure.textContent,/远程/);
+});
+
+test('legacy custom model divergence displays the effective transmitted model when settings are opened',()=>{
+  const page=createSettingsPageWithProfiles([profile('custom',{provider:'custom',model:'old-visible',customModel:'actual-model',
+    baseUrl:'https://fixture.example/v1'})],'custom');
+  assert.equal(page.modelSelect.value,'actual-model');
+  assert.match(page.autoDiagnosisDisclosure.textContent,/actual-model/);
 });
 
 test('provider, model and actual endpoint changes require a new automatic-diagnosis opt-in', () => {

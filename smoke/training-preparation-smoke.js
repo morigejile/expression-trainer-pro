@@ -5,7 +5,7 @@ async function run({mainWindow,evaluate,wait,capture,choose,setCustom}) {
   const originalAppearance = await evaluate('({...document.documentElement.dataset})');
   const reset = () => evaluate(`window.__trainingProductTrainer.trainingSetup.configure({trainingMode:'free',framework:null,frameworkDefinitionVersion:null,trainingPrompt:null})`);
   const snapshot = () => evaluate('window.__trainingProductTrainer.trainingSetup.snapshot()');
-  const center = () => evaluate(`(() => {const area=document.querySelector('.main-area').getBoundingClientRect(),start=document.getElementById('start-control-area').getBoundingClientRect();return {x:start.x+start.width/2,y:start.y+start.height/2,dx:start.x+start.width/2-area.x-area.width/2,dy:start.y+start.height/2-area.y-area.height/2};})()`);
+  const center = () => evaluate(`(() => {const area=document.querySelector('#frozen-preparing .session-stage').getBoundingClientRect(),start=document.getElementById('prepare-ring').getBoundingClientRect();return {x:start.x+start.width/2,y:start.y+start.height/2,dx:start.x+start.width/2-area.x-area.width/2,dy:start.y+start.height/2-area.y-area.height/2};})()`);
   const hover = async () => {
     const point = await evaluate(`(()=>{const r=document.getElementById('training-settings-anchor').getBoundingClientRect();return {x:Math.round(r.x+r.width/2),y:Math.round(r.y+r.height/2)};})()`);
     mainWindow.webContents.sendInputEvent({type:'mouseMove',...point});

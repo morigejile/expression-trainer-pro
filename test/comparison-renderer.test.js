@@ -33,6 +33,23 @@ class Document {
   getElementById(id){if(!this.elements.has(id)){const el=this.createElement('div');el.id=id;this.elements.set(id,el);}return this.elements.get(id);}
 }
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return {promise,resolve};};
+
+test('History supports unrestricted selection while Comparison accepts exactly two eligible inputs',()=>{
+  const f=fixture();f.controller.selection.clear();
+  for(const id of ['a','b','c','d']){const row=f.document.createElement('div');f.trainer.historyList.appendChild(row);f.controller.addChoice(row,{id,createdAt:'2026-10-12',status:id==='d'?'recording':'completed'});}
+  const choices=f.trainer.historyList.querySelectorAll('[data-compare-id]');
+  f.controller.syncSelection();assert.equal(f.document.getElementById('btn-history-delete-selected').disabled,true);
+  for(let i=0;i<3;i++){choices[i].checked=true;choices[i].listeners.get('change')();}
+  assert.equal(f.controller.selection.size,3);assert.equal(choices[3].disabled,false);
+  assert.equal(f.document.getElementById('btn-history-compare').disabled,true);
+  assert.equal(f.document.getElementById('btn-history-delete-selected').disabled,false);
+  assert.match(f.document.getElementById('history-selection-status').textContent,/3/);
+  choices[2].checked=false;choices[2].listeners.get('change')();assert.equal(f.document.getElementById('btn-history-compare').disabled,false);
+  choices[1].checked=false;choices[1].listeners.get('change')();choices[3].checked=true;choices[3].listeners.get('change')();
+  assert.equal(f.document.getElementById('btn-history-compare').disabled,true,'two selected but busy input is ineligible');
+  f.controller.leave(false);assert.deepEqual([...f.controller.selection],['a','d']);
+});
+
 function fixture(apiOverrides={}) {
   const document=new Document();const sessions=new Map(['a','b','c','d'].map(id=>[id,comparisonSession(id)]));
   const revoked=[];let url=0;const store=createTrainingRecordStore({maxRecords:100,revokeObjectURL:v=>revoked.push(v)});
@@ -105,4 +122,23 @@ test('a newer evidence playback wins over late audio for the same comparison',as
   left.resolve({ok:true,value:new Uint8Array(44)});await one;
   assert.equal(target.querySelector('audio').played,true);
   assert.equal(baseline.querySelector('audio').played,undefined);
+});
+
+test('Frozen Comparison adapts real filler metrics and keeps optional examples apart from evidence',()=>{
+  const a=comparisonSession('a'),b=comparisonSession('b');a.results[2].value.findings[0].example='这是建议写法，不能冒充原话';
+  const projection=compareSessions([a,b]),document=new Document(),container=document.createElement('main');
+  require('../src/frozen-comparison').renderComparison(container,projection,{onReport:()=>{},onPlay:()=>{}});
+  assert.match(container.textContent,/填充词命中次数/);assert.match(container.textContent,/填充词命中频率/);assert.match(container.textContent,/次\/录音分钟/);assert.doesNotMatch(container.textContent,/每百字|继续练习/);
+  const detail=container.querySelector('[data-detail-key="finding-baseline-wording-0"]');detail.open=true;detail.populateEvidence();
+  assert.ok(container.textContent.includes('这是建议写法，不能冒充原话'));assert.equal(detail.querySelectorAll('blockquote').some(node=>node.textContent.includes('建议写法')),false);
+});
+test('Frozen metric limitations distinguish saved denominators, totals and actual ASR source differences',()=>{
+  const projection=compareSessions([comparisonSession('a'),comparisonSession('b')]),document=new Document(),container=document.createElement('main');
+  require('../src/frozen-comparison').renderComparison(container,projection,{onReport(){},onPlay(){}});
+  for(const id of ['audio-duration-ms','filler-rate-per-recorded-minute']){const detail=container.querySelector(`[data-detail-key="metric-${id}"]`);detail.open=true;detail.populateEvidence();assert.doesNotMatch(detail.textContent,/识别来源不同或未知/);}
+  assert.match(container.querySelector('[data-detail-key="metric-audio-duration-ms"]').textContent,/总量.*评分/);
+  assert.match(container.querySelector('[data-detail-key="metric-filler-rate-per-recorded-minute"]').textContent,/保存.*分母/);
+  projection.metrics.find(metric=>metric.id==='text-character-count').limitations.push('asr-observation-only');
+  require('../src/frozen-comparison').renderComparison(container,projection,{onReport(){},onPlay(){}});
+  const changed=container.querySelector('[data-detail-key="metric-text-character-count"]');changed.open=true;changed.populateEvidence();assert.match(changed.textContent,/识别来源不同或未知/);
 });

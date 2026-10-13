@@ -3,24 +3,24 @@ const assert = require('node:assert/strict');
 
 const {calculateInitialWindowSize} = require('../lib/window-bounds');
 
-test('small work areas clamp the initial window to its lower bounds', () => {
+test('small work areas use the fixed initial window size', () => {
   assert.deepEqual(calculateInitialWindowSize({width: 1366, height: 768}), {
     width: 1200,
-    height: 720
+    height: 800
   });
 });
 
-test('standard work areas use rounded logical percentages', () => {
+test('standard work areas use the same fixed initial window size', () => {
   assert.deepEqual(calculateInitialWindowSize({width: 1920, height: 1080}), {
-    width: 1651,
-    height: 950
+    width: 1200,
+    height: 800
   });
 });
 
-test('large work areas clamp to the upper bounds', () => {
+test('large work areas do not enlarge the initial window', () => {
   assert.deepEqual(calculateInitialWindowSize({width: 3840, height: 2160}), {
-    width: 1920,
-    height: 1200
+    width: 1200,
+    height: 800
   });
 });
 

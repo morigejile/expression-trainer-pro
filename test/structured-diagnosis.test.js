@@ -25,6 +25,47 @@ function parse(value,input = context()) {
 function apiResponse(content) { return {ok:true,status:200,async json() { return {choices:[{message:{content}}]}; }}; }
 const profile = {provider:'openai',apiKey:'test-secret-key',model:'fixture-model'};
 
+test('optional expression references keep common and framework Finding evidence separate', () => {
+  for (const example of [undefined,null,'  先说明观点，再补充一个与观点相关的事实。  ','字'.repeat(1600)]) {
+    const source = context();
+    source.analysisTarget = {framework:'prep',definitionVersion:'prep-v1'};
+    const data = {...response(),frameworkSummary:'专项反馈',frameworkFindings:[{
+      ...response().findings[0],id:'framework-1'
+    }],frameworkRecommendation:null};
+    if (example !== undefined) {
+      data.findings[0].example = example;
+      data.frameworkFindings[0].example = example;
+    }
+    const parsed = parse(JSON.stringify(data),source);
+    for (const finding of [parsed.findings[0],parsed.frameworkAnalysis.findings[0]]) {
+      assert.deepEqual(finding.evidenceRefs,['segment-1']);
+      assert.equal(finding.recommendation,'补充一个与观点直接相关的事实。');
+      assert.equal(Object.hasOwn(finding,'example'),example !== undefined);
+      if (example !== undefined) assert.equal(finding.example,example === null ? null : example.trim());
+    }
+  }
+});
+
+test('expression reference extension rejects invalid types without relaxing Finding or evidence validation', () => {
+  const source = context();
+  source.analysisTarget = {framework:'prep',definitionVersion:'prep-v1'};
+  for (const target of ['common','framework']) {
+    for (const example of [false,1,{},[], '', '   ', '字'.repeat(1601)]) {
+      const data = {...response(),frameworkSummary:'专项反馈',frameworkFindings:[{
+        ...response().findings[0],id:'framework-1'
+      }],frameworkRecommendation:null};
+      (target === 'common' ? data.findings : data.frameworkFindings)[0].example = example;
+      assert.throws(()=>parse(JSON.stringify(data),source),{code:'invalid-response'});
+    }
+  }
+  for (const change of [finding=>{finding.tip='新增未知字段';},finding=>{finding.category='行动安排';},
+    finding=>{finding.evidenceRefs=['invented'];},finding=>{finding.recommendation=8;},
+    finding=>{finding.evidenceRefs=['segment-1','segment-1'];}]) {
+    const data = response();data.findings[0].example='先说观点，再给出已确认的事实。';change(data.findings[0]);
+    assert.throws(()=>parse(JSON.stringify(data)),{code:'invalid-response'});
+  }
+});
+
 test('flat framework output becomes the existing snapshot shape using the requested target, not the original training framework', () => {
   for (const framework of ['prep','star','pyramid']) {
     const source = context();

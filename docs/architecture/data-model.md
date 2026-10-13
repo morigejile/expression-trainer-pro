@@ -259,7 +259,7 @@ M2 V1 复用现有 SQLite results 存储版本化 JSON payload，不新增 Evide
 |---|---|---|
 | `speech-evidence` | Source VAD 快照：`audio` sample 数/采样率、`segments`、`capabilities`、`quality.vad`、`provenance` 和 source 执行 `status` | `schemaVersion = 1`；来源使用 `engine` / `engineVersion` / `modelId` / `modelVersion` / `modelSha256` / `thresholdVersion` / `thresholds` / `normalizationVersion`。未运行或失败时未知值为空，不由当前设置补造 |
 | `common-analysis` | §5.3 的确定性测量与逐项状态，`speechEvidenceRunId` 指向当次 Source result，保留其版本和 quality | `schemaVersion = 1`，`definitionVersion = common-metrics-v1`；`inputRevision` 与当前输入 transcript 一致 |
-| `diagnosis` | §5.4 的结构化摘要/Finding 或局部不可用原因；`speechEvidenceRunId`、`metricRunId` 绑定实际输入 | `schemaVersion = 1`；prompt/schema 身份为 `structured-diagnosis-v1`，provider/model/profile 与分析指令快照保留在该 result 来源中 |
+| `diagnosis` | §5.4 的结构化摘要/Finding 或局部不可用原因；`speechEvidenceRunId`、`metricRunId` 绑定实际输入 | `schemaVersion = 1`；实际提示版本由 provenance.promptVersion 与报告 analysisVersion 记录，`example` 可选扩展使用 `structured-diagnosis-v5`；provider/model/profile 与分析指令快照保留在该 result 来源中 |
 | `report-snapshot` | `evidenceRunId`、`metricRunId`、`analysisRunId` 引用本次组合的三个结果；保存 `availability` 和各版本 | `schemaVersion = 1`；雷达未校准时保存 `radar.status = unavailable`、`reason = not-calibrated`、`version = null`，没有数值投影 |
 
 Source 的区间以 canonical 16 kHz 音频为基准，使用 `[startSample, endSample)`、Run 内的稳定 `speech-N` ID；裁剪到真实 sample 数、排序并合并重叠或相接区间，保留实际间隔。不持久化第二套 non-speech intervals，也不声称 lexical/token timing。结果封装层使用 `completed / failed / unavailable`；source payload 仍可独立记录 `cancelled`，不把未完成推理当成整段静音。
@@ -299,7 +299,9 @@ VAD 是模型观察。当前 `vad-thresholds-uncalibrated` 作为降级原因随
 
 AI 输入是有界的 `AnalysisContext`：同一 Session/revision 的 transcript、可用音频时间事实、Speech Evidence、Common Metrics、分区 quality 和已捕获的分析指令；不附带原始录音、完整设置或凭据。`allowedEvidenceRefs` 由上述真实输入生成；超过输入上限或 revision 不匹配时显式不可用，不静默截断后假装证据完整。可执行边界见 [Analysis Context](../../lib/analysis-context.js)。
 
-输出严格为 `schemaVersion = 1`、`summary`、`findings`。每个 Finding 包含唯一 `id`、受控 `category`、`observation`、`interpretation`、`recommendation`、至少一个实际 `evidenceRefs`；类别的唯一产品定义见 [Training Flow §7.1](../product/training-flow.md#71-完整分析与训练重点分层)。未知字段、未知引用、重复 ID 或无效类型均拒绝；没有充分证据时 Findings 可以为空。解析与边界上限见 [Structured Diagnosis](../../lib/structured-diagnosis.js)。
+输出严格为 `schemaVersion = 1`、`summary`、`findings`。每个 Finding 包含唯一 `id`、受控 `category`、`observation`、`interpretation`、`recommendation`、至少一个实际 `evidenceRefs`，以及可选 `example`；通用与框架 Finding 使用相同字段语义。类别的唯一产品定义见 [Training Flow §7.1](../product/training-flow.md#71-完整分析与训练重点分层)。未知字段、未知引用、重复 ID 或无效类型均拒绝；没有充分证据时 Findings 可以为空。解析与边界上限见 [Structured Diagnosis](../../lib/structured-diagnosis.js)。
+
+`recommendation` 是具体、可执行的下一轮表达练习建议，仍使用既有字段，不新增 tip。`example` 是一种建议表达方式，不是用户原文或 Evidence，不得虚构现实中的负责人、时间、经历或事实。字段可缺失或为 null；提供字符串时必须为非空文本且不超过1600字符。旧结果缺失/null时正常读取并省略表达参考区，不复制 recommendation、不填固定示例、不自动重分析或改写历史。扩展沿用 schemaVersion=1 的可选字段兼容及现有提示/报告版本机制，不改变 Session/SQLite schema，其他字段的类型、长度和引用校验保持严格。
 
 AI 解释已测事实，不重算时长、频次、比例或给出雷达/总分；不推断未提供的精确词时刻、声学特征或情绪质量。输出没有 severity/priority 必填字段、重练执行控制或自动范围选择字段。启用与失败恢复按 Training Flow §6.1/§7.6，结构化失败不改写 Source、Metric 或训练事实。
 

@@ -48,3 +48,61 @@ test('comparison IPC retains the main-window and top-frame access boundary',asyn
   assert.equal((await handler({sender:contents,senderFrame:{url:frame.url}},{})).error.code,'FORBIDDEN');
   assert.equal((await handler({sender:contents,senderFrame:frame},{})).ok,true);assert.equal(calls,1);
 });
+
+test('comparison with an available analyzer reads saved sessions without analysis adapters or writes',async t=>{
+  const sessions=new Map(['a','b'].map(id=>[id,comparisonSession(id)]));
+  const reads=[];const forbidden=[];
+  const reject=operation=>()=>{forbidden.push(operation);throw new Error(`Unexpected ${operation}`);};
+  const app=createTrainingSessionApplication({openStore:async()=>({
+    get:id=>{reads.push(id);return sessions.get(id);},
+    appendResult:reject('appendResult'),readAudio:reject('readAudio'),finalize:reject('finalize'),close(){}
+  }),analysisOptions:{getAnalysisInputs:reject('getAnalysisInputs'),runSpeechEvidence:reject('runSpeechEvidence'),
+    getDiagnosisProfile:reject('getDiagnosisProfile'),diagnose:reject('diagnose')}});
+  t.after(()=>app.close());
+  const before=structuredClone([...sessions]);
+  const first=await app.execute('compare',{requestId:'read-only',sessionIds:['b','a']});
+  assert.equal(first.ok,true);
+  const snapshots=[first.value.baseline.snapshot,first.value.target.snapshot];
+  const reopened=await app.execute('compare',{requestId:'read-only-again',sessionIds:['b','a'],snapshots});
+  assert.equal(reopened.ok,true);
+  assert.deepEqual(reads,['b','a','b','a']);
+  assert.deepEqual(forbidden,[]);
+  assert.deepEqual([...sessions],before);
+  assert.deepEqual(reopened.value.baseline.reportIds,{source:'a-speech-evidence',metric:'a-common-analysis',diagnosis:'a-diagnosis'});
+  assert.deepEqual(reopened.value.target.reportIds,{source:'b-speech-evidence',metric:'b-common-analysis',diagnosis:'b-diagnosis'});
+});
+
+test('reopening a comparison rechecks both saved inputs and never substitutes cached or other sessions',async t=>{
+  const sessions=new Map(['a','b','c'].map(id=>[id,comparisonSession(id)]));
+  const reads=[];
+  const app=createTrainingSessionApplication({openStore:async()=>({
+    get:id=>{reads.push(id);return sessions.get(id);},delete:id=>sessions.delete(id),close(){}
+  })});t.after(()=>app.close());
+  const command={requestId:'fixed-inputs',sessionIds:['a','b']};
+  const first=await app.execute('compare',command);
+  assert.equal(first.ok,true);
+  const snapshots=[first.value.baseline.snapshot,first.value.target.snapshot];
+  assert.equal((await app.execute('delete',{requestId:'delete-input',sessionId:'a'})).ok,true);
+  const reopened=await app.execute('compare',{...command,snapshots});
+  assert.equal(reopened.ok,false);
+  assert.equal(reopened.error.code,'SESSION_NOT_FOUND');
+  assert.equal(Object.hasOwn(reopened,'value'),false);
+  assert.deepEqual(reads,['a','b','a','b']);
+  assert.equal(sessions.has('c'),true);
+});
+
+test('pinned application reads reject revision and linked-result ownership changes accurately',async t=>{
+  const sessions=new Map(['a','b'].map(id=>[id,comparisonSession(id)]));
+  const app=createTrainingSessionApplication({openStore:async()=>({get:id=>sessions.get(id),close(){}})});
+  t.after(()=>app.close());
+  const command={requestId:'stale-pin',sessionIds:['a','b']};
+  const first=await app.execute('compare',command);
+  const snapshots=[first.value.baseline.snapshot,first.value.target.snapshot];
+  for(const change of [a=>a.transcript.revision=2,a=>a.results[0].sessionId='foreign',a=>a.results.pop()]) {
+    const a=comparisonSession('a');change(a);sessions.set('a',a);
+    const result=await app.execute('compare',{...command,snapshots});
+    assert.equal(result.ok,false);
+    assert.equal(result.error.code,'COMPARISON_STALE');
+    assert.equal(Object.hasOwn(result,'value'),false);
+  }
+});

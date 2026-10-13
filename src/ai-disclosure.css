@@ -1,0 +1,13 @@
+/* First AI notice uses the Frozen Demo's handoff dialog dimensions and typography. */
+#ai-disclosure-modal .modal-content{width:min(540px,calc(100vw - 40px));max-height:calc(100dvh - 40px);overflow:auto;padding:26px;background:#fcfaf3;border:1px solid #a89a7e50;border-radius:2px;box-shadow:0 15px 70px #493f2e1c;color:var(--ink,#393831);font-family:'Panel Manrope','Panel Source Han',sans-serif;font-weight:350;letter-spacing:.025em}
+#ai-disclosure-modal .modal-header{margin-bottom:22px;padding:0;border:0}
+#ai-disclosure-modal h2{font-size:21px;font-weight:300}
+#ai-disclosure-modal .modal-body{padding:0;font-size:11px;line-height:1.9;color:var(--muted,#817b6e)}
+#ai-disclosure-modal h3{font-size:17px;font-weight:350;line-height:1.8;color:var(--ink,#393831)}
+#ai-disclosure-service{white-space:pre-line;overflow-wrap:anywhere}
+#ai-disclosure-data{padding-left:18px;margin:15px 0}
+#ai-disclosure-modal .ai-disclosure-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:12px;margin-top:22px}
+#ai-disclosure-modal button{font:inherit;color:inherit;background:transparent;border:1px solid #b8ac924f;border-radius:4px;padding:9px 16px;cursor:pointer}
+#ai-disclosure-modal .btn-close{font-size:26px;border:0;padding:0 5px}
+#ai-disclosure-modal #btn-ai-disclosure-privacy{border:0;padding:0;color:var(--accent,#8d7654)}
+#ai-disclosure-error{color:#98684f}

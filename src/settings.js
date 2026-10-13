@@ -376,7 +376,7 @@ class SettingsPage {
     this.apikeyInput.value = providerConfig.apiKey || '';
     this.ollamaUrlInput.value = providerConfig.ollamaUrl || 'http://localhost:11434';
     this.customBaseUrlInput.value = providerConfig.baseUrl || '';
-    this.modelSelect.value = providerConfig.model || providerConfig.customModel || '';
+    this.modelSelect.value = profilePrivacy.getEffectiveLlmModel(providerConfig) || '';
   }
 
   flushCurrentProfile() {
@@ -416,7 +416,7 @@ class SettingsPage {
     const providerName = {openai:'OpenAI',deepseek:'DeepSeek',ollama:'Ollama',custom:'自定义 OpenAI 兼容服务'}[profile.provider] || '所选服务';
     const location = profilePrivacy.isLocalLlmProfile(profile) ? '本机处理' : '远程处理';
     this.autoDiagnosisDisclosure.textContent = `${providerName} · ${this.modelSelect.value.trim() || '尚未填写模型'}：${location}。` +
-      '启用并保存后，录音结束时会向当前使用的该配置发送本次训练的转写文本、相关语音证据与确定性指标、分析指令、可选题目与所选框架。针对性练习还会发送练习目标及上一轮转写，用于比较。' +
+      '启用并保存后，首次尚未完成 AI 数据告知时，先保存训练并进入报告，确认说明后分析；以后按该配置自动分析。分析使用本次训练的转写文本、相关语音证据与确定性指标、分析指令、训练方式、所选框架及可选主题与场景。针对性练习还会使用所选目标、范围及必要的上一轮转写与训练上下文，用于比较。' +
       '分析内容不包含音频、API 密钥或无关历史。';
   }
 

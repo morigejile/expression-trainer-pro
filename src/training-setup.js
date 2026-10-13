@@ -17,7 +17,7 @@
     const buttons = {framework:byId('training-framework'),topic:byId('training-topic'),scenario:byId('training-scenario')};
     const names = {framework:'表达框架',topic:'主题',scenario:'场景'};
     let draft = normalizeTrainingContext(), dirty = false, locked = false;
-    let practiceRequest = null, practiceLabel = '', active = null, custom = null, invalidCustom = false;
+    let practiceRequest = null, practiceLabel = '', practiceRecommendation='', active = null, custom = null, invalidCustom = false;
     let collapseTimer = null, keyboardMode = false, pickerView = null;
     const isOpen = () => picker.matches(':popover-open');
     const short = text => text.replace(/\s+/g,' ').trim().slice(0,12) + (text.trim().length > 12 ? '…' : '');
@@ -50,7 +50,7 @@
       }
       anchor.disabled = locked;
       focus.hidden = !practiceRequest;
-      focus.textContent = practiceRequest ? `本次练习：${practiceLabel}（${{sentence:'句子',segment:'片段',full:'完整表达'}[practiceRequest.scope]}）。若已启用 AI 诊断，会使用本轮与上一轮转写比较这个目标，原始录音留在本机。` : '';
+      focus.textContent = practiceRequest ? `练习范围：${{sentence:'句子',segment:'片段',full:'完整表达'}[practiceRequest.scope]} · ${practiceLabel}${practiceRecommendation?`\n${practiceRecommendation}`:''}\n使用 AI 分析时，会使用本轮与上一轮转写比较这个目标，原始录音留在本机。` : '';
     }
     function setPart(kind,value) {
       const parts = getPromptParts(draft.trainingPrompt);
@@ -215,12 +215,13 @@
         if (invalidCustom) throw Object.assign(new Error('Invalid training context'),{code:'INVALID_SESSION'});
         return {...normalizeTrainingContext(draft),...(practiceRequest ? {practiceRequest:structuredClone(practiceRequest)} : {})};
       },
-      clearPractice() { practiceRequest = null; practiceLabel = ''; closePicker(false); reveal(false); render(); },
+      clearPractice() { practiceRequest = null; practiceLabel = '';practiceRecommendation=''; closePicker(false); reveal(false); render(); },
       configure(value,practice = {}) {
         if (locked) return false;
         closePicker(false); draft = normalizeTrainingContext(value); dirty = true;
         practiceRequest = practice.practiceRequest ? structuredClone(practice.practiceRequest) : null;
         practiceLabel = practice.practiceLabel || ''; status.textContent = ''; invalidCustom = false;
+        practiceRecommendation=practice.practiceRecommendation || '';
         render(); reveal(false); return true;
       },
       lock(value) { locked = Boolean(value); if (locked) { closePicker(false); reveal(false); } render(); },

@@ -91,13 +91,18 @@ async function runCoordinatedRequest(
 }
 
 const fakeLlm = {
-  async sendStructuredDiagnosis(context) {
+  async sendStructuredDiagnosis(context,profile) {
     calls.llmDiagnosis += 1;
+    if (profile.model==='i2-failure') throw Object.assign(new Error('Injected network failure'),{code:'network'});
+    if (profile.model==='i2-timeout') throw Object.assign(new Error('Injected timeout'),{code:'timeout'});
+    if (profile.model==='i2-pending') await new Promise(resolve=>{fakeLlm.releaseDiagnosis=resolve;});
     const {parseStructuredDiagnosisResponse} = require('../lib/structured-diagnosis');
     const data = {schemaVersion:1,summary:'先说明目标，再给出支持理由。',
       findings:context.transcript.segments.length ? [{id:'finding-1',category:'organization',observation:'表达可以先说明目标。',
         interpretation:'先给出重点可以帮助听者理解。',recommendation:'下一次先用一句话说明重点。',
         evidenceRefs:[context.transcript.segments[0].id]}] : []};
+    if (profile.model.startsWith('i2-') && data.findings[0]) data.findings[0].example=profile.model==='i2-null'?null:'我建议先明确这次表达的目标，再说明支持这个目标的理由。';
+    if (profile.model==='i2-empty') {data.summary='本次未形成有充分证据的改善建议。';data.findings=[];}
     if (context.analysisTarget) data.frameworkAnalysis = {...context.analysisTarget,summary:'先说明观点，再补充与观点相关的具体支撑。',
       findings:data.findings.map(finding => ({...finding,id:'framework-1'}))};
     if (context.practiceComparison) {
@@ -196,6 +201,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   const apiContract = await mainWindow.webContents.executeJavaScript(`(() => {
     const expected = [
       'getLlmProviderSettings', 'saveLlmProviderSettings', 'openSettings',
+      'getAppInfo', 'onUtilityOpen', 'trainingCloseDecisionPending',
       'getLlmProfileSummaries', 'selectLlmProfile', 'onLlmProviderSettingsChanged',
       'getAppearance', 'saveAppearance', 'onAppearanceChanged',
       'getRecordingPolicy', 'acknowledgeRecordingPolicy',
@@ -277,19 +283,19 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     test: await window.api.testLLMConnection({schemaVersion: 2, activeProfileId: 'not-authorized', profiles: []})
   }))()`);
   assert.deepEqual(mainLlmSettingsAccess, {
-    get: {success: false, error: '仅设置窗口可访问完整 LLM 配置'},
-    save: {success: false, error: '仅设置窗口可访问完整 LLM 配置'},
-    test: {success: false, error: '仅设置窗口可访问完整 LLM 配置'}
+    get: {schemaVersion: 3, activeProfileId: null, profiles: []},
+    save: {success: false, errorCode: 'invalid-ipc-input', error: '设置或帮助请求无效。'},
+    test: {success: false, errorCode: 'invalid-ipc-input', error: '设置或帮助请求无效。'}
   });
   await mainWindow.webContents.executeJavaScript(
     `document.getElementById('btn-settings').click()`
   );
-  const settingsWindow = await waitUntil('settings window creation', () => {
-    return BrowserWindow.getAllWindows().find(window => {
-      return !window.isDestroyed() && window.webContents.getURL().endsWith('/settings.html');
-    });
-  });
-  await waitForPage(settingsWindow, 'settings.html');
+  await waitUntil('settings Utility opens in Main', () => mainWindow.webContents.executeJavaScript(
+    `document.getElementById('utility').open && document.getElementById('surface-title').textContent === 'AI分析'
+      && document.querySelector('#utility [data-add]') !== null`
+  ));
+  assert.equal(BrowserWindow.getAllWindows().length, 1, 'Settings must use Main instead of a second window');
+  const settingsWindow = mainWindow;
 
   const originalLlmSettings = await settingsWindow.webContents.executeJavaScript(
     'window.api.getLlmProviderSettings()'
@@ -322,6 +328,8 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     }]
   })`);
   assert.deepEqual(smokeProfileSave, {success: true});
+  const notice=await mainWindow.webContents.executeJavaScript('window.api.getAiDisclosureState()');
+  assert.equal((await mainWindow.webContents.executeJavaScript(`window.api.acknowledgeAiDisclosure({scopeVersion:${JSON.stringify(notice.scopeVersion)}})`)).success,true);
 
   const llmProfileIpcState = await mainWindow.webContents.executeJavaScript(`(async () => {
     const initial = await window.api.getLlmProfileSummaries();
@@ -333,7 +341,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.equal(llmProfileIpcState.initial.profiles[0].active, true);
   assert.equal(llmProfileIpcState.selected.success, true);
   assert.equal(llmProfileIpcState.selected.summary.activeProfileId, llmProfileIpcState.initial.activeProfileId);
-  assert.deepEqual(llmProfileIpcState.invalid, {success: false, error: 'Invalid LLM profile ID'});
+  assert.deepEqual(llmProfileIpcState.invalid, {success: false, errorCode: 'invalid-ipc-input', error: '设置或帮助请求无效。'});
   for (const summary of [llmProfileIpcState.initial, llmProfileIpcState.selected.summary]) {
     assert.doesNotMatch(JSON.stringify(summary), /apiKey|baseUrl|ollamaUrl/);
   }
@@ -356,7 +364,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   ]);
   assert.deepEqual(playbackAnalysisIpcState.missing, {
     success: false,
-    error: '所选模型配置不存在',
+    error: '所选模型配置不存在或不可用',
     errorCode: 'invalid-profile-id'
   });
   assert.deepEqual(
@@ -375,28 +383,38 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   );
   assert.deepEqual(initialRecordingPolicy, {acknowledged: false});
 
+  await mainWindow.webContents.executeJavaScript(`document.getElementById('close-surface').click()`);
+  await waitUntil('settings Utility closes', () => mainWindow.webContents.executeJavaScript(`!document.getElementById('utility').open`));
+
+  await mainWindow.webContents.executeJavaScript(`document.getElementById('btn-help').click()`);
+  await waitUntil('Help Utility opens', () => mainWindow.webContents.executeJavaScript(
+    `document.getElementById('utility').open && document.getElementById('help-search') !== null`
+  ));
+  await mainWindow.webContents.executeJavaScript(`document.querySelector('#local-nav [data-page="feedback"]').click()`);
+  await waitUntil('Help feedback content loads', () => mainWindow.webContents.executeJavaScript(
+    `document.querySelector('#utility [data-feedback]') !== null`
+  ));
   const helpState = await mainWindow.webContents.executeJavaScript(`(() => {
     const helpButton = document.getElementById('btn-help');
-    const helpModal = document.getElementById('help-modal');
-    helpButton.click();
+    const helpModal = document.getElementById('utility');
     const openState = {
       buttonText: helpButton.textContent.trim(),
-      title: helpModal.querySelector('.modal-header h2').textContent.trim(),
-      open: !helpModal.classList.contains('hidden'),
-      feedbackHeading: document.getElementById('feedback-section-title').textContent.trim(),
-      documentButtonText: document.getElementById('btn-open-feedback-document').textContent.trim(),
-      hasDiagnostics: Boolean(document.getElementById('btn-help-diagnostics')),
+      title: document.getElementById('surface-title').textContent.trim(),
+      open: helpModal.open,
+      feedbackHeading: helpModal.querySelector('.diagnostic h2').textContent.trim(),
+      documentButtonText: helpModal.querySelector('[data-feedback]').textContent.trim(),
+      hasDiagnostics: Boolean(helpModal.querySelector('[data-export]')),
       hasBugForm: Boolean(document.getElementById('bug-description')),
       hasSuggestionForm: Boolean(document.getElementById('suggestion-description'))
     };
-    document.getElementById('btn-close-help').click();
-    return {...openState, closed: helpModal.classList.contains('hidden')};
+    document.getElementById('close-surface').click();
+    return {...openState, closed: !helpModal.open};
   })()`);
   assert.deepEqual(helpState, {
     buttonText: '帮助',
-    title: '帮助与反馈',
+    title: '问题与反馈',
     open: true,
-    feedbackHeading: '问题和建议',
+    feedbackHeading: '问题反馈',
     documentButtonText: '打开问题和建议文档',
     hasDiagnostics: true,
     hasBugForm: false,
@@ -408,7 +426,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     screen: document.body.dataset.screen,
     state: document.body.dataset.trainingState,
     startVisible: document.getElementById('btn-start').getBoundingClientRect().height > 0,
-    transcriptHidden: getComputedStyle(document.getElementById('subtitle-scroll')).display === 'none',
+    transcriptHidden: document.getElementById('subtitle-scroll').getBoundingClientRect().height === 0,
     reportHidden: getComputedStyle(document.getElementById('report-ai-section')).display === 'none'
   }))()`);
   assert.deepEqual(preparingState, {screen:'training',state:'preparing',startVisible:true,transcriptHidden:true,reportHidden:true});
@@ -430,7 +448,8 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       reducedMotionRule: Array.from(document.styleSheets)
         .flatMap(sheet => Array.from(sheet.cssRules))
         .some(rule => rule.conditionText?.includes('prefers-reduced-motion')),
-      visibleTitle: document.querySelector('.app-title')?.textContent.trim(),
+      brandLabel: document.getElementById('btn-home').getAttribute('aria-label'),
+      brandPresent: Boolean(document.querySelector('#btn-home .brand-mark')),
       decorativeMascotPresent: Boolean(document.querySelector('.girl-icon')),
       emojiControls: Array.from(document.querySelectorAll('button')).filter(button => {
         return /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(button.textContent);
@@ -441,13 +460,14 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     };
   })()`);
   assert.deepEqual(desktopUsability.controls, [
-    { id: 'btn-home', text: '表达训练' },
+    { id: 'btn-home', text: '' },
     { id: 'btn-history', text: '训练历史' },
     { id: 'btn-settings', text: '设置' }
   ]);
   assert.match(desktopUsability.densityDescription, /字数.*不含标点.*同一字符只扣除一次/);
   assert.equal(desktopUsability.reducedMotionRule, true);
-  assert.equal(desktopUsability.visibleTitle, '表达训练');
+  assert.equal(desktopUsability.brandLabel, '表达训练，返回准备');
+  assert.equal(desktopUsability.brandPresent, true);
   assert.equal(desktopUsability.decorativeMascotPresent, false);
   assert.deepEqual(desktopUsability.emojiControls, []);
   assert.deepEqual(desktopUsability.unlabeledSvgControls, []);
@@ -527,7 +547,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
         const feedbackScroll = document.getElementById('feedback-content');
         return {
           viewport: {width: innerWidth, height: innerHeight},
-          stage: rect('[data-region="stage"]'),
+          stage: rect('#frozen-recording .session-stage'),
           transcript: rect('#subtitle-scroll'),
           coach: rect('[data-region="coach"]'),
           insights: rect('[data-region="insights"]'),
@@ -551,15 +571,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       assert.equal(geometry.controlsPreserved, true);
       assert.equal(geometry.timer, '12:34');
       assert.equal(geometry.trainingStatus, '布局切换状态保真');
-      assert.ok(geometry.transcript.right <= geometry.coach.left + 1, `${layout} transcript must not intersect feedback`);
-      assert.ok(geometry.coach.width >= 300 && geometry.coach.width <= 460, `${layout} coach width must stay bounded`);
-      assert.ok(geometry.coach.top >= 0 && geometry.coach.bottom <= geometry.viewport.height, `${layout} coach must remain visible`);
-      assert.ok(geometry.insights.height < geometry.coach.height, `${layout} insights must remain subordinate to feedback`);
-      if (layout === 'coach-rail') {
-        assert.ok(geometry.insights.top >= geometry.coach.bottom - 1, 'coach-rail insights must sit below feedback');
-      } else if (viewport.width >= 1280) {
-        assert.ok(geometry.coach.top > 0 && geometry.coach.bottom < geometry.viewport.height, 'focus HUD must be inset');
-      }
+      assert.ok(geometry.transcript.left >= geometry.stage.left && geometry.transcript.right <= geometry.stage.right + 1,'Frozen recording transcript stays inside the stage');
+      assert.equal(geometry.coach.height,0,'legacy coaching rail is absent from migrated recording');
+      assert.equal(geometry.insights.height,0,'legacy metric panel is absent from migrated recording');
     }
   }
   await mainWindow.webContents.executeJavaScript(`(() => {
@@ -573,16 +587,18 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   mainWindow.setContentSize(...originalContentSize);
   await delay(40);
 
+  await mainWindow.webContents.executeJavaScript(`document.getElementById('btn-help').click()`);
+  await waitUntil('Help Utility keyboard content ready', () => mainWindow.webContents.executeJavaScript(
+    `document.getElementById('utility').open && document.getElementById('help-search') !== null`
+  ));
   const modalKeyboardState = await mainWindow.webContents.executeJavaScript(`(() => {
     const opener = document.getElementById('btn-help');
-    const modal = document.getElementById('help-modal');
-    opener.focus(); opener.click();
-    modal.dispatchEvent(new KeyboardEvent('keydown', {key:'Escape', bubbles:true}));
-    return {role:modal.getAttribute('role'),ariaModal:modal.getAttribute('aria-modal'),
-      closedAfterEscape:modal.classList.contains('hidden'),
+    const modal = document.getElementById('utility');
+    modal.dispatchEvent(new Event('cancel', {cancelable:true}));
+    return {nativeDialog:modal.tagName === 'DIALOG',closedAfterEscape:!modal.open,
       focusReturnedToUtilityMenu:document.activeElement === document.querySelector('.utility-menu summary')};
   })()`);
-  assert.deepEqual(modalKeyboardState, {role:'dialog',ariaModal:'true',closedAfterEscape:true,focusReturnedToUtilityMenu:true});
+  assert.deepEqual(modalKeyboardState, {nativeDialog:true,closedAfterEscape:true,focusReturnedToUtilityMenu:true});
 
   const graphWindow = new BrowserWindow({
     show: false,
@@ -797,7 +813,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   await waitUntil('automatic AI diagnosis persisted', () => mainWindow.webContents.executeJavaScript(`(() => {
     const record = window.__recordingSmokeTrainer.trainingRecords?.selected();
     return !record?.reportPending && record?.saveState === 'saved'
-      && document.getElementById('report-body').textContent.includes('先说明目标，再给出支持理由');
+      && document.getElementById('report-summary-copy').textContent.includes('先说明目标，再给出支持理由');
   })()`));
   assert.equal(calls.llmReport, 0);
   assert.equal(calls.llmDiagnosis, 1);
@@ -833,71 +849,69 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   await mainWindow.webContents.executeJavaScript(
     `document.getElementById('btn-settings').click()`
   );
-  await waitForPage(settingsWindow, 'settings.html');
+  await waitUntil('Settings Utility AI content ready', () => mainWindow.webContents.executeJavaScript(
+    `document.getElementById('utility').open && document.querySelector('#utility [data-add]') !== null`
+  ));
+  await mainWindow.webContents.executeJavaScript(`document.querySelector('#local-nav [data-page="speech"]').click()`);
   if (process.platform !== 'darwin') {
-    assert.equal(settingsWindow.isMenuBarVisible(), false, 'settings window must not render a second menu header');
+    assert.equal(mainWindow.isMenuBarVisible(), false, 'Main Utility must not render a second menu header');
   }
-  const settingsState = await waitUntil('settings page initialization', async () => {
+  const settingsState = await waitUntil('speech Utility initialization', async () => {
     return settingsWindow.webContents.executeJavaScript(`(() => {
-      const provider = document.getElementById('provider');
-      const model = document.getElementById('model');
-      const cards = document.querySelectorAll('.asr-model-card');
-      if (!provider || !model || cards.length !== 4) return null;
+      const cards = document.querySelectorAll('#utility .speech-model');
+      if (document.getElementById('surface-title').textContent !== '语音识别' || cards.length !== 4) return null;
       return {
-        title: document.title,
+        title: document.getElementById('surface-title').textContent,
         hasGetLlmProviderSettings: typeof window.api?.getLlmProviderSettings === 'function',
         theme: document.documentElement.dataset.theme,
         layout: document.documentElement.dataset.layout,
         themeControls: document.querySelectorAll('[name="appearance-theme"]').length,
         layoutControls: document.querySelectorAll('[name="appearance-layout"]').length,
         modelNames: Array.from(cards, card => card.querySelector('h3')?.textContent.trim()),
-        status: document.getElementById('asr-model-status')?.textContent.trim()
+        currentName: document.querySelector('#utility .first-group h3')?.textContent.trim(),
+        currentStatus: document.querySelector('#utility .first-group .active-status, #utility .first-group .speech-model > small')?.textContent.trim()
       };
     })()`);
   });
   assert.deepEqual(settingsState, {
-    title: '设置',
+    title: '语音识别',
     hasGetLlmProviderSettings: true,
     theme: 'graphite',
     layout: 'coach-rail',
-    themeControls: 4,
-    layoutControls: 2,
+    themeControls: 0,
+    layoutControls: 0,
     modelNames: [
       'Paraformer 中英双语',
       'Zipformer Small CTC 中文 INT8',
       'Zipformer Large CTC 中文 INT8',
       'SenseVoiceSmall INT8 多语种'
     ],
-    status: '当前使用：Paraformer 中英双语'
+    currentName: 'Paraformer 中英双语',
+    currentStatus: '未安装'
   });
+  assert.equal(BrowserWindow.getAllWindows().length, 1);
 
   await mainWindow.webContents.executeJavaScript(`(() => {
+    window.__frozenComputed = () => ['#utility','#surface-title','#frozen-report','#frozen-report-heading'].map(selector => {
+      const element = document.querySelector(selector), style = getComputedStyle(element), rect = element.getBoundingClientRect();
+      return {selector,fontFamily:style.fontFamily,fontSize:style.fontSize,fontWeight:style.fontWeight,color:style.color,
+        backgroundColor:style.backgroundColor,backgroundImage:style.backgroundImage,width:rect.width,height:rect.height};
+    });
     window.__appearanceSmoke = {
       transcript: document.getElementById('subtitle-container'),
       feedback: document.getElementById('feedback-content'),
       insights: document.querySelector('[data-region="insights"]'),
       trainingStatus: document.getElementById('training-status'),
       timer: document.getElementById('timer'),
-      actions: document.querySelector('.action-bar')
+      actions: document.querySelector('.action-bar'),
+      visual: window.__frozenComputed()
     };
   })()`);
   const connectionCallsBeforeAppearance = calls.llmConnection;
-  await settingsWindow.webContents.executeJavaScript(`(() => {
-    const control = document.querySelector('[name="appearance-theme"][value="paper"]');
-    control.checked = true;
-    control.dispatchEvent(new Event('change', {bubbles: true}));
-  })()`);
-  await waitUntil('paper theme selection', async () => {
-    const theme = await mainWindow.webContents.executeJavaScript('document.documentElement.dataset.theme');
-    return theme === 'paper';
-  });
-  await settingsWindow.webContents.executeJavaScript(`(() => {
-    const control = document.querySelector('[name="appearance-layout"][value="focus-hud"]');
-    control.checked = true;
-    control.dispatchEvent(new Event('change', {bubbles: true}));
-  })()`);
-  const synchronizedSettingsAppearance = await waitUntil('settings appearance synchronization', async () => {
-    const [mainState, settingsState] = await Promise.all([
+  const legacyAppearanceSaved = await mainWindow.webContents.executeJavaScript(`window.api.saveAppearance({theme:'paper',layout:'focus-hud'})`);
+  assert.deepEqual(legacyAppearanceSaved, {success:true,appearance:{schemaVersion:1,theme:'paper',layout:'focus-hud'}});
+  const synchronizedSettingsAppearance = await waitUntil('underlying appearance persists without changing Frozen Utility or report', async () => {
+    const mainState = await
       mainWindow.webContents.executeJavaScript(`(() => ({
         theme: document.documentElement.dataset.theme,
         layout: document.documentElement.dataset.layout,
@@ -906,21 +920,14 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
         insightsPreserved: window.__appearanceSmoke.insights === document.querySelector('[data-region="insights"]'),
         trainingStatusPreserved: window.__appearanceSmoke.trainingStatus === document.getElementById('training-status'),
         timerPreserved: window.__appearanceSmoke.timer === document.getElementById('timer'),
-        actionsPreserved: window.__appearanceSmoke.actions === document.querySelector('.action-bar')
-      }))()`),
-      settingsWindow.webContents.executeJavaScript(`(() => ({
-        theme: document.documentElement.dataset.theme,
-        layout: document.documentElement.dataset.layout,
-        error: document.getElementById('appearance-error').textContent,
-        scrollable: getComputedStyle(document.body).overflowY === 'auto'
-      }))()`)
-    ]);
-    return mainState.theme === 'paper' && settingsState.theme === 'paper'
-      ? {mainState, settingsState}
+        actionsPreserved: window.__appearanceSmoke.actions === document.querySelector('.action-bar'),
+        visualPreserved: JSON.stringify(window.__appearanceSmoke.visual) === JSON.stringify(window.__frozenComputed())
+      }))()`);
+    return mainState.theme === 'paper' && mainState.layout === 'focus-hud'
+      ? mainState
       : null;
   });
   assert.deepEqual(synchronizedSettingsAppearance, {
-    mainState: {
       theme: 'paper',
       layout: 'focus-hud',
       transcriptPreserved: true,
@@ -928,10 +935,11 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       insightsPreserved: true,
       trainingStatusPreserved: true,
       timerPreserved: true,
-      actionsPreserved: true
-    },
-    settingsState: {theme: 'paper', layout: 'focus-hud', error: '', scrollable: true}
+      actionsPreserved: true,
+      visualPreserved: true
   });
+  assert.deepEqual(await mainWindow.webContents.executeJavaScript('window.api.getAppearance()'),
+    {schemaVersion:1,theme:'paper',layout:'focus-hud'});
   assert.equal(calls.llmConnection, connectionCallsBeforeAppearance);
 
   const asrManagementState = await settingsWindow.webContents.executeJavaScript(`(async () => {
@@ -969,63 +977,44 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   );
   assert.equal(successfulSwitch.ok, true);
   assert.equal(successfulSwitch.state.effectiveModelId, 'zipformer-small-ctc-zh-int8-2025-04-01');
-  await settingsWindow.webContents.executeJavaScript(
-    `document.getElementById('btn-prompt-editor').click()`
-  );
-  const promptEditorWindow = await waitUntil('prompt editor window creation', () => {
-    return BrowserWindow.getAllWindows().find(window => {
-      return !window.isDestroyed() && window.webContents.getURL().endsWith('/prompt-editor.html');
-    });
-  });
-  await waitForPage(promptEditorWindow, 'prompt-editor.html');
-  assert.equal(promptEditorWindow.getParentWindow(), settingsWindow);
-  if (process.platform !== 'darwin') {
-    assert.equal(promptEditorWindow.isMenuBarVisible(), false, 'prompt editor must not render a second menu header');
-  }
-  assert.equal(
-    promptEditorWindow.webContents.listenerCount('will-prevent-unload') > 0,
-    true,
-    'dirty system-close attempts must have a native confirmation handler'
-  );
-  const promptEditorState = await promptEditorWindow.webContents.executeJavaScript(`(() => {
-    const back = document.getElementById('btn-back').getBoundingClientRect();
-    const heading = document.querySelector('h1').getBoundingClientRect();
-    document.getElementById('goals').value = '尚未保存的目标';
-    window.confirm = () => false;
-    document.getElementById('btn-back').click();
+  await mainWindow.webContents.executeJavaScript(`window.api.openPromptEditor()`);
+  await waitUntil('preferences open in the same Main Utility', () => mainWindow.webContents.executeJavaScript(
+    `document.getElementById('utility').open && document.getElementById('surface-title').textContent === '分析偏好'
+      && document.querySelector('#utility [data-pref="goals"]') !== null`
+  ));
+  assert.equal(BrowserWindow.getAllWindows().length, 1, 'analysis preferences must use the same Utility');
+  const originalPrompt = await mainWindow.webContents.executeJavaScript('window.api.getCustomPrompt()');
+  const promptEditorState = await mainWindow.webContents.executeJavaScript(`(() => {
+    const close = document.getElementById('close-surface').getBoundingClientRect();
+    const heading = document.getElementById('surface-title').getBoundingClientRect();
+    const goals = document.querySelector('#utility [data-pref="goals"]');
+    goals.value = '尚未保存的目标';
+    goals.dispatchEvent(new Event('input',{bubbles:true}));
+    document.getElementById('close-surface').click();
     return {
-      overlaps: !(back.right <= heading.left || back.left >= heading.right
-        || back.bottom <= heading.top || back.top >= heading.bottom),
-      theme: document.documentElement.dataset.theme,
-      layout: document.documentElement.dataset.layout
+      overlaps: !(close.right <= heading.left || close.left >= heading.right
+        || close.bottom <= heading.top || close.top >= heading.bottom),
+      open: document.getElementById('utility').open,
+      unsavedChoiceShown: !document.getElementById('unsaved').hidden
     };
   })()`);
-  assert.deepEqual(promptEditorState, {
-    overlaps: false,
-    theme: 'paper',
-    layout: 'focus-hud'
-  });
-  await delay(50);
-  assert.equal(promptEditorWindow.isDestroyed(), false, 'declined dirty navigation must keep the editor open');
-  const promptAppearanceSave = await promptEditorWindow.webContents.executeJavaScript(
-    `window.api.saveAppearance({theme: 'midnight', layout: 'coach-rail'})`
-  );
-  assert.deepEqual(promptAppearanceSave, {
-    success: true,
-    appearance: {schemaVersion: 1, theme: 'midnight', layout: 'coach-rail'}
-  });
-  await waitUntil('prompt appearance synchronization', async () => {
-    const [mainTheme, promptTheme] = await Promise.all([
-      mainWindow.webContents.executeJavaScript('document.documentElement.dataset.theme'),
-      promptEditorWindow.webContents.executeJavaScript('document.documentElement.dataset.theme')
-    ]);
-    return mainTheme === 'midnight' && promptTheme === 'midnight';
-  });
-  await promptEditorWindow.webContents.executeJavaScript(
-    `window.api.saveAppearance({theme: 'graphite', layout: 'coach-rail'})`
-  );
-  promptEditorWindow.destroy();
-  settingsWindow.close();
+  assert.deepEqual(promptEditorState, {overlaps:false,open:true,unsavedChoiceShown:true});
+  const continuedPreferences = await mainWindow.webContents.executeJavaScript(`(() => {
+    document.getElementById('stay').click();
+    return {open:document.getElementById('utility').open,choiceHidden:document.getElementById('unsaved').hidden,
+      draft:document.querySelector('#utility [data-pref="goals"]').value};
+  })()`);
+  assert.deepEqual(continuedPreferences, {open:true,choiceHidden:true,draft:'尚未保存的目标'});
+  assert.deepEqual(await mainWindow.webContents.executeJavaScript('window.api.getCustomPrompt()'), originalPrompt,
+    'continued editing must not silently persist the draft');
+  await mainWindow.webContents.executeJavaScript(`(() => {
+    document.getElementById('close-surface').click();document.getElementById('discard').click();
+    return window.api.saveAppearance({theme:'graphite',layout:'coach-rail'});
+  })()`);
+  assert.equal(await mainWindow.webContents.executeJavaScript('document.getElementById("utility").open'), false);
+  assert.deepEqual(await mainWindow.webContents.executeJavaScript('window.api.getCustomPrompt()'), originalPrompt,
+    'discard must preserve the saved preferences');
+  assert.equal(mainWindow.isDestroyed(), false, 'closing Utility must leave Main open');
 
   await mainWindow.webContents.executeJavaScript(`document.getElementById('btn-history').click()`);
   await waitUntil('History opens saved session', () => mainWindow.webContents.executeJavaScript(`(() => {
@@ -1035,7 +1024,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   })()`));
   await waitUntil('History Report restored without analysis rerun', () => mainWindow.webContents.executeJavaScript(`document.body.dataset.screen === 'report'
     && !document.getElementById('btn-report-back').classList.contains('hidden')
-    && document.getElementById('report-body').textContent.includes('先说明目标，再给出支持理由')`));
+    && document.getElementById('report-summary-copy').textContent.includes('先说明目标，再给出支持理由')`));
   assert.equal(calls.llmReport, 0);
   assert.equal(calls.llmDiagnosis, 1);
   assert.equal(calls.llmFeedback, 0);

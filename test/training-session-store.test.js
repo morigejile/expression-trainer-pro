@@ -93,6 +93,12 @@ test('duplicate finalization coalesces and cannot replace completed facts or aud
   assert.equal(store.list().length, 1);
 });
 
+test('History exposes saved audio duration without substituting training wall time',async t=>{
+  const store=await fixture(t).open(),record=store.create(start());await store.finalize(record.id,completed());
+  const row=store.list()[0],saved=await store.get(record.id);
+  assert.equal(row.durationMs,2000);assert.equal(row.audioDurationMs,saved.artifact.durationMs);assert.notEqual(row.audioDurationMs,row.durationMs);
+});
+
 test('only microphone Free sessions are accepted and source snapshots exclude settings', async t => {
   const f = fixture(t);
   const store = await f.open();

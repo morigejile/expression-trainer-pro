@@ -78,7 +78,7 @@ M1 的 Context Area 仅轻量显示只读“自由表达”，不提供模式、
 Preparing 的内容分成两个区域：
 
 - **Context Area**：Framework、Topic、Scenario 使用三个胶囊控件，默认收起，仅保留轻量视觉锚点；针对性练习的 Practice Focus 单独可见。
-- **Start Control Area**：把轻量、水印/背景感的 readiness 紧邻“开始表达”，二者作为整体位于主内容的视觉中心；展开准备选项不推动主操作。
+- **Start Control Area**：唯一开始操作位于主内容的视觉中心；正常准备态不显示“准备就绪”或其他准备状态文字，麦克风、服务或初始化失败仍按 §3.5 显示异常提示；展开准备选项不推动主操作。
 
 锚点位于主操作上方，悬停、点击或键盘聚焦后展开三个胶囊；离开后短暂延迟收起。选择列表、查看说明或编辑自定义内容期间保持展开，键盘焦点仍在设置区域时也不收起。恢复配置或从报告带入上下文不自动展开胶囊。Preparing 不重复展示完整上下文摘要；录音时保留只读摘要。返回 Preparing 保持主操作居中，并将阅读焦点放在页面标题，针对性练习目标仍在首屏可见。
 
@@ -149,6 +149,8 @@ Training Context 的主题/场景回答“这次讲什么、在什么情境下�
 
 主区域按所选 ASR 能力展示实时 transcript（streaming；utterance 例外见下文）。信息权重为 **ASR 文本 > Recording 状态 > 控制 > 时长/声波 > Context indicator**：录音指示、时长与声波/音频活动反馈保持轻量；声波只表示是否检测到声音，不代表表达质量或得分。Active 显示暂停/结束，Paused 显示继续/结束，保留已有 ASR 文本且不允许编辑。
 
+Preparing 与 Recording / Paused 保持 Header、可伸缩 Main Content、底部交互区的布局关系；底部横线是交互区的上边界，交互区保持在窗口底部，原文在主区内滚动，不随文本长度推动录音控制。
+
 轻量只读 Context indicator 显示如“STAR · 项目复盘”、主题/场景和当前针对性练习目标；不允许在 Recording（含 Paused）编辑 Training Context。ASR 文本不混入实时评分、Finding、结构分析或 AI 建议。后续主区/辅助区布局与机械设备主题见 Backlog B-13/B-14，不改变当前 ASR 主显示的信息层级。
 
 所选主 ASR 的产品角色按 [R-A10](requirements.md#6-m2表达证据ai-分析与雷达图)；SenseVoiceSmall 的 utterance 交互边界如下。Utterance 能力不提供实时 partial，不能伪造实时字幕或依赖尚未产生的文本给出实时提醒；应明确显示录音与等待转写状态。既有 utterance 有界缓冲基线见 [ADR-0009](../architecture/adr/0009-productize-multiple-asr-models.md)，实施验证由 Backlog D-08 跟踪；等待、失败与能力差异的详细交互留到 Interaction / State Design，不在本阶段确定新的切句方案。
@@ -181,7 +183,7 @@ Focus Mode/专注模式仍在 [Backlog B-12](backlog.md#not-now)，不纳入当�
 - 回到报告、回到首页和继续当前问题只表达导航/训练意图，不承担保存职责；持久化职责不依赖报告是否仍然打开。
 - Processing 仍是 Training Workspace 的状态，UI 仅显示“正在生成报告”与进度；不展开 ASR / VAD / LLM 等技术步骤。有可信、单调的进度才显示百分比，否则使用 indeterminate progress，不伪造百分比。
 - Processing 允许离开，后台任务与保存不依赖该 Screen 保持打开；结果在 History 对应记录中可访问。用户仍停留在本次 Processing 时才自然进入对应 Report，不因后台完成强制抢回已离开的页面。
-- **不做 Progressive Report Rendering**：等待完整结果或已完成的 Partial 判定后进入 Report，不在核心结果刚出现时先打开报告再增量补齐。采用合理、有界的 timeout 处理卡住；到期终止本次等待，进入对应 Report Unavailable / 失败恢复状态（§7.4），不无限卡在 Processing。timeout 数值按真实任务耗时与资源预算确定，尚未冻结秒数；超时/重试仍保护已保存数据。
+- **不做 Progressive Report Rendering**：正常已告知的自动分析等待完整结果或已完成的 Partial 判定后进入 Report，不在核心结果刚出现时先打开报告再增量补齐。首次 AI 告知采用 §6.1 的限定例外：先保存事实与可用本地结果、进入 Report，再由用户确认是否开始 AI；不将此例外扩展为通用渐进报告。采用合理、有界的 timeout 处理卡住；到期终止本次等待，进入对应 Report Unavailable / 失败恢复状态（§7.4），不无限卡在 Processing。timeout 数值按真实任务耗时与资源预算确定，尚未冻结秒数；超时/重试仍保护已保存数据。
 - 缺少有效 AI profile 时就地提供配置入口；失败时提供重试，保留可用的本地事实和确定性分析。报告可用性与局部恢复见 §7.4；timeout 的实现细节见 §14。
 
 M1 对本原则的落实限于已有完成逐字稿、稳定片段、音频和已有结果的自动保存，不新增每个 ASR partial 的持久化、完整事件日志或后续分析算法。M1 的报告进入与手动分析按 §7.5；本节默认分析的完整等待、Partial 判定和 Processing timeout 随 M2 交付，不要求 M1 为尚未主动发起的 AI 请求等待。崩溃恢复与完整性规则由数据模型和 M1 定义，不承诺录音中断时每个尚未持久化的采样都可恢复。
@@ -190,9 +192,19 @@ M1 对本原则的落实限于已有完成逐字稿、稳定片段、音频和�
 
 首次安装没有预置的可用 AI profile；用户在设置中添加配置、选为当前 profile，并明确开启该配置的“训练结束后自动诊断”。新建、复制和旧配置迁移后均默认关闭自动诊断，不把已有 API key 或曾经手动分析解释为自动发送授权。关闭开关后，后续训练不再自动请求该配置。
 
-本地/远程按实际 endpoint 判断：只有回环地址属于本地，局域网或其他远程地址即使使用 Ollama 名称也按远程处理。远程启用前按 R-A11 告知将发送的转写、证据、指标与分析指令；M4 增加用户所选框架和可选题目，针对性练习仅补充所选目标及上一轮转写用于比较，并在准备区提示。原始音频和无关历史不发送。更改 provider、模型或 endpoint 后撤销原自动启用，需要对新配置重新明确开启。
+本地/远程按实际 endpoint 判断：只有回环地址属于本地，局域网或其他远程地址即使使用 Ollama 名称也按远程处理。
+
+用户首次使用 AI 分析时在 Report 内完成统一数据告知弹窗：AI 分析可能使用本地或远程模型；远程分析只发送完成分析所必需的转写、相关证据、时间与指标、分析指令，以及训练方式、所选框架、可选主题和场景。针对性练习仅补充所选目标及必要的上一轮转写/上下文用于比较，并在准备区提示。原始音频、密钥和无关历史不进入分析内容；远程服务按其接口使用配置凭据完成认证。弹窗显示当前所用服务、模型与按实际 endpoint 判断的处理位置。完整说明长期保留在“帮助 → 数据与隐私”。
+
+自动诊断已开启但告知尚未完成时，先保存录音与训练事实及可用本地结果，进入本次 Report，再弹出说明；确认后按当前配置的自动启用状态分析当前记录。自动诊断关闭时，进入 Report 不弹告知；用户首次点击“分析这一次”才弹出说明，确认后执行这一次手动分析。确认前不得请求 AI；取消、关闭或离开弹窗不执行本次分析，也不记为完成告知，录音、转写和本地指标继续可查看。用户离开处理或报告后不由迟到响应抢回页面或弹出另一记录的告知。
+
+完成该告知后，在已告知数据范围没有实质变化的情况下，后续手动分析、自动分析、更换服务/模型/地址及本地/远程切换不重复弹窗。首次统一告知覆盖远程传输；仅有本地告知的历史状态在首次远程分析前补齐告知，发送范围实质扩大时重新告知。普通文案、提示词或模型版本更新不直接等于范围扩大。告知完成状态真实持久化，记录覆盖的数据类别、本地/远程范围、必要版本及确认时间，重启后仍有效；不从 API key、已有分析结果或录音确认标志推断新版 AI 告知已经完成。
+
+统一告知与自动分析授权分开：完成告知不自动开启任何 profile 的自动诊断。更改 provider、模型或 endpoint 后仍撤销原自动启用，需要对新配置重新明确开启；若告知范围没有实质变化，不重复数据告知。远程知情与自动启用的验收边界沿用 R-A11。
 
 自动诊断仅使用当前选中且配置完整、明确启用的 profile；当前配置不可用时就地说明和引导设置，不自动改用另一配置。未配置、未开启、离线、无有效文本或请求失败时保留事实与可用本地分析，不伪称“没有问题”。配置 schema 和现状见 [Current](../architecture/current.md)，隐私验收由 [R-A11](requirements.md#6-m2表达证据ai-分析与雷达图) 维护。
+
+手动“分析这一次”不受自动诊断开关阻断，使用用户明确选中的有效配置，不静默切换其他服务。自动请求仍检查该配置的自动启用状态。告知覆盖与配置检查在真实请求边界生效；现有用户可达的报告、回放及其他 AI 分析入口遵守同一门禁。连接测试不发送训练数据，不以连接成功代替 AI 数据告知。正常已告知的自动分析继续沿用 §6 的 Processing 流程；本轮不扩展完整历史报告的主动重分析策略。
 
 ## 7. 分析层与首次报告
 
@@ -201,6 +213,8 @@ M1 对本原则的落实限于已有完成逐字稿、稳定片段、音频和�
 Common Analysis 覆盖共享维度，如流畅/节奏、清晰/精确、简洁/聚焦、组织/衔接，具体定义沿用 M2。Free 可识别结论过晚、支撑不足、顺序混乱、重复或衔接问题；用户未请求框架视角时，不按 PREP/STAR/Pyramid 槽位判错。
 
 Finding 使用稳定、精简、受控的 category，AI 不自由创建分类；无足够证据不创建 Finding。M2 初始枚举已确认：`organization`（组织与衔接）、`argument`（论点与论据）、`delivery`（节奏与停顿）、`wording`（措辞与口头禅）。后续可在实际需求下版本化扩展，当前响应不得临时增加类别。category 不等于 Radar dimension，也不要求每类都有分数或图轴；量程、映射与完整校准延后至 [Backlog B-20](backlog.md#not-now)，M2 决策状态见 D-04。Finding 的字段、证据与 provenance 仍只由 [Data Model §5–§6](../architecture/data-model.md#5-later-derived-entities) 定义。
+
+“行动安排”不新增一级 category。关于结尾未明确负责人、开始时间或下一步安排的 Finding 归入 `organization`（组织与衔接）；“行动安排”可以作为具体问题描述或语义说明保留。
 
 Structured 在 Common Analysis 外增加所选框架的 Framework Analysis。专项分析说明框架部分的存在、顺序、比例、支撑或层级关系，不替代 Common Analysis，也不重复给无关表达问题评分。
 
@@ -267,7 +281,7 @@ Finding 是 Report 诊断的唯一展示来源，并以 Card / Row 呈现。点�
 展开内容保留已确认的顺序：
 
 ```text
-原话 / 音频证据 → 简短解释 → 改进示例 → 训练提示 → 针对这个问题继续练习
+原话 / 音频证据 → 简短解释 → 一种表达参考（有内容时） → 下一轮怎么练 → 针对这个问题继续练习
 ```
 
 改进示例是参考，不是标准答案，不要求用户复述。Finding 尽可能定位 transcript segment；有字符/token span 或音频时间区间时，可原位高亮对应逐字稿、定位/播放音频，并解释证据与结论的关系。时间未知或仅为估计时明确标记，仍可查看原文，不伪造精确音频位置。Common 与 Framework findings 使用同一规则。
@@ -284,13 +298,15 @@ Finding 是 Report 诊断的唯一展示来源，并以 Card / Row 呈现。点�
 | Finding 行动作 | “继续练习”，对象明确是该行 Finding |
 | Finding 展开后动作 | “针对这个问题继续练习”，与该行入口指向同一练习目标 |
 
-取消 Report-level 通用“继续练习”，包括顶部针对性练习结果区；只保留上述两个 Finding-aware 入口。它们是同一动作的两种呈现，不是要求同时重复显示的两组按钮。结果、证据或历程区不另造通用练习出口。
+普通 Report 不提供报告级通用“继续练习”入口；用户先选择具体 Finding，再通过“练习这一点”等 Finding-aware 动作进入针对性练习。Finding 行与展开区的入口是同一动作的两种呈现，不要求重复显示。
+
+针对性练习 Report 的顶部结果区保留“继续练习这个目标”：该入口绑定当前已明确的 Practice Focus，表示延续当前练习链，不属于通用继续练习。点击后携带当前主题、场景、训练方式、练习目标与用户所选练习范围进入 Preparing，由用户再次点击开始后进入 Recording。若要更换目标，仍从具体 Finding 的“练习这一点”发起，并以当前 Session 为基准开始新的练习链。证据与历程区不另造通用练习出口；Comparison 不增加“继续练习”入口。
 
 展开、收起、播放、查看详细指标属于内容交互；“回到问题列表”属于当前页面定位；继续练习属于带目标的核心任务动作。三者不与“首页 / History”混成一排导航按钮。不设置“完成本次练习”，所有导航和动作均不承担保存职责。
 
 ## 9. 带上下文再次进入 Training Workspace
 
-“继续练习/重练”描述为什么开始本次训练，以及它与上一轮的关系；不是独立训练模式、独立 Workspace 或需要重新讨论的一条训练流程。用户通过 §8.2 的 Finding 入口带着上下文再次进入同一 Training Workspace，复用录音、暂停、继续、结束、ASR 与持久化机制，不新增 Practice Workspace。Training Workspace 轻量显示本轮练习目标与必要提示，让用户知道本轮针对什么问题。
+“继续练习/重练”描述为什么开始本次训练，以及它与上一轮的关系；不是独立训练模式、独立 Workspace 或需要重新讨论的一条训练流程。用户通过 §8.2 的 Finding 入口，或针对性练习结果区绑定当前目标的入口，带着上下文再次进入同一 Training Workspace，复用录音、暂停、继续、结束、ASR 与持久化机制，不新增 Practice Workspace。Training Workspace 轻量显示本轮练习目标与必要提示，让用户知道本轮针对什么问题。
 
 从 Finding 进入 Preparing 时，默认继承来源 Session 的主题/场景（没有则保持空）、训练方式与 framework，并另带入所选 Finding、Practice Focus 与来源引用；不把改善目标改写为 Training Context，也不要求从空白首页重新填一遍。Preparing 中的可调整边界仍遵循 §5；继承不改写来源记录，也不保证不同范围/上下文天然可比，按 §11 判断。
 
@@ -321,6 +337,8 @@ Finding 展开区提供「练习范围」下拉框与「针对这个问题继续
 继续同一目标沿当前链推进；改选另一个 Finding 开始新的练习链。某 Session 可同时作为上一链的末轮和下一链的基准，例如 A → B → C 练结论位置，从 C 改练口头禅后形成 C → D → E；C 仍是一条 Session，不复制记录或改写旧链的练习目标。
 
 结果区把本轮目标作为来源 Finding 卡片显示，可选择范围并「继续练习这个目标」；它始终指向保存的具体目标，不是 Report-level 通用继续按钮。改选本次分析中的其他 Finding 则开启新链，不依赖跨轮 Finding ID 或文本相同来自动匹配目标。
+
+Report 顶部的针对性结果区先放「查看对比证据」和「查看练习历程」，再放目标建议、练习范围及绑定当前目标的「继续练习这个目标」。该入口仍属于顶部结果区；不另增通用继续按钮，也不将证据/历程移到范围与动作之后。
 
 来源删除后保留原轮次和「来源报告已删除」位置，不连带删除后续记录，不重编号，也不自动跨过缺失轮次比较。例如 A → 已删除的 B → C 中，C 仍为第 3 轮，C/B 比较不可用；已有结论须标明来源证据无法复核。C → D 可继续比较。数据表示与最小保留信息见 [Data Model §6](../architecture/data-model.md#6-analysis-and-retraining-invariants)。用户从哪条 Finding 开始下一轮仍遵循 §8.2。
 
@@ -353,7 +371,7 @@ Free 报告可在证据支持时推荐框架，解释原因并等待用户选择
 | 维度 | 已确认约束 |
 |---|---|
 | 键盘与焦点 | 保证 Dialog、Panel 的基础键盘操作与焦点恢复正确 |
-| 主题 | 所有窗口保持一致；切换主题不重置业务状态 |
+| 主题 | 已迁移界面沿用冻结 Demo 与后续确认的视觉；Settings 隐藏旧主题／布局切换入口，保留原配置和底层兼容能力，不让旧偏好覆盖已确认界面 |
 | Utility Surface | Settings / Help 的覆盖与关闭语义统一见 §13.1；主窗口承载核心业务 |
 | 状态保护 | 打开或关闭窗口、Panel、Dialog 不影响 Training、Report 等业务状态 |
 | 冲突操作 | 仅局部禁用相互冲突的操作，不锁死整个界面 |
@@ -388,7 +406,7 @@ Screen 以用户任务与 Workspace 职责划分：任务未改变优先 State�
 |---|---|
 | Training Workspace（Home） | Preparing（§3：Context Area + Start Control Area）→ Recording（§4：Active / Paused）→ Processing（§6） |
 | Report Workspace | Complete / Partial / Unavailable（§7.4）；内容与 Report B / Practice Chain 见 §7–§10 |
-| History / 训练历史 | Empty / Populated；Populated 内 0 / 1 / 2 selected（§13.2） |
+| History / 训练历史 | Empty / Populated；Populated 内 0 / 1 / 2 / 3 条及以上 selected（§13.2） |
 | Comparison / Review Workspace | Ready / Partial / Unavailable（§13.3）；M3 固定两条记录的差异视图 |
 | Settings / Help | 覆盖当前 Screen 的 Utility Surface，以 × 关闭（§13.1） |
 
@@ -399,7 +417,7 @@ App Shell（Primary：Training / History；Utility：···）
 │       └─ End（Active / Paused 均可）→ Processing
 │       └─ 完成 / Partial 判定 / timeout → Report 对应状态（§6、§7.4）
 │           └─ Finding → 同一 Training Workspace（optional Practice Focus）→ Report B
-├─ History.Empty / Populated（0–2 selected）
+├─ History.Empty / Populated（多条 selected；Comparison 仍为两条）
 │  ├─ 打开单条 → Report
 │  └─ 两条 + [对比] → Comparison.Ready / Partial / Unavailable
 │                       └─ 下钻单侧 Report → ← 返回对比
@@ -419,22 +437,28 @@ Deferred：Progress / Trends；Finding-scoped AI Conversation（§13.5）
 | 关于／应用版本 | 暂放设置页底部，不单独建页 |
 | 诊断（运行环境/ASR 故障排查） | 唯一入口为“帮助 → 问题与反馈”，诊断导出也在这里；移除主窗口顶部等其他位置的重复入口。这里不指 Report 中的 AI 表达诊断，也不属于报告导出待办 |
 | History | 用户可见名称为“训练历史”，对象是训练 Session，不是操作历史或聊天历史 |
-| 数据与隐私说明 | 放帮助页并长期可查；首次录音确认和远程 AI 启用仍在对应操作前完成，不以帮助说明替代确认 |
+| 数据与隐私说明 | 放帮助页并长期可查；首次录音确认及 AI 数据告知分别按 §3.5 / §6.1 执行，不以帮助说明替代确认 |
 | 继续练习／重练 | 复用 Training Workspace，用户路径见 §9；数据关系见 Data Model §6 |
 
 Settings / Help 用“×”关闭，不用“← 返回”；关闭后恢复打开前的 Screen/context，不构成普通层级 Screen。两者可以有内部 local navigation，但最多同时打开一个主要 Utility Surface；Settings 中求助使用就地解释或替换 Surface 内容，不叠加多层 overlay。这里的 × 仅表示 Utility 关闭，不替代 Report / Comparison 下钻的 contextual Back。
+
+Settings 的 AI 配置、语音识别和分析偏好使用同一 Surface；已有入口统一到主窗口，不并存用户可达的独立设置／分析偏好窗口。分析偏好映射已有自定义指令字段，保持与训练主题、场景和练习目标独立。连接测试、保存与实际生效分开：测试不保存配置或触发训练分析，保存失败保留草稿；配置缺失不自动改用其他服务。模型状态来自真实管理能力，区分所选与生效模型，未知进度不显示百分比，任务冲突只局部限制相关操作。
+
+未保存时关闭（含 Escape）、切换子页或替换 Settings / Help，沿用冻结界面的就地提示：继续编辑，或明确放弃修改后继续。未明确放弃前不丢弃草稿；保存请求未结束时不允许重复提交或退出编辑。Utility 开关不重置录音、处理、分析或练习链，也不改写当前任务已冻结的配置。FAQ 分类与搜索在本地完成，反馈由用户主动打开既有入口；诊断导出只在“帮助 → 问题与反馈”，遵守既有脱敏边界。帮助不得承诺尚未实现的转写恢复。
 
 History 的内容职责与路径由 §13.2 维护，单条历史详情共用 Report Workspace。以上是目标归属，不声明所有调整已实现，也不改变既有里程碑范围。
 
 ### 13.2 History 与 Comparison / Review
 
-History 负责找记录、打开记录、明确删除及选择两条记录发起比较。它保持按创建时间倒序排列的普通 Session 列表，不按练习链重排、分层或嵌套；同一 Session 只是一条记录。打开一条 Session 的路径是 **History → Report Workspace**，不另建历史详情 Screen。
+History 负责找记录、打开记录、明确删除及选择两条记录发起比较。它保持按创建时间倒序排列的普通 Session 列表，不按练习链重排、分层或嵌套；同一 Session 只是一条记录。打开一条 Session 的路径是 **History → Report Workspace**，不另建历史详情 Screen。点击记录内容打开报告，内容区域支持键盘操作；复选框与右侧轻量文字「删除」按钮独立操作，不触发打开。分批加载不是全部历史，仍提供继续读取入口。
 
 条目用于识别本次训练：日期/时间、时长、训练方式，以及可用的主题/场景、练习目标与记录状态应保持各自语义；主题/场景与 Practice Focus 的区分见 §3.4，缺失内容不伪造。条目不显示“上游报告 / 下游报告”，也不展开整条练习链、多个报告或完整分析。来源关系仍保存在数据层，需要查看针对性练习结果或历程时进入 Report（§10）。
 
 History 只有 Empty / Populated 状态。Empty 就地说明暂无记录并提供去 Training Workspace 的“开始表达”入口，不新建 Empty Page。
 
-M3 的唯一完整对比发起路径是 **History 普通列表 → checkbox 勾选两条 Session → 点击明确的 [对比] → Comparison / Review Workspace**。选择仅为 Populated 内的 0 / 1 / 2 selected 状态，不是独立选择模式、页面或向导；保持列表浏览与单条打开。最多选择两条：选满后其余记录自动 disabled，已选项仍可取消；取消后其余恢复可选，[对比] 仅恰好两条时启用，不因第二条被勾选就自动跳转。比较须明确基线与目标角色。
+完整对比的唯一发起路径是 **History 普通列表 → checkbox 恰好勾选两条有效 Session → 点击明确的 [对比] → Comparison / Review Workspace**。同一套复选框允许继续选择多条，用于对比或删除，不新增独立删除模式、页面或向导。显示实际已选数量：0 条时对比与批量删除禁用；1 条时可删除、不可对比；恰好 2 条且满足既有比较条件时可对比，也可删除；3 条及以上可删除、不可对比。选满两条不禁用其他复选框，不因勾选第二条自动跳转；Comparison 始终只接受两个 Session。
+
+单条及批量删除均需明确确认。单条确认识别具体记录，并说明删除录音、转写和分析结果；批量一次确认选中数量及同样的数据范围，执行按钮明确标为删除动作。确认绑定当次选中的 Session ID 集合，等待和执行期间不混入新选择，不重复提交同一任务。成功项从列表与选择中移除；失败项保留、继续选中，说明失败数量并可重试，不把部分失败宣布为全部成功。删除只作用于明确选择，不默认扩展到全部历史或后续练习；链降级按 §10.2，不级联、不重编号。已固定 Comparison 输入被删除时提示失效，不补位、不重新配对、不使用旧缓存中的被删除内容。
 
 不同 Framework 仍允许选择并进入 Comparison；[对比] 附近可轻提示“部分结构化指标可能无法直接比较”，不以框架不同替用户禁止选择。具体可比性按 §11 / §13.3 逐项说明。
 
@@ -456,6 +480,8 @@ Comparison 是固定两个 Session 的完整差异工作区，回答“这两次
 Evidence 就近附着在它支持的 Finding 或指标比较项下，按需查看两侧原文、时间位置和可用音频；不设一个脱离比较项的页面尾部 Evidence 总区。无 Finding、AI 不可用或分析不完整时，已有时长、逐字稿、音频及可靠指标仍可比较/查看；分析缺失明确标识，不等于“没有问题”。“不再出现”不能仅由另一侧未分析或证据缺失推断，更不自动等同已经解决。
 
 M3 首版采用可靠指标变化与两侧证据复盘：Analysis Comparison 按类别组织两侧已保存 Finding，明确未建立跨录音问题对应，不自动标注改善、持续或新出现；该能力按 R-R02 / Backlog B-25 延期。打开对比不触发 AI、ASR、VAD 或历史重算。指标变化只陈述观察，不自动评价好坏；雷达继续显示未校准/不可用。旧记录没有结构化分析时仍可查看原文、录音和可用事实。
+
+冻结 UI 示例中的「然后」次数适配为已有的「填充词命中次数」，「然后／每百字」适配为已有的「填充词命中频率」（次／录音分钟）。读取固定报告中的当次词表统计及录音时长，名称、单位和观察文案一致适配；不新增单词或每百字指标，不用墙钟时长替代音频时长。指标定义、来源、分母及逐项兼容规则唯一由 [Data Model §5.3／§10](../architecture/data-model.md#53-common-analysis-v1) 维护；缺失为不可用，不可靠时保留两侧值、说明原因，不计算差值。
 
 比较状态与限制遵循 §11；不能以某个可比指标推断整体可比。针对性练习的轻量对比与这里的完整对比共用底层 comparison 概念、证据引用和可比性规则，展示层不同。Application Core 与数据职责分别见 [Target Architecture §7](../architecture/target.md#7-analysis-architecture) 和 [Data Model §10](../architecture/data-model.md#10-comparison-invariants)。
 
@@ -482,14 +508,16 @@ Comparison 内不提供换 Session、选择其他历史记录或重新配对的�
 
 ### 13.6 App Shell 与 Navigation Context
 
-Primary Navigation 仅 **Training（Home）与 History**。极简全局 App Header 为 `Expression Trainer / App name或logo → Training`、`History`、`··· → Settings / Help`，不重复放 Home / Training 两个按钮；History 在当前顶层目的地有 active state。Settings / Help 是低频 Utility，不与主导航争抢权重。
+Primary Navigation 仅 **Training（Home）与 History**。极简全局 App Header 为 `App logo → Training`、`History`、`··· → Settings / Help`，不重复放 Home / Training 两个按钮；History 在当前顶层目的地有 active state。Settings / Help 是低频 Utility，不与主导航争抢权重。
+
+App Header 左侧仅保留四条竖线组成的品牌图标，不并列显示应用名称；点击图标返回 Preparing，保留“表达训练，返回准备”的可访问名称与返回提示。图形母版为 [brand-mark.svg](../../src/assets/brand-mark.svg)，后续 App 图标沿用此图形；系统图标尺寸与封装在打包接入时适配。
 
 App Header 表达全局去向；Screen Header 表达当前页面身份、对象与 contextual Back。Report / Comparison 标题不进入一级导航；Home 无需额外“Training”大标题。Top-level Training / History 没有 contextual Back。
 
 | 来源 / 操作 | 返回与上下文 |
 |---|---|
 | Training → Report | 自然结果 Screen，不强制“← Training”；新训练/针对性练习由内容动作发起 |
-| History → Report | “← 训练历史”，恢复原列表滚动位置、checkbox selection，以及未来若有的筛选/搜索状态 |
+| History → Report | “← 训练历史”，恢复原列表滚动位置、完整 checkbox selection（包括超过两条），以及未来若有的筛选/搜索状态 |
 | History → Comparison | “← 训练历史”，恢复原 History 状态；换比较对象在 History 完成 |
 | Comparison → 单侧 Report | “← 返回对比”，恢复 §13.4 的原 Comparison |
 | 本轮 Report → 历程中的某轮 Report | “← 返回本轮报告”，恢复该轮固定的报告快照；不自动改成更新分析版本 |
@@ -512,6 +540,6 @@ Global Navigation 负责切换主目的地，Contextual Back 负责下钻后的�
 
 M2 实时分工已按 §4 收口；M4 首版范围选择器已按 §9 落实。上述未细化交互不重开 D-10，也不把 B-19 可选实时 AI 提前纳入当前交付。
 
-跨 Screen 的已确认约束见 §12.1；快捷键、焦点细则、Utility 尺寸/位置与状态转换的实现细节留到 Interaction / State Design。届时基于已确认 Screen / State 结构与源码细化实现；已过期的 UI audit 不再充当设计或验收基准，本次不生成新的 As-Is 审计。
+跨 Screen 的已确认约束见 §12.1。已迁移界面的 Utility 容器及基本键盘/关闭/草稿行为沿用冻结基线和 §13.1；未细化的快捷键及未来能力的实现细节继续留到 Interaction / State Design，基于已确认 Screen / State 结构细化。已过期的 UI audit 不再充当设计或验收基准，不生成重复的 As-Is 审计。
 
 Focus Mode 是 Backlog，不属于本表中的已接受待细化能力。后续以本文作为核心体验与 Screen Structure source of truth，结合 Requirements 的验收边界和 Roadmap 的里程碑顺序细化 §13.5 与本节剩余项，不从历史对话重新推导已确认结论。

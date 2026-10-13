@@ -55,7 +55,7 @@ test('finalization schedules M2 once, reading history is passive, and only Main 
   const app=f.open(options);
   const {sessionId}=await app.execute('create',{requestId:'new',input:start()});
   await app.execute('finalize',{requestId:'save',sessionId,input:completion()});
-  const result=await app.execute('analyze',{requestId:'wait',sessionId});
+  const result=await app.execute('analyze',{requestId:'wait',sessionId,trigger:'automatic'});
   assert.equal(result.ok,true);
   assert.equal(result.value.kind,'report-snapshot');
   assert.equal(calls,1);
@@ -121,6 +121,19 @@ test('malformed commands and arbitrary paths never mutate history or leak input'
     assert.equal(JSON.stringify(response).includes('private-path'), false);
   }
   assert.deepEqual((await app.execute('list', {requestId: 'healthy'})).value, []);
+});
+
+test('practice history accepts an optional report pin and strictly validates supplied IDs', async t => {
+  const app=fixture(t).open();
+  const {sessionId}=await app.execute('create',{requestId:'new',input:start()});
+  assert.deepEqual((await app.execute('practiceHistory',{requestId:'old-caller',sessionId})).value,[]);
+  const pinned=await app.execute('practiceHistory',{requestId:'pin',sessionId,reportId:'saved-report'});
+  assert.equal(pinned.ok,true);assert.deepEqual(pinned.value,[]);
+  for (const reportId of [null,undefined,'','../report',{},1]) {
+    const result=await app.execute('practiceHistory',{requestId:'invalid-pin',sessionId,reportId});
+    assert.equal(result.error.code,'INVALID_SESSION');
+  }
+  assert.equal((await app.execute('list',{requestId:'unchanged'})).value.length,1);
 });
 
 test('interruption preserves completed sessions and cannot revive deleted sessions', async t => {

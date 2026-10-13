@@ -93,7 +93,7 @@ async function fixture(t, provider = 'custom', {speechAvailable=false} = {}) {
       const saved=await invoke(app,'finalize',{sessionId,input:{completedAt:'2026-09-19T00:00:01Z',durationMs:1000,audio,
         transcript:{text,segments:[{id:'segment-1',text,timingSource:'unavailable'}]}}});
       assert.equal(saved.ok,true);
-      const report=await invoke(app,'analyze',{sessionId});
+      const report=await invoke(app,'analyze',{sessionId,trigger:'automatic'});
       assert.equal(report.ok,true);
       return (await invoke(app,'get',{sessionId})).value;
     }};
@@ -137,7 +137,7 @@ test('speech, metric and Finding evidence keep exact run ownership through HTTP 
   for (const ref of finding.evidenceRefs) assert.ok(Object.hasOwn(context.evidenceMap,ref));
   assert.deepEqual(context.quality.vad,{status:'degraded',reasons:['vad-thresholds-uncalibrated']});
   assert.equal(report.analysisRun.provenance.profileId,'approved');
-  assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v4');
+  assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v5');
   assert.equal((await f.command('analyze',{retry:true})).value.id,report.snapshot.id,'complete report is not reanalyzed');
   await f.app.close();
   const restored=(await f.command('get',{},f.open())).value;

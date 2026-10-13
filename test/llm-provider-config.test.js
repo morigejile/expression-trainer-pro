@@ -58,7 +58,7 @@ test('profile summaries exclude incomplete legacy defaults from selectable model
       {id: 'configured', name: 'Work', provider: 'deepseek', apiKey: 'key', model: 'deployed-model'}
     ]
   });
-  assert.equal(summary.activeProfileId, 'configured');
+  assert.equal(summary.activeProfileId, null);
   assert.deepEqual(summary.profiles.map(profile => profile.id), ['configured']);
 });
 

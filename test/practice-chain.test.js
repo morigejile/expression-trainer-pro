@@ -92,3 +92,25 @@ test('practice validates the selected saved finding and rejects forged chain fac
   const deleted = await app.execute('create',{requestId:'deleted',input:{...input(),practiceRequest:request(a)}});
   assert.equal(deleted.error.code,'SESSION_NOT_FOUND');
 });
+
+test('fixed practice history stays passive and pinned through a new analysis and SQLite reopen', async t => {
+  let summary='首次保存的练习反馈',calls=0;
+  const f=fixture(t,{diagnose:async ({session}) => {
+    calls++;
+    return {schemaVersion:1,summary:'本轮完整报告',findings:[finding],...(session.practice ? {practiceFeedback:{status:'improved',
+      summary,previousEvidenceRefs:['segment-1'],currentEvidenceRefs:['segment-1']}} : {})};
+  }});
+  let app=f.open();const a=await complete(app);const b=await complete(app,request(a));
+  const reportId=b.results.at(-1).id;const facts=structuredClone(b.practice);
+  summary='后来保存的反馈';
+  assert.equal((await app.execute('analyze',{requestId:'new-analysis',sessionId:b.id,retry:true})).ok,true);
+  await app.close();app=f.open();const beforeRead=calls;
+  const pinned=await app.execute('practiceHistory',{requestId:'fixed',sessionId:b.id,reportId});
+  assert.equal(pinned.ok,true);assert.equal(pinned.value.at(-1).reportId,reportId);
+  assert.equal(pinned.value.at(-1).summary,'首次保存的练习反馈');
+  assert.equal((await app.execute('practiceHistory',{requestId:'default',sessionId:b.id})).value.at(-1).summary,'后来保存的反馈');
+  assert.equal(calls,beforeRead);
+  assert.deepEqual((await app.execute('get',{requestId:'facts',sessionId:b.id})).value.practice,facts);
+  const historyItem=(await app.execute('list',{requestId:'history-item'})).value.find(item=>item.id===b.id);
+  assert.deepEqual(historyItem.practice,{round:facts.round,scope:facts.scope,goal:facts.goal});
+});

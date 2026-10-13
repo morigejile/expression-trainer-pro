@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 async function run({app, mainWindow, BrowserWindow, phase}) {
-  assert.ok(['write', 'read', 'offline', 'offline-read', 'degraded','m4','m4-read'].includes(phase));
+  assert.ok(['write', 'read', 'offline', 'offline-read', 'degraded','m4','m4-read','i1','i1-read','i2','i2-read','i2-auto','i2-auto-read','i2-live-read','i3','i3-read','i4','i4-read','i5','i5-read','audio-background'].includes(phase));
   const offline = phase.startsWith('offline');
   if (offline) {
     mainWindow.webContents.session.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']}, (_details, done) => done({cancel:true}));
@@ -57,6 +57,7 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
   await evaluate(`(async () => {
     await window.api.acknowledgeRecordingPolicy();
     localStorage.setItem('expression-trainer.help-seen','1');
+    document.querySelectorAll('dialog[open]').forEach(dialog=>dialog.close());
     document.body.replaceWith(document.body.cloneNode(true));
     document.querySelectorAll('.modal').forEach(el => el.classList.add('hidden'));
     window.__trainingProductTrainer = new ExpressionTrainer({audioCaptureFactory: () => {
@@ -78,24 +79,23 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
   assert.equal(await evaluate(`Boolean(document.getElementById('training-topic') && document.getElementById('training-scenario'))`), true, 'Preparing offers independent topic/scenario capsules');
   await evaluate('window.__trainingProductTrainer.trainingSetup.ready');
   if (offline) assert.equal((await evaluate('window.api.getLlmProfileSummaries()')).profiles.length, 0);
+  // Existing normal flow smoke represents covered users; I2 exercises the
+  // first-notice path through the actual modal without pre-acknowledging it.
+  if (!phase.startsWith('i2') && phase !== 'audio-background') {
+    const state=await invoke('getAiDisclosureState',{});
+    assert.equal((await invoke('acknowledgeAiDisclosure',{scopeVersion:state.scopeVersion})).success,true);
+  }
 
   if (phase === 'write') await capture('preparing');
 
-  const saveProfile = async model => {
+  const saveProfile = async (model,autoDiagnosisEnabled = true) => {
     await evaluate('window.api.openSettings()');
-    let settingsWindow;
-    const deadline = Date.now() + 5000;
-    while (Date.now() < deadline) {
-      settingsWindow = BrowserWindow.getAllWindows().find(win => !win.isDestroyed() && win.webContents.getURL().endsWith('/settings.html') && !win.webContents.isLoadingMainFrame());
-      if (settingsWindow) break;
-      await new Promise(resolve => setTimeout(resolve, 30));
-    }
-    assert.ok(settingsWindow, 'settings window opened');
-    const config = {schemaVersion:3,activeProfileId:'product-smoke',profiles:[{id:'product-smoke',name:'Product smoke',provider:'deepseek',apiKey:'smoke-only-key',model,ollamaUrl:'',baseUrl:'',customModel:'',autoDiagnosisEnabled:true}]};
-    const saved = await settingsWindow.webContents.executeJavaScript(`window.api.saveLlmProviderSettings(${JSON.stringify(config)})`);
+    await wait('settings Utility opened',`document.getElementById('utility').open && !window.__trainingProductTrainer.utility.loading`);
+    const config = {schemaVersion:3,activeProfileId:'product-smoke',profiles:[{id:'product-smoke',name:'Product smoke',provider:'deepseek',apiKey:'smoke-only-key',model,ollamaUrl:'',baseUrl:'',customModel:'',autoDiagnosisEnabled}]};
+    const saved = await invoke('saveLlmProviderSettings',config);
     assert.equal(saved.success, true);
     await wait('provider selection reached renderer', `window.__trainingProductTrainer.playbackProfileSummary.profiles.some(p => p.model===${JSON.stringify(model)})`);
-    settingsWindow.close();
+    await evaluate('window.__trainingProductTrainer.utility.requestClose()');
   };
 
   const click = async selector => {
@@ -181,10 +181,10 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
     await evaluate(`document.querySelector('[data-compare-id="${ids[1]}"]').click()`);
     assert.equal(await evaluate(`document.body.dataset.screen`),'history');
     assert.equal(await evaluate(`document.getElementById('btn-history-compare').disabled`),false);
-    if(ids.length>2)assert.equal(await evaluate(`document.querySelector('[data-compare-id="${ids[2]}"]').disabled`),true);
+    if(ids.length>2)assert.equal(await evaluate(`document.querySelector('[data-compare-id="${ids[2]}"]').disabled`),false);
     await evaluate(`document.getElementById('btn-history-compare').click()`);
     await wait('comparison rendered',`document.body.dataset.screen==='comparison' && document.querySelector('.comparison-metric')`);
-    assert.match(await evaluate(`document.getElementById('comparison-content').textContent`),/暂未建立跨录音问题对应/);
+    assert.match(await evaluate(`document.getElementById('comparison-content').textContent`),/尚未自动建立问题对应关系/);
     assert.equal(await evaluate(`document.querySelectorAll('[data-comparison-report]').length`),2);
     await evaluate(`document.querySelector('[data-detail-key="original-target"]').open=true`);
     await wait('target recording evidence available',`document.querySelector('[data-detail-key="original-target"] audio')`);
@@ -192,8 +192,8 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
     await wait('comparison evidence audio decodes and plays',`document.querySelector('[data-detail-key="original-target"] audio').dataset.played==='true'`);
     const pinned=await evaluate(`window.__trainingProductTrainer.comparison.context.projection.baseline.snapshot`);
     await evaluate(`document.querySelector('[data-detail-key="metric-text-character-count"]').open=true`);
-    const scroll=await evaluate(`(()=>{const area=document.getElementById('comparison-screen');area.scrollTop=600;return area.scrollTop;})()`);
-    assert.ok(scroll>0,'comparison must scroll within its workspace');
+    const scroll=await evaluate(`(()=>{window.scrollTo(0,600);return window.scrollY;})()`);
+    assert.ok(scroll>0,'comparison uses the Frozen page scrolling');
     await capture(offline?'comparison-offline':'comparison');
     await evaluate(`document.querySelector('[data-comparison-report="baseline"]').click()`);
     await wait('comparison drills into the shared report',`document.body.dataset.screen==='report' && window.__trainingProductTrainer.reportSource==='comparison'`);
@@ -202,8 +202,8 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
     await wait('pinned comparison restored',`document.body.dataset.screen==='comparison' && !window.__trainingProductTrainer.comparison.loading`);
     assert.deepEqual(await evaluate(`window.__trainingProductTrainer.comparison.context.projection.baseline.snapshot`),pinned);
     assert.equal(await evaluate(`document.querySelector('[data-detail-key="metric-text-character-count"]').open`),true);
-    assert.equal(await evaluate(`document.getElementById('comparison-screen').scrollTop`),scroll,'Report return restores the comparison scroll position');
-    await evaluate(`document.getElementById('btn-help').click();document.getElementById('btn-close-help').click()`);
+    assert.equal(await evaluate(`window.scrollY`),scroll,'Report return restores the comparison scroll position');
+    await evaluate(`document.getElementById('btn-help').click();document.getElementById('close-surface').click()`);
     assert.equal(await evaluate(`document.querySelector('[data-detail-key="metric-text-character-count"]').open`),true);
     await evaluate(`document.getElementById('btn-comparison-back').click()`);
     await wait('history restores selection',`document.body.dataset.screen==='history' && !window.__trainingProductTrainer.historyLoading`);
@@ -213,6 +213,78 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
     assert.equal(await evaluate(`document.getElementById('btn-history-compare').disabled`),true);
     assert.deepEqual(aiCalls(),before,'comparison and report drill-down must not request AI');
   };
+
+  if (phase === 'audio-background') {
+    await require('./audio-background-smoke').run({mainWindow,evaluate,wait,invoke,aiCalls});
+    console.log('TRAINING_PRODUCT_AUDIO-BACKGROUND_OK');app.quit();return;
+  }
+  if (phase.startsWith('i2')) {
+    await require('./i2-report-smoke').run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capture,saveProfile,recordOnce,openHistory,calls,aiCalls});
+    console.log(`TRAINING_PRODUCT_${phase.toUpperCase()}_OK`);app.quit();return;
+  }
+  if (phase.startsWith('i3')) {
+    await require('./i3-practice-smoke').run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capture,saveProfile,recordOnce,openHistory,calls,aiCalls,choose,setCustom});
+    console.log(`TRAINING_PRODUCT_${phase.toUpperCase()}_OK`);app.quit();return;
+  }
+  if (phase.startsWith('i5')) {
+    await require('./i5-utility-smoke').run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capture,saveProfile,recordOnce,openHistory,calls,aiCalls,choose,setCustom});
+    console.log(`TRAINING_PRODUCT_${phase.toUpperCase()}_OK`);app.quit();
+    return;
+  }
+  if (phase.startsWith('i4')) {
+    await require('./i4-history-smoke').run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capture,saveProfile,recordOnce,openHistory,calls,aiCalls,choose,setCustom});
+    console.log(`TRAINING_PRODUCT_${phase.toUpperCase()}_OK`);app.quit();return;
+  }
+
+  if (phase === 'i1' || phase === 'i1-read') {
+    const fixturePathI1=path.join(app.getPath('userData'),'i1-fixture.json');
+    const labels={free:'自由表达',prep:'PREP',star:'STAR',pyramid:'金字塔'};
+    const assertReport=async (id,framework) => {
+      const saved=(await invoke('getTrainingSession',{requestId:'i1-read',sessionId:id})).value;
+      assert.equal(saved.framework,framework === 'free' ? null : framework);
+      assert.equal(saved.status,'completed');assert.ok(saved.transcript.text);
+      assert.equal(saved.artifact.state,'available');
+      const diagnosis=saved.results.find(run=>run.kind==='diagnosis');
+      assert.equal(diagnosis.status,'unavailable');assert.equal(diagnosis.value.reason,'not-enabled');
+      assert.equal(diagnosis.value.findings.length,0);
+      assert.match(await evaluate(`document.getElementById('record-identity').textContent`),new RegExp(labels[framework]));
+      assert.match(await evaluate(`document.getElementById('report-analysis-info').textContent`),new RegExp(labels[framework]));
+      assert.match(await evaluate(`document.getElementById('report-summary-copy').textContent`),/本次未生成 AI 分析/);
+      assert.equal(await evaluate(`document.querySelectorAll('#frozen-report .finding').length`),0);
+      assert.equal(await evaluate(`document.getElementById('legacy-styles').disabled`),true);
+      const statuses=await evaluate(`document.querySelectorAll('#report-analysis-info .report-status').length`);
+      await evaluate(`window.__trainingProductTrainer.flowView.show('report','preparing',window.__trainingProductTrainer.trainingRecords.selected())`);
+      assert.equal(await evaluate(`document.querySelectorAll('#report-analysis-info .report-status').length`),statuses,'state refresh retains the actual unavailable/failure status');
+      await evaluate(`document.getElementById('report-materials').open=true;document.getElementById('report-information').open=true`);
+      const audio=await evaluate(`(async()=>{const p=document.getElementById('recording-player');await p.play();p.pause();return {ready:p.readyState,bytes:(await fetch(p.src).then(r=>r.arrayBuffer())).byteLength};})()`);
+      assert.ok(audio.ready>=2);assert.equal(audio.bytes,364);
+    };
+    if (phase === 'i1') {
+      await saveProfile('disabled-model',false);
+      await evaluate(`document.getElementById('btn-start').click()`);
+      await wait('countdown owns checked resources',`document.body.dataset.trainingState==='countdown'`);
+      assert.equal((await invoke('listTrainingSessions',{requestId:'before-countdown-cancel'})).value.length,0);
+      await evaluate(`document.getElementById('btn-cancel-countdown').click()`);
+      await wait('countdown cancellation restores preparing',`document.body.dataset.trainingState==='preparing' && !window.__trainingProductTrainer.asrStartAttempt`);
+      assert.equal((await invoke('listTrainingSessions',{requestId:'after-countdown-cancel'})).value.length,0);
+      const records=[];
+      for (const framework of Object.keys(labels)) {
+        const prompt={schemaVersion:2,topic:{source:'user',text:`${labels[framework]} 真实记录上下文`},scenario:{source:'user',text:'向同事说明下一步安排'}};
+        const id=await recordOnce(prompt,{framework});records.push({id,framework});
+        await assertReport(id,framework);
+      }
+      fs.writeFileSync(fixturePathI1,JSON.stringify(records));
+      await require('./frozen-flow-smoke').run({mainWindow,BrowserWindow,evaluate,wait,capture,app});
+    } else {
+      for (const {id,framework} of JSON.parse(fs.readFileSync(fixturePathI1,'utf8'))) {
+        await openHistory(id);await assertReport(id,framework);
+        await evaluate(`document.getElementById('btn-report-back').click()`);
+        await wait('history context restored',`document.body.dataset.screen==='history' && !window.__trainingProductTrainer.historyLoading`);
+      }
+    }
+    assert.deepEqual(aiCalls(),initialCalls,'AI-off training/read/restart must issue zero AI requests');
+    console.log(`TRAINING_PRODUCT_${phase.toUpperCase()}_OK`);app.quit();return;
+  }
 
   if (phase === 'm4' || phase === 'm4-read') {
     const m4Path = path.join(app.getPath('userData'),'m4-fixture.json');
@@ -229,13 +301,13 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
       await require('./training-preparation-smoke').run({mainWindow,evaluate,wait,capture,choose,setCustom});
       await saveProfile('smoke-model');
       const a = await recordOnce(null,{framework:'prep',bank:true});
-      await wait('selected framework analysis',`document.getElementById('report-body').textContent.includes('PREP 专项分析')`);
+      await wait('selected framework analysis',`document.getElementById('report-analysis-info').textContent.includes('PREP 专项分析')`);
       const original = (await invoke('getTrainingSession',{requestId:'original',sessionId:a})).value;
       const prompt = original.trainingPrompt;
       assert.equal(prompt.topic.source,'bank');assert.equal(prompt.scenario.source,'bank');assert.equal(original.framework,'prep');
       await capture('m4-prep-report');
       await evaluate(`(()=>{const detail=document.querySelector('.framework-reanalysis');detail.open=true;detail.querySelectorAll('button')[1].click();})()`);
-      await wait('explicit STAR reanalysis',`!window.__trainingProductTrainer.trainingRecords.selected().reportPending && document.getElementById('report-body').textContent.includes('STAR 专项分析')`);
+      await wait('explicit STAR reanalysis',`!window.__trainingProductTrainer.trainingRecords.selected().reportPending && document.getElementById('report-analysis-info').textContent.includes('STAR 专项分析')`);
       const revised = (await invoke('getTrainingSession',{requestId:'revised',sessionId:a})).value;
       assert.equal(revised.framework,'prep');assert.deepEqual(revised.transcript,original.transcript);
       assert.equal(revised.results.filter(run=>run.kind==='speech-evidence').length,1);
@@ -275,7 +347,7 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
       await wait('four persisted rounds',`document.querySelectorAll('.practice-round').length===4`);
       await evaluate(`document.querySelector('.practice-round button').click()`);
       await wait('original pinned report',`window.__trainingProductTrainer.viewingTrainingRecordId===${JSON.stringify(f.a)} && window.__trainingProductTrainer.reportSource==='practice'`);
-      assert.match(await evaluate(`document.getElementById('report-body').textContent`),/STAR 专项分析/);
+      assert.match(await evaluate(`document.getElementById('report-analysis-info').textContent`),/STAR 专项分析/);
       await evaluate(`document.getElementById('btn-report-back').click()`);
       await wait('return to current practice',`window.__trainingProductTrainer.trainingRecords.selected()?.practice?.round===4`);
     }
@@ -297,7 +369,7 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
     if (phase === 'write') {
       await wait('automatic structured report saved', `window.__trainingProductTrainer.trainingRecords.selected().structuredReport?.analysisRun?.status==='completed' && !window.__trainingProductTrainer.trainingRecords.selected().reportPending`);
       assert.equal(calls.llmDiagnosis,initialCalls.diagnosis+7);
-      assert.match(await evaluate(`document.getElementById('report-body').textContent`),/先说明目标，再给出支持理由/);
+      assert.match(await evaluate(`document.getElementById('report-summary-copy').textContent`),/先说明目标，再给出支持理由/);
       await evaluate(`document.getElementById('btn-reanalyze').click()`);
       await wait('explicit playback analysis saved', `window.__trainingProductTrainer.trainingRecords.selected().playbackAnalysis && !window.__trainingProductTrainer.trainingRecords.selected().playbackPending`);
       assert.equal(calls.llmReport,initialCalls.report);
@@ -340,7 +412,7 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
       if (!offline) {
         assert.deepEqual(saved.value.results.find(result=>result.id===fixture.report.id),fixture.report,'settings changes must not rewrite saved report provenance');
         assert.deepEqual(saved.value.results.find(result=>result.id===fixture.playback.id),fixture.playback,'settings changes must not rewrite saved playback provenance');
-        assert.match(await evaluate(`document.getElementById('report-body').textContent`),/先说明目标，再给出支持理由/);
+        assert.match(await evaluate(`document.getElementById('report-summary-copy').textContent`),/先说明目标，再给出支持理由/);
         assert.match(await evaluate(`document.getElementById('feedback-content').textContent`),/SMOKE_PLAYBACK_ADVICE/);
       } else {
         assert.ok(saved.value.transcript.text.trim());
@@ -355,7 +427,9 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
       await capture('history');
       for (const id of fixture.ids) {
         await evaluate(`document.querySelector('[data-record-id="${id}"]').closest('.history-row').querySelector('.history-row-actions').click()`);
-        await wait('explicit delete reflected in list',`!window.__trainingProductTrainer.historyLoading && !document.querySelector('[data-record-id="${id}"]')`);
+        await wait('single-record deletion confirmation',`!document.getElementById('history-delete-modal').classList.contains('hidden')`);
+        await evaluate(`document.getElementById('btn-history-delete-confirm').click()`);
+        await wait('explicit delete reflected in list',`!window.__trainingProductTrainer.historyLoading && !window.__trainingProductTrainer.historyDeletion.busy && !document.querySelector('[data-record-id="${id}"]')`);
       }
       assert.deepEqual((await invoke('listTrainingSessions',{requestId:'deleted'})).value,[]);
       assert.equal(await evaluate(`document.getElementById('btn-history-start').classList.contains('hidden')`),false);

@@ -10,6 +10,16 @@ const { createTrainingRecordStore } = require('../src/training-records');
 delete global.document;
 const { validatePlaybackAnalysisPayload } = require('../lib/ipc-input');
 
+test('declining unsaved Utility exit leaves training shutdown untouched',async()=>{
+  const trainer=Object.create(ExpressionTrainer.prototype);trainer.utility={dialog:{open:true},prepareWindowClose:async()=>false};trainer.isRecording=true;
+  assert.equal(await trainer.prepareTrainingClose(),false);assert.equal(trainer.closing,undefined);assert.equal(trainer.isRecording,true);
+});
+test('native Utility keeps its built-in Tab traversal instead of trapping focus on a hidden menu action',()=>{
+  const first={},hidden={focus(){throw Error('hidden action must not receive focus');}},modal={classList:{contains:()=>false},querySelectorAll:()=>[first,hidden]};
+  const trainer=Object.create(ExpressionTrainer.prototype);trainer.activeModal=modal;trainer.utility={dialog:modal};const previous=global.document;global.document={activeElement:first};let prevented=false;
+  try{trainer.handleModalKeydown({key:'Tab',shiftKey:true,preventDefault(){prevented=true;}});assert.equal(prevented,false);}finally{global.document=previous;}
+});
+
 function createClassList() {
   const classes = new Set();
   return {
@@ -133,8 +143,15 @@ function createTrainer() {
     return elements.get(id);
   };
   const trainer = Object.create(ExpressionTrainer.prototype);
+  // Existing ASR lifecycle tests start at countdown completion. Countdown
+  // ownership and cancellation are exercised separately below.
+  trainer.runCountdown = async () => true;
   trainer.currentScreen = 'training';
   trainer.navigationGeneration = 0;
+  // These lifecycle fixtures represent already-informed users. The real
+  // disclosure/modal gate and zero-call cancellations are covered separately.
+  trainer.ensureAiDisclosure=async () => true;
+  trainer.offerAutomaticDisclosure=async () => {};
   trainer.historyOffset = 0;
   for (const field of ['reportAiStatus', 'recordSaveStatus', 'recordIdentity', 'retrySave', 'reportBack', 'historyList', 'historyStatus', 'historyMore']) trainer[field] = createElement();
   trainer.audioCaptureFactory = createAudioCapture;
@@ -204,6 +221,134 @@ function createTrainer() {
   trainer.modalOpener = null;
   return trainer;
 }
+
+test('countdown cancellation releases checked capture and ASR without creating a training record', async t => {
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.fullText = '';
+  trainer.runCountdown = ExpressionTrainer.prototype.runCountdown;
+  trainer.countdownNumber = createElement();
+  let created = 0, released = 0, cancelled = 0, enabled = 0;
+  t.after(() => clearInterval(trainer.timerInterval));
+  trainer.persistence = {start:async () => {created++;return {id:'should-not-exist'};}};
+  trainer.audioCaptureFactory = () => ({start:async () => ({}),stop:async () => {released++;},setEnabled:() => {enabled++;}});
+  global.window = {api:{cancelLLMRequests:async () => ({}),
+    startASR:async ({sessionId}) => ({ok:true,events:[{type:'ready',sessionId,sequence:0}]}),
+    cancelASR:async () => {cancelled++;return {ok:true,events:[]};}}};
+  t.after(() => {delete global.window;delete global.document;});
+  const starting = trainer.startRecording();
+  await flushMicrotasks();
+  assert.equal(document.body.dataset.trainingState,'countdown');
+  assert.equal(created,0);
+  assert.equal(enabled,0,'readiness check must not record countdown audio');
+  await trainer.cancelCountdown();
+  await starting;
+  assert.equal(created,0);
+  assert.equal(released,1);
+  assert.equal(cancelled,1);
+  assert.equal(trainer.asrStartAttempt,null);
+  assert.equal(document.body.dataset.trainingState,'preparing');
+});
+
+test('countdown completes after three real seconds and continues only its owning start', async t => {
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.countdownNumber = createElement();
+  const attempt = trainer.asrStartAttempt = {};
+  t.mock.timers.enable({apis:['setTimeout']});
+  t.after(() => {delete global.document;});
+  let complete = false;
+  const pending = ExpressionTrainer.prototype.runCountdown.call(trainer,attempt).then(value => {complete=value;});
+  assert.equal(trainer.countdownNumber.textContent,'3');
+  for (const digit of ['2','1']) {
+    t.mock.timers.tick(1000);await flushMicrotasks();
+    assert.equal(trainer.countdownNumber.textContent,digit);
+    assert.equal(complete,false);
+  }
+  t.mock.timers.tick(1000);await pending;
+  assert.equal(complete,true);
+  assert.equal(trainer.countdown,null);
+});
+
+test('countdown cancellation still releases ASR when microphone cleanup fails', async t => {
+  const trainer = createTrainer();
+  trainer.isRecording = false;
+  trainer.asrStartAttempt = {};
+  trainer.asrEventState = beginAsrSession(null,'countdown-failed-cleanup');
+  let cancelled = 0;
+  trainer.releaseAudioCapture = async () => {throw Error('device cleanup failed');};
+  trainer.cancelActiveAsrSession = async () => {cancelled++;};
+  const countdown = ExpressionTrainer.prototype.runCountdown.call(trainer,trainer.asrStartAttempt);
+  t.after(() => {delete global.document;});
+  await trainer.cancelCountdown();
+  assert.equal(await countdown,false);
+  assert.equal(cancelled,1);
+  assert.equal(trainer.asrStartAttempt,null);
+  assert.equal(document.body.dataset.trainingState,'preparing');
+});
+
+test('failed durable creation after countdown restores editable Preparing and releases audio and ASR', async t => {
+  const trainer=createTrainer();trainer.isRecording=false;trainer.fullText='';
+  trainer.runCountdown=ExpressionTrainer.prototype.runCountdown;
+  let cancelled=0, released=0;
+  trainer.persistence={start:async()=>{throw Error('disk full');}};
+  trainer.audioCaptureFactory=()=>({start:async()=>({}),setEnabled:()=>assert.fail('failed save must not begin capture'),stop:async()=>{released++;}});
+  global.window={api:{cancelLLMRequests:async()=>({}),
+    startASR:async({sessionId})=>({ok:true,events:[{type:'ready',sessionId,sequence:0}]}),
+    cancelASR:async()=>{cancelled++;return {ok:true,events:[]};}}};
+  t.mock.timers.enable({apis:['setTimeout']});
+  t.after(()=>{delete global.window;delete global.document;});
+  const starting=trainer.startRecording();await flushMicrotasks();
+  assert.equal(document.body.dataset.trainingState,'countdown');
+  for(let i=0;i<3;i++){t.mock.timers.tick(1000);await flushMicrotasks();}
+  await starting;
+  assert.equal(document.body.dataset.trainingState,'preparing');
+  assert.equal(trainer.isRecording,false);assert.equal(trainer.asrStartAttempt,null);
+  assert.equal(released,1);assert.equal(cancelled,1);
+  assert.match(trainer.userMessageText.textContent,/disk full/);
+});
+
+test('report evidence opens the containing disclosure before focusing a saved metric or audio', () => {
+  const trainer = createTrainer();
+  const metric = document.getElementById('metric:filler-count');
+  trainer.flowView = {};
+  const record = {segments:[{id:'segment-1',startMs:1200,text:'实际片段'}],audioUrl:'saved.wav'};
+  trainer.focusReportEvidence(record,'metric:filler-count');
+  assert.equal(document.getElementById('report-information').open,true);
+  assert.ok(metric.scrollIntoViewOptions);
+  trainer.focusReportEvidence(record,'segment-1');
+  assert.equal(document.getElementById('report-materials').open,true);
+  assert.equal(trainer.audioPlayer.currentTime,1.2);
+});
+
+test('unchecked ASR readiness cannot claim ready even with microphone permission', () => {
+  const trainer=createTrainer();trainer.isRecording=false;
+  trainer.microphoneState='ready';trainer.asrPreparationState='idle';
+  trainer.finishTrainingPreparation();
+  assert.doesNotMatch(trainer.trainingStatus.textContent,/就绪/);
+});
+
+test('ASR settings broadcasts refresh readiness without changing an active recording', () => {
+  const trainer=createTrainer();trainer.isRecording=false;trainer.microphoneState='ready';
+  trainer.handleAsrModelStateChanged({serviceStatus:'switching'});
+  assert.equal(trainer.btnStart.disabled,true);
+  assert.doesNotMatch(trainer.trainingStatus.textContent,/准备就绪/);
+  trainer.handleAsrModelStateChanged({serviceStatus:'failed'});
+  assert.match(trainer.trainingStatus.textContent,/加载失败/);
+  trainer.isRecording=true;
+  trainer.handleAsrModelStateChanged({serviceStatus:'ready'});
+  assert.equal(trainer.asrPreparationState,'failed','active capture keeps its pinned service lifecycle');
+});
+
+test('sound activity uses captured signal energy and returns to silence without random animation', () => {
+  const trainer=createTrainer();trainer.soundBars={children:Array.from({length:23},()=>({style:{}}))};
+  trainer.updateSoundActivity(new Float32Array(230).fill(0.01));
+  const low=parseFloat(trainer.soundBars.children[0].style.height);
+  trainer.updateSoundActivity(new Float32Array(230).fill(0.1));
+  assert.ok(parseFloat(trainer.soundBars.children[0].style.height)>low);
+  trainer.updateSoundActivity([]);
+  assert.ok(trainer.soundBars.children.every(bar=>parseFloat(bar.style.height)===3));
+});
 
 function audioChunk(sessionId = 'session-a', samples = new Float32Array([0.25, 0.5])) {
   return {
@@ -283,6 +428,67 @@ test('M2 analysis completes on its original saved record after leaving Processin
   assert.equal(record.fullText,'事实');
 });
 
+test('leaving Processing while ASR is stopping prevents background completion from reclaiming the page', async t => {
+  const trainer=createTrainer();
+  trainer.isRecording=true;
+  trainer.asrEventState=beginAsrSession(null,'processing-before-record');
+  trainer.beginRecordingBuffer('processing-before-record');
+  const stopped=createDeferred();
+  trainer.releaseAudioCapture=async()=>{};
+  trainer.finishOwnedAsrStopAndUi=()=>stopped.promise;
+  trainer.loadHistory=async()=>{};
+  t.after(()=>{delete global.document;});
+  const pending=trainer.stopRecording();
+  await flushMicrotasks();
+  assert.equal(trainer.processingRecordId,null);
+  await trainer.leaveProcessing();
+  assert.equal(trainer.currentScreen,'history');
+  stopped.resolve(true);await pending;
+  assert.equal(trainer.currentScreen,'history');
+});
+
+test('record A background completion cannot dismiss record B first AI notice or invalidate its confirmation',async t=>{
+  const trainer=createTrainer(),completion=createDeferred();
+  global.window={api:{cancelLLMRequests:async()=>({}),getAiDisclosureState:async()=>({required:true,scopeVersion:'ai-analysis-data-v1',dataCategories:[],profile:{name:'test',model:'test',location:'remote',endpoint:'https://example.invalid'}}),acknowledgeAiDisclosure:async()=>({success:true})}};
+  t.after(()=>{delete global.window;delete global.document;});
+  trainer.releaseAudioCapture=async()=>{};trainer.finishOwnedAsrStopAndUi=()=>completion.promise;
+  trainer.currentScreen='report';trainer.viewingTrainingRecordId='B';trainer.navigationGeneration=7;
+  trainer.asrEventState=beginAsrSession(null,'A');const operation=trainer.recordingStopOperation={sessionId:'A',left:true};
+  trainer.aiDisclosure=require('../src/ai-disclosure').createDisclosure({document,api:window.api,open:(modal,focus)=>trainer.openModal(modal,focus),close:modal=>trainer.closeModal(modal)});
+  trainer.ensureAiDisclosure=ExpressionTrainer.prototype.ensureAiDisclosure;
+  const permission=trainer.ensureAiDisclosure({id:'B'});await flushMicrotasks();
+  const modal=trainer.activeModal;assert.ok(modal);const finishing=trainer.completeRecordingStop(operation);
+  completion.resolve(true);await finishing;
+  assert.equal(trainer.activeModal,modal);assert.equal(trainer.navigationGeneration,7);
+  await document.getElementById('btn-ai-disclosure-confirm').dispatchEvent({type:'click'});
+  assert.equal(await permission,true);assert.equal(trainer.currentScreen,'report');assert.equal(trainer.viewingTrainingRecordId,'B');
+});
+
+test('opening another report during background ASR stop preserves both sessions and the viewed report', async t => {
+  const tail=createDeferred();
+  const {trainer,handlers,sessionId}=await startAudioCaptureHarness(t,{stopASR:()=>tail.promise});
+  await handlers.onChunk(audioChunk(sessionId,new Float32Array(160)));
+  trainer.durableSession={id:'training-A',trainingMode:'structured',framework:'prep',frameworkDefinitionVersion:'prep-v1',createdAt:'2026-10-11T00:00:00Z'};
+  trainer.fullText='训练 A 开头';trainer.sentences=[trainer.fullText];trainer.stats.totalWords=6;
+  trainer.pendingSegments=[{id:'segment-1',text:trainer.fullText,startMs:0,endMs:1,localAnalysis:null}];
+  const other=playbackRecord({id:'training-B',fullText:'B 已保存原文',segments:[],saveState:'failed',stats:{totalWords:18,fillers:2}});
+  trainer.getTrainingRecordStore().add(other);
+  let saved,rendered;
+  trainer.persistence={save:async record=>{saved={id:record.id,text:record.fullText,stats:{...record.stats},framework:record.framework};record.factsSaved=true;record.saveState='saved';return true;}};
+  trainer.renderCurrentReport=record=>{rendered=record.id;};trainer.loadHistory=async()=>{};
+  const stopping=trainer.stopRecording();await flushMicrotasks();
+  await trainer.leaveProcessing();await trainer.openHistoryRecord(other.id);
+  assert.equal(rendered,other.id);
+  tail.resolve(stopEnvelope(sessionId,'训练 A 尾部'));await stopping;
+  assert.ok(saved,`save failed: ${trainer.userMessageText.textContent}; ${trainer.trainingStatus.textContent}`);
+  assert.equal(saved.id,'training-A');assert.equal(saved.framework,'prep');
+  assert.equal(saved.text,'训练 A 开头训练 A 尾部');assert.equal(saved.stats.totalWords,8);
+  assert.equal(trainer.currentScreen,'report');assert.equal(trainer.viewingTrainingRecordId,other.id);
+  assert.equal(trainer.trainingRecords.selected().id,other.id);assert.equal(rendered,other.id);
+  assert.equal(trainer.fullText,other.fullText);assert.deepEqual(trainer.stats,other.stats);
+  assert.equal(trainer.subtitleContainer.children[0].textContent,other.fullText);
+});
+
 function completedM2Session(record) {
   const wrap = (id,kind,value,status = 'completed') => ({id,kind,value,status,sessionId:record.id,inputRevision:1});
   return {id:record.id,createdAt:record.createdAt,status:'completed',durationMs:record.durationMs,dataQuality:[],
@@ -315,7 +521,7 @@ test('analysis refresh preserves a failed result write until save retry succeeds
   trainer.persistence = createTrainingPersistence({api:window.api,onChange:owner=>trainer.renderRecordStatus(owner)});
   assert.equal(await trainer.persistence.save(record),false);
   assert.equal(record.factsSaved,true);
-  assert.equal(await trainer.awaitTrainingAnalysis(record),true);
+  assert.equal(await trainer.awaitTrainingAnalysis(record,false,undefined,{trigger:'automatic',prompt:false}),true);
   trainer.showRecord(record);
   assert.equal(record.saveState,'failed');
   assert.equal(record.saveError,'disk unavailable');
@@ -329,6 +535,39 @@ test('analysis refresh preserves a failed result write until save retry succeeds
   assert.equal(record.saveState,'saved');
   assert.equal(record.pendingResults.length,0);
   assert.equal(attempts[0],attempts[1]);
+});
+
+test('a late saved analysis cannot replace a fixed report opened from practice history',async t=>{
+  const trainer=createTrainer();trainer.isRecording=false;
+  const record=installPlaybackRecord(trainer,playbackRecord({factsSaved:true}));
+  const old=completedM2Session(record);const updated=structuredClone(old);
+  const diagnosis={...structuredClone(old.results[2]),id:'new-diagnosis',value:{...old.results[2].value,summary:'后来追加的摘要'}};
+  updated.results.push(diagnosis,{...structuredClone(old.results[3]),id:'new-snapshot',value:{...old.results[3].value,analysisRunId:diagnosis.id}});
+  record.results=old.results;record.structuredReport=require('../shared/report-selection').selectStructuredReport(old.results,{snapshotId:'snapshot'});
+  global.window={api:{getTrainingSession:async()=>({ok:true,value:updated}),analyzeTrainingSession:async()=>({ok:true,value:updated.results.at(-1)})}};
+  t.after(()=>{delete global.window;delete global.document;});
+  trainer.showRecord(record,'practice','snapshot');assert.equal(await trainer.refreshTrainingRecord(record),true);
+  assert.equal(record.structuredReport.snapshot.id,'snapshot');assert.doesNotMatch(record.structuredReport.analysisRun.value.summary,/后来追加/);
+  // A deliberate new analysis is an explicit version change, while passive
+  // refresh and the return path remain pinned to the saved report selected.
+  assert.equal(await trainer.awaitTrainingAnalysis(record,true,'prep'),true);assert.equal(record.structuredReport.snapshot.id,'new-snapshot');
+});
+
+for(const unavailable of ['fixed-report','deleted-source'])test(`failed ${unavailable} drilldown preserves the current report and analysis owner`,async t=>{
+  const trainer=createTrainer();trainer.isRecording=false;
+  const source=playbackRecord({id:'source',factsSaved:true,saveState:'failed'});
+  const sourceAudio=source.audioUrl;
+  const current=playbackRecord({id:'current',factsSaved:true});
+  trainer.getTrainingRecordStore().add(source);trainer.getTrainingRecordStore().add(current);
+  const saved=completedM2Session(source);saved.artifact.state='missing';
+  const messages=[];trainer.showUserMessage=message=>messages.push(message);
+  global.window={api:{getTrainingSession:async()=>({ok:true,value:unavailable==='deleted-source'?null:saved})}};
+  t.after(()=>{delete global.window;delete global.document;});
+  trainer.showRecord(current,'training');
+  await trainer.openHistoryRecord(source.id,{reportId:'missing-report',returnTo:{id:current.id,source:'training'}});
+  assert.equal(trainer.currentScreen,'report');assert.equal(trainer.viewingTrainingRecordId,current.id);
+  assert.equal(trainer.trainingRecords.selected().id,current.id);
+  assert.equal(messages.length,1);assert.equal(source.audioUrl,sourceAudio);
 });
 
 test('cancellation during fact saving never starts another analysis after cancel', async t => {
@@ -478,6 +717,7 @@ function startupTrainer(t, prepare, {
       if (channel === 'cancel-llm-requests') return Promise.resolve({success: true});
       if (channel === 'get-recording-policy') return getRecordingPolicy();
       if (channel === 'acknowledge-recording-policy') return acknowledgeRecordingPolicy();
+      if (channel === 'get-ai-disclosure-state') return Promise.resolve({required:false,profile:null});
       throw new Error(`Unexpected startup operation: ${channel}`);
     }
   };
@@ -3726,6 +3966,18 @@ test('close preparation waits for a stop operation even after the recording flag
   stopped.resolve();
   assert.equal(await closing, true);
   assert.deepEqual(order, ['cancel','drain']);
+});
+
+test('closing the application cancels an unanswered AI notice and drains without requesting AI',async t=>{
+  let requests=0;const trainer=createTrainer();trainer.isRecording=false;
+  global.window={api:{cancelLLMRequests:async()=>({}),getFinalReport:async()=>{requests++;return {success:true,report:'unexpected'};},
+    getAiDisclosureState:async()=>({required:true,scopeVersion:'ai-analysis-data-v1',dataCategories:[],profile:{name:'test',model:'test',location:'remote',endpoint:'https://example.invalid'}}),
+    acknowledgeAiDisclosure:async()=>assert.fail('closing cannot acknowledge data disclosure')}};
+  t.after(()=>{delete global.window;delete global.document;});
+  installPlaybackRecord(trainer);trainer.ensureAiDisclosure=ExpressionTrainer.prototype.ensureAiDisclosure;
+  trainer.aiDisclosure=require('../src/ai-disclosure').createDisclosure({document,api:window.api,open:(modal,focus)=>trainer.openModal(modal,focus),close:modal=>trainer.closeModal(modal)});
+  const pending=trainer.generateReport();await flushMicrotasks();assert.ok(trainer.activeModal);
+  assert.equal(await trainer.prepareTrainingClose(),true);assert.equal(await pending,false);assert.equal(requests,0);assert.equal(trainer.activeModal,null);
 });
 
 

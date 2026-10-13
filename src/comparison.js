@@ -138,20 +138,22 @@
     function stopAudio() {activePlayer?.pause();activePlayer=null;}
     function releaseAudio() {stopAudio();for(const url of urls.values())trainer.getObjectUrlApi().revokeObjectURL(url);urls.clear();}
     function syncSelection() {
+      const selectedInputs=[...selection].map(id=>trainer.historyItems?.get(id) || trainer.historyList.querySelector(`[data-compare-id="${id}"]`)?.dataset);
       for(const checkbox of trainer.historyList.querySelectorAll('[data-compare-id]')) {
         checkbox.checked=selection.has(checkbox.dataset.compareId);
-        checkbox.disabled=checkbox.dataset.unavailable==='true' || (selection.size===2 && !checkbox.checked);
+        checkbox.disabled=false;
       }
-      compareButton.disabled=selection.size!==2;
-      get('history-selection-status').textContent=`已选择 ${selection.size}/2 条训练`;
+      compareButton.disabled=selection.size!==2 || selectedInputs.some(item=>item?.unavailable==='true' || item?.deletionPending || ['recording','finalizing'].includes(item?.status));
+      get('btn-history-delete-selected').disabled=selection.size===0 || Boolean(trainer.historyDeletion?.busy);
+      get('history-selection-status').textContent=`已选 ${selection.size} 条`;
     }
     function addChoice(row,item) {
       const label=document.createElement('label');label.className='history-compare-choice';
       const input=document.createElement('input');input.type='checkbox';input.dataset.compareId=item.id;
       input.dataset.unavailable=String(Boolean(item.deletionPending || ['recording','finalizing'].includes(item.status)));
-      input.setAttribute('aria-label',`选择 ${new Date(item.createdAt).toLocaleString()} 的训练用于对比`);
-      input.addEventListener('change',()=>{if(input.checked && selection.size<2)selection.add(item.id);else selection.delete(item.id);syncSelection();});
-      label.appendChild(input);row.appendChild(label);
+      input.setAttribute('aria-label',`选择 ${new Date(item.createdAt).toLocaleString()} 的训练`);
+      input.addEventListener('change',()=>{if(input.checked)selection.add(item.id);else selection.delete(item.id);syncSelection();});
+      row.appendChild(input);
     }
     function leave(clearSelection=false) {
       request++;action++;loading=false;context=null;releaseAudio();content.replaceChildren();
@@ -163,18 +165,18 @@
     }
     function capture() {
       if(!context)return;
-      context.scroll=area.scrollTop;
+      context.scroll=trainer.flowView?document.defaultView.scrollY:area.scrollTop;
       context.expanded=new Set([...content.querySelectorAll('details[data-detail-key]')].filter(el=>el.open).map(el=>el.dataset.detailKey));
     }
     function draw() {
       if(!context?.projection)return;
       const p=context.projection;
-      stopAudio();renderComparison(content,p,{onReport:openReport,onPlay:play});
+      stopAudio();(trainer.flowView?globalThis.FrozenComparison.renderComparison:renderComparison)(content,p,{onReport:openReport,onPlay:play,onCollapse:()=>{action++;stopAudio();}});
       area.dataset.availability=p.availability;
       status.textContent=p.availability==='ready'?'已读取两次训练的保存结果':p.availability==='partial'?'部分项目暂不可比；可用内容仍可复盘。':'核心证据不足，暂时无法完成有意义的对比。';
       retry.hidden=p.availability!=='unavailable';
       for(const el of content.querySelectorAll('details[data-detail-key]'))if(context.expanded?.has(el.dataset.detailKey)){el.open=true;el.populateEvidence();}
-      area.scrollTop=context.scroll || 0;
+      if(trainer.flowView)document.defaultView.scrollTo(0,context.scroll || 0);else area.scrollTop=context.scroll || 0;
     }
     async function read(expected=context) {
       if(!expected)return null;
@@ -190,9 +192,9 @@
       finally {if(sequence===request)loading=false;}
     }
     async function open() {
-      if(selection.size!==2 || trainer.isRecording || trainer.asrStartAttempt || trainer.recordingStopOperation)return;
+      syncSelection();if(compareButton.disabled || selection.size!==2 || trainer.isRecording || trainer.asrStartAttempt || trainer.recordingStopOperation)return;
       releaseAudio();request++;action++;
-      trainer.historyScroll=get('history-screen').scrollTop;trainer.historyReturnFocus='btn-history-compare';
+      trainer.historyScroll=trainer.flowView?document.defaultView.scrollY:get('history-screen').scrollTop;trainer.historyReturnFocus='btn-history-compare';
       trainer.audioPlayer?.pause();trainer.releaseSavedRecordCache();
       context={ids:[...selection],projection:null,expanded:new Set(),scroll:0};
       trainer.setScreen('comparison');content.replaceChildren();status.textContent='正在读取两次训练…';retry.hidden=true;
@@ -223,8 +225,9 @@
       if(existing && (existing.reportPending || existing.playbackPending || ['failed','saving'].includes(existing.saveState))) {
         // Preserve pending writes and their identity; the comparison itself stays pinned.
         if(record.audioUrl)trainer.getObjectUrlApi().revokeObjectURL(record.audioUrl);
-        trainer.showRecord(existing,'comparison');
-      } else {store.remove(record.id);store.add(record);trainer.showRecord(record,'comparison');}
+        existing.structuredReport=record.structuredReport;trainer.showRecord(existing,'comparison',side.snapshot.reportId);
+      } else {store.remove(record.id);store.add(record);trainer.showRecord(record,'comparison',side.snapshot.reportId);}
+      trainer.viewingReportSnapshot={sessionId:side.session.id,reportId:side.snapshot.reportId};
       expected.reportSide=role;trainer.reportBack.focus();
     }
     async function play(role,ref,player,message) {
@@ -234,9 +237,9 @@
       if(!evidence?.available || !side.evidence.audio.available){message.textContent='这条证据的音频已不可用，原文仍可查看。';return;}
       const navigation=trainer.navigationGeneration;
       const audio=await api.readTrainingAudio({requestId:globalThis.crypto.randomUUID(),sessionId:side.session.id}).catch(()=>null);
-      if(context!==expected || navigation!==trainer.navigationGeneration || operation!==action)return;
+      if(context!==expected || navigation!==trainer.navigationGeneration || operation!==action || player.isConnected===false)return;
       if(!audio?.ok){message.textContent='录音已不可用，请重试或返回历史检查记录。';return;}
-      if(!await read(expected) || operation!==action)return;
+      if(!await read(expected) || operation!==action || player.isConnected===false)return;
       stopAudio();let url=urls.get(side.session.id);
       if(!url){url=trainer.getObjectUrlApi().createObjectURL(new Blob([audio.value],{type:'audio/wav'}));urls.set(side.session.id,url);}
       player.src=url;player.hidden=false;activePlayer=player;
@@ -253,5 +256,5 @@
       remove(id){selection.delete(id);if(context?.ids.includes(id)){request++;context=null;fail(new Error('对比记录已删除，请返回训练历史。'));}syncSelection();},
       get context(){return context;},get selection(){return selection;},get loading(){return loading;}};
   }
-  return {renderComparison,createComparisonController};
+  return {renderComparison,createComparisonController,valueText,reasonText};
 });

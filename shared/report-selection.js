@@ -7,8 +7,11 @@
   const CATEGORIES = {organization:'组织与衔接',argument:'论点与论据',delivery:'节奏与停顿',wording:'措辞与口头禅'};
   const frameworks = typeof module === 'object' && module.exports ? require('./training-frameworks') : globalThis.TrainingFrameworks;
   const refs = value => Array.isArray(value) && value.every(ref => typeof ref === 'string');
+  const exampleValid = value => !Object.hasOwn(value,'example') || value.example === null ||
+    typeof value.example === 'string' && value.example.length <= 1600 && Boolean(value.example.trim());
   const finding = value => value && Object.hasOwn(CATEGORIES,value.category) &&
-    ['id','observation','interpretation','recommendation'].every(key => typeof value[key] === 'string') && refs(value.evidenceRefs);
+    ['id','observation','interpretation','recommendation'].every(key => typeof value[key] === 'string') &&
+    refs(value.evidenceRefs) && exampleValid(value);
   function extensionsValid(value) {
     const f = value.frameworkAnalysis, r = value.frameworkRecommendation, p = value.practiceFeedback;
     return (!f || Boolean(frameworks?.getFramework(f.framework,f.definitionVersion)) && typeof f.summary === 'string' &&
@@ -55,7 +58,8 @@
       if (analysisRun.status === 'completed' && (typeof analysisRun.value.summary !== 'string' ||
           analysisRun.value.findings.some(finding => !finding || !Object.hasOwn(CATEGORIES,finding.category) ||
             ['observation','interpretation','recommendation'].some(key => typeof finding[key] !== 'string') ||
-            !Array.isArray(finding.evidenceRefs) || finding.evidenceRefs.some(ref => typeof ref !== 'string')))) continue;
+            !Array.isArray(finding.evidenceRefs) || finding.evidenceRefs.some(ref => typeof ref !== 'string') ||
+            !exampleValid(finding)))) continue;
       valid.push({snapshot,evidenceRun,metricRun,analysisRun});
     }
     if (snapshotId !== undefined) return snapshotId === null ? null : valid.find(report => report.snapshot.id === snapshotId) || null;

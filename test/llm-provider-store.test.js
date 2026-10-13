@@ -28,6 +28,34 @@ function providerSettings(provider, apiKey) {
   };
 }
 
+test('saving a changed provider/model/endpoint revokes automatic diagnosis at the durable boundary only',async()=>{
+  const {loadLlmProviderSettings,saveLlmProviderSettings}=require('../lib/llm-provider-store');
+  await withUserData(userDataPath=>{
+    const first={schemaVersion:3,activeProfileId:'selected',profiles:[{id:'selected',provider:'custom',model:'one',
+      baseUrl:'http://localhost:8080/v1',apiKey:'test-key',autoDiagnosisEnabled:true}]};
+    saveLlmProviderSettings(userDataPath,first);
+    assert.equal(loadLlmProviderSettings(userDataPath).profiles[0].autoDiagnosisEnabled,true);
+    for (const changes of [{model:'two',customModel:'two'},{baseUrl:'https://other.example/v1'},{provider:'deepseek'}]) {
+      const next=loadLlmProviderSettings(userDataPath);Object.assign(next.profiles[0],changes,{autoDiagnosisEnabled:true});
+      const saved=saveLlmProviderSettings(userDataPath,next);assert.equal(saved.profiles[0].autoDiagnosisEnabled,false);
+      saved.profiles[0].autoDiagnosisEnabled=true;
+      assert.equal(saveLlmProviderSettings(userDataPath,saved).profiles[0].autoDiagnosisEnabled,true);
+    }
+    const credentials=loadLlmProviderSettings(userDataPath);credentials.profiles[0].apiKey='new-key';credentials.profiles[0].name='Renamed';
+    assert.equal(saveLlmProviderSettings(userDataPath,credentials).profiles[0].autoDiagnosisEnabled,true);
+  });
+});
+test('changing the effective customModel revokes auto even when the legacy model field does not change',async()=>{
+  const {loadLlmProviderSettings,saveLlmProviderSettings}=require('../lib/llm-provider-store');
+  await withUserData(userDataPath=>{
+    saveLlmProviderSettings(userDataPath,{schemaVersion:3,activeProfileId:'custom',profiles:[{id:'custom',provider:'custom',
+      model:'legacy-visible',customModel:'actual-one',baseUrl:'https://fixture.example/v1',apiKey:'test-key',autoDiagnosisEnabled:true}]});
+    const next=loadLlmProviderSettings(userDataPath);next.profiles[0].customModel='actual-two';
+    const saved=saveLlmProviderSettings(userDataPath,next);assert.equal(saved.profiles[0].autoDiagnosisEnabled,false);
+    assert.equal(saved.profiles[0].model,'legacy-visible');assert.equal(saved.profiles[0].customModel,'actual-two');
+  });
+});
+
 test('canonical LLM provider file wins and migrates atomically to the explicit automatic-diagnosis schema', async () => {
   const { loadLlmProviderSettings } = require('../lib/llm-provider-store');
   await withUserData((userDataPath) => {

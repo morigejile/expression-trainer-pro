@@ -94,7 +94,7 @@ IA 归属与确认状态以 [Training Flow §13](training-flow.md#13-screen-stru
 | R-P01 | 每次完成的语音训练形成稳定、唯一的 `TrainingSession`。 | Session 有稳定 ID、创建时间、完成状态和内容摘要；结束语音输入后自动收尾保存，同一次提交不会生成重复的完成记录；不依赖“保存/完成”按钮或离开报告才持久化。 | P0 | Existing | M1 |
 | R-P02 | Session 跨应用重启保留。 | 完成训练并重启后，“训练历史”列表仍可读取；能够打开逐字稿、已有统计和可用的录音。 | P0 | Existing | M1 |
 | R-P03 | Session 关联逐字稿、片段时间线和音频可用状态。 | 文本和稳定片段按原顺序恢复；时间不存在时显式标记未知；音频缺失或损坏不能显示为可播放。 | P0 | Existing | M1 |
-| R-P04 | 用户可查看和删除本地训练记录。 | 训练历史按创建时间倒序；列表与单条打开按 [Training Flow §13.2](training-flow.md#132-history-与-comparison--review) 及 [M1 Report 切片 §7.5](training-flow.md#75-m1-的-report-内容与手动分析) 验收，M3 勾选对比不提前成为 M1 条件；删除需明确触发；删除后关联用户内容不再通过应用访问，失败时给出可操作错误。 | P0 | Existing | M1 |
+| R-P04 | 用户可查看和删除本地训练记录。 | 训练历史按创建时间倒序；列表、打开与单条／勾选批量删除按 [Training Flow §13.2](training-flow.md#132-history-与-comparison--review) 及 [M1 Report 切片 §7.5](training-flow.md#75-m1-的-report-内容与手动分析) 验收，后续多选能力不提前成为 M1 条件；删除需明确确认；删除后关联用户内容不再通过应用访问，失败项保留并提供可操作重试，不将部分失败当作全部成功。 | P0 | Existing | M1 |
 | R-P05 | 持久化失败、未完成写入和损坏记录必须可识别。 | 成功保存仅需弱提示；失败写入明显提示并可重试，不展示为成功；重启后能区分完整、未完成、音频缺失和记录损坏；健康记录仍可读取。 | P0 | Existing | M1 |
 | R-P06 | Session 保存生成结果所需的来源与版本信息。 | 至少可识别 ASR 模型、规则/度量版本以及已有 AI 结果的 Provider/模型和生成时间；不得保存密钥。 | P0 | Existing | M1 |
 | R-P07 | 用户在首次录音前获得真实的数据与云端边界说明。 | 说明本地持久化、删除方式、音频保留策略，以及配置远程 AI 后可能发送的逐字稿、时间/指标摘要和用户分析指令；明确音频是否离开设备；只有用户确认后才申请麦克风权限。 | P0 | Existing | M1 |
@@ -121,7 +121,7 @@ M1 完成录音的音频随 Session 保留至用户明确删除；不按条数�
 | R-A08 | 报告使用一套统一骨架并优先给出可行动结论。 | 按 [Training Flow §7–§8](training-flow.md#7-分析层与首次报告) 验收同一 Report Workspace 的摘要、优先 Finding、原位详情/证据和已有内容按需展开；历史详情复用该容器，不维护另一套报告。有效发现不因默认折叠而丢失，证据不足显式降级；导航和 Finding 动作遵循该文档 §8.2；按 [§6–§7.4](training-flow.md#6-自动持久化与分析状态) 验收 Processing 完成等待/合理 timeout、可信进度、允许离开，以及 Report 局部失败恢复和 Session 保存状态，不采用 progressive report rendering。 | P1 | Accepted | M2；M4 扩展 |
 | R-A09 | 使用版本化神经 VAD 产生语音活动和静音区间。 | VAD 对完成音频生成带模型/阈值/规范化规则版本和绝对 sample 边界的区间证据；结果不覆盖 ASR 时间戳，leading/trailing silence 不默认计 pause；失败时停顿/流畅度指标显式降级；M2 以有限真实表达人工复核及已有工程/资源证据验收；更大规模代表性准确率、阈值与资源预算校准按 B-24 重开，未完成前保留未校准标记。 | P0 | Accepted | M2 |
 | R-A10 | SenseVoiceSmall 是用户可选的主 ASR 模型之一。 | 通过模型选择与其他主 ASR 择一使用；被选中时产生该 Session 的主转写并记录模型/版本与实际 timing 能力，未选中时不额外运行辅助识别。Utterance 不伪造 partial，等待/失败状态明确且可恢复；失败保留已取得的本地事实，不伪称转写成功。标签不得直接等同表达质量；沿用 ADR-0009 的能力与资源基线，D-08 的 Provider 集成证据保留；本轮下载异常及真实设备 smoke/资源验收明确延期至 B-23，不阻塞 M2。当前可用路径继续采用用户已验收的 Zipformer Small CTC 中文 INT8；Catalog 技术默认与公开分发许可边界不变。 | P1 | Accepted；实机验收延期 | M2 集成；下载/实机验收归 B-23 |
-| R-A11 | 远程 AI 自动诊断具有明确、可撤销的知情边界。 | 首次启用远程 Profile 前说明 Provider 及将发送的数据类别；用户明确启用后才允许自动请求；设置中可停用；本地 Provider 不被描述为云端传输；音频、密钥、无关历史和未声明数据不得发送。 | P0 | Accepted | M2 |
+| R-A11 | AI 数据告知与自动诊断启用具有独立、可撤销的边界。 | 按 [Training Flow §6.1](training-flow.md#61-m2-自动诊断的配置与启用) 验收首次 Report 内统一告知、确认前零请求、取消、持久化覆盖范围、本地/远程补充告知及请求边界门禁；手动分析不受自动开关阻断，自动请求仍要求当前配置明确启用。实际 endpoint 决定处理位置，音频、密钥、无关历史和未声明数据不得发送。录音告知或连接测试不代替 AI 告知。 | P0 | Accepted | M2 / I2 |
 
 ## 7. M3：历史对比、复盘与 AI 对话
 
@@ -129,7 +129,7 @@ M1 完成录音的音频随 Session 保留至用户明确删除；不按条数�
 
 | ID | 需求 | Acceptance Criteria | Priority | Status | Target Milestone |
 |---|---|---|---|---|---|
-| R-R01 | 用户可比较两次训练。 | 按 [Training Flow §13.2–§13.4](training-flow.md#132-history-与-comparison--review) 验收 History 的 0–2 条选择与显式对比入口、Comparison 信息结构/可用性、单侧 Report 下钻与上下文恢复、固定比较对象边界；读取生成时稳定快照，复用 [Data Model §10](../architecture/data-model.md#10-comparison-invariants) 的 comparison 约束，能区分可比、需归一化和不可可靠比较，并用证据说明变化与限制。 | P1 | Accepted | M3 |
+| R-R01 | 用户可比较两次训练。 | 按 [Training Flow §13.2–§13.4](training-flow.md#132-history-与-comparison--review) 验收 History 多选中恰好两条有效记录的显式对比入口、Comparison 信息结构/可用性、单侧 Report 下钻与上下文恢复、固定比较对象边界；读取生成时稳定快照，复用 [Data Model §10](../architecture/data-model.md#10-comparison-invariants) 的 comparison 约束，能区分可比、需归一化和不可可靠比较，并用证据说明变化与限制。 | P1 | Accepted | M3 |
 | R-R02 | 用户可复盘一次或一组训练。 | M3 首版展示可靠指标变化及两侧已保存的 Finding/Evidence，可从问题或建议查看所属原文、时间位置与可用音频；不能建立可靠语义对应时明确限制，不把另一侧未返回 Finding 或模型版本变化解释为问题解决/用户进步。自动判断问题已经改善、持续存在和新出现明确延期至 Backlog B-25，不作为首版验收条件。 | P1 | Accepted；语义变化判断 deferred | M3 首版；扩展见 B-25 |
 | R-R03 | 用户可围绕 Finding 与 AI 直接对话（deferred）。 | 未来优先 Finding-scoped；上下文须声明来源 Session / Report、Finding 及 Evidence，用户可知使用内容；失败不修改事实与分析，会话可继续查看和删除。当前不新增通用 Chat Screen；重开见 Backlog B-17 / D-05。 | P1 | Not Now | M3 候选，重开后排期 |
 | R-R04 | 用户可查看长期趋势（deferred）。 | Common 指标可跨训练方式形成趋势，但仅比较定义一致的指标；framework-specific 趋势按 framework 分组；版本变化时重新计算或分段展示；没有足够样本时不声称趋势；当前不新增 Progress Screen / 一级导航，重开见 Backlog B-16。 | P2 | Not Now | M3 候选，重开后排期 |
