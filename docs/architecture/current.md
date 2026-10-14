@@ -484,6 +484,8 @@ M4 仍需复核原重分析失败场景、整理重练过程 UI 并验收真实 
 
 `ExpressionTrainer` 在实际 ASR/capture 准备后执行倒计时；采集保持禁用，到零后才创建 Session 并接收音频。声音活动读取实际 PCM，处理页等待原收尾/分析任务，离开后由原操作保存结果。录音、ASR、VAD、SQLite、WAV 和保存重试仍复用既有实现；I1 未新增存储 schema、AI 告知机制或转写重试 API，后续 AI 接线见 §17。普通报告无 AI 时只显示真实事实、可用本地指标与未执行状态；缺失指标不补零。产品规则仍由 [Training Flow](../product/training-flow.md) 维护。
 
+首页后续确认的文字与中线调整通过正式 HTML 和 `frozen-flow.css` 接入。标题放在 stage 内，以 CSS anchor 引用圆环实际顶部，文字居中于原中线边界到圆环顶部的区域；原边框厚度转为留白，保留圆环与设置位置。每次倒计时数字更新重置原淡入淡出动画的播放位置，避免首次一秒动画的 `both` 填充态将后续数字留在透明度零；每秒调度与录音启动门禁未改变。
+
 本切片使用 Node 24.20.0 / npm 11.19.0、Electron 43.4.1 在 Windows x64 定向验证。Renderer 产品流覆盖四种训练方式、倒计时取消、保存/重启/回放、返回与已有练习/对比；960、1280、1440 对照冻结状态，390 仅观察。额外以真实中文语音 fixture 经 AudioWorklet、Zipformer Large、VAD、SQLite/WAV 完成四种方式并重启读取，未发送 AI 请求。fixture 替代物理麦克风，实际发声、设备权限、用户操作体验及真实 AI 尚未在本切片验收；未重新打包或运行全仓验收。
 
 上述 I1 native 验证使用隔离 userData 与校验过哈希的模型副本。当时 Codex MSIX 环境中的 Roaming 路径重定向让默认模型缓存被路径检查拒绝（`Model file escapes install root`），普通启动路径尚未覆盖。I6 已修复这处路径视图误判，并使用原生产缓存验证正常 Main 分支；本轮证据及剩余限制见 §21。
@@ -516,9 +518,11 @@ Electron 测试使用隔离 userData 和确定性录音、ASR、LLM fixture，�
 
 ## 19. I4 History / Comparison 接入
 
-History 和 Comparison 接入同一 Frozen App Shell，沿用冻结列表、空态、双侧报告、按类别分析、就近展开证据和指标表的结构与字体；本批适配为文字删除、同一套复选框多选，以及已有填充词指标。产品交互只由 [Training Flow §13](../product/training-flow.md#13-screen-structure-收敛基线) 定义。[History](../../src/history.js) 使用现有分页读取和受控删除 API；每个 Session 一行，显示真实训练方式、主题/场景、目标/轮次与记录状态。列表投影补充保存音频的 `audioDurationMs` 和最小练习信息，保留原训练时长字段，不改 SQLite schema 或历史事实。
+History 和 Comparison 接入同一 Frozen App Shell，沿用冻结列表、空态、双侧报告、按类别分析、就近展开证据和指标表的结构与字体；当前采用图标删除、同一套复选框多选，以及已有填充词指标。产品交互只由 [Training Flow §13](../product/training-flow.md#13-screen-structure-收敛基线) 定义。[History](../../src/history.js) 使用现有分页读取和受控删除 API；每个 Session 一行，显示真实训练方式、主题/场景、目标/轮次与记录状态。列表投影补充保存音频的 `audioDurationMs` 和最小练习信息，保留原训练时长字段，不改 SQLite schema 或历史事实。
 
-同一选择集合支持任意条数，只有恰好两条且符合既有条件时才能显式进入 Comparison。内容按钮、复选框和删除按钮独立；Report 返回保留完整选择、列表和窗口滚动位置。单条及批量删除使用一次明确确认，捕获当时的 ID 集合并防止重复提交；取消、关闭和 Escape 不调用删除。执行仍经过既有 Main/Application，成功项移除，失败项保留并选中重试；返回丢失时以实际存储存在性核对，不能确认不存在就不宣布成功。离开 History 后完成删除也会移除旧行，失败的 pending 状态不会伪装成健康记录；未选中的后续练习不级联删除，复用 I3 的缺失来源/轮次降级。
+同一选择集合支持任意条数，只有恰好两条且符合既有条件时才能显式进入 Comparison。内容按钮、复选框和删除按钮独立；Report 返回保留完整选择、列表和内容区滚动位置。单条及批量删除使用一次明确确认，捕获当时的 ID 集合并防止重复提交；取消、关闭和 Escape 不调用删除。执行仍经过既有 Main/Application，成功项移除，失败项保留并选中重试；返回丢失时以实际存储存在性核对，不能确认不存在就不宣布成功。离开 History 后完成删除也会移除旧行，失败的 pending 状态不会伪装成健康记录；未选中的后续练习不级联删除，复用 I3 的缺失来源/轮次降级。
+
+主 Renderer 的长工作区使用 `history-scroll`、`report-scroll`、`comparison-scroll` 容器；Report View State 与既有导航控制器按容器位置保存和恢复上下文，继续校验异步材料/历程的记录、报告与导航身份。实时计时节点固定在 `transport-time`，不再还原到 Header；导航由居中 Flex 容器排列，取消按不同页面标题测量平移。固定区和滚动区的产品边界由 [Training Flow §12.1 / §13.6](../product/training-flow.md#121-跨-screen-的-ux-约束) 维护。
 
 [Frozen Comparison](../../src/frozen-comparison.js) 展示既有只读 [Comparison Core](../../lib/session-comparison.js) 投影。进入时固定双方角色、Report 与结果引用，新增分析不替换输入；单侧完整报告下钻和返回恢复快照、展开、位置与焦点。无结构化报告的旧记录仍可固定读取健康事实，通用和框架 Finding 均保留 recommendation、可选 example 和真实引用。删除输入会使原对比失效，不自动换记录或从缓存恢复证据；音频异步读取后继续检查固定输入和当前展开容器。
 

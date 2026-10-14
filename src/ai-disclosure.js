@@ -35,12 +35,6 @@
       if (!state.required) return true;
       if (!modal) throw new Error('AI 数据告知暂不可用，尚未发起分析。');
       if (pending) return pending.promise;
-      const profile=state.profile;
-      byId('ai-disclosure-service').textContent=`${profile.name} · ${profile.model} · ${profile.location==='local'?'本机回环地址':'远程服务'}\n${profile.endpoint}`;
-      const data=byId('ai-disclosure-data');data.replaceChildren();
-      for (const category of state.dataCategories) {
-        const item=document.createElement('li');item.textContent=category.label;data.appendChild(item);
-      }
       byId('ai-disclosure-error').textContent='';confirm.disabled=false;
       const decision={state};decision.promise=new Promise(resolve=>{decision.resolve=resolve;});pending=decision;
       open(modal,confirm);return decision.promise;

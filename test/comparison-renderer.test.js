@@ -65,6 +65,16 @@ function fixture(apiOverrides={}) {
   return {document,controller,trainer,api,sessions,store,revoked};
 }
 
+test('frozen Comparison captures regional History and restores its own scroll and disclosures after drilldown',async t=>{
+  const previous=globalThis.FrozenComparison;globalThis.FrozenComparison=require('../src/frozen-comparison');t.after(()=>{globalThis.FrozenComparison=previous;});
+  const f=fixture();f.trainer.flowView={};const documentScroll=[];f.document.defaultView={scrollY:900,scrollTo:(...args)=>documentScroll.push(args)};
+  f.document.getElementById('history-scroll').scrollTop=530;await f.controller.open();assert.equal(f.trainer.historyScroll,530);
+  const content=f.document.getElementById('comparison-content'),detail=content.querySelector('details[data-detail-key]');detail.open=true;detail.populateEvidence();const key=detail.dataset.detailKey;
+  f.document.getElementById('comparison-scroll').scrollTop=317;await f.controller.openReport('baseline');f.document.getElementById('comparison-scroll').scrollTop=0;await f.controller.restore();
+  assert.equal(f.document.getElementById('comparison-scroll').scrollTop,317);assert.equal(content.querySelector(`details[data-detail-key="${key}"]`).open,true);assert.deepEqual(documentScroll,[]);
+  assert.ok(f.document.getElementById('comparison-identities').querySelector('[data-comparison-report="baseline"]'));
+});
+
 test('later comparison and navigation win over delayed reads without stale UI or data',async()=>{
   const first=deferred();const {controller,api,document}=fixture();const original=api.compareTrainingSessions;let calls=0;
   api.compareTrainingSessions=cmd=>++calls===1?first.promise:original(cmd);

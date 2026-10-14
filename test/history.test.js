@@ -2,7 +2,7 @@
 const test=require('node:test'),assert=require('node:assert/strict');
 const {describe,renderRow,createDeletionController}=require('../src/history');
 class Node{constructor(tag='div'){this.tagName=tag;this.children=[];this.listeners={};this.dataset={};this.text='';}set textContent(text){this.text=text;this.children=[];}get textContent(){return this.text+this.children.map(child=>child.textContent).join('');}appendChild(node){this.children.push(node);return node;}replaceChildren(){this.children=[];}setAttribute(key,value){this[key]=value;}addEventListener(key,handler){this.listeners[key]=handler;}click(){return this.listeners.click?.();}}
-const document=()=>{const nodes=new Map();return {createElement:tag=>new Node(tag),getElementById:id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);}};};
+const document=()=>{const nodes=new Map();return {createElement:tag=>new Node(tag),createElementNS:(_ns,tag)=>new Node(tag),getElementById:id=>{if(!nodes.has(id))nodes.set(id,new Node());return nodes.get(id);}};};
 const item=id=>({id,createdAt:'2026-10-12T00:00:00Z',status:'completed',trainingMode:'structured',framework:'prep',durationMs:60000,audioDurationMs:5000,trainingPrompt:{schemaVersion:2,topic:{source:'user',text:'真实主题'},scenario:{source:'user',text:'真实场景'}},practice:{round:3,scope:'sentence',goal:{observation:'真实目标'}}});
 test('History keeps real context, target and recorded duration separate from training wall time',()=>{
   const value=describe(item('a'));assert.equal(value.mode,'PREP');assert.equal(value.duration,'00:05');assert.equal(value.title,'真实主题');assert.match(value.context,/真实场景.*第 3 轮.*真实目标/);
@@ -11,6 +11,13 @@ test('History keeps real context, target and recorded duration separate from tra
 test('History content and delete controls dispatch independent actions using actual IDs',async()=>{
   const opened=[],deleted=[],row=renderRow(document(),item('a'),{onOpen:id=>opened.push(id),onDelete:id=>deleted.push(id)});
   await row.children[1].click();assert.deepEqual(deleted,['a']);assert.deepEqual(opened,[]);await row.children[0].click();assert.deepEqual(opened,['a']);assert.match(row.textContent,/PREP/);assert.doesNotMatch(row.textContent,/自由表达|→/);
+});
+test('single deletion uses the accessible trash sprite while failed rows keep a retry name',()=>{
+  for(const deletionPending of [false,true]){
+    const row=renderRow(document(),{...item('a'),deletionPending},{onOpen(){},onDelete(){}}),button=row.children[1];
+    assert.equal(button.type,'button');assert.equal(button.title,'删除记录');assert.match(button['aria-label'],deletionPending?/重试删除/:/删除记录/);
+    assert.equal(button.textContent,'');const icon=button.children[0];assert.equal(icon.tagName,'svg');assert.equal(icon.width,'16');assert.equal(icon.height,'16');assert.equal(icon['aria-hidden'],'true');assert.equal(icon.children[0].href,'#icon-trash');
+  }
 });
 function fixture({approve=true,remove,get}={}){const doc=document(),selection=new Set(['a','b']),items=new Map(['a','b','c'].map(id=>[id,item(id)]));const calls=[],removed=[];let confirmations=0,refreshes=0;
   const controller=createDeletionController({document:doc,selection,items,confirm:async ids=>{confirmations++;return typeof approve==='function'?approve(ids):approve;},api:{deleteTrainingSession:async command=>{calls.push(command.sessionId);return remove?remove(command.sessionId):{ok:true};},getTrainingSession:async command=>get?get(command.sessionId):{ok:true,value:items.get(command.sessionId)}},onDeleted:id=>removed.push(id),onRefresh:async()=>{refreshes++;}});

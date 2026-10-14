@@ -4,8 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 async function run({app, mainWindow, BrowserWindow, phase}) {
-  assert.ok(['write', 'read', 'offline', 'offline-read', 'degraded','m4','m4-read','i1','i1-read','i2','i2-read','i2-auto','i2-auto-read','i2-live-read','i3','i3-read','i4','i4-read','i5','i5-read','audio-background'].includes(phase));
-  const offline = phase.startsWith('offline');
+  assert.ok(['write', 'read', 'offline', 'offline-read', 'degraded','m4','m4-read','i1','i1-read','i2','i2-read','i2-auto','i2-auto-read','i2-live-read','i3','i3-read','i4','i4-read','i5','i5-read','audio-background','countdown'].includes(phase));
+  const offline = phase.startsWith('offline') || phase === 'countdown';
   if (offline) {
     mainWindow.webContents.session.webRequest.onBeforeRequest({urls:['http://*/*','https://*/*']}, (_details, done) => done({cancel:true}));
     globalThis.fetch = async () => { throw new Error('Offline product smoke'); };
@@ -79,6 +79,11 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
   assert.equal(await evaluate(`Boolean(document.getElementById('training-topic') && document.getElementById('training-scenario'))`), true, 'Preparing offers independent topic/scenario capsules');
   await evaluate('window.__trainingProductTrainer.trainingSetup.ready');
   if (offline) assert.equal((await evaluate('window.api.getLlmProfileSummaries()')).profiles.length, 0);
+  if (phase === 'countdown') {
+    await require('./countdown-smoke').run({app,mainWindow,evaluate,wait,invoke});
+    assert.deepEqual(aiCalls(),initialCalls,'Countdown regression must issue zero AI requests');
+    console.log('TRAINING_PRODUCT_COUNTDOWN_OK');app.quit();return;
+  }
   // Existing normal flow smoke represents covered users; I2 exercises the
   // first-notice path through the actual modal without pre-acknowledging it.
   if (!phase.startsWith('i2') && phase !== 'audio-background') {

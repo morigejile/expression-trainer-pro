@@ -35,7 +35,10 @@
     const topic=text('topic'),scenario=text('scenario');
     const subheading=[topic.every(value=>value===null)?'未设置主题':topic[0] && topic[0]===topic[1]?'同一主题':'不同主题',scenario.every(value=>value===null)?'未设置场景':scenario[0] && scenario[0]===scenario[1]?'同一场景':'不同场景',sides[0].session.trainingMode===sides[1].session.trainingMode && sides[0].session.framework===sides[1].session.framework?sides[0].session.trainingMode?context.formatTrainingContext({...sides[0].session,trainingPrompt:null}):'训练方式未保存':'不同训练方式'];
     document.getElementById('comparison-context').textContent=subheading.join(' · ');
-    const header=el('section','compare-header'),identities=el('div','compare-identities');header.appendChild(identities);container.appendChild(header);
+    const header=el('section','compare-header'),identities=el('div','compare-identities'),fixed=document.getElementById('comparison-identities');header.appendChild(identities);
+    let originals;
+    if(fixed){fixed.replaceChildren(header);const section=el('section','comparison-originals');originals=el('div','comparison-pair');section.appendChild(originals);container.appendChild(section);}
+    else container.appendChild(header);
     for(const [index,side] of sides.entries()){
       const role=index?'target':'baseline',identity=el('div');identities.appendChild(identity);
       const parts=context.getPromptParts(side.session.trainingPrompt),mode=side.session.trainingMode==='free'?'自由表达':side.session.trainingMode==='structured'?context.formatTrainingContext({...side.session,trainingPrompt:null}):'训练方式未保存';
@@ -44,8 +47,10 @@
       identity.appendChild(el('p',null,`${new Date(side.session.createdAt).toLocaleString()} · ${value(side.evidence.audio.endMs,'ms')}`));
       identity.appendChild(el('p',null,[mode,parts.scenario?.text,side.session.practice?`针对性练习第 ${side.session.practice.round} 轮`:null].filter(Boolean).join(' · ')));
       if(side.session.practice)identity.appendChild(el('p',null,`练习范围：${{sentence:'句子',segment:'片段',full:'完整表达'}[side.session.practice.scope]} · 目标：${side.session.practice.goal.observation}`));
+      for(const line of identity.children)if(['H2','P'].includes(line.tagName))line.setAttribute('title',line.textContent);
       const open=button('查看这次报告 →',()=>onReport(role));open.dataset.comparisonReport=role;identity.appendChild(open);
-      disclosure(identity,`original-${role}`,'查看原文与录音',body=>{body.appendChild(el('p','source-note',`识别来源：${side.sources.asr?.modelId || '来源未保存'} · ${side.sources.asr?.modelVersion || '版本未保存'}`));const refs=(side.session.transcript?.segments || []).map(segment=>segment.id);if(!refs.length)body.appendChild(el('p',null,side.session.transcript?.text || '暂无可读原文。'));evidence(body,side,['audio',...refs]);});
+      const materials=originals?el('div'):identity;if(originals)originals.appendChild(materials);
+      disclosure(materials,`original-${role}`,'查看原文与录音',body=>{body.appendChild(el('p','source-note',`识别来源：${side.sources.asr?.modelId || '来源未保存'} · ${side.sources.asr?.modelVersion || '版本未保存'}`));const refs=(side.session.transcript?.segments || []).map(segment=>segment.id);if(!refs.length)body.appendChild(el('p',null,side.session.transcript?.text || '暂无可读原文。'));evidence(body,side,['audio',...refs]);});
     }
     const observations=projection.metrics.filter(metric=>['audio-duration-ms','filler-count'].includes(metric.id)&&metric.delta!==null);
     if(observations.length){const section=el('section','report-section');section.appendChild(el('h2',null,'可以观察到的变化'));const insight=el('p','compare-insight');

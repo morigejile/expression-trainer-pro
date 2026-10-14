@@ -156,16 +156,16 @@
       row.appendChild(input);
     }
     function leave(clearSelection=false) {
-      request++;action++;loading=false;context=null;releaseAudio();content.replaceChildren();
+      request++;action++;loading=false;context=null;releaseAudio();content.replaceChildren();get('comparison-identities')?.replaceChildren();
       if(clearSelection)selection.clear();syncSelection();
     }
     function fail(error) {
-      releaseAudio();content.replaceChildren();status.textContent=error?.message || '无法读取对比，请重试。';
+      releaseAudio();content.replaceChildren();get('comparison-identities')?.replaceChildren();status.textContent=error?.message || '无法读取对比，请重试。';
       area.dataset.availability='unavailable';retry.hidden=false;
     }
     function capture() {
       if(!context)return;
-      context.scroll=trainer.flowView?document.defaultView.scrollY:area.scrollTop;
+      context.scroll=(trainer.flowView?get('comparison-scroll'):area).scrollTop;
       context.expanded=new Set([...content.querySelectorAll('details[data-detail-key]')].filter(el=>el.open).map(el=>el.dataset.detailKey));
     }
     function draw() {
@@ -176,7 +176,7 @@
       status.textContent=p.availability==='ready'?'已读取两次训练的保存结果':p.availability==='partial'?'部分项目暂不可比；可用内容仍可复盘。':'核心证据不足，暂时无法完成有意义的对比。';
       retry.hidden=p.availability!=='unavailable';
       for(const el of content.querySelectorAll('details[data-detail-key]'))if(context.expanded?.has(el.dataset.detailKey)){el.open=true;el.populateEvidence();}
-      if(trainer.flowView)document.defaultView.scrollTo(0,context.scroll || 0);else area.scrollTop=context.scroll || 0;
+      (trainer.flowView?get('comparison-scroll'):area).scrollTop=context.scroll || 0;
     }
     async function read(expected=context) {
       if(!expected)return null;
@@ -194,17 +194,17 @@
     async function open() {
       syncSelection();if(compareButton.disabled || selection.size!==2 || trainer.isRecording || trainer.asrStartAttempt || trainer.recordingStopOperation)return;
       releaseAudio();request++;action++;
-      trainer.historyScroll=trainer.flowView?document.defaultView.scrollY:get('history-screen').scrollTop;trainer.historyReturnFocus='btn-history-compare';
+      trainer.historyScroll=get(trainer.flowView?'history-scroll':'history-screen').scrollTop;trainer.historyReturnFocus='btn-history-compare';
       trainer.audioPlayer?.pause();trainer.releaseSavedRecordCache();
       context={ids:[...selection],projection:null,expanded:new Set(),scroll:0};
-      trainer.setScreen('comparison');content.replaceChildren();status.textContent='正在读取两次训练…';retry.hidden=true;
+      trainer.setScreen('comparison');content.replaceChildren();get('comparison-identities')?.replaceChildren();status.textContent='正在读取两次训练…';retry.hidden=true;
       area.focus();if(await read())draw();
     }
     async function restore() {
       if(!context)return trainer.showHistory({restore:true});
       action++;
       trainer.audioPlayer?.pause();trainer.setScreen('comparison');status.textContent='正在检查原对比…';
-      if(await read()){draw();content.querySelector(`[data-comparison-report="${context.reportSide || 'baseline'}"]`)?.focus({preventScroll:true});}
+      if(await read()){draw();(trainer.flowView?get('comparison-identities'):content).querySelector(`[data-comparison-report="${context.reportSide || 'baseline'}"]`)?.focus({preventScroll:true});}
     }
     async function openReport(role) {
       if(!context || loading)return;capture();stopAudio();

@@ -312,7 +312,8 @@ class ExpressionTrainer {
       this.asrPreparationState = 'failed';
     }
     this.btnStart.disabled = false;
-    this.btnStartLabel.textContent = this.asrPreparationState === 'failed' ? '重试加载' : this.flowView ? '开始' : '开始表达';
+    this.btnStartLabel.textContent = this.asrPreparationState === 'failed' ? '重试加载' : this.flowView ? 'start' : '开始表达';
+    this.btnStart.setAttribute('aria-label',this.asrPreparationState === 'failed' ? '重试加载' : '开始表达');
     if (!this.fullText.trim() && !this.isRecording && !this.asrStartAttempt) {
       this.finishTrainingPreparation();
     }
@@ -640,7 +641,14 @@ class ExpressionTrainer {
         if (countdown.remaining === 0) {
           this.countdown = null;resolve(true);return;
         }
-        if (this.countdownNumber) this.countdownNumber.textContent = String(countdown.remaining);
+        if (this.countdownNumber) {
+          this.countdownNumber.textContent = String(countdown.remaining);
+          // Text changes do not restart a CSS animation held at opacity zero.
+          for (const animation of this.countdownNumber.getAnimations?.() || []) {
+            animation.currentTime = 0;
+            animation.play();
+          }
+        }
         countdown.remaining--;
         countdown.timer = setTimeout(tick,1000);
       };
@@ -963,7 +971,7 @@ class ExpressionTrainer {
       } else {
         this.setScreen(this.currentScreen,'preparing',{refresh:true});
         if (this.currentScreen === 'history') {
-          const area=document.getElementById('history-screen');
+          const area=document.getElementById(this.flowView?'history-scroll':'history-screen');
           const scroll=area?.scrollTop || 0, focusId=document.activeElement?.dataset?.recordId;
           await this.loadHistory();
           if (this.currentScreen === 'history') {
@@ -1696,6 +1704,7 @@ class ExpressionTrainer {
   }
 
   setScreen(screen, state = 'preparing',{refresh=false} = {}) {
+    const previousScreen=this.currentScreen;
     if (!refresh) {this.aiDisclosure?.cancel();this.pendingAutoDisclosureRecord=null;this.reportRestoration=null;}
     if (screen !== 'report') {this.reportCleanup?.();this.reportCleanup = null;}
     this.currentScreen = screen;
@@ -1706,6 +1715,11 @@ class ExpressionTrainer {
       document.body.dataset.trainingState = state;
     }
     this.flowView?.show(screen,state,this.trainingRecords?.selected());
+    if(!refresh && previousScreen!==screen){
+      const regionId={history:'history-scroll',report:'report-scroll',comparison:'comparison-scroll'}[screen];
+      const region=regionId?document.getElementById(regionId):null;
+      if(region){region.scrollTop=0;region.scrollLeft=0;}
+    }
     const busy = this.isRecording || this.asrStartAttempt || this.recordingStopOperation;
     this.trainingSetup?.lock(screen !== 'training' || state !== 'preparing' || busy);
     for (const name of ['btn-home','btn-history']) {
@@ -1731,10 +1745,12 @@ class ExpressionTrainer {
   }
 
   showRecord(record, source = null,reportId=null) {
+    const changedRecord=this.viewingTrainingRecordId!==record.id;
     this.viewingReportSnapshot=reportId?{sessionId:record.id,reportId}:null;
     this.reportSource = source;
     this.selectTrainingRecord(record.id);
     this.setScreen('report');
+    if(changedRecord){const region=document.getElementById('report-scroll');if(region)region.scrollTop=0;}
     this.reportBack?.classList.toggle('hidden', !['history','comparison','practice'].includes(source));
     if (this.reportBack) this.reportBack.textContent = source === 'comparison' ? '← 返回对比' : source === 'practice' ? '← 返回本轮报告' : '← 训练历史';
     if (!record.structuredReport) this.reportAiStatus && (this.reportAiStatus.textContent = record.reportStatus === 'failed' ? '上次 AI 报告生成失败，可重试；已有结果保留。' : '');
@@ -1762,8 +1778,8 @@ class ExpressionTrainer {
     this.releaseSavedRecordCache();
     this.setScreen('history');
     if (restore && this.historyList?.children.length) {
-      const area = document.getElementById('history-screen');
-      if(this.flowView)window.scrollTo(0,this.historyScroll || 0);else area.scrollTop = this.historyScroll || 0;
+      const area = document.getElementById(this.flowView?'history-scroll':'history-screen');
+      if(area)area.scrollTop = this.historyScroll || 0;
       if (this.historyReturnFocus) document.getElementById(this.historyReturnFocus)?.focus({preventScroll:true});
       else this.historyList.querySelector(`[data-record-id="${this.historyOpenedId}"]`)?.focus({preventScroll:true});
       return;
@@ -1810,7 +1826,7 @@ class ExpressionTrainer {
     const previousSelected=this.trainingRecords?.selected()?.id;
     const currentRead=()=>this.navigationGeneration===navigation && this.reportOpenGeneration===readGeneration && !this.deletedSessionIds?.has(id);
     if (this.currentScreen==='history') {
-      this.historyScroll = this.flowView?window.scrollY:document.getElementById('history-screen')?.scrollTop || 0;
+      this.historyScroll = document.getElementById(this.flowView?'history-scroll':'history-screen')?.scrollTop || 0;
       this.historyOpenedId = id;this.historyReturnFocus = null;
     }
     try {

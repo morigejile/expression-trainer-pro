@@ -51,6 +51,10 @@ test('I1 frozen UI records four training modes with AI disabled, cancels countdo
   runPhase(userData,'i1');runPhase(userData,'i1-read');
 });
 
+test('countdown digits are visibly rendered after cancel and after a saved recording', {timeout:90000}, t => {
+  runPhase(isolatedData(t),'countdown');
+});
+
 for (const phase of ['i2','i2-auto']) test(`${phase}: first AI notice, cancellation, real IPC analysis and persisted restart`,{timeout:180000},t=>{
   const userData=isolatedData(t);runPhase(userData,phase);runPhase(userData,`${phase}-read`);
 });

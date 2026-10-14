@@ -49,7 +49,6 @@
           move('training-practice-focus','preparation-notes');
           move('training-context-status','preparation-notes');
           move('subtitle-scroll','recording-stage');
-          move('timer','transport-time');
           for (const id of ['btn-pause','btn-resume','btn-stop']) move(id,'transport-actions');
           move('training-status',state === 'processing' ? 'processing-status-detail' : 'preparation-notes');
           move('btn-leave-processing','processing-actions');move('btn-cancel-processing','processing-actions');
@@ -70,34 +69,7 @@
       if (frozen && screen === 'report' && record?.id !== reportId) {
         byId('report-materials').open=false;byId('report-information').open=false;reportId=record?.id;
       }
-      alignHeader();
-      // Enabled stylesheets settle after the current navigation turn. The
-      // window may be hidden/minimized, where animation frames are suspended.
-      document.defaultView.setTimeout(alignHeader,0);
     }
-    // The frozen preview aligns the glyph and History to the content edges.
-    function alignHeader() {
-      const brand=byId('btn-home'), history=byId('btn-history'), menu=document.querySelector('.topbar .utility-menu');
-      brand.style.transform=history.style.transform='none';
-      menu.style.transform='translateY(-50%)';
-      const active=document.querySelector('body[data-frozen-ui="training"] :is(#frozen-preparing,#frozen-recording,#frozen-processing):not([hidden]) .session-heading');
-      const heading=document.body.dataset.frozenUi === 'report' ? byId('frozen-report-heading')
-        : ['recording','paused'].includes(document.body.dataset.trainingState) ? byId('frozen-recording').querySelector('.session-heading')
-          : document.body.dataset.trainingState === 'processing' ? byId('frozen-processing').querySelector('.session-heading') : active;
-      if (!heading || !document.body.dataset.frozenUi) return;
-      const bounds=heading.getBoundingClientRect(), css=document.defaultView.getComputedStyle(heading);
-      brand.style.transform=`translateX(${bounds.left+parseFloat(css.paddingLeft)-brand.querySelector('.brand-mark').getBoundingClientRect().left}px)`;
-      history.style.transform=`translateX(${bounds.right-parseFloat(css.paddingRight)-history.getBoundingClientRect().right}px)`;
-      const right=history.getBoundingClientRect().right, menuBounds=menu.getBoundingClientRect();
-      if (menuBounds.left<right+8 || menuBounds.right>document.body.clientWidth) {
-        const available=document.body.clientWidth-right;
-        const left=available>=menuBounds.width ? right+Math.min(37,available-menuBounds.width)
-          : right-history.getBoundingClientRect().width-18-menuBounds.width;
-        menu.style.transform=`translateY(-50%) translateX(${left-menuBounds.left}px)`;
-      }
-    }
-    document.defaultView.addEventListener('resize',alignHeader);
-    document.fonts.ready.then(alignHeader);
     show('training');
     return {show,preparation};
   }

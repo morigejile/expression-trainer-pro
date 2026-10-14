@@ -17,30 +17,30 @@ dialog:not([open]){display:none!important}
 .history-study #compare-selected{border-radius:4px}
 
 /* Typography alignment is limited to the three new report surfaces. */
-.beo .session-report:has(>.session-stage),.beo .comparison-view{color:var(--ink)}
+.beo .session-report:has(.session-stage),.beo .comparison-view{color:var(--ink)}
 .beo .target-report .round-result h2,.beo .comparison-view .compare-insight{letter-spacing:.01em}
 .beo .comparison-view .compare-identities h2,.beo .comparison-view .comparison-pair h4{letter-spacing:.02em}
-.beo .session-report:has(>.session-stage) .report-disclosure>div,.beo .comparison-view .report-disclosure>div{font-weight:350}
+.beo .session-report:has(.session-stage) .report-disclosure>div,.beo .comparison-view .report-disclosure>div{font-weight:350}
 
 /* Accepted preparation/recording typography and horizontal edges, only on the new reports. */
-.beo :is(.session-report:has(>.session-stage),.comparison-view){
+.beo :is(.session-report:has(.session-stage),.comparison-view){
   --report-inset:36px;--report-title-size:28px;--muted:#857e70;
   width:min(920px,calc(100% - 96px));max-width:none;margin-left:auto;margin-right:auto;
   padding-left:0;padding-right:0;color:#393831;
   font-family:'Panel Manrope','Panel Source Han',sans-serif;font-weight:350;line-height:1.8;letter-spacing:.025em;
 }
-.beo :is(.session-report:has(>.session-stage),.comparison-view)>.session-heading{padding-left:var(--report-inset);padding-right:var(--report-inset)}
-.beo :is(.session-report:has(>.session-stage),.comparison-view)>.session-heading h1{font-size:var(--report-title-size);font-weight:300;line-height:1.4;letter-spacing:.035em;color:#393831}
-.beo :is(.session-report:has(>.session-stage),.comparison-view)>.session-heading p{font-size:11px;font-weight:400;line-height:1.8;letter-spacing:normal;color:#857e70}
-.beo :is(.session-report:has(>.session-stage),.comparison-view) :is(.summary-panel,.round-result,.compare-header,.report-section,.study-materials){padding-left:var(--report-inset);padding-right:var(--report-inset)}
-.beo :is(.session-report:has(>.session-stage),.comparison-view)>.findings-section{margin-left:var(--report-inset);margin-right:var(--report-inset)}
-.beo :is(.session-report:has(>.session-stage),.comparison-view)>.context-back-row{margin-left:var(--report-inset);margin-right:var(--report-inset)}
-.beo :is(.session-report:has(>.session-stage),.comparison-view) :is(.findings-section>header h2,.report-section>h2,.report-section>header h2,.finding-detail h4){font-weight:350;letter-spacing:.02em;line-height:1.7}
-.beo :is(.session-report:has(>.session-stage),.comparison-view) :is(.summary-copy h2,.round-result h2,.compare-insight){font-weight:300;letter-spacing:.025em;line-height:1.7}
-.beo :is(.session-report:has(>.session-stage),.comparison-view) :is(.finding-detail,.transcript-lines p,.comparison-pair p,.report-disclosure>div){font-weight:350;letter-spacing:.025em;line-height:1.8}
-.beo :is(.session-report:has(>.session-stage),.comparison-view) :is(.practice-action,.text-action,.practice-controls select){font-weight:400;letter-spacing:.025em}
-@media(max-height:740px){.beo :is(.session-report:has(>.session-stage),.comparison-view){--report-title-size:26px}}
-@media(max-width:720px){.beo :is(.session-report:has(>.session-stage),.comparison-view){--report-inset:12px;--report-title-size:25px;width:calc(100% - 32px)}}
+.beo :is(.session-report:has(.session-stage),.comparison-view)>.session-heading{padding-left:var(--report-inset);padding-right:var(--report-inset)}
+.beo :is(.session-report:has(.session-stage),.comparison-view)>.session-heading h1{font-size:var(--report-title-size);font-weight:300;line-height:1.4;letter-spacing:.035em;color:#393831}
+.beo :is(.session-report:has(.session-stage),.comparison-view)>.session-heading p{font-size:11px;font-weight:400;line-height:1.8;letter-spacing:normal;color:#857e70}
+.beo :is(.session-report:has(.session-stage),.comparison-view) :is(.summary-panel,.round-result,.compare-header,.report-section,.study-materials){padding-left:var(--report-inset);padding-right:var(--report-inset)}
+.beo :is(.session-report:has(.session-stage),.comparison-view)>.findings-section{margin-left:var(--report-inset);margin-right:var(--report-inset)}
+.beo :is(.session-report:has(.session-stage),.comparison-view)>.context-back-row{margin-left:var(--report-inset);margin-right:var(--report-inset)}
+.beo :is(.session-report:has(.session-stage),.comparison-view) :is(.findings-section>header h2,.report-section>h2,.report-section>header h2,.finding-detail h4){font-weight:350;letter-spacing:.02em;line-height:1.7}
+.beo :is(.session-report:has(.session-stage),.comparison-view) :is(.summary-copy h2,.round-result h2,.compare-insight){font-weight:300;letter-spacing:.025em;line-height:1.7}
+.beo :is(.session-report:has(.session-stage),.comparison-view) :is(.finding-detail,.transcript-lines p,.comparison-pair p,.report-disclosure>div){font-weight:350;letter-spacing:.025em;line-height:1.8}
+.beo :is(.session-report:has(.session-stage),.comparison-view) :is(.practice-action,.text-action,.practice-controls select){font-weight:400;letter-spacing:.025em}
+@media(max-height:740px){.beo :is(.session-report:has(.session-stage),.comparison-view){--report-title-size:26px}}
+@media(max-width:720px){.beo :is(.session-report:has(.session-stage),.comparison-view){--report-inset:12px;--report-title-size:25px;width:calc(100% - 32px)}}
 
 /* Report disclosure arrows share the finding button's stroke. */
 .beo .report-disclosure>summary{align-items:center}
@@ -75,7 +75,7 @@ dialog:not([open]){display:none!important}
 .beo .session-report .finding-row p{display:block;margin:5px 0 0;font-size:10px;line-height:1.8}
 .beo .session-report .finding-open{align-self:center}
 .beo .session-report .finding-detail{padding-left:42px;padding-right:0;padding-bottom:24px}
-.beo .session-report:has(>.session-stage) .findings-section .finding-detail h4{font-size:12px;font-weight:500;line-height:1.7;color:#393831;margin:22px 0 6px}
+.beo .session-report:has(.session-stage) .findings-section .finding-detail h4{font-size:12px;font-weight:500;line-height:1.7;color:#393831;margin:22px 0 6px}
 .beo .session-report .finding-detail>p{font-size:13px;font-weight:350;line-height:1.8;margin:0;color:#393831}
 .beo .session-report .finding-detail>p.example{color:#76664b}
 @media(max-width:460px){

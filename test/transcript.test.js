@@ -254,20 +254,35 @@ test('countdown completes after three real seconds and continues only its owning
   const trainer = createTrainer();
   trainer.isRecording = false;
   trainer.countdownNumber = createElement();
+  let animationPlays = 0;
+  const animation = {currentTime:1000,play() {animationPlays++;}};
+  trainer.countdownNumber.getAnimations = () => [animation];
   const attempt = trainer.asrStartAttempt = {};
   t.mock.timers.enable({apis:['setTimeout']});
   t.after(() => {delete global.document;});
   let complete = false;
   const pending = ExpressionTrainer.prototype.runCountdown.call(trainer,attempt).then(value => {complete=value;});
   assert.equal(trainer.countdownNumber.textContent,'3');
+  assert.equal(animation.currentTime,0);
   for (const digit of ['2','1']) {
+    animation.currentTime = 1000;
     t.mock.timers.tick(1000);await flushMicrotasks();
     assert.equal(trainer.countdownNumber.textContent,digit);
+    assert.equal(animation.currentTime,0,'Each digit restarts the animation left transparent by its predecessor');
     assert.equal(complete,false);
   }
   t.mock.timers.tick(1000);await pending;
   assert.equal(complete,true);
   assert.equal(trainer.countdown,null);
+  assert.equal(animationPlays,3);
+  const nextAttempt = trainer.asrStartAttempt = {};
+  animation.currentTime = 1000;
+  const again = ExpressionTrainer.prototype.runCountdown.call(trainer,nextAttempt);
+  assert.equal(trainer.countdownNumber.textContent,'3');
+  assert.equal(animation.currentTime,0,'The next countdown starts from the beginning');
+  for (let i=0;i<3;i++) {t.mock.timers.tick(1000);await flushMicrotasks();}
+  assert.equal(await again,true);
+  assert.equal(animationPlays,6);
 });
 
 test('countdown cancellation still releases ASR when microphone cleanup fails', async t => {
