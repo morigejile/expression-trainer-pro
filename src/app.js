@@ -132,6 +132,7 @@ class ExpressionTrainer {
     this.initElements();
     this.flowView = typeof document.createComment === 'function' && window.FrozenFlowView
       ? window.FrozenFlowView.createFlowView(document) : null;
+    this.utilityMenu = window.UtilityMenu?.createUtilityMenu({document});
     this.trainingSetup = TrainingSetup.createTrainingSetup({api:window.api,document});
     this.comparison = SessionComparison.createComparisonController({trainer:this,api:window.api,document});
     this.historyItems=new Map();
@@ -1705,6 +1706,7 @@ class ExpressionTrainer {
 
   setScreen(screen, state = 'preparing',{refresh=false} = {}) {
     const previousScreen=this.currentScreen;
+    if(previousScreen!==screen)this.utilityMenu?.close();
     if (!refresh) {this.aiDisclosure?.cancel();this.pendingAutoDisclosureRecord=null;this.reportRestoration=null;}
     if (screen !== 'report') {this.reportCleanup?.();this.reportCleanup = null;}
     this.currentScreen = screen;

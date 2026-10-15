@@ -67,23 +67,34 @@ async function modelState({installed = [LARGE], service = {}, task = {}, catalog
   const result = await router.getModelState(); assert.equal(result.ok, true); return result.state;
 }
 
-test('quick-start search finds every FAQ locally and clearing it restores the starting steps', () => {
+test('quick-start has no search field and ignores stale searches without hiding steps or FAQs', () => {
+  const fixture = view();
+  const result = help(fixture, 'start');
+  assert.equal(result.searchInput, null);
+  assert.equal(fixture.parent.querySelector('#help-search'), null);
+  assert.equal(fixture.parent.querySelector('.help-search'), null);
+  for (const query of ['原始音频', 'totally-unmatched', '']) {
+    result.search(query);
+    assert.equal(fixture.parent.querySelectorAll('.steps').length, 1);
+    assert.equal(fixture.parent.querySelectorAll('.faq').length, 2);
+    assert.doesNotMatch(fixture.parent.textContent, /搜索结果|没有找到/);
+  }
+});
+
+test('other Help sections retain local FAQ search and clearing restores their own content', () => {
   const fixture = view(); const actions = [];
-  const result = help(fixture, 'start', {onHelp: page => actions.push(page)});
-  assert.equal(fixture.parent.querySelectorAll('.steps').length, 1);
-  const input = fixture.parent.querySelector('#help-search');
-  assert.ok(input); assert.equal(result.searchInput, input);
-  input.value = '原始音频'; input.listeners.get('input')();
+  const result = help(fixture, 'report', {onHelp: page => actions.push(page)});
+  result.search('原始音频');
   assert.match(fixture.parent.querySelector('#help-results').textContent, /远程 AI 分析/);
   assert.equal(fixture.parent.querySelectorAll('.steps').length, 0);
-  input.value = '第一次怎么开始'; input.listeners.get('input')();
+  result.search('第一次怎么开始');
   assert.match(fixture.parent.querySelector('#help-results').textContent, /首次录音/);
-  input.value = 'totally-unmatched'; input.listeners.get('input')();
+  result.search('totally-unmatched');
   assert.match(fixture.parent.textContent, /没有找到/); assert.deepEqual(actions, []);
   click(fixture.parent.querySelector('[data-help="feedback"]')); assert.deepEqual(actions, ['feedback']);
-  input.value = ' '; input.listeners.get('input')();
-  assert.equal(fixture.parent.querySelectorAll('.steps').length, 1);
-  assert.equal(fixture.parent.querySelectorAll('.faq').length, 2);
+  result.search(' ');
+  assert.equal(fixture.parent.querySelectorAll('.help-facts').length, 1);
+  assert.equal(fixture.parent.querySelectorAll('.steps').length, 0);
 });
 
 test('privacy keeps the actual disclosure, credential and selected-record deletion boundaries', () => {

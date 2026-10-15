@@ -16,7 +16,6 @@
     comparison?.addChoice(row,item);
     const open=node('button','history-row-main');open.type='button';open.dataset.recordId=item.id;
     open.disabled=Boolean(item.deletionPending || ['recording','finalizing'].includes(item.status));
-    if(document.createElementNS){const ns='http://www.w3.org/2000/svg',svg=document.createElementNS(ns,'svg');for(const [key,value] of Object.entries({class:'mic',width:'22',height:'24',viewBox:'0 0 24 24',fill:'none',stroke:'currentColor','stroke-width':'1.3','aria-hidden':'true'}))svg.setAttribute(key,value);const rect=document.createElementNS(ns,'rect');for(const [key,value] of Object.entries({x:'8',y:'2',width:'8',height:'13',rx:'4'}))rect.setAttribute(key,value);const path=document.createElementNS(ns,'path');path.setAttribute('d','M5 11v1a7 7 0 0 0 14 0v-1M12 19v3m-4 0h8');svg.appendChild(rect);svg.appendChild(path);open.appendChild(svg);}
     const text=node('div');text.appendChild(node('strong',null,info.title));text.appendChild(node('small',null,`${info.date} · ${info.duration} · ${info.mode} · ${info.state}`));if(info.context)text.appendChild(node('small',null,info.context));open.appendChild(text);
     open.addEventListener('click',()=>onOpen(item.id));
     const remove=node('button','history-row-actions');remove.type='button';remove.setAttribute('title','删除记录');remove.setAttribute('aria-label',`${item.deletionPending?'重试删除记录':'删除记录'} ${info.date} · ${info.title}`);

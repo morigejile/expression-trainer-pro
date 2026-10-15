@@ -141,7 +141,8 @@
     const results = element(document, 'div'); results.id = 'help-results';
     let searchInput = null;
     function search(query) {
-      const normalized = String(query ?? '').trim().toLowerCase();
+      // Quick Start always shows its steps and FAQ, including after stale queries.
+      const normalized = selected === 'start' ? '' : String(query ?? '').trim().toLowerCase();
       results.replaceChildren();
       if (!normalized) { ({start, report, privacy, feedback})[selected](document, results, options); return; }
       const matches = questions.filter(question => (question.title + question.answer).toLowerCase().includes(normalized));
@@ -152,13 +153,6 @@
         results.appendChild(button(document, '前往问题与反馈', 'help', 'feedback',
           typeof options.onHelp === 'function' ? () => options.onHelp('feedback') : null));
       }
-    }
-    if (selected === 'start') {
-      const wrapper = element(document, 'div', 'help-search');
-      searchInput = element(document, 'input'); searchInput.id = 'help-search'; searchInput.type = 'search';
-      searchInput.placeholder = '搜索录音、报告或隐私问题'; searchInput.setAttribute('aria-label', '搜索全部帮助问题');
-      searchInput.addEventListener('input', () => search(searchInput.value));
-      wrapper.appendChild(searchInput); parent.appendChild(wrapper);
     }
     parent.appendChild(results); search('');
     return {searchInput, results, search};

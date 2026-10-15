@@ -49,6 +49,11 @@ body[data-frozen-ui="training"] :is(#frozen-preparing,#frozen-recording)>.sessio
    caption spans from that boundary to the ring's actual top and centers within it. */
 body[data-frozen-ui="training"] #frozen-preparing>.session-stage{border-top:0;padding-top:1px}
 body[data-frozen-ui="training"] #prepare-ring{anchor-name:--prepare-ring}
+/* Outside the stage's centering calculation: only the auxiliary controls move. */
+html.spacing-compact body[data-frozen-ui="training"] #prepare-auxiliary{position:absolute;top:calc(100% + 32px);left:50%;transform:translateX(-50%);height:44px;width:max-content;min-width:44px;display:grid;place-items:center}
+html.spacing-compact body[data-frozen-ui="training"] #prepare-auxiliary>.context-area{position:relative;inset:auto;transform:none;grid-area:1/1;height:44px;display:flex;align-items:center}
+html.spacing-compact body[data-frozen-ui="training"] #prepare-auxiliary>.cancel-countdown{position:static;inset:auto;transform:none;grid-area:1/1}
+@media(max-height:740px){html.spacing-compact body[data-frozen-ui="training"] #prepare-auxiliary{top:calc(100% + 24px)}}
 html.spacing-compact body[data-frozen-ui="training"] #prepare-caption{top:0;bottom:anchor(--prepare-ring top);height:auto;display:flex;align-items:center;justify-content:center}
 body[data-frozen-ui="training"] #recording-stage .subtitle-scroll{height:100%}
 body[data-frozen-ui="training"][data-training-state="preparing"] #training-status,
@@ -76,6 +81,7 @@ body[data-frozen-ui="training"] .subtitle-line:not(.old),body[data-frozen-ui="tr
 body[data-frozen-ui="training"] .subtitle-line :is(.filler,.hedge,.vague,.strong){color:inherit;background:none}
 #sound-bars i{display:block;width:2px;flex:0 0 2px;height:3px;border-radius:1px;background:#8d7654;animation:none!important;transform:none!important}
 #transport-actions .icon{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+#transport-actions #btn-pause .icon{stroke-width:3.6}
 #transport-actions #btn-stop .icon{width:19px;height:19px}
 #transport-actions :is(#btn-resume,#btn-stop) .icon{fill:currentColor;stroke:none}
 #transport-time #timer{font-size:13px;line-height:1.8;color:#80715d;font-weight:400;font-variant-numeric:tabular-nums;margin-left:6px}
@@ -147,18 +153,25 @@ body[data-frozen-ui]:not([data-frozen-ui=""]) .modal-header button{font-size:26p
 body[data-frozen-ui]:not([data-frozen-ui=""]) .modal .modal-body{font-size:14px;line-height:1.9;color:#777164}
 body[data-frozen-ui]:not([data-frozen-ui=""]) .modal .modal-body h2{font-size:17px;font-weight:350}
 body[data-frozen-ui]:not([data-frozen-ui=""]) .modal .modal-body button{border:1px solid #dcd8cf;padding:8px 16px;font-size:13px;border-radius:3px;margin:5px}
-body[data-frozen-ui]:not([data-frozen-ui=""]) #training-picker{position:fixed;margin:0;width:min(450px,calc(100vw - 40px));max-height:calc(100vh - 60px);padding:25px;border:1px solid var(--line);border-radius:3px;background:#fcfaf3;color:#393831;box-shadow:0 30px 100px #1d253330;overflow:auto}
+body[data-frozen-ui]:not([data-frozen-ui=""]) #training-picker{position:fixed;margin:0;width:min(360px,calc(100vw - 40px));max-height:calc(100vh - 60px);padding:20px;border:1px solid var(--line);border-radius:3px;background:#fcfaf3;color:#393831;box-shadow:0 30px 100px #1d253330;overflow:hidden}
+body[data-frozen-ui]:not([data-frozen-ui=""]) #training-picker:popover-open{display:flex;flex-direction:column}
 body[data-frozen-ui]:not([data-frozen-ui=""]) #training-picker::backdrop{background:#282c3750;backdrop-filter:blur(8px)}
-body[data-frozen-ui]:not([data-frozen-ui=""]) .training-picker-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px}
-body[data-frozen-ui]:not([data-frozen-ui=""]) .training-picker-header h2{font-size:20px;font-weight:350;margin:0}
+body[data-frozen-ui]:not([data-frozen-ui=""]) .training-picker-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-shrink:0}
+body[data-frozen-ui]:not([data-frozen-ui=""]) #training-picker-close{display:grid;place-items:center;width:32px;height:32px;flex:0 0 32px;padding:0}
+body[data-frozen-ui]:not([data-frozen-ui=""]) #training-picker>.training-picker-hint{flex-shrink:0}
+body[data-frozen-ui]:not([data-frozen-ui=""]) #training-picker-content{min-height:0;overflow:auto;overscroll-behavior:contain;overflow-wrap:anywhere}
+body[data-frozen-ui]:not([data-frozen-ui=""]) .training-picker-actions{flex-shrink:0}
+body[data-frozen-ui]:not([data-frozen-ui=""]) .training-picker-actions:empty{display:none}
+body[data-frozen-ui]:not([data-frozen-ui=""]) .picker-actions{display:flex;justify-content:flex-end;gap:8px}
+body[data-frozen-ui]:not([data-frozen-ui=""]) .training-picker-header h2{min-width:0;overflow-wrap:anywhere;font-size:20px;font-weight:350;margin:0}
 body[data-frozen-ui]:not([data-frozen-ui=""]) .training-picker-hint{font-size:12px;color:#857e70;line-height:1.9}
 body[data-frozen-ui]:not([data-frozen-ui=""]) .picker-options{padding:0;list-style:none;display:grid;gap:6px}
-body[data-frozen-ui]:not([data-frozen-ui=""]) .picker-option{display:flex;align-items:center;background:var(--hover);border-radius:2px}
-body[data-frozen-ui]:not([data-frozen-ui=""]) .picker-option-select{flex:1;text-align:left;padding:14px 15px;font-size:13px}
+body[data-frozen-ui]:not([data-frozen-ui=""]) .picker-option{display:flex;align-items:center;min-height:44px;background:var(--hover);border-radius:2px}
+body[data-frozen-ui]:not([data-frozen-ui=""]) .picker-option-select{flex:1;min-width:0;min-height:44px;text-align:left;padding:9px 12px;font-size:13px;white-space:normal;overflow-wrap:anywhere}
 body[data-frozen-ui]:not([data-frozen-ui=""]) .picker-option:has([aria-pressed="true"]){background:var(--evidence);box-shadow:inset 0 0 0 1px var(--line);color:var(--accent)}
-body[data-frozen-ui]:not([data-frozen-ui=""]) .picker-help{width:33px;height:33px;border-radius:50%;font-size:12px}
+body[data-frozen-ui]:not([data-frozen-ui=""]) .picker-help{width:33px;height:33px;flex:0 0 33px;margin:0 6px;border-radius:50%;font-size:12px}
 body[data-frozen-ui]:not([data-frozen-ui=""]) .picker-action{font-size:12px;padding:11px 18px;border:1px solid var(--line);border-radius:3px;margin-top:12px}
-body[data-frozen-ui]:not([data-frozen-ui=""]) #training-custom-text{width:100%;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit;padding:12px;font-size:12px}
+body[data-frozen-ui]:not([data-frozen-ui=""]) #training-custom-text{width:100%;max-width:100%;border:1px solid var(--line);background:var(--panel);color:var(--ink);font:inherit;padding:12px;font-size:12px}
 body[data-frozen-ui]:not([data-frozen-ui=""]) .visually-hidden{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 @media(max-height:740px){body[data-frozen-ui="training"] .subtitle-line{font-size:22px}body[data-frozen-ui="report"] .report-header h1{font-size:26px}}
 @media(max-width:720px){.layout>.topbar.app-header{margin:0 16px;padding:0 12px}.topbar.app-header .utility-menu{left:auto;right:calc(100% + 18px)}#prepare-context-slot .training-capsule{min-width:90px;padding:9px 8px;font-size:10px}body[data-frozen-ui="training"] #recording-stage .subtitle-scroll{padding-left:12px;padding-right:12px}body[data-frozen-ui="training"] .subtitle-line{font-size:20px}body[data-frozen-ui="report"] .report-header h1{font-size:25px}body[data-frozen-ui="report"] .record-identity{white-space:normal}body[data-frozen-ui]:not([data-frozen-ui=""]) .user-message{width:calc(100% - 56px)}}
@@ -166,6 +179,18 @@ body[data-frozen-ui]:not([data-frozen-ui=""]) .visually-hidden{position:absolute
 #history-screen,#comparison-screen{display:none}
 body[data-frozen-ui="history"] #history-screen,body[data-frozen-ui="comparison"] #comparison-screen{display:block;font-family:'Panel Manrope','Panel Source Han',sans-serif;min-width:0;overflow-wrap:anywhere}
 body[data-frozen-ui="history"] #history-screen{color:#000}
+body[data-frozen-ui="history"] #history-scroll{scrollbar-gutter:stable;scrollbar-width:auto;scrollbar-color:auto}
+body[data-frozen-ui="history"] #history-scroll::-webkit-scrollbar{width:8px;height:8px}
+body[data-frozen-ui="history"] #history-scroll::-webkit-scrollbar-track,body[data-frozen-ui="history"] #history-scroll::-webkit-scrollbar-corner{background:transparent}
+body[data-frozen-ui="history"] #history-scroll::-webkit-scrollbar-thumb{background:#a89e8bb3;border-radius:4px}
+body[data-frozen-ui="history"] #history-scroll::-webkit-scrollbar-thumb:hover{background:#918572}
+body[data-frozen-ui="history"] #history-scroll::-webkit-scrollbar-button{display:none;width:0;height:0}
+body[data-frozen-ui="history"] .history-entry{gap:10px}
+body[data-frozen-ui="history"] .history-compare-choice{display:grid;place-items:center;flex:0 0 32px;width:32px;height:32px;cursor:pointer}
+body[data-frozen-ui="history"] .history-compare-choice input{appearance:none;position:relative;box-sizing:border-box;width:16px;height:16px;margin:0;border:1px solid #9b917f;border-radius:2px;background:transparent;cursor:pointer}
+body[data-frozen-ui="history"] .history-compare-choice input:checked{border-color:#8d7e64;background:#c9b99a24}
+body[data-frozen-ui="history"] .history-compare-choice input:checked::after{content:'';position:absolute;left:5px;top:2px;width:4px;height:8px;border:solid #796b52;border-width:0 1.5px 1.5px 0;transform:rotate(45deg)}
+body[data-frozen-ui="history"] .history-compare-choice input:focus-visible{outline:3px solid var(--focus,#8d7654);outline-offset:3px}
 body[data-frozen-ui="history"] #history-status,body[data-frozen-ui="comparison"] #comparison-status{font-size:11px;color:var(--muted);line-height:1.8;margin:0 36px 18px}
 body[data-frozen-ui="history"] #history-status:empty,body[data-frozen-ui="comparison"] #comparison-status:empty{display:none}
 body[data-frozen-ui="history"] .history-entry>button.history-row-main{min-width:0;overflow-wrap:anywhere}

@@ -153,7 +153,7 @@
       input.dataset.unavailable=String(Boolean(item.deletionPending || ['recording','finalizing'].includes(item.status)));
       input.setAttribute('aria-label',`选择 ${new Date(item.createdAt).toLocaleString()} 的训练`);
       input.addEventListener('change',()=>{if(input.checked)selection.add(item.id);else selection.delete(item.id);syncSelection();});
-      row.appendChild(input);
+      label.appendChild(input);row.appendChild(label);
     }
     function leave(clearSelection=false) {
       request++;action++;loading=false;context=null;releaseAudio();content.replaceChildren();get('comparison-identities')?.replaceChildren();

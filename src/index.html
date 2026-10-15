@@ -113,8 +113,10 @@
         <section class="session-stage">
           <div id="prepare-caption" class="compact-prepare-caption"></div>
           <div id="prepare-object" class="prepare-object">
-            <div id="prepare-context-slot" class="context-area"></div>
             <div id="prepare-ring" class="halo-object"></div>
+            <div id="prepare-auxiliary" class="prepare-auxiliary">
+              <div id="prepare-context-slot" class="context-area"></div>
+            </div>
           </div>
         </section>
         <footer class="session-foot"><div id="preparation-notes"><section id="preflight-notice" class="state-notice state-preflight" role="status" hidden><h2 id="preflight-title"></h2><p id="preflight-description"></p><div class="state-actions"><button id="btn-open-asr-settings" type="button" hidden>打开语音识别设置</button><button id="btn-recheck-preparation" type="button">重新检查</button></div></section></div></footer>
@@ -170,6 +172,7 @@
           <header class="training-picker-header"><h2 id="training-picker-title" tabindex="-1"></h2><button id="training-picker-close" type="button" aria-label="关闭选项">×</button></header>
           <p id="training-picker-hint" class="training-picker-hint"></p>
           <div id="training-picker-content"></div>
+          <div id="training-picker-actions" class="training-picker-actions"></div>
         </section>
         <p id="training-context-status" role="status" aria-live="polite"></p>
       </div>
@@ -376,6 +379,7 @@
   <script src="../lib/llm-provider-config.js"></script>
   <script src="utility-content.js"></script>
   <script src="frozen-utility.js"></script>
+  <script src="utility-menu.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

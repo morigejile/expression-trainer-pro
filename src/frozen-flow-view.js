@@ -45,7 +45,7 @@
           move('training-picker','main-workspace');
           move('btn-start','prepare-ring');
           move('countdown-display','prepare-ring');
-          move('btn-cancel-countdown','prepare-object');
+          move('btn-cancel-countdown','prepare-auxiliary');
           move('training-practice-focus','preparation-notes');
           move('training-context-status','preparation-notes');
           move('subtitle-scroll','recording-stage');

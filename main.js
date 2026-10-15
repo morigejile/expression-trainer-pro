@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog, ipcMain, Menu, screen, shell, utilityProcess } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, screen, shell, utilityProcess } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -352,9 +352,16 @@ function armTrainingCloseTimer(window) {
   }, 10000);
 }
 
+let cachedApplicationIcon;
+function applicationIcon() {
+  // Reading through fs also works when the renderer assets are inside ASAR.
+  return cachedApplicationIcon ||= nativeImage.createFromBuffer(fs.readFileSync(path.join(__dirname, 'src/assets/app-icon.png')));
+}
+
 function createMainWindow() {
   const initialSize = calculateInitialWindowSize(screen.getPrimaryDisplay().workAreaSize);
   mainWindow = new BrowserWindow({
+    icon: applicationIcon(),
     width: initialSize.width,
     height: initialSize.height,
     minWidth: 960,
@@ -414,6 +421,7 @@ function createPromptEditorWindow() {
   }
 
   promptEditorWindow = new BrowserWindow({
+    icon: applicationIcon(),
     width: 720,
     height: 700,
     resizable: true,
@@ -454,6 +462,7 @@ function createSettingsWindow() {
   }
 
   settingsWindow = new BrowserWindow({
+    icon: applicationIcon(),
     width: 600,
     height: 500,
     resizable: false,

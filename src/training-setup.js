@@ -13,6 +13,7 @@
     const view = document.defaultView;
     const settings = byId('training-settings'), anchor = byId('training-settings-anchor'), capsules = byId('training-capsules');
     const picker = byId('training-picker'), title = byId('training-picker-title'), hint = byId('training-picker-hint'), content = byId('training-picker-content');
+    const pickerActions = byId('training-picker-actions');
     const label = byId('training-context-label'), status = byId('training-context-status'), focus = byId('training-practice-focus');
     const buttons = {framework:byId('training-framework'),topic:byId('training-topic'),scenario:byId('training-scenario')};
     const names = {framework:'表达框架',topic:'主题',scenario:'场景'};
@@ -94,11 +95,12 @@
       title.textContent = option.label;
       hint.textContent = option.purpose || (active === 'framework' ? '不限定表达结构，按自己的方式说。' : names[active]);
       content.replaceChildren();
+      pickerActions.replaceChildren();
       if (option.structure) content.append(node('p',option.structure,'picker-structure'));
       if (option.guidance || option.text) content.append(node('p',option.guidance || option.text,'picker-description'));
       if (option.example) content.append(node('blockquote',option.example,'picker-example'));
       const back = action('← 返回选项',showList); back.dataset.setupBack = '';
-      content.append(back); positionPicker(); title.focus({preventScroll:true});
+      pickerActions.append(back); positionPicker(); title.focus({preventScroll:true});
     }
     function showCustom() {
       pickerView = 'custom';
@@ -107,6 +109,7 @@
       title.textContent = `自定义${names[kind]}`;
       hint.textContent = kind === 'topic' ? '这次想讲什么？' : '向谁、在什么情况下表达？';
       content.replaceChildren();
+      pickerActions.replaceChildren();
       const input = node('textarea'); input.id = 'training-custom-text'; input.rows = 4; input.maxLength = MAX_PROMPT_LENGTH;
       input.value = custom.original?.text || ''; input.setAttribute('aria-label',`自定义${names[kind]}`);
       const done = action('完成',() => closePicker(),'picker-action picker-primary'); done.dataset.setupDone = '';
@@ -120,7 +123,8 @@
         setPart(kind,custom.original); invalidCustom = false; closePicker();
       }); cancel.dataset.setupCancel = '';
       const actions = node('div',null,'picker-actions'); actions.append(cancel,done);
-      content.append(input,node('p',`留空则不设置${names[kind]}。`,'training-picker-hint'),actions);
+      content.append(input,node('p',`留空则不设置${names[kind]}。`,'training-picker-hint'));
+      pickerActions.append(actions);
       positionPicker(); input.focus({preventScroll:true});
     }
     function showList() {
@@ -129,6 +133,7 @@
       title.textContent = names[active];
       hint.textContent = active === 'framework' ? '按名字选择，点问号了解框架。' : active === 'topic' ? '这次讲什么？可以不设置。' : '向谁、在什么情况下表达？可以不设置。';
       content.replaceChildren();
+      pickerActions.replaceChildren();
       const options = active === 'framework' ? [{id:'free',label:'自由表达'},...['prep','star','pyramid'].map(id => getFramework(id))]
         : [{id:'none',label:`不设${names[active]}`},...getPromptOptions(active)];
       const selected = active === 'framework' ? draft.framework || 'free' : getPromptParts(draft.trainingPrompt)[active];

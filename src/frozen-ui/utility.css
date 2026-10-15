@@ -28,9 +28,10 @@
 #utility[data-surface="settings"] .activation-line{display:flex;justify-content:space-between;align-items:flex-start;gap:26px}
 #utility[data-surface="settings"] .activation-line p{font-size:12px;color:var(--muted);line-height:1.9;margin-top:9px}
 #utility[data-surface="settings"] .current-config{font-size:11px;color:var(--muted);margin:12px 0 0;line-height:1.8;overflow-wrap:anywhere}
-#utility[data-surface="settings"] .ai-switch{position:relative;overflow:hidden;flex:0 0 42px;width:42px;height:24px;min-height:24px;min-width:42px;padding:0;border:1px solid #b8b1a45e;border-radius:4px;background:#d7d1c6;margin-top:1px;transition:background-color .18s,border-color .18s}
-#utility[data-surface="settings"] .ai-switch span{position:absolute;left:0;top:0;width:calc(100% - 18px);height:100%;background:#fcfaf4;border-radius:3px;box-shadow:none;transition:transform .18s}
-#utility[data-surface="settings"] .ai-switch[aria-checked="true"]{background:#8d7958;border-color:#8d7958}
+#utility[data-surface="settings"] #ai-toggle.ai-switch{position:relative;overflow:hidden;flex:0 0 44px;width:44px;height:32px;min-height:32px;min-width:44px;padding:0;border:0;border-radius:9px;background:transparent;margin-top:1px}
+#utility[data-surface="settings"] #ai-toggle.ai-switch::before{content:'';position:absolute;left:4px;top:7px;width:36px;height:18px;border-radius:9px;background:#d7d1c6;transition:background-color .18s}
+#utility[data-surface="settings"] .ai-switch span{position:absolute;left:6px;top:9px;width:14px;height:14px;background:#fcfaf4;border-radius:50%;box-shadow:none;transition:transform .18s}
+#utility[data-surface="settings"] #ai-toggle.ai-switch[aria-checked="true"]::before{background:#8d7958}
 #utility[data-surface="settings"] .ai-switch[aria-checked="true"] span{transform:translateX(18px)}
 #utility[data-surface="settings"] .config-list{border-top:1px solid var(--line);padding-top:24px;margin-top:28px}
 #utility[data-surface="settings"] .config-row{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:20px;min-height:82px;padding:16px 0}
@@ -90,7 +91,7 @@
 #utility[data-surface="settings"] #unsaved button{font-size:11px;padding:5px 10px;min-height:32px}
 @media(max-width:850px){#utility[data-surface="settings"] .config-actions{grid-template-columns:58px 40px 28px;gap:4px}#utility[data-surface="settings"] .config-row{gap:10px}#utility[data-surface="settings"] .settings-form{grid-template-columns:1fr}}
 @media(max-width:560px){#utility[data-surface="settings"] #utility-kind{font-size:16px}#utility[data-surface="settings"] .config-row{grid-template-columns:1fr;padding:16px 0;gap:7px}#utility[data-surface="settings"] .config-actions{justify-self:end}#utility[data-surface="settings"] .settings-section-head{gap:10px}#utility[data-surface="settings"] .sidebar nav button{font-size:11px;padding:6px 9px;min-height:30px}#utility[data-surface="settings"] .settings-section-head h2{font-size:15px}#utility[data-surface="settings"] .editor-actions>span{flex-basis:100%}#utility[data-surface="settings"] .activation-line{gap:16px}#utility[data-surface="settings"] .speech-model-top{gap:10px}}
-@media(prefers-reduced-motion:reduce){#utility[data-surface="settings"] .ai-switch,#utility[data-surface="settings"] .ai-switch span{transition:none}}
+@media(prefers-reduced-motion:reduce){#utility[data-surface="settings"] .ai-switch,#utility[data-surface="settings"] .ai-switch::before,#utility[data-surface="settings"] .ai-switch span{transition:none}}
 
 /* Shared reading patterns for settings and help. */
 #utility[data-surface="help"] .content-scroll{padding-top:30px;padding-bottom:36px}

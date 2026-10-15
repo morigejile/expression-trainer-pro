@@ -74,7 +74,7 @@ ASR 产品层以 `models/registry.json` 作为唯一 schema-v2 Catalog，不依�
 
 ### 3.3 Packaging、安装与升级
 
-`forge.config.js` 是唯一打包配置，当前只构建 Windows x64 Squirrel；native Sherpa bundle 保持 ASAR unpack，模型位于 `appData/expression-trainer-pro-models`。内部制品已验证安装、真实模型首次准备、强制离线二次启动、1.0.0→1.0.1 前向升级和卸载数据保留，终端用户无需开发工具。
+`forge.config.js` 是唯一打包配置，当前只构建 Windows x64 Squirrel；native Sherpa bundle 保持 ASAR unpack，模型位于 `appData/expression-trainer-pro-models`。内部制品已验证安装、真实模型首次准备、强制离线二次启动、1.0.0→1.0.1 前向升级和卸载数据保留，终端用户无需开发工具。系统图标由 `src/assets/brand-mark.svg` 派生为 `app-icon.png / .ico`，通过 Main 的窗口图标、Packager 的可执行文件图标和 Squirrel 的 `setupIcon` 接入；本次图标接线不改变应用身份或数据路径，安装版与快捷方式图标尚未重新验证。
 
 受支持更新路径是向前安装。手工运行旧完整 Setup 可能降级应用二进制，并可能用旧 schema 覆盖共享用户文件；重新运行当前 Setup 只能恢复应用版本，不能恢复已被覆盖的数据。该已知边界保留在支持文档，不为内部阶段增加 updater 框架。
 
@@ -538,7 +538,7 @@ MB4 复用固定快照的填充词命中次数和每录音分钟频率，不新�
 
 [Frozen Utility](../../src/frozen-utility.js) 仅管理界面草稿，持久化仍使用既有 LLM profile、custom-prompt 和模型管理 API。AI 新建、复制、删除、当前选择、自动开关及编辑保存读取真实存储；连接测试绑定当前编辑配置，不保存或触发训练分析。身份变更后的自动撤销以 Main 保存结果为准，再读取实际状态；失败保留草稿。分析偏好将冻结标签映射至已有 `goals / styleRef / customRules / customWords`，不新增配置文件、不修改训练主题/场景/目标或旧结果。I2 的告知文件与请求门禁保持独立，查看/编辑设置和连接测试不代替告知。
 
-[Utility Content](../../src/utility-content.js) 读取实际 Catalog / 模型管理 DTO，分开显示持久选择与生效模型，按真实 action 接入安装、取消、重试、重新安装和切换。只有可信下载阶段与完整分母显示百分比，未知总量和校验阶段显示等待；没有初始化麦克风或移植模拟安装。FAQ 分组及全条目搜索在本地完成；帮助与隐私说明同步当前保存、删除、AI 告知和恢复事实，不承诺 MB3 重新转写。诊断只在问题与反馈导出，调用既有脱敏快照和保存能力；反馈仍由用户主动打开白名单文档，不自动提交。
+[Utility Content](../../src/utility-content.js) 读取实际 Catalog / 模型管理 DTO，分开显示持久选择与生效模型，按真实 action 接入安装、取消、重试、重新安装和切换。只有可信下载阶段与完整分母显示百分比，未知总量和校验阶段显示等待；没有初始化麦克风或移植模拟安装。FAQ 分组及搜索在本地完成，快速开始直接显示步骤与 FAQ、忽略搜索词；帮助与隐私说明同步当前保存、删除、AI 告知和恢复事实，不承诺 MB3 重新转写。诊断只在问题与反馈导出，调用既有脱敏快照和保存能力；反馈仍由用户主动打开白名单文档，不自动提交。
 
 [Trusted Utility IPC](../../lib/trusted-utility-ipc.js) 将必要完整配置、偏好、连接测试、模型、版本、诊断与反馈入口限定为当前主窗口、主 frame、精确主文档 URL。字段、类型、数量和长度有界，非法窗口/子 frame/文档和参数拒绝，失败不透传密钥、私有地址或原始错误。模型广播同时到主窗口，下载、校验、缓存、ASR 与存储机制未重写。Utility 关闭及替换时保护未保存修改，原生 Dialog 承担可见控件的 Tab 遍历；Escape 仍走草稿保护。真正的应用退出先等待明确草稿决定，再沿用既有训练排空与超时保护，决定等待不被误判为渲染器挂起。读取与操作完成按界面代际隔离，不让旧设置读取、模型、诊断导出或反馈响应覆盖新子页。
 

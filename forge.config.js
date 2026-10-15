@@ -53,6 +53,7 @@ function createForgeConfig({environment = process.env, catalog = modelCatalog} =
   }
 
   const packagerConfig = {
+    icon: path.join(__dirname, 'src/assets/app-icon.ico'),
     arch: 'x64',
     executableName: 'ExpressionTrainer',
     asar: {
@@ -73,6 +74,7 @@ function createForgeConfig({environment = process.env, catalog = modelCatalog} =
       platforms: ['win32'],
       config: {
         name: makerName,
+        setupIcon: path.join(__dirname, 'src/assets/app-icon.ico'),
         setupExe: `${makerName}Setup.exe`
       }
     }

@@ -22,7 +22,7 @@ function fixture(response) {
   const controller = createTrainingSetup({api:{getTrainingSetup:() => response},document});
   return {controller,element:id => document.getElementById(id),clickData(key) {
     const find = element => Object.hasOwn(element.dataset,key) ? element : element.children.map(find).find(Boolean);
-    find(document.getElementById('training-picker-content')).listeners.click();
+    (find(document.getElementById('training-picker-content')) || find(document.getElementById('training-picker-actions'))).listeners.click();
   }};
 }
 
