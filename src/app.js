@@ -78,6 +78,7 @@ const FrozenReport = typeof module !== 'undefined' && module.exports ? require('
 const ReportViewState = typeof module !== 'undefined' && module.exports ? require('./report-view-state') : window.ReportViewState;
 const AiDisclosure = typeof module !== 'undefined' && module.exports ? require('./ai-disclosure') : window.AiDisclosure;
 const {checkMicrophoneReadiness} = typeof module !== 'undefined' && module.exports ? require('./microphone-readiness') : window.MicrophoneReadiness;
+const ReportPlayback = typeof module !== 'undefined' && module.exports ? require('./report-playback') : window.ReportPlayback;
 
 class ExpressionTrainer {
   constructor({ audioCaptureFactory = createAudioCapture } = {}) {
@@ -130,6 +131,8 @@ class ExpressionTrainer {
     this.microphoneState = 'checking';
     this.historyOffset = 0;
     this.initElements();
+    this.reportPlayback=ReportPlayback.createReportPlayback({document,audio:this.audioPlayer,
+      renderText:renderHighlightedText,onSelect:id=>this.selectPlaybackSegment(id)});
     this.flowView = typeof document.createComment === 'function' && window.FrozenFlowView
       ? window.FrozenFlowView.createFlowView(document) : null;
     this.utilityMenu = window.UtilityMenu?.createUtilityMenu({document});
@@ -1754,12 +1757,17 @@ class ExpressionTrainer {
     this.setScreen('report');
     if(changedRecord){const region=document.getElementById('report-scroll');if(region)region.scrollTop=0;}
     this.reportBack?.classList.toggle('hidden', !['history','comparison','practice'].includes(source));
-    if (this.reportBack) this.reportBack.textContent = source === 'comparison' ? '← 返回对比' : source === 'practice' ? '← 返回本轮报告' : '← 训练历史';
+    if (this.reportBack) {
+      const text = source === 'comparison' ? '返回对比' : source === 'practice' ? '返回本轮报告' : '返回 history';
+      const label = this.reportBack.querySelector?.('.context-back-label');
+      if (label) label.textContent = text; else this.reportBack.textContent = `← ${text}`;
+    }
     if (!record.structuredReport) this.reportAiStatus && (this.reportAiStatus.textContent = record.reportStatus === 'failed' ? '上次 AI 报告生成失败，可重试；已有结果保留。' : '');
     const structuredAnalysis = record.factsSaved && typeof window.api.analyzeTrainingSession === 'function';
     this.btnReport.disabled = Boolean(record.reportPending) || !record.fullText.trim() ||
       (!structuredAnalysis && record.metricsAvailable === false);
     this.btnReanalyze.disabled = Boolean(record.playbackPending);
+    this.reportPlayback?.updateFeedback(record);
   }
 
   renderRecordStatus(record) {
@@ -2041,6 +2049,7 @@ class ExpressionTrainer {
     this.playbackControls?.classList.remove('hidden');
     if (this.audioPlayer && record.audioUrl && this.audioPlayer.src !== record.audioUrl) this.audioPlayer.src = record.audioUrl;
     if (!record.audioUrl) { this.audioPlayer?.removeAttribute('src'); this.audioPlayer?.load?.(); }
+    this.reportPlayback?.setRecord(record);
     this.fullText = record.fullText;
     this.sentences = record.segments.map(segment => segment.text);
     this.stats = { ...record.stats };
@@ -2076,7 +2085,7 @@ class ExpressionTrainer {
 
   togglePlayback() {
     const record = this.trainingRecords?.selected() ?? null;
-    if (!record || record.id !== this.viewingTrainingRecordId || !record.audioUrl || !this.audioPlayer) return false;
+    if (!record || record.id !== this.viewingTrainingRecordId || !record.audioUrl || !this.audioPlayer || ['missing','corrupt'].includes(record.audioState)) return false;
     if (this.audioPlayer.paused) {
       const playing = this.audioPlayer.play();
       playing?.catch?.(() => this.showUserMessage('录音播放失败，请重试'));
@@ -2099,6 +2108,7 @@ class ExpressionTrainer {
   renderPlaybackSegment(segmentId) {
     const record = this.trainingRecords?.selected() ?? null;
     if (!record || record.id !== this.viewingTrainingRecordId) return;
+    if(this.reportPlayback){this.reportPlayback.setCurrentSegment(segmentId);return;}
     let currentLine = null;
     for (const line of this.subtitleContainer.querySelectorAll('[data-segment-id]')) {
       const isCurrent = line.dataset.segmentId === segmentId;
@@ -2110,6 +2120,7 @@ class ExpressionTrainer {
   }
 
   renderPlaybackAnalysis(record, segmentId) {
+    if(this.reportPlayback&&this.currentScreen==='report'&&this.viewingTrainingRecordId===record.id){this.reportPlayback.updateFeedback(record);return;}
     const analysis = record.playbackAnalysis;
     if (!analysis) {
       this.feedbackStatus.textContent = '尚未生成回放分析';
@@ -2120,6 +2131,18 @@ class ExpressionTrainer {
     this.feedbackStatus.textContent = `回放分析 · ${model}`;
     const item = analysis.items?.find(candidate => candidate.segmentId === segmentId);
     this.feedbackContent.textContent = item?.advice || '该片段暂无特别建议';
+  }
+
+  selectPlaybackSegment(segmentId) {
+    const record=this.trainingRecords?.selected(),segment=record?.segments.find(item=>item.id===segmentId);
+    if(!segment||record.id!==this.viewingTrainingRecordId||this.currentScreen!=='report')return false;
+    this.reportPlayback?.selectSegment(segmentId);
+    if(record.audioUrl&&Number.isFinite(segment.startMs)){
+      const generation=this.playbackSeekGeneration=(this.playbackSeekGeneration||0)+1;
+      const seek=()=>{if(this.currentScreen==='report'&&this.viewingTrainingRecordId===record.id&&this.audioPlayer.src===record.audioUrl&&this.playbackSeekGeneration===generation)this.audioPlayer.currentTime=segment.startMs/1000;};
+      if(this.audioPlayer.readyState>=1)seek();else this.audioPlayer.addEventListener('loadedmetadata',seek,{once:true});
+    }
+    return true;
   }
 
   async loadLlmProfileOptions(summary, {isCurrent = () => true} = {}) {
@@ -2179,11 +2202,13 @@ class ExpressionTrainer {
       if (!response?.success) {
         await restoreSelection();
         this.feedbackStatus.textContent = response?.error || '无法切换分析模型';
+        this.reportPlayback?.showNotice('无法切换分析模型，已恢复原配置；已有反馈保留。');
         return false;
       }
       this.playbackProfileRefreshGeneration = (this.playbackProfileRefreshGeneration ?? 0) + 1;
       this.playbackProfileRefreshPromise = null;
       await this.loadLlmProfileOptions(response.summary);
+      this.reportPlayback?.showNotice('');
       const record = this.trainingRecords?.selected();
       if (record?.id === this.viewingTrainingRecordId) {
         this.renderPlaybackAnalysis(record, this.playbackSegmentId);
@@ -2192,6 +2217,7 @@ class ExpressionTrainer {
     } catch (error) {
       await restoreSelection();
       this.feedbackStatus.textContent = error?.message || '无法切换分析模型';
+      this.reportPlayback?.showNotice('无法切换分析模型，已恢复原配置；已有反馈保留。');
       return false;
     }
   }
@@ -2201,11 +2227,12 @@ class ExpressionTrainer {
   async analyzeRecordingForRecord() {
     const record = this.trainingRecords?.selected();
     if (!record || record.playbackPending) return false;
-    if (!record.segments.length || record.segments.some(s => !Number.isInteger(s.startMs) || !Number.isInteger(s.endMs) || s.endMs <= s.startMs)) {
+    if (!ReportPlayback.hasAnalyzableSegments(record.segments)) {
       this.feedbackStatus.textContent = '没有可分析的有效片段时间，仍可查看逐字稿。'; return false;
     }
     record.playbackPending = true;
     this.btnReanalyze.disabled = true;
+    this.reportPlayback?.updateFeedback(record);
     try {
       let refresh = this.playbackProfileRefreshPromise || this.refreshLlmProfileOptions();
       while (refresh) {
@@ -2218,6 +2245,8 @@ class ExpressionTrainer {
       const profileId = this.playbackProfileSummary?.activeProfileId;
       if (!profileId) { this.showUserMessage('请先配置分析模型',{openSettings:true}); return false; }
       if (!await this.ensureAiDisclosure(record,profileId)) return false;
+      record.playbackRequestModel=this.playbackProfileSummary.profiles.find(profile=>profile.id===profileId)?.model || null;
+      if(this.currentScreen==='report'&&this.viewingTrainingRecordId===record.id)this.reportPlayback?.updateFeedback(record);
       this.feedbackStatus.textContent = '正在分析回放…';
       let response;
       try { response = await window.api.analyzePlayback({profileId,segments:record.segments.map(({id,text,startMs,endMs}) => ({id,text,startMs,endMs}))}); }
@@ -2235,7 +2264,10 @@ class ExpressionTrainer {
         if (!response.success) this.feedbackStatus.textContent = '回放分析失败，可重试；已有分析保留。';
       }
       return response.success;
-    } finally { record.playbackPending = false; if (this.viewingTrainingRecordId === record.id) this.btnReanalyze.disabled = false; }
+    } finally {
+      record.playbackPending=false;record.playbackRequestModel=null;
+      if(this.viewingTrainingRecordId===record.id){this.btnReanalyze.disabled=false;if(this.currentScreen==='report')this.reportPlayback?.updateFeedback(record);}
+    }
   }
 
   handleGlobalKeydown(event) {

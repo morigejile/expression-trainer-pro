@@ -83,12 +83,14 @@
       </div>
 
       <section id="history-screen" class="history-study session-view session-report report" aria-labelledby="history-title">
-        <header class="report-header session-heading"><div><h1 id="history-title" tabindex="-1">训练历史</h1><p id="history-count">正在读取记录</p></div></header>
-        <p id="history-status" class="screen-status" role="status" aria-live="polite"></p>
-        <div class="history-compare-toolbar history-select">
+        <header class="report-header session-heading history-heading"><div class="history-heading-layout">
+          <h1 id="history-title" tabindex="-1">训练历史</h1><p id="history-count">正在读取记录</p>
+          <div class="history-compare-toolbar history-select">
           <span id="history-selection-status" role="status" aria-live="polite">已选 0 条</span>
           <div class="history-selection-actions"><button id="btn-history-delete-selected" class="outline-button" type="button" disabled>删除选中记录</button><button id="btn-history-compare" class="outline-button" type="button" disabled>对比所选记录</button></div>
-        </div>
+          </div>
+        </div></header>
+        <p id="history-status" class="screen-status" role="status" aria-live="polite"></p>
         <div id="history-scroll" class="workspace-scroll" tabindex="0" role="region" aria-label="训练历史列表">
         <div id="history-list" class="study-history-list"></div>
         <section id="history-empty" class="simple-prepare" hidden><h2>暂无记录</h2><button id="btn-history-start" class="outline-button" type="button">开始表达</button></section>
@@ -149,7 +151,7 @@
         <section class="session-stage"><section class="summary-panel"><div id="report-summary-copy" class="summary-copy"></div><div id="report-summary-metrics" class="metrics"></div></section></section>
         <section id="frozen-findings" class="findings-section"></section>
         <section class="study-materials">
-          <details id="report-materials" class="report-disclosure"><summary>原文与录音</summary><div><div id="report-transcript"></div><div id="report-audio"></div><div id="report-playback-analysis"></div></div></details>
+          <details id="report-materials" class="report-disclosure"><summary>原文与录音</summary><div><div id="report-audio"></div><div id="report-transcript"><div id="playback-segments"></div><div id="playback-inline-feedback" class="playback-inline-feedback" hidden></div></div></div></details>
           <details id="report-information" class="report-disclosure"><summary>指标与分析信息</summary><div><div id="report-analysis-info"></div><div id="report-local-statistics"></div></div></details>
         </section>
         <div id="report-persistence-state" class="report-footer"></div>
@@ -178,7 +180,7 @@
       </div>
 
       <header id="report-header" class="report-header">
-        <button id="btn-report-back" class="btn-support btn-support-secondary hidden" type="button">← 训练历史</button>
+        <button id="btn-report-back" class="btn-support btn-support-secondary hidden" type="button"><span class="context-back-arrow" aria-hidden="true">← </span><span class="context-back-label">返回 history</span></button>
         <h1>这一次表达。</h1>
         <p id="record-identity" class="record-identity"></p>
         <div id="record-save-state" class="record-save-state">
@@ -196,9 +198,16 @@
 
       <div id="playback-controls" class="playback-controls hidden">
         <audio id="recording-player" controls preload="metadata"></audio>
-        <label for="playback-model">分析模型</label>
-        <select id="playback-model"></select>
-        <button id="btn-reanalyze" type="button">分析回放</button>
+        <div id="playback-player" class="playback-player" hidden>
+          <button id="playback-toggle" class="playback-toggle" type="button" aria-label="播放录音"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="media-play" d="m9 5 10 7-10 7Z"/><path class="media-pause" d="M8 5v14M16 5v14"/></svg></button>
+          <span class="playback-time"><span id="playback-current-time">00:00</span><span aria-hidden="true"> / </span><span id="playback-duration">—</span></span>
+          <input id="playback-seek" class="playback-seek" type="range" min="0" max="1" step="0.1" value="0" aria-label="回放进度">
+          <div class="playback-sound"><button id="playback-mute" type="button" aria-label="静音" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m11 5-5 4H3v6h3l5 4Z M15 8q5 4 0 8 M18 5q8 7 0 14"/></svg></button><input id="playback-volume" type="range" min="0" max="1" step="0.05" value="1" aria-label="音量"></div>
+          <select id="playback-speed" aria-label="播放速度"><option value="0.25">0.25×</option><option value="0.5">0.5×</option><option value="0.75">0.75×</option><option value="1" selected>1×</option><option value="1.25">1.25×</option><option value="1.5">1.5×</option><option value="1.75">1.75×</option><option value="2">2×</option></select>
+        </div>
+        <p id="playback-audio-status" class="playback-note" role="status"></p>
+        <div class="playback-analysis-toolbar"><div class="playback-feedback-heading"><h3>逐段反馈</h3><span id="playback-feedback-status" role="status" aria-live="polite"></span></div><div class="playback-analysis-actions"><label for="playback-model">模型</label><select id="playback-model"></select><button id="btn-reanalyze" type="button">生成反馈</button></div></div>
+        <p id="playback-result-source" class="playback-note"></p><p id="playback-analysis-note" class="playback-note"></p><p id="playback-notice" class="playback-note" role="status"></p>
       </div>
 
       <div id="start-control-area" class="start-control-area">
@@ -380,6 +389,7 @@
   <script src="utility-content.js"></script>
   <script src="frozen-utility.js"></script>
   <script src="utility-menu.js"></script>
+  <script src="report-playback.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

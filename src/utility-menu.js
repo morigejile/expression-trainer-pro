@@ -22,5 +22,24 @@
     }
     return {close};
   }
-  return {createUtilityMenu};
+  function createConfigMenus({document,root}) {
+    const menus=()=>Array.from(root.querySelectorAll('.config-more'));
+    const owner=target=>{const menu=target?.closest?.('.config-more');return menu&&root.contains(menu)?menu:null;};
+    function close(except=null){for(const menu of menus())if(menu!==except)menu.open=false;}
+    document.addEventListener('click',event=>{
+      const menu=owner(event.target);
+      close(menu);
+      if(menu&&event.target.closest('button'))menu.open=false;
+    },true);
+    root.addEventListener('toggle',event=>{const menu=owner(event.target);if(menu?.open)close(menu);},true);
+    root.addEventListener('focusout',event=>{const menu=owner(event.target);if(menu&&!menu.contains(event.relatedTarget))menu.open=false;});
+    root.addEventListener('keydown',event=>{
+      if(event.key!=='Escape'||event.defaultPrevented)return;
+      const menu=menus().find(item=>item.open);if(!menu)return;
+      event.preventDefault();event.stopPropagation();menu.open=false;
+      menu.querySelector('summary')?.focus({preventScroll:true});
+    },true);
+    return {close:()=>close()};
+  }
+  return {createUtilityMenu,createConfigMenus};
 });

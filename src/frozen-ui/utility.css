@@ -94,6 +94,7 @@
 @media(prefers-reduced-motion:reduce){#utility[data-surface="settings"] .ai-switch,#utility[data-surface="settings"] .ai-switch::before,#utility[data-surface="settings"] .ai-switch span{transition:none}}
 
 /* Shared reading patterns for settings and help. */
+#utility[data-surface="help"] .faq+.diagnostic{border-top:0}
 #utility[data-surface="help"] .content-scroll{padding-top:30px;padding-bottom:36px}
 #utility .help-section-title{font-size:16px;font-weight:350;line-height:1.6;margin:28px 0 6px}
 #utility .help-links{display:flex;flex-wrap:wrap;gap:8px 28px;margin:14px 0 0}
@@ -156,6 +157,16 @@
 #utility[data-surface] .faq[open]{padding-bottom:17px}
 #utility[data-surface] :is(.faq,.preference-more)>summary{min-height:32px}
 #utility[data-surface="settings"] .preference-more>summary{padding-top:6px;padding-bottom:6px}
+#utility[data-surface="help"] :is(.quick-start-faq,.feedback-faq){padding:16px 0}
+#utility[data-surface="help"] :is(.quick-start-faq,.feedback-faq) h3{margin:0 0 7px;font-size:13px;font-weight:400;line-height:1.8;color:var(--ink)}
+#utility[data-surface="help"] :is(.quick-start-faq,.feedback-faq) p{font-size:12px;color:var(--muted)}
+#utility[data-surface="help"] .feedback-faq:first-child{padding-top:0}
+#utility #content.content-scroll{scrollbar-gutter:stable;scrollbar-width:auto;scrollbar-color:auto}
+#utility #content.content-scroll::-webkit-scrollbar{width:8px;height:8px}
+#utility #content.content-scroll::-webkit-scrollbar-track,#utility #content.content-scroll::-webkit-scrollbar-corner{background:transparent}
+#utility #content.content-scroll::-webkit-scrollbar-thumb{background:#a89e8bb3;border-radius:4px}
+#utility #content.content-scroll::-webkit-scrollbar-thumb:hover{background:#918572}
+#utility #content.content-scroll::-webkit-scrollbar-button{display:none;width:0;height:0}
 
 @media(max-width:650px){
   #utility[data-surface="settings"] .activation-line{display:grid;grid-template-columns:minmax(0,1fr) 42px;gap:0 16px}

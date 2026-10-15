@@ -53,11 +53,11 @@
           move('training-status',state === 'processing' ? 'processing-status-detail' : 'preparation-notes');
           move('btn-leave-processing','processing-actions');move('btn-cancel-processing','processing-actions');
         } else if (frozen) {
-          move('subtitle-scroll','report-transcript');move('playback-controls','report-audio');
+          move('playback-controls','report-audio');
           move('report-header','frozen-report-heading');move('report-ai-section','frozen-findings');
           move('btn-report-back','frozen-report-context');move('record-save-state','report-persistence-state');
           move('report-analysis-actions','report-summary-copy');
-          move('panel-left','report-local-statistics');move('panel-right','report-playback-analysis');
+          move('panel-left','report-local-statistics');
         }
         layoutKey=key;
       }

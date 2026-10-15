@@ -1,7 +1,7 @@
 'use strict';
 const test=require('node:test');
 const assert=require('node:assert/strict');
-const {createUtilityMenu}=require('../src/utility-menu');
+const {createUtilityMenu,createConfigMenus}=require('../src/utility-menu');
 
 function fixture() {
   const listeners=new Map(),menuListeners=new Map();let focusCalls=0;
@@ -37,4 +37,28 @@ test('Escape closes an open menu and returns focus to the three dots',()=>{
 });
 test('programmatic navigation closes without redirecting page focus',()=>{
   const f=fixture();f.controller.close();assert.equal(f.menu.open,false);assert.equal(f.focusCalls,0);
+});
+
+function configFixture(){
+  const docEvents={},rootEvents={},document={addEventListener(type,fn){docEvents[type]=fn;}};
+  const menus=Array.from({length:2},()=>{
+    const menu={open:false,contains(node){return [menu,menu.summary,menu.item].includes(node);},querySelector(){return menu.summary;}};
+    menu.closest=selector=>selector==='.config-more'?menu:null;
+    menu.summary={closest:selector=>selector==='.config-more'?menu:null,focus(){document.activeElement=this;}};
+    menu.item={closest:selector=>selector==='.config-more'?menu:selector==='button'?menu.item:null};return menu;
+  });
+  const outside={closest(){return null;}},root={querySelectorAll(){return menus;},contains(node){return menus.some(menu=>menu.contains(node));},addEventListener(type,fn){rootEvents[type]=fn;}};
+  const controller=createConfigMenus({document,root});
+  return {menus,document,controller,outside,click(target){docEvents.click({target});},focusout(target,relatedTarget){rootEvents.focusout({target,relatedTarget});},escape(){const e={key:'Escape',preventDefault(){this.prevented=true;},stopPropagation(){this.stopped=true;}};rootEvents.keydown(e);return e;}};
+}
+test('configuration menus close outside and before actions while retaining native summary toggling',()=>{
+  const f=configFixture(),[a,b]=f.menus;a.open=true;f.click(a.summary);assert.equal(a.open,true);
+  f.click(b.summary);assert.equal(a.open,false);b.open=true;f.click(b.item);assert.equal(b.open,false);
+  a.open=true;f.document.activeElement=f.outside;f.click(f.outside);assert.equal(a.open,false);assert.equal(f.document.activeElement,f.outside);
+});
+test('configuration menu focus stays within its group; Escape consumes only the menu and restores its trigger',()=>{
+  const f=configFixture(),[a]=f.menus;a.open=true;f.focusout(a.summary,a.item);assert.equal(a.open,true);
+  const e=f.escape();assert.equal(a.open,false);assert.equal(f.document.activeElement,a.summary);assert.ok(e.prevented&&e.stopped);
+  assert.equal(f.escape().prevented,undefined);a.open=true;f.focusout(a.item,f.outside);assert.equal(a.open,false);
+  a.open=true;f.controller.close();assert.equal(a.open,false);
 });

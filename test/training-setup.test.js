@@ -10,7 +10,8 @@ function fixture(response) {
     setAttribute(name,value){this[name]=value;},addEventListener(name,handler){this.listeners[name]=handler;},
     matches(selector){return selector === ':popover-open' && Boolean(this.open);},contains(){return false;},
     append(...nodes){this.children.push(...nodes);},replaceChildren(...nodes){this.children=nodes;},
-    focus(){},showPopover(){this.open=true;},hidePopover(){this.open=false;},
+    focus(){document.activeElement=this;},showPopover(){this.open=true;},hidePopover(){this.open=false;},
+    querySelector(selector){const match=selector.match(/\[data-setup-help="([^"]+)"\]/);const find=node=>node.dataset.setupHelp===match?.[1]?node:node.children.map(find).find(Boolean);return match?this.children.map(find).find(Boolean)||null:null;},
     getBoundingClientRect(){return {left:100,top:100,bottom:136,width:200,height:250};}});
   const document = {defaultView:{innerWidth:960,innerHeight:640,addEventListener(){}},addEventListener(){},
     createElement(){const value=make();created.push(value);return value;},getElementById(id) {
@@ -20,11 +21,62 @@ function fixture(response) {
     return elements.get(id);
   }};
   const controller = createTrainingSetup({api:{getTrainingSetup:() => response},document});
-  return {controller,element:id => document.getElementById(id),clickData(key) {
-    const find = element => Object.hasOwn(element.dataset,key) ? element : element.children.map(find).find(Boolean);
-    (find(document.getElementById('training-picker-content')) || find(document.getElementById('training-picker-actions'))).listeners.click();
-  }};
+  const findData=(key,value)=>{const find=element=>Object.hasOwn(element.dataset,key)&&(value===undefined||element.dataset[key]===value)?element:element.children.map(find).find(Boolean);return find(document.getElementById('training-picker-content'))||find(document.getElementById('training-picker-actions'));};
+  return {controller,document,element:id=>document.getElementById(id),findData,clickData(key,value){findData(key,value).listeners.click();}};
 }
+
+test('framework help uses display-only copy and closes one level with question focus and scroll restored', async () => {
+  const initial={trainingMode:'structured',framework:'star',frameworkDefinitionVersion:'star-v1',trainingPrompt:null};
+  const f=fixture(Promise.resolve({ok:true,value:initial}));await f.controller.ready;
+  f.element('training-framework').listeners.click();f.element('training-picker-content').scrollTop=52;
+  f.clickData('setupHelp','prep');
+  assert.equal(f.element('training-picker-title').textContent,'PREP');
+  assert.equal(f.element('training-picker-hint').hidden,false);
+  assert.match(f.element('training-picker-hint').textContent,/适合表达观点、判断或建议/);
+  assert.equal(f.element('training-picker-close')['aria-label'],'返回框架选择列表');
+  assert.equal(f.findData('setupBack'),undefined);
+  const copy=f.element('training-picker-content').children.map(node=>node.textContent).join('\n');
+  assert.match(copy,/先说观点，再解释理由、举例支持/);
+  const example=f.element('training-picker-content').children.find(node=>node.className==='picker-example');
+  assert.equal(example.children.length,4);
+  assert.match(example.children[0].textContent,/观点：我建议每周安排一天不开会/);
+  assert.match(example.children[3].textContent,/收束：可以先试行一个月/);
+  assert.doesNotMatch(copy,/无需逐项填写|接口|监控/);
+  assert.deepEqual(f.controller.snapshot(),initial);
+  f.element('training-picker-close').listeners.click();
+  assert.equal(f.element('training-picker').open,true);
+  assert.equal(f.document.activeElement,f.findData('setupHelp','prep'));
+  assert.equal(f.element('training-picker-content').scrollTop,52);
+  assert.equal(f.findData('setupSelect','star')['aria-pressed'],'true');
+  assert.equal(f.element('training-picker-hint').textContent,'选择这次表达的组织方式，点问号查看说明。');
+  f.clickData('setupHelp','free');
+  let prevented=false,stopped=false;
+  f.element('training-picker').listeners.keydown({key:'Escape',preventDefault(){prevented=true;},stopPropagation(){stopped=true;}});
+  assert.ok(prevented&&stopped);assert.equal(f.element('training-picker').open,true);
+  assert.equal(f.document.activeElement,f.findData('setupHelp','free'));
+  f.element('training-picker-close').listeners.click();assert.equal(f.element('training-picker').open,false);
+  assert.equal(f.document.activeElement,f.element('training-framework'));assert.deepEqual(f.controller.snapshot(),initial);
+});
+
+test('topic and scenario help close one level with selection, question focus and list scroll restored', async () => {
+  const f=fixture(Promise.resolve({ok:true,value:context(null)}));await f.controller.ready;
+  for(const kind of ['topic','scenario']){
+    f.element('training-'+kind).listeners.click();f.element('training-picker-content').scrollTop=37;
+    const id=f.findData('setupHelp').dataset.setupHelp;f.clickData('setupHelp',id);
+    assert.equal(f.findData('setupBack'),undefined);
+    assert.equal(f.element('training-picker-close')['aria-label'],`返回${kind==='topic'?'主题':'场景'}选择列表`);
+    f.element('training-picker-close').listeners.click();assert.equal(f.element('training-picker').open,true);
+    assert.equal(f.element('training-picker-content').scrollTop,37);
+    assert.equal(f.document.activeElement,f.findData('setupHelp',id));
+    assert.equal(f.findData('setupSelect','none')['aria-pressed'],'true');
+    f.clickData('setupHelp',id);
+    f.element('training-picker').listeners.keydown({key:'Escape',preventDefault(){},stopPropagation(){}});
+    assert.equal(f.element('training-picker').open,true);
+    assert.equal(f.document.activeElement,f.findData('setupHelp',id));
+    f.element('training-picker-close').listeners.click();assert.equal(f.element('training-picker').open,false);
+    assert.equal(f.document.activeElement,f.element('training-'+kind));
+  }
+});
 
 test('late restoration refreshes untouched custom editor and cancel preserves both saved choices', async () => {
   let resolve;

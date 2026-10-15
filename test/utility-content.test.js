@@ -81,6 +81,25 @@ test('quick-start has no search field and ignores stale searches without hiding 
   }
 });
 
+test('quick-start describes optional AI and renders two full answers without disclosure controls', () => {
+  const fixture=view(),settings=[];
+  help(fixture,'start',{onSettings:page=>settings.push(page)});
+  const text=fixture.parent.textContent;
+  assert.match(text,/开始一次表达.*点击首页的 start/);assert.match(text,/倒计时后开始/);
+  assert.match(text,/查看本次记录.*转写、录音和本地统计/);
+  assert.match(text,/配置 AI 后.*自动分析.*报告中手动分析/);
+  assert.match(text,/回看，或继续练习.*history.*报告提供具体建议时/);
+  assert.match(text,/录音、转写、回放.*本地统计和历史/);
+  assert.match(text,/保存不依赖 AI 分析成功/);
+  assert.match(text,/实时字幕取决于.*语音识别模型.*流式.*结束后转写/);
+  assert.equal(fixture.parent.querySelectorAll('.quick-start-faq').length,2);
+  assert.equal(fixture.parent.querySelectorAll('details').length,0);
+  assert.equal(fixture.parent.querySelectorAll('summary').length,0);
+  click(fixture.parent.querySelector('[data-setting="speech"]'));assert.deepEqual(settings,['speech']);
+  help(fixture,'report');assert.ok(fixture.parent.querySelectorAll('details').length>0);
+  assert.equal(fixture.parent.querySelectorAll('.quick-start-faq').length,0);
+});
+
 test('other Help sections retain local FAQ search and clearing restores their own content', () => {
   const fixture = view(); const actions = [];
   const result = help(fixture, 'report', {onHelp: page => actions.push(page)});
@@ -139,6 +158,20 @@ test('feedback and export invoke only the explicit Help actions and render app i
   assert.equal(fixture.parent.querySelectorAll('[data-export]').length, 0);
   assert.equal(fixture.parent.querySelectorAll('[data-feedback]').length, 0);
   assert.equal(fixture.parent.querySelectorAll('.help-facts').length, 1);
+});
+
+test('feedback shows all three original answers without disclosures and search clears back to the full page',()=>{
+  const fixture=view(),actions=[];
+  const result=help(fixture,'feedback',{onSettings:page=>actions.push(page),appInfo:{version:'1.0.1'}});
+  assert.doesNotMatch(fixture.parent.textContent,/找到遇到的问题，按提示检查/);
+  assert.equal(fixture.parent.querySelectorAll('details').length,0);assert.equal(fixture.parent.querySelectorAll('summary').length,0);
+  assert.equal(fixture.parent.querySelectorAll('.feedback-faq').length,3);
+  assert.match(fixture.parent.textContent,/系统默认输入设备/);assert.match(fixture.parent.textContent,/之前可用的模型仍会保留/);
+  assert.match(fixture.parent.textContent,/测试成功后仍需保存配置/);assert.match(fixture.parent.textContent,/1\.0\.1/);
+  result.search('模型下载失败');assert.match(fixture.parent.textContent,/模型下载失败/);assert.equal(fixture.parent.querySelectorAll('details').length,0);
+  click(fixture.parent.querySelector('[data-setting="speech"]'));assert.deepEqual(actions,['speech']);
+  result.search('');assert.equal(fixture.parent.querySelectorAll('.feedback-faq').length,3);assert.ok(fixture.parent.querySelector('[data-export]'));
+  help(fixture,'privacy');assert.ok(fixture.parent.querySelectorAll('details').length>0);
 });
 
 test('speech uses the actual Catalog DTO, distinguishes utterance mode and dispatches its exact model action', async () => {

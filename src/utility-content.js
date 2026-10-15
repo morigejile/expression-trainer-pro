@@ -9,8 +9,8 @@
     {title: '怎样比较两次训练？', group: 'report', answer: '在训练历史中勾选两条记录，点击对比。较早的一次作为基线。对比读取已有结果，不会重新调用 AI。'},
     {title: '针对性练习后，先看哪里？', group: 'report', answer: '先看顶部的本轮目标反馈，再展开上一轮与本轮的证据。完整报告和其他建议仍可继续查看。'},
     {title: '第一次怎么开始练习？', group: 'start', searchOnly: true, answer: '在准备页点击开始，主题、场景和框架都可选。首次录音先阅读数据说明，确认后再授权麦克风。录音中可以暂停、继续或结束。'},
-    {title: '没有配置 AI，还能使用吗？', group: 'start', answer: '可以录音、转写，查看本地统计和训练历史。AI 分析需要有效配置；训练保存不依赖 AI 分析成功。'},
-    {title: '为什么录音时没有字幕？', group: 'start', answer: 'SenseVoice 在录音结束后转写，不提供实时字幕。需要边说边看字幕时，可在语音识别设置中选择流式模型。', action: 'speech'},
+    {title: '没有配置 AI，还能使用吗？', group: 'start', answer: '可以录音、转写、回放，查看本地统计和历史。AI 分析需要有效配置；保存不依赖 AI 分析成功。'},
+    {title: '为什么录音时没有字幕？', group: 'start', answer: '是否提供实时字幕取决于当前语音识别模型：流式识别模型会在录音中显示字幕，结束后转写模型会在录音结束后生成转写。可在语音识别设置中查看当前模型并按需选择。', action: 'speech'},
     {title: '主题、框架和练习目标有什么区别？', group: 'report', answer: '主题是讲什么，场景是对谁、在什么情境下讲，框架是如何组织表达。练习目标来自你选定的具体问题；分析偏好则是长期关注点。'},
     {title: '为什么没有分数或雷达图？', group: 'report', answer: '评分维度尚未完成校准，暂不提供分数或雷达图。可以先看结论、原文依据和练习建议。'},
     {title: '分析失败，会丢掉录音吗？', group: 'report', answer: '若界面已确认训练保存，录音和已有结果仍可查看，也可以重试分析。若提示保存失败，需要先处理保存问题。'},
@@ -42,9 +42,9 @@
     return node;
   }
 
-  function faq(document, parent, question, options) {
-    const detail = element(document, 'details', 'faq');
-    detail.appendChild(element(document, 'summary', null, question.title));
+  function faq(document, parent, question, options, fullAnswer = false) {
+    const detail = element(document, fullAnswer ? 'section' : 'details', fullAnswer ? `faq ${question.group === 'feedback' ? 'feedback-faq' : 'quick-start-faq'}` : 'faq');
+    detail.appendChild(element(document, fullAnswer ? 'h3' : 'summary', null, question.title));
     const body = element(document, 'div');
     body.appendChild(element(document, 'p', null, question.answer));
     if (question.action) body.appendChild(button(document, '打开相关设置 →', 'setting', question.action,
@@ -53,7 +53,7 @@
   }
 
   function groupedQuestions(document, parent, page, options) {
-    for (const question of questions) if (question.group === page && !question.searchOnly) faq(document, parent, question, options);
+    for (const question of questions) if (question.group === page && !question.searchOnly) faq(document, parent, question, options, page === 'start' || page === 'feedback');
   }
 
   function facts(document, parent, rows) {
@@ -70,9 +70,9 @@
   function start(document, parent, options) {
     const steps = element(document, 'ol', 'steps');
     for (const [title, description] of [
-      ['开始表达', '主题、场景和框架都可选，录音中可暂停或结束。首次录音先确认数据说明，再授权麦克风。'],
-      ['查看报告', '先看结论，再展开原文依据。训练自动保存，AI 分析未完成时仍可查看已有结果；保存失败时按提示重试。'],
-      ['选一点继续练', '从一个具体问题开始下一轮，沿用主题和场景，集中练习这一点。']
+      ['开始一次表达', '点击首页的 start。框架、主题和场景都可跳过；首次录音按提示确认说明并授权麦克风，倒计时后开始。录音中可以暂停、继续或结束。'],
+      ['查看本次记录', '结束后查看转写、录音和本地统计。配置 AI 后，可选择自动分析或在报告中手动分析。'],
+      ['回看，或继续练习', '在 history 中查看已保存记录。报告提供具体建议时，可以从建议进入下一轮针对性练习。']
     ]) {
       const item = element(document, 'li'), body = element(document, 'div');
       body.appendChild(element(document, 'h3', null, title));
@@ -109,7 +109,6 @@
   }
 
   function feedback(document, parent, options) {
-    parent.appendChild(element(document, 'p', 'intro', '找到遇到的问题，按提示检查；仍无法解决时，可准备反馈。'));
     groupedQuestions(document, parent, 'feedback', options);
     const section = element(document, 'section', 'diagnostic');
     const title = element(document, 'div', 'section-title');
@@ -147,7 +146,7 @@
       if (!normalized) { ({start, report, privacy, feedback})[selected](document, results, options); return; }
       const matches = questions.filter(question => (question.title + question.answer).toLowerCase().includes(normalized));
       results.appendChild(element(document, 'p', 'help-filter-meta', `搜索结果 · ${matches.length} 项`));
-      for (const question of matches) faq(document, results, question, options);
+      for (const question of matches) faq(document, results, question, options, selected === 'feedback');
       if (!matches.length) {
         results.appendChild(element(document, 'p', 'intro', '没有找到匹配内容。试试“录音”“AI”或“隐私”。'));
         results.appendChild(button(document, '前往问题与反馈', 'help', 'feedback',

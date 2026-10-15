@@ -3305,6 +3305,20 @@ test('playback analysis renders the exact fallback when a segment has no advice'
   assert.equal(trainer.feedbackContent.textContent, '该片段暂无特别建议');
 });
 
+test('playback feedback requires actual text-bearing segments instead of a displayed word count', async t => {
+  const payloads=[];
+  global.window={api:{analyzePlayback:async payload=>{payloads.push(payload);return {success:true,analysis:{items:[]}};}}};
+  t.after(()=>{delete global.window;delete global.document;});
+  const trainer=createTrainer();
+  installPlaybackRecord(trainer,playbackRecord({fullText:'',segments:[{id:'empty',text:'   ',startMs:0,endMs:1000}],stats:{totalWords:0}}));
+  trainer.playbackProfileSummary=profileSummary;
+  assert.equal(await trainer.analyzeSelectedRecording(),false);
+  assert.equal(payloads.length,0,'blank timed rows must not be sent for analysis');
+  installPlaybackRecord(trainer,playbackRecord({stats:{totalWords:0}}));
+  assert.equal(await trainer.analyzeSelectedRecording(),true,'real segment text remains analyzable when a saved counter is zero');
+  assert.equal(payloads.length,1);
+});
+
 test('deleting the selected record while analysis is pending suppresses the result', async (t) => {
   const pending = createDeferred();
   global.document = {createElement};

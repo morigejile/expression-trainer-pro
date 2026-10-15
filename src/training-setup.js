@@ -8,18 +8,42 @@
   'use strict';
   const {normalizeTrainingContext,normalizeTrainingPrompt,getPromptParts,formatTrainingContext,MAX_PROMPT_LENGTH} = context;
   const {getFramework,getPromptOptions} = frameworks;
+  // Preparation copy only. Shared framework definitions also feed analysis inputs.
+  const frameworkHelp = {
+    free: {
+      purpose:'不预设结构，按自己的思路说。',
+      guidance:'可以从一个想法或一件经历开始，逐步把意思讲清楚。'
+    },
+    prep: {
+      purpose:'适合表达观点、判断或建议。',
+      guidance:'先说观点，再解释理由、举例支持，最后回到观点。',
+      example:['观点：我建议每周安排一天不开会。','理由：连续时间更有利于专注。','例子：上周没有会议的上午，我完成了一直拖延的方案。','收束：可以先试行一个月，再看效果。']
+    },
+    star: {
+      purpose:'适合讲述经历，说明自己做了什么。',
+      guidance:'简要交代情境与任务，重点讲自己的行动，再说明结果或收获。',
+      example:['情境：小组汇报前，负责汇总的同学临时请假。','任务：我需要整理材料，按时完成汇报。','行动：我确认了重点，统一材料，并和同伴演练。','结果：汇报按时完成，也让我认识到提前共享材料的重要性。']
+    },
+    pyramid: {
+      purpose:'适合汇报、提案和说明复杂问题。',
+      guidance:'先给核心结论，再分组展开要点，用事实逐层支撑。',
+      example:['结论：建议将活动推迟一周，补齐人员和场地准备。','人员准备：两位主讲人尚未确认时间。','场地准备：设备还需要一次测试。']
+    }
+  };
   function createTrainingSetup({api,document}) {
     const byId = id => document.getElementById(id);
     const view = document.defaultView;
     const settings = byId('training-settings'), anchor = byId('training-settings-anchor'), capsules = byId('training-capsules');
     const picker = byId('training-picker'), title = byId('training-picker-title'), hint = byId('training-picker-hint'), content = byId('training-picker-content');
     const pickerActions = byId('training-picker-actions');
+    const closeButton = byId('training-picker-close');
     const label = byId('training-context-label'), status = byId('training-context-status'), focus = byId('training-practice-focus');
     const buttons = {framework:byId('training-framework'),topic:byId('training-topic'),scenario:byId('training-scenario')};
     const names = {framework:'表达框架',topic:'主题',scenario:'场景'};
     let draft = normalizeTrainingContext(), dirty = false, locked = false;
     let practiceRequest = null, practiceLabel = '', practiceRecommendation='', active = null, custom = null, invalidCustom = false;
     let collapseTimer = null, keyboardMode = false, pickerView = null;
+    let helpReturn = null;
     const isOpen = () => picker.matches(':popover-open');
     const short = text => text.replace(/\s+/g,' ').trim().slice(0,12) + (text.trim().length > 12 ? '…' : '');
     function reveal(value) {
@@ -89,21 +113,47 @@
       if (restoreFocus) source?.focus({preventScroll:true});
       queueCollapse();
     }
+    function setPickerView(value) {
+      pickerView = value;
+      picker.dataset.view = value === 'help' ? `${active}-help` : value;
+      closeButton.setAttribute('aria-label',value === 'help'
+        ? `返回${active === 'framework' ? '框架' : names[active]}选择列表` : `关闭${names[active]}选项`);
+    }
+    function dismissPicker() {
+      if (pickerView !== 'help') return closePicker();
+      const previous = helpReturn;
+      showList();
+      content.scrollTop = previous?.scrollTop || 0;
+      if (previous) content.querySelector(`[data-setup-help="${previous.id}"]`)?.focus({preventScroll:true});
+    }
     function showHelp(option) {
-      pickerView = 'help';
+      helpReturn = {id:option.id,scrollTop:content.scrollTop};
+      setPickerView('help');
       custom = null;
       title.textContent = option.label;
-      hint.textContent = option.purpose || (active === 'framework' ? '不限定表达结构，按自己的方式说。' : names[active]);
+      hint.hidden = false;
+      hint.textContent = active === 'framework' ? frameworkHelp[option.id].purpose : option.purpose || names[active];
       content.replaceChildren();
       pickerActions.replaceChildren();
+      if (active === 'framework') {
+        const copy = frameworkHelp[option.id];
+        content.append(node('p',copy.guidance,'picker-description'));
+        if (copy.example) {
+          content.append(node('p','例如','picker-example-caption'));
+          const example = node('div',null,'picker-example');
+          for (const line of copy.example) example.append(node('p',line));
+          content.append(example,node('p','示例供参考，不必逐项照念。','picker-example-note'));
+        }
+        positionPicker(); title.focus({preventScroll:true}); return;
+      }
       if (option.structure) content.append(node('p',option.structure,'picker-structure'));
       if (option.guidance || option.text) content.append(node('p',option.guidance || option.text,'picker-description'));
       if (option.example) content.append(node('blockquote',option.example,'picker-example'));
-      const back = action('← 返回选项',showList); back.dataset.setupBack = '';
-      pickerActions.append(back); positionPicker(); title.focus({preventScroll:true});
+      positionPicker(); title.focus({preventScroll:true});
     }
     function showCustom() {
-      pickerView = 'custom';
+      setPickerView('custom');
+      hint.hidden = false;
       const kind = active;
       custom = {kind,original:getPromptParts(draft.trainingPrompt)[kind]}; invalidCustom = false;
       title.textContent = `自定义${names[kind]}`;
@@ -128,10 +178,12 @@
       positionPicker(); input.focus({preventScroll:true});
     }
     function showList() {
-      pickerView = 'list';
+      setPickerView('list');
+      helpReturn = null;
+      hint.hidden = false;
       custom = null; invalidCustom = false;
       title.textContent = names[active];
-      hint.textContent = active === 'framework' ? '按名字选择，点问号了解框架。' : active === 'topic' ? '这次讲什么？可以不设置。' : '向谁、在什么情况下表达？可以不设置。';
+      hint.textContent = active === 'framework' ? '选择这次表达的组织方式，点问号查看说明。' : active === 'topic' ? '这次讲什么？可以不设置。' : '向谁、在什么情况下表达？可以不设置。';
       content.replaceChildren();
       pickerActions.replaceChildren();
       const options = active === 'framework' ? [{id:'free',label:'自由表达'},...['prep','star','pyramid'].map(id => getFramework(id))]
@@ -179,14 +231,15 @@
     settings.addEventListener('pointerleave',queueCollapse);
     settings.addEventListener('focusin',() => reveal(true));
     settings.addEventListener('focusout',queueCollapse);
-    byId('training-picker-close').addEventListener('click',() => closePicker());
+    closeButton.addEventListener('click',dismissPicker);
     picker.addEventListener('keydown',event => {
-      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); closePicker(); }
+      if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); dismissPicker(); }
     });
     picker.addEventListener('toggle',event => {
       if (event.newState !== 'closed' || isOpen()) return;
       if (invalidCustom && custom) { setPart(custom.kind,custom.original); invalidCustom = false; }
       custom = null; active = null;
+      helpReturn = null;
       for (const button of Object.values(buttons)) button.setAttribute('aria-expanded','false');
       queueCollapse();
     });
