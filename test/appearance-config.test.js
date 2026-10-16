@@ -16,7 +16,7 @@ test('appearance defaults to graphite coach-rail schema 1', () => {
 });
 
 test('appearance accepts every supported theme without changing layout', () => {
-  for (const theme of ['graphite', 'ink-night', 'coral-glow']) {
+  for (const theme of ['graphite', 'ink-night', 'coral-glow', 'frosted-mist']) {
     assert.deepEqual(normalizeAppearance({schemaVersion: 1, theme, layout: 'coach-rail'}), {
       schemaVersion: 1,
       theme,

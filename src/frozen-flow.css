@@ -279,6 +279,10 @@ body[data-frozen-ui]:not([data-frozen-ui=""]) .history-delete-actions{display:fl
 body[data-frozen-ui]:not([data-frozen-ui=""]) .modal .danger-action{background:var(--accent);color:var(--paper,#fcfaf3);border-color:var(--accent)}
 
 /* Long workspaces share a fixed shell and one regional content scroller. */
+/* The migrated shell fills the viewport; only regional scrollers reserve space.
+   Override the base root gutter even when report.css is enabled, retaining its
+   independent overflow-anchor rule. */
+html:has(>body[data-frozen-ui]:not([data-frozen-ui=""])){scrollbar-gutter:auto}
 body[data-frozen-ui]:is([data-frozen-ui="history"],[data-frozen-ui="report"],[data-frozen-ui="comparison"]){height:100dvh;overflow:hidden}
 body[data-frozen-ui]:is([data-frozen-ui="history"],[data-frozen-ui="report"],[data-frozen-ui="comparison"]) .layout{display:flex;height:100dvh;min-height:0;flex-direction:column;overflow:hidden}
 body[data-frozen-ui]:is([data-frozen-ui="history"],[data-frozen-ui="report"],[data-frozen-ui="comparison"]) .app-header{flex:0 0 88px}

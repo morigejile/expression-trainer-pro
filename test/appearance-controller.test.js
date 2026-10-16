@@ -6,7 +6,7 @@ const deferred=()=>{let resolve,reject;const promise=new Promise((yes,no)=>{reso
 const value=theme=>({schemaVersion:1,theme,layout:'coach-rail'});
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
 test('new IDs are distinct from retired palettes; all legacy layouts keep the accepted layout',()=>{
- assert.deepEqual(THEME_IDS,['graphite','coral-glow','ink-night']);
+ assert.deepEqual(THEME_IDS,['graphite','coral-glow','ink-night','frosted-mist']);
  for(const theme of ['midnight','paper','mist','unknown',undefined])assert.deepEqual(normalizeAppearance({theme,layout:'focus-hud'}),value('graphite'));
  for(const theme of THEME_IDS)assert.deepEqual(normalizeAppearance({theme,layout:'focus-hud'}),value(theme));
 });

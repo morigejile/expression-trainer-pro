@@ -192,11 +192,11 @@ Main 只持有 `AsrProcessController`；实际 session wrapper、managed provide
 
 Settings / Help 当前由主窗口的 Frozen Utility 承载，AI 与分析偏好不再从用户入口打开独立窗口。Settings 新增「外观」子页，旧主题／布局入口继续隐藏；外观切换规则见 Training Flow §12.1，Utility 接线与验证边界见 §20。
 
-`appearance.json` 保持 schema 1，主题标识为 `graphite`（当前默认）、`coral-glow`、`ink-night`；后两者与旧主题标识独立。旧 `midnight/paper/mist`、未知主题和旧布局均规范为当前默认主题/`coach-rail`，已知新主题保留，布局固定为 `coach-rail`。读取不重写原文件；缺失、损坏或未知配置安全回退，future schema 可读取已知值但拒绝显式保存。`asr-selection.json` 只保存 `selectedModelId`；缺失或稳定损坏在默认模型成功后原子恢复，瞬时初始化失败不改写选择。外观和模型操作都独立于 LLM 保存/连接测试。
+`appearance.json` 保持 schema 1，主题标识为 `graphite`（当前默认）、`coral-glow`、`ink-night`、`frosted-mist`（柔雾 · 毛玻璃）。预览标识 `frost` 只用于验收来源，不是正式配置值；新标识与旧 `mist` 独立。旧 `midnight/paper/mist`、未知主题和旧布局均规范为当前默认主题/`coach-rail`，已知新主题保留，布局固定为 `coach-rail`。读取不重写原文件；缺失、损坏或未知配置安全回退，future schema 可读取已知值但拒绝显式保存。`asr-selection.json` 只保存 `selectedModelId`；缺失或稳定损坏在默认模型成功后原子恢复，瞬时初始化失败不改写选择。外观和模型操作都独立于 LLM 保存/连接测试。
 
 Appearance 与 ASR selection 当前均为 schema version 1；二者和 LLM provider 使用独立 config/store、Preload API 与 IPC，不共用配置快照。LLM provider 保留从 legacy settings.json 单向迁移和 canonical 文件优先规则；外观只从 appearance.json 读取，不重新合并旧 settings.json 偏好。损坏来源保留原文，future schema 只读可识别字段且拒绝显式保存。设置“保存”和“测试连接”保持独立。
 
-`lib/appearance-config.js` 为 Main 与 Renderer 共享的校验/选项所有者；`src/appearance.js` 仅更新根节点属性，以单个保存队列处理最新选择，忽略保存期间较早广播，失败恢复最近成功值并反馈。沿用原 Main/Preload/store 的读取、原子保存与广播，不新增 localStorage。`src/themes.css` 集中维护两套新主题的共享颜色/表面角色及专属材质，默认主题继续使用原样式；不包含预览数据或模拟行为。珊瑚实底回退由 CSS 支持检测、减少透明度偏好及打开 Utility/切换外观时的实际模糊样式检查触发。
+`lib/appearance-config.js` 为 Main 与 Renderer 共享的四项校验/选项所有者；`src/appearance.js` 仅更新根节点属性，以单个保存队列处理最新选择，忽略保存期间较早广播，失败恢复最近成功值并反馈。沿用原 Main/Preload/store 的读取、原子保存与广播，不新增 localStorage。`src/themes.css` 集中维护新增主题的共享颜色/表面角色及专属材质，默认主题继续使用原样式；不包含预览数据或模拟行为。实底回退复用 CSS 支持检测、减少透明度偏好及实际模糊样式检查：珊瑚检查 Utility 的玻璃底；柔雾检查导航玻璃层，不把其本来就使用实底的 Utility 阅读面板误判为模糊失败。柔雾菜单与浮层回退为协调的不透明浅蓝表面。
 
 ### 5.8 Benchmark dataset boundary (BM-01)
 

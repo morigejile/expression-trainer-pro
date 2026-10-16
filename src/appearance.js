@@ -10,11 +10,15 @@
   function syncMaterialFallback(root){
     if(!root?.ownerDocument)return;
     delete root.dataset.materialFallback;
-    if(root.dataset.theme!=='coral-glow')return;
+    const frost=root.dataset.theme==='frosted-mist';
+    if(!frost&&root.dataset.theme!=='coral-glow')return;
     const view=root.ownerDocument.defaultView,utility=root.ownerDocument.getElementById('utility');
     const supported=view.CSS?.supports?.('backdrop-filter','blur(1px)');
+    // Frost has a solid reading panel. Check its glass navigation instead of
+    // treating the intentionally unblurred Utility base as a failed material.
+    const material=frost?root.ownerDocument.querySelector?.('.utility-menu>summary'):utility?.open?utility:null;
     if(!supported||view.matchMedia?.('(prefers-reduced-transparency: reduce)').matches
-      ||(utility?.open&&view.getComputedStyle(utility).backdropFilter==='none'))root.dataset.materialFallback='solid';
+      ||(material&&view.getComputedStyle(material).backdropFilter==='none'))root.dataset.materialFallback='solid';
   }
   function createAppearanceController({root=globalThis.document.documentElement,api=globalThis.api}={}){
     let appearance=applyAppearance(root,root.dataset),saved={...appearance},status='loading',error='',revision=0,receivedBroadcast=false,initialized=false,task=null;

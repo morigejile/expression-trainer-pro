@@ -67,7 +67,7 @@ test('explicit save publishes normalized appearance atomically', async () => {
 test('all formal themes survive a new store read; legacy files are mapped without being rewritten', async () => {
   await withUserData(userDataPath=>{
     const file=path.join(userDataPath,'appearance.json');
-    for(const theme of ['graphite','coral-glow','ink-night']){
+    for(const theme of ['graphite','coral-glow','ink-night','frosted-mist']){
       saveAppearance(userDataPath,{theme,layout:'coach-rail'});
       assert.equal(loadAppearance(userDataPath).theme,theme);
     }

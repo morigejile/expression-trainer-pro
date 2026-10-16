@@ -1,86 +1,86 @@
-/* Shared color and surface roles for coral-glow and ink-night.
+/* Shared color and surface roles for the current additional appearances.
    Graphite deliberately inherits the unchanged default styles.
    Material values were locked from the accepted complete inner-page snapshots. */
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo{color: var(--ink); color-scheme: light;}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(h1, h2, h3, strong, .finding-observation, .picker-description, .picker-example, .history-row-main){color: var(--ink);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) .topbar.app-header{border-bottom-color: var(--line);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) .topbar.app-header :is(.brand, .nav-history, .utility-menu summary){color: var(--nav) !important;}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) .topbar.app-header .utility-menu summary{border-radius: 50%; background: rgba(223, 231, 237, 0.28);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) .topbar.app-header .utility-menu-items, html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo #training-picker, html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility[data-surface="settings"] .config-more > div{background: var(--glass); border-color: var(--glass-line); border-radius: 16px; box-shadow: 0 12px 35px var(--shadow),0 1px 3px #3449630d;}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) .topbar.app-header .utility-menu-items button{color: var(--ink);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .session-foot{border-top-color: var(--line);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo #prepare-ring{border-color: rgba(168, 187, 203, 0.25); background: rgba(228, 237, 243, 0.24); box-shadow: rgba(97, 121, 142, 0.05) 0px 8px 24px, rgba(255, 255, 255, 0.75) 0px 1px 1px inset;}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo #prepare-context-slot #training-settings-anchor{color: var(--muted); background: var(--glass); border-radius: 50%; box-shadow: 0 3px 14px var(--shadow);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(.context-capsule, .training-capsule){color: var(--accent); border-color: var(--line); background: var(--glass);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(.training-picker-hint, .picker-example-caption, .picker-example-note, .picker-help, .screen-status, .report-footer, #history-count, .history-row-main small, .record-status){color: var(--muted);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(.picker-option, .picker-choice){color: var(--ink);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .picker-option:has([aria-pressed="true"]){background: var(--evidence); color: var(--accent);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(.picker-option-select, .picker-help)[aria-pressed="true"]{color: var(--accent);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(.picker-help, #training-picker-close){background: transparent; color: var(--muted); border-color: var(--line);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo{color: var(--ink); color-scheme: light;}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(h1, h2, h3, strong, .finding-observation, .picker-description, .picker-example, .history-row-main){color: var(--ink);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) .topbar.app-header{border-bottom-color: var(--line);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) .topbar.app-header :is(.brand, .nav-history, .utility-menu summary){color: var(--nav) !important;}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) .topbar.app-header .utility-menu summary{border-radius: 50%; background: rgba(223, 231, 237, 0.28);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) .topbar.app-header .utility-menu-items, html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo #training-picker, html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility[data-surface="settings"] .config-more > div{background: var(--glass); border-color: var(--glass-line); border-radius: 16px; box-shadow: 0 12px 35px var(--shadow),0 1px 3px #3449630d;}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) .topbar.app-header .utility-menu-items button{color: var(--ink);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .session-foot{border-top-color: var(--line);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo #prepare-ring{border-color: rgba(168, 187, 203, 0.25); background: rgba(228, 237, 243, 0.24); box-shadow: rgba(97, 121, 142, 0.05) 0px 8px 24px, rgba(255, 255, 255, 0.75) 0px 1px 1px inset;}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo #prepare-context-slot #training-settings-anchor{color: var(--muted); background: var(--glass); border-radius: 50%; box-shadow: 0 3px 14px var(--shadow);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.context-capsule, .training-capsule){color: var(--accent); border-color: var(--line); background: var(--glass);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.training-picker-hint, .picker-example-caption, .picker-example-note, .picker-help, .screen-status, .report-footer, #history-count, .history-row-main small, .record-status){color: var(--muted);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.picker-option, .picker-choice){color: var(--ink);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .picker-option:has([aria-pressed="true"]){background: var(--evidence); color: var(--accent);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.picker-option-select, .picker-help)[aria-pressed="true"]{color: var(--accent);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.picker-help, #training-picker-close){background: transparent; color: var(--muted); border-color: var(--line);}
 html[data-theme="coral-glow"] body.beo #training-picker::backdrop{background: rgba(82, 105, 135, 0.11); backdrop-filter: blur(3px);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo #countdown-display{background: var(--glass); color: var(--accent); border-color: var(--line);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo #btn-cancel-countdown{color: var(--muted); border-color: var(--line);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo #recording-stage .subtitle-line.old{color: var(--past);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo #recording-stage .subtitle-line:not(.old){color: var(--ink);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo #transport-time #timer{color: var(--muted);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo #sound-bars i{background: var(--accent);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .recording-indicator{background: var(--record);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .is-paused .recording-indicator{background: var(--warning);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo #transport-actions :is(#btn-pause, #btn-resume, #btn-stop){color: var(--accent); background: var(--glass); border-color: var(--line); box-shadow: inset 0 1px 2px #ffffffab,0 4px 14px var(--shadow);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo #transport-actions #btn-stop{color: var(--danger);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(.session-report, .history-study){background: var(--reading); color: var(--ink); --muted: var(--theme-muted);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(.outline-button, .btn-report-back, #btn-report-back, .finding-open, .finding-practice, .practice-start, .report-disclosure > summary){color: var(--accent); border-color: var(--line);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo #btn-report-back:hover{background: var(--hover);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(.finding-detail, .finding-recommendation, .finding-details, .evidence-caption, .source-note, .summary-subtitle, .record-save-state){color: var(--muted);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(.finding-category, .evidence-block span, .metrics span, .metrics small){color: var(--muted);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(#record-identity, .record-save-state){color: var(--muted);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .evidence-block{background: var(--evidence); border-left-color: var(--accent); color: var(--ink);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .evidence-block blockquote{color: var(--ink);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .evidence-button{color: var(--accent); border-color: var(--line);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .history-row-actions{color: var(--muted);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .history-row-actions:hover{color: var(--danger); background: var(--record-soft);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .history-choice input{color: var(--accent); border-color: var(--muted); accent-color: var(--accent); background: transparent;}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .history-choice input:checked{border-color: var(--accent); background: var(--evidence);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .history-compare-choice input{border-color: var(--muted); background: transparent;}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .history-compare-choice input:checked{border-color: var(--accent); background: var(--evidence);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .history-compare-choice input:checked::after{border-color: var(--accent);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(input, textarea, select){color: var(--ink); background: var(--field); border-color: var(--line); accent-color: var(--accent);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .modal{background: rgba(52, 67, 91, 0.14);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .modal-content{background: var(--reading); color: var(--ink); border-color: var(--line); box-shadow: 0 15px 70px var(--shadow);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .modal :is(p, .source-note){color: var(--muted);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .modal button{color: var(--accent); border-color: var(--line);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .modal .danger-action{background: var(--danger); color: rgb(255, 255, 255); border-color: var(--danger);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .user-message{background: var(--panel); color: var(--ink); border-color: var(--line);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility{background: var(--panel); color: var(--ink); border-color: var(--glass-line); box-shadow: rgba(51, 77, 115, 0.19) 0px 20px 70px;}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility::backdrop{background: rgba(52, 67, 91, 0.14); backdrop-filter: none;}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility :is(.sidebar, .surface-header){background: var(--glass); border-color: var(--line);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility #content{background: var(--reading);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility :is(.surface-header h1, .sidebar h2, .settings-section-head h2, .activation-line h2, .config-info strong, .faq h3, .help-facts dt){color: var(--ink);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility :is(p, small, label, .sidebar-bottom, .settings-intro, .hint, .source-note, .help-facts dd, .identity-note, .settings-form label, .editor-actions > span){color: var(--muted);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility :is(.primary, .secondary-control, .text-control, .active-status, .help-link, .settings-help-link, .sidebar nav button[aria-current], .config-more summary){color: var(--accent); border-color: var(--line);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility .primary{background: var(--evidence);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility button:hover{background: var(--hover);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility .sidebar nav button[aria-current="page"]::before{background: var(--accent);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility :is(input, select, textarea){background: var(--field); color: var(--ink); border-color: var(--line);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility #ai-toggle.ai-switch::before{background: rgb(200, 211, 223);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility #ai-toggle.ai-switch[aria-checked="true"]::before{background: var(--accent);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility #ai-toggle.ai-switch span{background: rgb(252, 253, 255);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility .active-status i{background: var(--success);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility :is(.danger, .delete-confirm button.danger){color: var(--danger) !important;}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility :is(.delete-confirm, .consent-panel, .unsaved){background: rgb(243, 233, 219); border-color: var(--warning); color: var(--warning);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility :is(.delete-confirm p, .consent-panel p){color: var(--warning);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility[data-feedback="error"] #edit-status{color: var(--danger);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility[data-feedback="warning"] #edit-status{color: var(--warning);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility[data-feedback="success"] #edit-status{color: var(--success);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(button, input, select, textarea):disabled{opacity: 1; color: var(--disabled-ink); cursor: default;}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility :is(input, select, textarea):disabled{background: var(--disabled-bg); border-color: var(--line);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) #utility button:disabled{color: var(--disabled-ink); box-shadow: none;}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(button, summary, a, input, textarea, select, [tabindex]):focus-visible{outline-offset: 3px; outline: 3px solid var(--focus) !important;}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(#history-scroll, #report-scroll, #utility #content, #training-picker-content)::-webkit-scrollbar{width: 8px; height: 8px;}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(#history-scroll, #report-scroll, #utility #content, #training-picker-content)::-webkit-scrollbar-track, html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(#history-scroll, #report-scroll, #utility #content, #training-picker-content)::-webkit-scrollbar-corner{background: transparent;}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(#history-scroll, #report-scroll, #utility #content, #training-picker-content)::-webkit-scrollbar-thumb{background: var(--thumb); border-radius: 4px;}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(#history-scroll, #report-scroll, #utility #content, #training-picker-content)::-webkit-scrollbar-thumb:hover{background: var(--thumb-hover);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(#history-scroll, #report-scroll, #utility #content, #training-picker-content)::-webkit-scrollbar-button{display: none; width: 0px; height: 0px;}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo #countdown-display{background: var(--glass); color: var(--accent); border-color: var(--line);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo #btn-cancel-countdown{color: var(--muted); border-color: var(--line);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo #recording-stage .subtitle-line.old{color: var(--past);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo #recording-stage .subtitle-line:not(.old){color: var(--ink);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo #transport-time #timer{color: var(--muted);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo #sound-bars i{background: var(--accent);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .recording-indicator{background: var(--record);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .is-paused .recording-indicator{background: var(--warning);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo #transport-actions :is(#btn-pause, #btn-resume, #btn-stop){color: var(--accent); background: var(--glass); border-color: var(--line); box-shadow: inset 0 1px 2px #ffffffab,0 4px 14px var(--shadow);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo #transport-actions #btn-stop{color: var(--danger);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.session-report, .history-study){background: var(--reading); color: var(--ink); --muted: var(--theme-muted);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.outline-button, .btn-report-back, #btn-report-back, .finding-open, .finding-practice, .practice-start, .report-disclosure > summary){color: var(--accent); border-color: var(--line);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo #btn-report-back:hover{background: var(--hover);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.finding-detail, .finding-recommendation, .finding-details, .evidence-caption, .source-note, .summary-subtitle, .record-save-state){color: var(--muted);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.finding-category, .evidence-block span, .metrics span, .metrics small){color: var(--muted);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#record-identity, .record-save-state){color: var(--muted);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .evidence-block{background: var(--evidence); border-left-color: var(--accent); color: var(--ink);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .evidence-block blockquote{color: var(--ink);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .evidence-button{color: var(--accent); border-color: var(--line);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .history-row-actions{color: var(--muted);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .history-row-actions:hover{color: var(--danger); background: var(--record-soft);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .history-choice input{color: var(--accent); border-color: var(--muted); accent-color: var(--accent); background: transparent;}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .history-choice input:checked{border-color: var(--accent); background: var(--evidence);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .history-compare-choice input{border-color: var(--muted); background: transparent;}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .history-compare-choice input:checked{border-color: var(--accent); background: var(--evidence);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .history-compare-choice input:checked::after{border-color: var(--accent);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(input, textarea, select){color: var(--ink); background: var(--field); border-color: var(--line); accent-color: var(--accent);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .modal{background: rgba(52, 67, 91, 0.14);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .modal-content{background: var(--reading); color: var(--ink); border-color: var(--line); box-shadow: 0 15px 70px var(--shadow);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .modal :is(p, .source-note){color: var(--muted);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .modal button{color: var(--accent); border-color: var(--line);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .modal .danger-action{background: var(--danger); color: rgb(255, 255, 255); border-color: var(--danger);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .user-message{background: var(--panel); color: var(--ink); border-color: var(--line);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility{background: var(--panel); color: var(--ink); border-color: var(--glass-line); box-shadow: rgba(51, 77, 115, 0.19) 0px 20px 70px;}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility::backdrop{background: rgba(52, 67, 91, 0.14); backdrop-filter: none;}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility :is(.sidebar, .surface-header){background: var(--glass); border-color: var(--line);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility #content{background: var(--reading);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility :is(.surface-header h1, .sidebar h2, .settings-section-head h2, .activation-line h2, .config-info strong, .faq h3, .help-facts dt){color: var(--ink);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility :is(p, small, label, .sidebar-bottom, .settings-intro, .hint, .source-note, .help-facts dd, .identity-note, .settings-form label, .editor-actions > span){color: var(--muted);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility :is(.primary, .secondary-control, .text-control, .active-status, .help-link, .settings-help-link, .sidebar nav button[aria-current], .config-more summary){color: var(--accent); border-color: var(--line);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility .primary{background: var(--evidence);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility button:hover{background: var(--hover);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility .sidebar nav button[aria-current="page"]::before{background: var(--accent);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility :is(input, select, textarea){background: var(--field); color: var(--ink); border-color: var(--line);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility #ai-toggle.ai-switch::before{background: rgb(200, 211, 223);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility #ai-toggle.ai-switch[aria-checked="true"]::before{background: var(--accent);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility #ai-toggle.ai-switch span{background: rgb(252, 253, 255);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility .active-status i{background: var(--success);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility :is(.danger, .delete-confirm button.danger){color: var(--danger) !important;}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility :is(.delete-confirm, .consent-panel, .unsaved){background: rgb(243, 233, 219); border-color: var(--warning); color: var(--warning);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility :is(.delete-confirm p, .consent-panel p){color: var(--warning);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility[data-feedback="error"] #edit-status{color: var(--danger);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility[data-feedback="warning"] #edit-status{color: var(--warning);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility[data-feedback="success"] #edit-status{color: var(--success);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(button, input, select, textarea):disabled{opacity: 1; color: var(--disabled-ink); cursor: default;}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility :is(input, select, textarea):disabled{background: var(--disabled-bg); border-color: var(--line);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility button:disabled{color: var(--disabled-ink); box-shadow: none;}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(button, summary, a, input, textarea, select, [tabindex]):focus-visible{outline-offset: 3px; outline: 3px solid var(--focus) !important;}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#history-scroll, #report-scroll, #utility #content, #training-picker-content)::-webkit-scrollbar{width: 8px; height: 8px;}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#history-scroll, #report-scroll, #utility #content, #training-picker-content)::-webkit-scrollbar-track, html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#history-scroll, #report-scroll, #utility #content, #training-picker-content)::-webkit-scrollbar-corner{background: transparent;}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#history-scroll, #report-scroll, #utility #content, #training-picker-content)::-webkit-scrollbar-thumb{background: var(--thumb); border-radius: 4px;}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#history-scroll, #report-scroll, #utility #content, #training-picker-content)::-webkit-scrollbar-thumb:hover{background: var(--thumb-hover);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#history-scroll, #report-scroll, #utility #content, #training-picker-content)::-webkit-scrollbar-button{display: none; width: 0px; height: 0px;}
 @supports (backdrop-filter:blur(1px)) {
 html[data-theme="coral-glow"] :is(.topbar.app-header .utility-menu summary, .topbar.app-header .utility-menu-items, body.beo #training-picker, #utility[data-surface="settings"] .config-more > div, #utility .sidebar, body.beo #transport-actions button, body.beo #training-settings-anchor){backdrop-filter: blur(24px) saturate(1.3);}
 html[data-theme="coral-glow"] .topbar.app-header .utility-menu summary{background: rgba(255, 255, 255, 0.28); box-shadow: rgba(255, 255, 255, 0.52) 0px 0px 0px 1px inset;}
@@ -91,7 +91,7 @@ html[data-material-fallback="solid"][data-theme="coral-glow"] body.beo #training
 html[data-theme="coral-glow"] :is(body.beo #btn-start, .topbar.app-header .utility-menu summary, .topbar.app-header .utility-menu-items, body.beo #training-picker, #utility[data-surface="settings"] .config-more > div, #utility .sidebar, body.beo #transport-actions button, body.beo #training-settings-anchor){background: rgb(237, 243, 252);}
 }
 @media (prefers-reduced-motion: reduce) {
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) *{transition: none !important; animation: auto ease 0s 1 normal none running none !important;}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) *{transition: none !important; animation: auto ease 0s 1 normal none running none !important;}
 }
 
 /* Glass surface treatment. */
@@ -209,7 +209,7 @@ html:root[data-theme="coral-glow"] body.beo audio::-webkit-media-controls-panel{
 html:root[data-theme="coral-glow"] body.beo :is(#comparison-scroll, .modal-content)::-webkit-scrollbar-thumb{background: var(--thumb); border-radius: 4px;}
 html:root[data-theme="coral-glow"] body.beo :is(#comparison-scroll, .modal-content)::-webkit-scrollbar-track{background: transparent;}
 html:root[data-theme="coral-glow"] body.beo :is(#comparison-scroll, .modal-content)::-webkit-scrollbar-corner{background: transparent;}
-html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(#comparison-scroll, .modal-content)::-webkit-scrollbar-button{display: none; width: 0px; height: 0px;}
+html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#comparison-scroll, .modal-content)::-webkit-scrollbar-button{display: none; width: 0px; height: 0px;}
 html:root[data-theme="coral-glow"] :is(.topbar.app-header .utility-menu-items, body.beo #training-picker, #utility[data-surface="settings"] .config-more > div, #utility .sidebar, body.beo #transport-actions button){backdrop-filter: blur(24px) saturate(1.3);}
 html:root[data-theme="coral-glow"] body.beo :is(#training-picker, .utility-menu-items, #utility .config-more > div){background: var(--glass); border-color: var(--glass-line);}
 html:root[data-material-fallback="solid"][data-theme="coral-glow"] :is(body.beo #btn-start, .topbar.app-header .utility-menu summary, .topbar.app-header .utility-menu-items, body.beo #training-picker, #utility .config-more > div, #utility .sidebar, body.beo #transport-actions button, body.beo #training-settings-anchor){backdrop-filter: none; background: rgb(255, 246, 241);}
@@ -217,14 +217,14 @@ html:root[data-material-fallback="solid"][data-theme="coral-glow"] body.beo #tra
 @supports not(backdrop-filter:blur(1px)) {
 html:root[data-theme="coral-glow"] :is(body.beo #btn-start, .topbar.app-header .utility-menu summary, .topbar.app-header .utility-menu-items, body.beo #training-picker, #utility .config-more > div, #utility .sidebar, body.beo #transport-actions button, body.beo #training-settings-anchor){background: rgb(255, 246, 241);}
 }
-html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(#comparison-scroll, .modal-content)::-webkit-scrollbar{background: transparent;}
-html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(#comparison-scroll, .modal-content)::-webkit-scrollbar-thumb{background: var(--thumb); border-radius: 4px;}
-html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(#comparison-scroll, .modal-content)::-webkit-scrollbar-thumb:hover{background: var(--thumb-hover);}
-html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo textarea::-webkit-scrollbar{background: transparent;}
-html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo textarea::-webkit-scrollbar-thumb{background: var(--thumb); border-radius: 4px;}
-html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo textarea::-webkit-scrollbar-thumb:hover{background: var(--thumb-hover);}
-html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo textarea::-webkit-scrollbar-track, html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo textarea::-webkit-scrollbar-corner{background: transparent;}
-html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo textarea::-webkit-scrollbar-button{display: none; width: 0px; height: 0px;}
+html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#comparison-scroll, .modal-content)::-webkit-scrollbar{background: transparent;}
+html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#comparison-scroll, .modal-content)::-webkit-scrollbar-thumb{background: var(--thumb); border-radius: 4px;}
+html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#comparison-scroll, .modal-content)::-webkit-scrollbar-thumb:hover{background: var(--thumb-hover);}
+html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo textarea::-webkit-scrollbar{background: transparent;}
+html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo textarea::-webkit-scrollbar-thumb{background: var(--thumb); border-radius: 4px;}
+html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo textarea::-webkit-scrollbar-thumb:hover{background: var(--thumb-hover);}
+html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo textarea::-webkit-scrollbar-track, html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo textarea::-webkit-scrollbar-corner{background: transparent;}
+html:root[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo textarea::-webkit-scrollbar-button{display: none; width: 0px; height: 0px;}
 html:root[data-theme="coral-glow"]{background: rgb(243, 217, 211); color-scheme: light;}
 
 /* Coral's unified reading surface: one fill per fixed/scrolling workspace. */
@@ -261,15 +261,88 @@ html:root[data-theme="coral-glow"][data-material-fallback="solid"] #utility :is(
 }
 
 /* The current real media adapter shares the same roles as the native player. */
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .playback-player button,
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(.playback-time,.playback-feedback-heading h3,#playback-speed,#playback-model,#btn-reanalyze){color:var(--accent);border-color:var(--line)}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo #playback-toggle{background:var(--evidence);border-color:var(--line)}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(#playback-toggle,#btn-reanalyze,.playback-segment-button):hover{background:var(--hover)}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .playback-segment-button{color:var(--ink)}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(.playback-segment-time,.playback-position,.playback-advice-label){color:var(--muted)}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .playback-segment-button[aria-pressed="true"]{background:var(--evidence);box-shadow:inset 2px 0 var(--accent)}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo .playback-inline-feedback{background:var(--evidence);color:var(--ink);border-color:var(--line)}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(#playback-seek,#playback-volume){background:transparent!important}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(#playback-seek,#playback-volume)::-webkit-slider-runnable-track{background:var(--line)}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo #playback-seek::-webkit-slider-runnable-track{background:linear-gradient(to right,var(--accent) var(--playback-progress,0%),var(--line) var(--playback-progress,0%))}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"]) body.beo :is(#playback-seek,#playback-volume)::-webkit-slider-thumb{background:var(--accent)}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .playback-player button,
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.playback-time,.playback-feedback-heading h3,#playback-speed,#playback-model,#btn-reanalyze){color:var(--accent);border-color:var(--line)}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo #playback-toggle{background:var(--evidence);border-color:var(--line)}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#playback-toggle,#btn-reanalyze,.playback-segment-button):hover{background:var(--hover)}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .playback-segment-button{color:var(--ink)}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.playback-segment-time,.playback-position,.playback-advice-label){color:var(--muted)}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .playback-segment-button[aria-pressed="true"]{background:var(--evidence);box-shadow:inset 2px 0 var(--accent)}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .playback-inline-feedback{background:var(--evidence);color:var(--ink);border-color:var(--line)}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#playback-seek,#playback-volume){background:transparent!important}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#playback-seek,#playback-volume)::-webkit-slider-runnable-track{background:var(--line)}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo #playback-seek::-webkit-slider-runnable-track{background:linear-gradient(to right,var(--accent) var(--playback-progress,0%),var(--line) var(--playback-progress,0%))}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#playback-seek,#playback-volume)::-webkit-slider-thumb{background:var(--accent)}
+
+
+/* Frosted-mist: exact palette/material from the specified key-page frost preview. */
+html[data-theme="frosted-mist"] body.beo, html[data-theme="frosted-mist"] #utility{--bg: #dfe7f1; --ink: #2c3f53; --muted: #536b82; --theme-muted: #536b82; --past: #708297; --accent: #4e7097; --focus: #4b6197; --button-ink: #365577; --record: #a44859; --record-soft: #a4485914; --line: #7d91ab3d; --hover: #7894bc17; --panel: #f1f5fb; --popover: #edf3fc; --evidence: #e2eaf7; --reading: #f1f5fb; --field: #f7faff; --glass: #f5f9ffb8; --glass-line: #ffffffb3; --nav: #536e8d; --disabled-ink: #76879b; --disabled-bg: #e0e7f1; --thumb: #8195b3b8; --thumb-hover: #687e9e; --danger: #a04353; --warning: #8b6225; --success: #416c5d; --shadow: #5b739d22; --page: var(--bg); --soft: var(--evidence); --warn: var(--warning);}
+html[data-theme="frosted-mist"] body.beo{background: radial-gradient(400px 300px at 40% 64%, rgba(156, 196, 238, 0.396), transparent 75%), radial-gradient(400px 300px at 66% 48%, rgba(205, 182, 234, 0.42), transparent 73%), radial-gradient(at 3% 14%, rgb(212, 229, 237), transparent 48%), radial-gradient(at 95% 80%, rgb(198, 211, 237), transparent 53%), radial-gradient(at 88% 13%, rgb(245, 229, 236), transparent 47%), linear-gradient(130deg, rgb(233, 237, 242), rgb(220, 229, 241) 52%, rgb(220, 231, 237));}
+html[data-theme="frosted-mist"] body.beo #prepare-ring{background: rgba(255, 255, 255, 0.13); border-color: rgba(255, 255, 255, 0.64); box-shadow: rgba(101, 130, 173, 0.13) 0px 14px 45px, rgba(255, 255, 255, 0.75) 0px 1px 2px inset;}
+html[data-theme="frosted-mist"] body.beo #btn-start{background: linear-gradient(145deg, rgba(255, 255, 255, 0.32), rgba(255, 255, 255, 0.03) 65%, rgba(255, 255, 255, 0.14)), rgba(245, 249, 255, 0.35); color: rgb(54, 85, 119); box-shadow: rgba(255, 255, 255, 0.64) 0px 1px 3px inset, rgba(158, 180, 211, 0.22) 0px -1px 2px inset, rgba(91, 125, 156, 0.08) 0px 4px 18px, rgba(255, 255, 255, 0.64) 0px 0px 0px 1px inset;}
+html[data-theme="frosted-mist"] body.beo #btn-start:hover{box-shadow: rgba(255, 255, 255, 0.79) 0px 1px 4px inset, rgba(91, 125, 156, 0.14) 0px 6px 24px;}
+html[data-theme="frosted-mist"] body.beo #training-picker::backdrop{background: rgba(82, 105, 135, 0.11); backdrop-filter: blur(3px);}
+@supports (backdrop-filter:blur(1px)) {
+html[data-theme="frosted-mist"] :is(.topbar.app-header .utility-menu summary, .topbar.app-header .utility-menu-items, body.beo #training-picker, #utility[data-surface="settings"] .config-more > div, #utility .sidebar, body.beo #transport-actions button, body.beo #training-settings-anchor){backdrop-filter: blur(24px) saturate(1.3);}
+html[data-theme="frosted-mist"] body.beo #btn-start{backdrop-filter: blur(24px) saturate(1.55);}
+html[data-theme="frosted-mist"] .topbar.app-header .utility-menu summary{background: rgba(255, 255, 255, 0.28); box-shadow: rgba(255, 255, 255, 0.52) 0px 0px 0px 1px inset;}
+}
+html[data-material-fallback="solid"][data-theme="frosted-mist"] :is(body.beo #btn-start, .topbar.app-header .utility-menu summary, .topbar.app-header .utility-menu-items, body.beo #training-picker, #utility[data-surface="settings"] .config-more > div, #utility .sidebar, body.beo #transport-actions button, body.beo #training-settings-anchor){backdrop-filter: none; background: rgb(237, 243, 252);}
+html[data-material-fallback="solid"][data-theme="frosted-mist"] body.beo #training-picker::backdrop{backdrop-filter: none;}
+@supports not(backdrop-filter:blur(1px)) {
+html[data-theme="frosted-mist"] :is(body.beo #btn-start, .topbar.app-header .utility-menu summary, .topbar.app-header .utility-menu-items, body.beo #training-picker, #utility[data-surface="settings"] .config-more > div, #utility .sidebar, body.beo #transport-actions button, body.beo #training-settings-anchor){background: rgb(237, 243, 252);}
+}
+
+/* Existing formal surfaces outside the fourteen accepted preview states.
+   Stable reading panels and semantic roles extend the same blue-purple palette. */
+html:root[data-theme="frosted-mist"] body.beo :is(.comparison-view,.target-report){background:var(--reading);color:var(--ink);--muted:var(--theme-muted)}
+html:root[data-theme="frosted-mist"] body.beo :is(.round-result,.comparison-card,.comparison-section,.comparison-metrics,.practice-history,.practice-evidence){border-color:var(--line);color:var(--ink)}
+html:root[data-theme="frosted-mist"] body.beo :is(.finding-index,.record-identity,.practice-source-status,.comparison-note,.comparison-limitations){color:var(--muted)}
+html:root[data-theme="frosted-mist"] body.beo :is(.practice-action,.practice-scope,.text-action,.evidence-button,.comparison-card button){color:var(--accent);border-color:var(--line)}
+html:root[data-theme="frosted-mist"] body.beo :is(.practice-action,.practice-start){background:var(--evidence)}
+html:root[data-theme="frosted-mist"] body.beo :is(.practice-action,.practice-start):hover:not(:disabled){background:var(--hover)}
+html:root[data-theme="frosted-mist"] body.beo #countdown-number{color:var(--button-ink)}
+html:root[data-theme="frosted-mist"] body.beo :is(#preparation-notes,#preparation-notes #training-practice-focus){color:var(--muted)}
+html:root[data-theme="frosted-mist"] body.beo #playback-mute[aria-pressed="true"]{background:var(--evidence)}
+html:root[data-theme="frosted-mist"] body.beo .modal-content,
+html:root[data-theme="frosted-mist"] body.beo #ai-disclosure-modal .modal-content{background:var(--reading);color:var(--ink);border-color:var(--line);box-shadow:0 15px 70px var(--shadow)}
+html:root[data-theme="frosted-mist"] body.beo #ai-disclosure-modal .modal-body p:not(#ai-disclosure-error){color:var(--muted)}
+html:root[data-theme="frosted-mist"] body.beo #ai-disclosure-modal button{border-color:var(--line)}
+html:root[data-theme="frosted-mist"] body.beo #ai-disclosure-modal #btn-ai-disclosure-confirm{background:var(--accent);color:var(--field);border-color:var(--accent)}
+html:root[data-theme="frosted-mist"] #utility :is(.delete-confirm,.consent-panel,#unsaved){background:#f3e9db;color:var(--warning);border-color:var(--warning)}
+html:root[data-theme="frosted-mist"] #utility :is(.delete-confirm p,.consent-panel p,#unsaved span){color:var(--warning)}
+html:root[data-theme="frosted-mist"] body.beo .modal .danger-action{background:var(--danger);border-color:var(--danger);color:var(--field)}
+html:root[data-theme="frosted-mist"] body.beo :is([role="alert"],#ai-disclosure-error,.delete-failed,.state-error){color:var(--danger)}
+html:root[data-theme="frosted-mist"] body.beo option{background:var(--field);color:var(--ink);color-scheme:light}
+html:root[data-theme="frosted-mist"] body.beo audio{color-scheme:light}
+html:root[data-theme="frosted-mist"] body.beo audio::-webkit-media-controls-panel{background:var(--evidence)}
+html:root[data-theme="frosted-mist"] body.beo :is(#btn-start,.playback-player button,#btn-reanalyze,.practice-action,.practice-start):disabled,
+html:root[data-theme="frosted-mist"] body.beo #ai-disclosure-modal #btn-ai-disclosure-confirm:disabled{color:var(--disabled-ink);background:var(--disabled-bg);border-color:var(--line);box-shadow:none;opacity:1}
+
+/* Normal Utility/reading panels are already solid. Only glass layers need the
+   opaque fallback; neither text opacity nor normal material values are changed. */
+html:root[data-theme="frosted-mist"][data-material-fallback="solid"] :is(.utility-menu-items,#training-picker,#utility .config-more>div,#utility .sidebar){background:var(--popover);backdrop-filter:none}
+@media(prefers-reduced-transparency:reduce){
+ html:root[data-theme="frosted-mist"] :is(body.beo #btn-start,.topbar.app-header .utility-menu summary,.utility-menu-items,body.beo #training-picker,#utility .config-more>div,#utility .sidebar,body.beo #transport-actions button,body.beo #training-settings-anchor){background:var(--popover);backdrop-filter:none}
+ html:root[data-theme="frosted-mist"] body.beo #training-picker::backdrop{backdrop-filter:none}
+}
+
+/* Quiet decoration on the two compact frost controls; keep their icons,
+   geometry, focus outline and existing material/fallback detection intact. */
+html:root[data-theme="frosted-mist"] body.beo .topbar.app-header .utility-menu>summary{--frost-control-rest:rgba(219,230,246,.06);--frost-control-hover:rgba(204,222,245,.20);--frost-control-pressed:rgba(185,209,240,.30);background:var(--frost-control-rest);box-shadow:inset 0 0 0 1px rgba(255,255,255,.08)}
+html:root[data-theme="frosted-mist"] body.beo #prepare-context-slot #training-settings-anchor{--frost-control-rest:rgba(173,194,222,.14);--frost-control-hover:rgba(183,203,230,.24);--frost-control-pressed:rgba(164,188,220,.30);background:var(--frost-control-rest);box-shadow:inset 0 0 0 1px rgba(247,250,255,.13),0 1px 4px rgba(91,115,157,.035)}
+html:root[data-theme="frosted-mist"] body.beo .topbar.app-header .utility-menu>summary:hover,
+html:root[data-theme="frosted-mist"] body.beo .topbar.app-header .utility-menu[open]>summary,
+html:root[data-theme="frosted-mist"] body.beo #prepare-context-slot #training-settings-anchor:is(:hover,[aria-expanded="true"]){background:var(--frost-control-hover);box-shadow:inset 0 0 0 1px rgba(247,250,255,.22),0 1px 4px rgba(91,115,157,.035)}
+html:root[data-theme="frosted-mist"] body.beo .topbar.app-header .utility-menu>summary:active,
+html:root[data-theme="frosted-mist"] body.beo #prepare-context-slot #training-settings-anchor:active{background:var(--frost-control-pressed);box-shadow:inset 0 0 0 1px rgba(247,250,255,.17)}
+html:root[data-theme="frosted-mist"][data-material-fallback="solid"] body.beo .topbar.app-header .utility-menu>summary,
+html:root[data-theme="frosted-mist"][data-material-fallback="solid"] body.beo #prepare-context-slot #training-settings-anchor{--frost-control-rest:#d6e1ef;--frost-control-hover:#ccdbee;--frost-control-pressed:#c4d5ea}
+@supports not(backdrop-filter:blur(1px)){
+ html:root[data-theme="frosted-mist"] body.beo .topbar.app-header .utility-menu>summary,
+ html:root[data-theme="frosted-mist"] body.beo #prepare-context-slot #training-settings-anchor{--frost-control-rest:#d6e1ef;--frost-control-hover:#ccdbee;--frost-control-pressed:#c4d5ea}
+}
+@media(prefers-reduced-transparency:reduce){
+ html:root[data-theme="frosted-mist"] body.beo .topbar.app-header .utility-menu>summary,
+ html:root[data-theme="frosted-mist"] body.beo #prepare-context-slot #training-settings-anchor{--frost-control-rest:#d6e1ef;--frost-control-hover:#ccdbee;--frost-control-pressed:#c4d5ea}
+}
