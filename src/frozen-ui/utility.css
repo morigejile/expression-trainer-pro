@@ -8,6 +8,18 @@
 @media(max-width:850px){#utility{width:calc(100vw - 28px);height:calc(100dvh - 90px)}#utility .utility-shell{grid-template-columns:155px minmax(0,1fr)}#utility .sidebar{padding:24px 12px}#utility .surface-header{padding:22px 24px}#utility .content-scroll{padding:24px}}
 @media(max-width:560px){#utility .utility-shell{display:flex;flex-direction:column}#utility .sidebar{padding:14px 12px;border-right:0;border-bottom:1px solid var(--line)}#utility-kind{font-size:16px;margin:0 0 13px 10px}#utility .sidebar nav{gap:5px}#utility .sidebar nav button{padding:5px 8px;font-size:11px}#utility .sidebar nav button[aria-current=page]{border-left:0;border-bottom:1px solid #8d7654}#utility .surface-header{padding:16px 22px;min-height:75px}#utility .surface-header h1{font-size:25px}#utility .content-scroll{padding:20px 22px}#utility .appearance-current{gap:10px}#utility .paper-swatch{width:45px;height:45px}}
 
+/* Appearance uses native radio semantics; saving never replaces these controls. */
+#utility .appearance-options{border:0;margin:0;padding:0;display:grid;gap:0}
+#utility .appearance-options legend{font-size:13px;color:var(--ink);margin-bottom:12px}
+#utility .appearance-choice{display:flex;align-items:center;gap:16px;min-height:80px;padding:16px 0;border-bottom:1px solid var(--line);cursor:pointer}
+#utility .appearance-choice input{width:16px;height:16px;min-height:16px;margin:0;flex:0 0 16px;accent-color:var(--accent)}
+#utility .appearance-copy{display:grid;gap:5px}
+#utility .appearance-copy strong{font-size:13px;font-weight:400;color:var(--ink)}
+#utility .appearance-copy small{font-size:11px;color:var(--muted);line-height:1.8}
+#utility .appearance-choice:has(:checked) .appearance-copy strong{color:var(--accent)}
+#utility #appearance-status{margin-top:20px;min-height:24px}
+#utility #appearance-status[data-status=error]{color:var(--danger,#9f4540)}
+
 /* Settings content hierarchy and AI configuration sections. */
 #utility[data-surface="settings"] .content-scroll{padding-top:30px;padding-bottom:36px}
 #utility .sidebar-bottom strong{display:block;font-size:12px;font-weight:400;color:#746c5d}

@@ -25,9 +25,9 @@ test('appearance initializes from visible HTML defaults before async load resolv
   });
 
   assert.deepEqual(root.dataset, {theme: 'graphite', layout: 'coach-rail'});
-  deferred.resolve({schemaVersion: 1, theme: 'paper', layout: 'focus-hud'});
+  deferred.resolve({schemaVersion: 1, theme: 'coral-glow', layout: 'coach-rail'});
   await initializing;
-  assert.deepEqual(root.dataset, {theme: 'paper', layout: 'focus-hud'});
+  assert.deepEqual(root.dataset, {theme: 'coral-glow', layout: 'coach-rail'});
 });
 
 test('appearance read failure preserves visible defaults and still accepts broadcasts', async () => {
@@ -47,8 +47,8 @@ test('appearance read failure preserves visible defaults and still accepts broad
 
   assert.deepEqual(root.dataset, {theme: 'graphite', layout: 'coach-rail'});
   assert.equal(typeof state.unsubscribe, 'function');
-  listener({theme: 'mist', layout: 'coach-rail'});
-  assert.equal(root.dataset.theme, 'mist');
+  listener({theme: 'ink-night', layout: 'coach-rail'});
+  assert.equal(root.dataset.theme, 'ink-night');
 });
 
 test('appearance normalizes untrusted renderer payloads', () => {
@@ -66,10 +66,10 @@ test('applying appearance changes attributes without replacing root children', (
   const children = [{id: 'transcript'}, {id: 'feedback'}];
   const root = {dataset: {}, children};
 
-  applyAppearance(root, {theme: 'midnight', layout: 'focus-hud'});
+  applyAppearance(root, {theme: 'ink-night', layout: 'coach-rail'});
 
   assert.equal(root.children, children);
-  assert.deepEqual(root.dataset, {theme: 'midnight', layout: 'focus-hud'});
+  assert.deepEqual(root.dataset, {theme: 'ink-night', layout: 'coach-rail'});
 });
 
 test('a newer broadcast is not overwritten by an older initial read', async () => {
@@ -87,9 +87,22 @@ test('a newer broadcast is not overwritten by an older initial read', async () =
     }
   });
 
-  listener({theme: 'mist', layout: 'focus-hud'});
-  deferred.resolve({theme: 'paper', layout: 'coach-rail'});
+  listener({theme: 'ink-night', layout: 'coach-rail'});
+  deferred.resolve({theme: 'coral-glow', layout: 'coach-rail'});
   await initializing;
 
-  assert.deepEqual(root.dataset, {theme: 'mist', layout: 'focus-hud'});
+  assert.deepEqual(root.dataset, {theme: 'ink-night', layout: 'coach-rail'});
+});
+
+test('all renderer HTML entries load shared appearance validation before the controller',()=>{
+  const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
+  for(const page of ['index.html','settings.html','prompt-editor.html']){
+    const text=fs.readFileSync(path.join(__dirname,'../src',page),'utf8');
+    const config=text.indexOf('src="../lib/appearance-config.js"'),controller=text.indexOf('src="appearance.js"');
+    assert(config>=0&&config<controller,page+' shared dependency order');
+    const context=vm.createContext({});
+    vm.runInContext(fs.readFileSync(path.join(__dirname,'../lib/appearance-config.js'),'utf8'),context);
+    vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/appearance.js'),'utf8'),context);
+    const root={dataset:{}};context.Appearance.applyAppearance(root,{theme:'ink-night'});assert.equal(root.dataset.theme,'ink-night');
+  }
 });

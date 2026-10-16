@@ -190,11 +190,13 @@ Main 只持有 `AsrProcessController`；实际 session wrapper、managed provide
 
 `custom-prompt.json` 由 `lib/custom-prompt-store.js` 读写，与其余 store 同形；解析结果按 mtime+size 缓存、保存时失效，避免逐句分析反复同步读盘。
 
-Settings / Help 当前由主窗口的 Frozen Utility 承载，AI 与分析偏好不再从用户入口打开独立窗口。旧主题／布局入口按确认隐藏，原外观文件与底层 API 保留，已迁移界面使用冻结样式；完整接线与验证边界见 §20。
+Settings / Help 当前由主窗口的 Frozen Utility 承载，AI 与分析偏好不再从用户入口打开独立窗口。Settings 新增「外观」子页，旧主题／布局入口继续隐藏；外观切换规则见 Training Flow §12.1，Utility 接线与验证边界见 §20。
 
-`appearance.json` 只保存四个主题和两个布局标识；缺失、损坏或未知值回退 Graphite/coach-rail，future schema 可读取已知值但拒绝显式保存。`asr-selection.json` 只保存 `selectedModelId`；缺失或稳定损坏在默认模型成功后原子恢复，瞬时初始化失败不改写选择。外观和模型操作都独立于 LLM 保存/连接测试。
+`appearance.json` 保持 schema 1，主题标识为 `graphite`（当前默认）、`coral-glow`、`ink-night`；后两者与旧主题标识独立。旧 `midnight/paper/mist`、未知主题和旧布局均规范为当前默认主题/`coach-rail`，已知新主题保留，布局固定为 `coach-rail`。读取不重写原文件；缺失、损坏或未知配置安全回退，future schema 可读取已知值但拒绝显式保存。`asr-selection.json` 只保存 `selectedModelId`；缺失或稳定损坏在默认模型成功后原子恢复，瞬时初始化失败不改写选择。外观和模型操作都独立于 LLM 保存/连接测试。
 
-Appearance 与 ASR selection 当前均为 schema version 1；二者和 LLM provider 使用独立 config/store、Preload API 与 IPC，不共用配置快照。三种配置的新文件不存在时才从 legacy settings.json 单向迁移，新文件存在后以其为准；损坏来源保留原文，future schema 只读可识别字段且拒绝显式保存。设置“保存”和“测试连接”保持独立。迁移、原子发布失败、新文件优先和 future schema 边界已有对应测试。
+Appearance 与 ASR selection 当前均为 schema version 1；二者和 LLM provider 使用独立 config/store、Preload API 与 IPC，不共用配置快照。LLM provider 保留从 legacy settings.json 单向迁移和 canonical 文件优先规则；外观只从 appearance.json 读取，不重新合并旧 settings.json 偏好。损坏来源保留原文，future schema 只读可识别字段且拒绝显式保存。设置“保存”和“测试连接”保持独立。
+
+`lib/appearance-config.js` 为 Main 与 Renderer 共享的校验/选项所有者；`src/appearance.js` 仅更新根节点属性，以单个保存队列处理最新选择，忽略保存期间较早广播，失败恢复最近成功值并反馈。沿用原 Main/Preload/store 的读取、原子保存与广播，不新增 localStorage。`src/themes.css` 集中维护两套新主题的共享颜色/表面角色及专属材质，默认主题继续使用原样式；不包含预览数据或模拟行为。珊瑚实底回退由 CSS 支持检测、减少透明度偏好及打开 Utility/切换外观时的实际模糊样式检查触发。
 
 ### 5.8 Benchmark dataset boundary (BM-01)
 

@@ -258,7 +258,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     const received = [];
     const unsubscribe = window.api.onAppearanceChanged(appearance => received.push(appearance));
     const initial = await window.api.getAppearance();
-    const saved = await window.api.saveAppearance({theme: 'paper', layout: 'focus-hud'});
+    const saved = await window.api.saveAppearance({theme: 'coral-glow', layout: 'coach-rail'});
     await new Promise(resolve => setTimeout(resolve, 25));
     unsubscribe();
     const restored = await window.api.saveAppearance({theme: 'graphite', layout: 'coach-rail'});
@@ -268,9 +268,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     initial: {schemaVersion: 1, theme: 'graphite', layout: 'coach-rail'},
     saved: {
       success: true,
-      appearance: {schemaVersion: 1, theme: 'paper', layout: 'focus-hud'}
+      appearance: {schemaVersion: 1, theme: 'coral-glow', layout: 'coach-rail'}
     },
-    received: [{schemaVersion: 1, theme: 'paper', layout: 'focus-hud'}],
+    received: [{schemaVersion: 1, theme: 'coral-glow', layout: 'coach-rail'}],
     restored: {
       success: true,
       appearance: {schemaVersion: 1, theme: 'graphite', layout: 'coach-rail'}
@@ -536,7 +536,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       );
       await waitUntil(`${layout} layout at ${viewport.width}`, async () => {
         const value = await mainWindow.webContents.executeJavaScript('document.documentElement.dataset.layout');
-        return value === layout;
+        return value === 'coach-rail';
       });
       const geometry = await mainWindow.webContents.executeJavaScript(`(() => {
         const rect = selector => {
@@ -909,7 +909,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   })()`);
   const connectionCallsBeforeAppearance = calls.llmConnection;
   const legacyAppearanceSaved = await mainWindow.webContents.executeJavaScript(`window.api.saveAppearance({theme:'paper',layout:'focus-hud'})`);
-  assert.deepEqual(legacyAppearanceSaved, {success:true,appearance:{schemaVersion:1,theme:'paper',layout:'focus-hud'}});
+  assert.deepEqual(legacyAppearanceSaved, {success:true,appearance:{schemaVersion:1,theme:'graphite',layout:'coach-rail'}});
   const synchronizedSettingsAppearance = await waitUntil('underlying appearance persists without changing Frozen Utility or report', async () => {
     const mainState = await
       mainWindow.webContents.executeJavaScript(`(() => ({
@@ -923,13 +923,13 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
         actionsPreserved: window.__appearanceSmoke.actions === document.querySelector('.action-bar'),
         visualPreserved: JSON.stringify(window.__appearanceSmoke.visual) === JSON.stringify(window.__frozenComputed())
       }))()`);
-    return mainState.theme === 'paper' && mainState.layout === 'focus-hud'
+    return mainState.theme === 'graphite' && mainState.layout === 'coach-rail'
       ? mainState
       : null;
   });
   assert.deepEqual(synchronizedSettingsAppearance, {
-      theme: 'paper',
-      layout: 'focus-hud',
+      theme: 'graphite',
+      layout: 'coach-rail',
       transcriptPreserved: true,
       feedbackPreserved: true,
       insightsPreserved: true,
@@ -939,7 +939,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       visualPreserved: true
   });
   assert.deepEqual(await mainWindow.webContents.executeJavaScript('window.api.getAppearance()'),
-    {schemaVersion:1,theme:'paper',layout:'focus-hud'});
+    {schemaVersion:1,theme:'graphite',layout:'coach-rail'});
   assert.equal(calls.llmConnection, connectionCallsBeforeAppearance);
 
   const asrManagementState = await settingsWindow.webContents.executeJavaScript(`(async () => {
