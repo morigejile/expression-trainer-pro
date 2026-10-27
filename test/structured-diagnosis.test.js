@@ -25,6 +25,155 @@ function parse(value,input = context()) {
 function apiResponse(content) { return {ok:true,status:200,async json() { return {choices:[{message:{content}}]}; }}; }
 const profile = {provider:'openai',apiKey:'test-secret-key',model:'fixture-model'};
 
+function assessed(data=response(),overrides={}) {
+  return {...data,assessment:{status:'analyzable',reason:'有可理解的表达内容。',
+    categories:['organization','argument','delivery','wording'],frameworkAssessable:false,
+    evidenceRefs:['segment-1'],...overrides}};
+}
+
+test('material-insufficient diagnosis is a successful explicit result without fabricated problems or framework analysis', () => {
+  for (const framework of [null,'prep','star','pyramid']) {
+    const source=context();
+    if (framework) source.analysisTarget={framework,definitionVersion:`${framework}-v1`};
+    const data=assessed({schemaVersion:1,summary:'本次只有试音和问候。',findings:[],
+      frameworkSummary:null,frameworkFindings:[],frameworkRecommendation:null},
+    {status:'insufficient',reason:'只有试音和问候，没有展开表达内容。',categories:[],frameworkAssessable:false});
+    const parsed=parse(JSON.stringify(data),source);
+    assert.equal(parsed.assessment.status,'insufficient');
+    assert.deepEqual(parsed.findings,[]);
+    assert.equal(parsed.frameworkAnalysis,null);
+    for (const change of [d=>{d.findings=response().findings;},
+      d=>{d.frameworkRecommendation={framework:'prep',reason:'应练结构',evidenceRefs:['segment-1']};}]) {
+      const invalid=structuredClone(data);change(invalid);
+      assert.throws(()=>parse(JSON.stringify(invalid),source),{code:'invalid-response'});
+    }
+  }
+});
+
+test('limited assessment admits only declared dimensions and does not impose a character threshold', () => {
+  const data=assessed(response(),{status:'limited',categories:['wording']});
+  assert.throws(()=>parse(JSON.stringify(data)),{code:'invalid-response'});
+  data.findings[0].category='wording';
+  assert.equal(parse(JSON.stringify(data)).findings[0].category,'wording');
+  const short=assessed(response());
+  assert.equal(parse(JSON.stringify(short)).assessment.status,'analyzable');
+  for (const change of [d=>{d.assessment.status='perfect';},d=>{d.assessment.reason='';},
+    d=>{d.assessment.categories=['wording','wording'];},d=>{d.assessment.evidenceRefs=['invented'];},
+    d=>{d.assessment.frameworkAssessable='yes';},d=>{d.assessment.score=99;}]) {
+    const invalid=structuredClone(short);change(invalid);
+    assert.throws(()=>parse(JSON.stringify(invalid)),{code:'invalid-response'});
+  }
+});
+
+test('new expression references retain supported rewrites and omit unsupported facts without discarding the diagnosis', () => {
+  const data=assessed();
+  Object.assign(data.findings[0],{example:'这是观点。',exampleEvidenceRefs:['segment-1']});
+  const parsed=parse(JSON.stringify(data));
+  assert.equal(parsed.findings[0].example,'这是观点。');
+  assert.deepEqual(parsed.findings[0].exampleEvidenceRefs,['segment-1']);
+  for (const [example,refs] of [['本周内再测一轮。',['segment-1']],['下周一由张三完成。',['segment-1']],
+    ['计划在2026年完成3次测试。',['segment-1']],['这是观点。',[]],['这是观点。',['invented']]]) {
+    Object.assign(data.findings[0],{example,exampleEvidenceRefs:refs});
+    const result=parse(JSON.stringify(data));
+    assert.equal(result.findings.length,1);
+    assert.equal(result.findings[0].example,null);
+    assert.deepEqual(result.findings[0].exampleEvidenceRefs,[]);
+  }
+});
+
+test('practice comparability and explicit inability to assess improvement cannot become an unchanged outcome', () => {
+  const source=context();
+  source.practiceComparison={status:'available',previous:{transcript:{segments:[{id:'p',text:'前一轮观点'}]}}};
+  const data=assessed();
+  data.practiceFeedback={status:'unchanged',summary:'无法判断组织层面的改善。',
+    comparability:{status:'unavailable',reason:'当前内容与所选练习目标不对应。'},
+    previousEvidenceRefs:['p'],currentEvidenceRefs:['segment-1']};
+  let feedback=parse(JSON.stringify(data),source).practiceFeedback;
+  assert.equal(feedback.status,'unavailable');
+  data.practiceFeedback.comparability={status:'comparable',reason:'两侧都有原文。'};
+  feedback=parse(JSON.stringify(data),source).practiceFeedback;
+  assert.equal(feedback.status,'unavailable');
+  data.practiceFeedback.summary='前后都先铺垫背景，再说明观点。';
+  feedback=parse(JSON.stringify(data),source).practiceFeedback;
+  assert.equal(feedback.status,'unchanged');
+  assert.throws(()=>{const invalid=structuredClone(data);delete invalid.practiceFeedback.comparability;parse(JSON.stringify(invalid),source);},{code:'invalid-response'});
+});
+
+test('current provider boundary requires assessment rather than accepting an old unassessed response or retrying silently', async () => {
+  const {sendStructuredDiagnosis}=require('../lib/ai-feedback');
+  let requests=0;
+  await assert.rejects(sendStructuredDiagnosis(context(),profile,{fetchImpl:async()=>{
+    requests++;return apiResponse(JSON.stringify(response()));
+  }}),{code:'invalid-response'});
+  assert.equal(requests,1);
+});
+
+test('flat comparison fields normalize to one saved comparability decision without allowing mixed shapes',()=>{
+  const source=context();source.practiceComparison={status:'available',scope:'full',previous:{transcript:{segments:[{id:'p'}]}}};
+  const data=assessed();data.practiceFeedback={status:'unchanged',summary:'前后都先说明观点。',
+    comparisonStatus:'comparable',comparisonReason:'两侧均包含目标内容。',previousEvidenceRefs:['p'],currentEvidenceRefs:['segment-1']};
+  const feedback=parse(JSON.stringify(data),source).practiceFeedback;
+  assert.deepEqual(feedback.comparability,{status:'comparable',reason:'两侧均包含目标内容。'});
+  assert.equal(Object.hasOwn(feedback,'comparisonStatus'),false);
+  data.practiceFeedback.comparability={status:'comparable',reason:'重复定义'};
+  assert.throws(()=>parse(JSON.stringify(data),source),{code:'invalid-response'});
+});
+
+test('comparison uncertainty follows the selected scope and checks the explanation as well as the summary',()=>{
+  const source=context();source.practiceComparison={status:'available',scope:'sentence',previous:{transcript:{segments:[{id:'p'}]}}};
+  const data=assessed();data.practiceFeedback={status:'improved',
+    summary:'无法比较全文结构的变化，但所选句子已去掉重复措辞，表达更简洁。',
+    comparability:{status:'comparable',reason:'同一目标在两侧有对应表达。'},previousEvidenceRefs:['p'],currentEvidenceRefs:['segment-1']};
+  assert.equal(parse(JSON.stringify(data),source).practiceFeedback.status,'improved');
+  source.practiceComparison.scope='full';
+  data.practiceFeedback.status='unchanged';data.practiceFeedback.summary='本轮表达的变化不明显。';
+  data.practiceFeedback.comparability.reason='无法可靠判断组织层面的改善。';
+  const feedback=parse(JSON.stringify(data),source).practiceFeedback;
+  assert.equal(feedback.status,'unavailable');
+  assert.match(feedback.summary,/暂时无法可靠比较/);
+  assert.doesNotMatch(feedback.summary,/变化不明显/);
+  source.practiceComparison.scope='sentence';
+  for(const reason of ['整体来看，无法可靠判断所选目标是否改善。','无法比较全文结构的变化，也无法确认所选句子的措辞是否改善。']) {
+    data.practiceFeedback.comparability.reason=reason;
+    assert.equal(parse(JSON.stringify(data),source).practiceFeedback.status,'unavailable');
+  }
+});
+
+test('narrow practice cannot save an assessment with no remaining evaluable dimension after full-framework suppression',()=>{
+  const source=context();source.analysisTarget={framework:'prep',definitionVersion:'prep-v1'};
+  source.practiceComparison={status:'available',scope:'sentence',previous:{transcript:{segments:[{id:'p'}]}}};
+  const data=assessed({schemaVersion:1,summary:'仅有框架观察。',findings:[],frameworkSummary:'框架摘要',frameworkFindings:[],frameworkRecommendation:null,
+    practiceFeedback:{status:'unchanged',summary:'可比较。',comparisonStatus:'comparable',comparisonReason:'框架可比较。',previousEvidenceRefs:['p'],currentEvidenceRefs:['segment-1']}},
+    {status:'limited',categories:[],frameworkAssessable:true});
+  const parsed=parse(JSON.stringify(data),source);
+  assert.equal(parsed.assessment.status,'insufficient');
+  assert.equal(parsed.assessment.frameworkAssessable,false);
+  assert.equal(parsed.frameworkAnalysis,null);
+  assert.equal(parsed.practiceFeedback.status,'unavailable');
+});
+
+test('source-cited references cannot introduce new factual clauses even when they contain no date or number',()=>{
+  const source=context();source.transcript.segments[0].text='主要功能已基本完成，报告功能还有待完善。';
+  const data=assessed();Object.assign(data.findings[0],{example:'报告正文还是空的。',exampleEvidenceRefs:['segment-1']});
+  assert.equal(parse(JSON.stringify(data),source).findings[0].example,null);
+  data.findings[0].example='报告功能还有待完善。主要功能已基本完成。';
+  assert.equal(parse(JSON.stringify(data),source).findings[0].example,data.findings[0].example);
+  source.transcript.segments[0].text='我不同意取消例行会议。';
+  data.findings[0].example='同意取消例行会议。';
+  assert.equal(parse(JSON.stringify(data),source).findings[0].example,null,'a supported substring cannot delete a negation');
+});
+
+test('unsupported calendar, Chinese quantities and placeholders are omitted but source-supported quantities remain readable',()=>{
+  const data=assessed();data.findings[0].exampleEvidenceRefs=['segment-1'];
+  for(const example of ['我会再做三轮测试。','我会在周末完成。','由[负责人]在[时间]完成。']) {
+    data.findings[0].example=example;
+    assert.equal(parse(JSON.stringify(data)).findings[0].example,null);
+  }
+  const source=context();source.transcript.segments[0].text='我会在周末再做三轮测试。';
+  data.findings[0].example='我会在周末再做三轮测试。';
+  assert.equal(parse(JSON.stringify(data),source).findings[0].example,'我会在周末再做三轮测试。');
+});
+
 test('optional expression references keep common and framework Finding evidence separate', () => {
   for (const example of [undefined,null,'  先说明观点，再补充一个与观点相关的事实。  ','字'.repeat(1600)]) {
     const source = context();
@@ -112,12 +261,13 @@ test('prompt examples teach parallel Finding arrays and remain consumable by the
       if (practice) source.practiceComparison={status:'unavailable'};
       const {system}=getStructuredDiagnosisPrompt(source);
       const template=JSON.parse(system.match(/\n(\{\n[\s\S]+?\n\})\n/)[1]);
-      assert.deepEqual(Object.keys(template).sort(),['schemaVersion','summary','findings','frameworkSummary',
+      assert.deepEqual(Object.keys(template).sort(),['schemaVersion','assessment','summary','findings','frameworkSummary',
         'frameworkFindings','frameworkRecommendation',...(practice?['practiceFeedback']:[])].sort());
       assert.equal(template.frameworkSummary===null,!framework);
       // Replace only the declared placeholder citations with supplied source IDs.
       // All other example fields must satisfy the same parser used for real output.
       for (const finding of [...template.findings,...template.frameworkFindings]) finding.evidenceRefs=['segment-1'];
+      template.assessment.evidenceRefs=['segment-1'];
       const parsed=parse(JSON.stringify(template),source);
       assert.equal(parsed.frameworkAnalysis?.framework ?? null,framework);
       assert.equal(parsed.practiceFeedback?.status ?? null,practice?'unavailable':null);
@@ -130,7 +280,7 @@ test('DeepSeek diagnosis requests JSON output for Free and each reanalysis targe
   for (const framework of [null,'prep','star','pyramid']) {
     const source = context();
     if (framework) source.analysisTarget = {framework,definitionVersion:`${framework}-v1`};
-    const data = {...response(),frameworkAnalysis:null,frameworkRecommendation:null};
+    const data = assessed({...response(),frameworkAnalysis:null,frameworkRecommendation:null},{frameworkAssessable:Boolean(framework)});
     if (framework) data.frameworkAnalysis = {framework,definitionVersion:`${framework}-v1`,summary:'专项反馈',findings:[]};
     let request;
     const fetchImpl = async (_url,options) => {
@@ -151,7 +301,7 @@ test('JSON output is limited to the known DeepSeek structured endpoint and does 
   const requests = [];
   for (const provider of ['openai','custom','ollama']) {
     await sendStructuredDiagnosis(context(),{...profile,provider,baseUrl:'https://example.test/v1'},
-      {fetchImpl:async (_url,options) => {requests.push(JSON.parse(options.body));return apiResponse(JSON.stringify(response()));}});
+      {fetchImpl:async (_url,options) => {requests.push(JSON.parse(options.body));return apiResponse(JSON.stringify(assessed()));}});
   }
   assert.equal(await sendFeedback('测试表达',{...profile,provider:'deepseek'},null,
     {fetchImpl:async (_url,options) => {requests.push(JSON.parse(options.body));return apiResponse('补充例子。');}}),'补充例子。');
@@ -258,9 +408,9 @@ test('structured request separates untrusted quoted source data from system inst
   const result = await sendStructuredDiagnosis(source,profile,{fetchImpl:async(_url,options)=>{
     request=JSON.parse(options.body);
     assert.equal(options.headers.Authorization,'Bearer test-secret-key');
-    return apiResponse(JSON.stringify(response()));
+    return apiResponse(JSON.stringify(assessed()));
   }});
-  assert.deepEqual(result,response());
+  assert.deepEqual(result,assessed());
   assert.equal(request.temperature,0.2);
   assert.equal(request.messages[0].role,'system');
   assert.equal(request.messages[0].content.includes('IGNORE THE SCHEMA'),false);
@@ -286,8 +436,9 @@ test('provider response validation pins the selected framework and both practice
   source.analysisTarget = {framework:'star',definitionVersion:'star-v1'};
   source.practiceComparison = {status:'available',goal:{observation:'结果不清楚'},scope:'full',
     previous:{transcript:{segments:[{id:'previous-1',text:'之前的表达'}]}}};
-  const data = {...response(),frameworkAnalysis:{framework:'star',definitionVersion:'star-v1',summary:'结果仍需补充',findings:[]},
-    practiceFeedback:{status:'unchanged',summary:'继续练习说明结果',previousEvidenceRefs:['previous-1'],currentEvidenceRefs:['segment-1']}};
+  const data = assessed({...response(),frameworkAnalysis:{framework:'star',definitionVersion:'star-v1',summary:'结果仍需补充',findings:[]},
+    practiceFeedback:{status:'unchanged',summary:'继续练习说明结果',comparability:{status:'comparable',reason:'两侧有对应目标的原文。'},
+      previousEvidenceRefs:['previous-1'],currentEvidenceRefs:['segment-1']}},{frameworkAssessable:true});
   const result = await sendStructuredDiagnosis(source,profile,{fetchImpl:async (_url,options) => {
     const body=JSON.parse(options.body), sent=JSON.parse(body.messages[1].content);
     assert.equal(sent.analysisTarget.framework,'star');assert.equal(sent.trainingContext.trainingMode,'free');

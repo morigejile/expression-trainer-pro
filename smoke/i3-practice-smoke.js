@@ -40,7 +40,8 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     assert.equal(await evaluate(`document.querySelector('.round-action .practice-start').textContent`),'继续练习这个目标');
     assert.equal(await evaluate(`(()=>{const s=document.querySelector('.practice-result'),e=s.querySelector('.practice-evidence'),h=s.querySelector('.practice-history'),a=s.querySelector('.round-action');return Boolean((e.compareDocumentPosition(h)&Node.DOCUMENT_POSITION_FOLLOWING)&&(h.compareDocumentPosition(a)&Node.DOCUMENT_POSITION_FOLLOWING));})()`),true,
       'same-goal action follows evidence and history inside the top result area');
-    assert.equal(await evaluate(`document.querySelectorAll('#report-body .finding-open').length>=2`),true,
+    const findings=[...report(saved).analysisRun.value.findings,...(report(saved).analysisRun.value.frameworkAnalysis?.findings || [])];
+    assert.equal(await evaluate(`document.querySelectorAll('#report-body .finding-open').length`),findings.length,
       'current Findings retain Frozen disclosure and explicit new-goal actions');
     return saved;
   };
@@ -87,12 +88,12 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     await evaluate(`document.querySelector('.practice-history').open=true;document.querySelector('.practice-evidence').open=true;document.getElementById('report-materials').open=true;document.getElementById('report-information').open=true;document.querySelector('.finding-details').open=true;document.querySelector('.round-action .practice-scope').value='sentence'`);
     await wait('practice history loaded',`document.querySelectorAll('.practice-round').length===${saved.practice.round}`);
     const state = await evaluate(`(() => {
-      window.scrollTo(0,250);
+      document.getElementById('report-scroll').scrollTop=250;
       const button=document.querySelector('.practice-round button');button.focus({preventScroll:true});
       window.__i3ReturnButton=button;
-      return {scroll:window.scrollY,id:${trainer}.trainingRecords.selected().structuredReport.snapshot.id};
+      return {scroll:document.getElementById('report-scroll').scrollTop,id:${trainer}.trainingRecords.selected().structuredReport.snapshot.id};
     })()`);
-    assert.ok(state.scroll>0,'Frozen Report uses actual page scrolling');
+    assert.ok(state.scroll>0,'Frozen Report uses its actual workspace scrolling');
     await evaluate(`document.querySelector('.practice-round button').click()`);
     await wait('history drills into exact baseline snapshot',`${trainer}.viewingTrainingRecordId===${JSON.stringify(baseline)} && ${trainer}.reportSource==='practice'`);
     assert.equal(await evaluate(`${trainer}.trainingRecords.selected().structuredReport.snapshot.id`),pinnedReportId);
@@ -102,12 +103,12 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
       assert.equal(await evaluate(`document.querySelector(${JSON.stringify(selector)}).open`),true,`return restores ${selector}`);
     }
     assert.equal(await evaluate(`document.querySelector('.round-action .practice-scope').value`),'sentence');
-    assert.equal(await evaluate(`window.scrollY`),state.scroll);
+    assert.equal(await evaluate(`document.getElementById('report-scroll').scrollTop`),state.scroll);
     assert.equal(await evaluate(`document.activeElement===document.querySelector('.practice-round button')`),true,'return restores the history opener focus');
     await evaluate(`${trainer}.refreshTrainingRecord(${trainer}.trainingRecords.selected())`);
     await wait('late passive refresh preserves the restored practice view',`document.querySelector('.practice-history').open && document.querySelector('.practice-evidence').open && document.querySelector('.round-action .practice-scope').value==='sentence' && document.querySelectorAll('.practice-round').length===${saved.practice.round} && !${trainer}.reportRestoration`);
     assert.equal(await evaluate(`${trainer}.trainingRecords.selected().structuredReport.snapshot.id`),state.id);
-    assert.equal(await evaluate(`window.scrollY`),state.scroll);
+    assert.equal(await evaluate(`document.getElementById('report-scroll').scrollTop`),state.scroll);
     assert.equal(await evaluate(`document.activeElement===document.querySelector('.practice-round button')`),true,'passive refresh keeps the restored history focus');
     for(const selector of ['#report-materials','#report-information','.finding-details'])assert.equal(await evaluate(`document.querySelector(${JSON.stringify(selector)}).open`),true);
     assert.deepEqual(aiCalls(),beforeCalls,'history inspection and return never trigger AI');
@@ -164,10 +165,10 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   await evaluate(`${trainer}.awaitTrainingAnalysis(${trainer}.trainingRecords.selected(),true,'star')`); await ready();
   const laterA = await session(aId); assert.notEqual(report(laterA).snapshot.id,aReport); assert.deepEqual(immutable(laterA),immutable(a));
   await openHistory(cId); await ready(); await restoreHistoryView(c,aId,aReport);
-  const utilityContext=await evaluate(`({record:${trainer}.viewingTrainingRecordId,snapshot:${trainer}.trainingRecords.selected().structuredReport.snapshot.id,scroll:window.scrollY,scope:document.querySelector('.round-action .practice-scope').value})`);
+  const utilityContext=await evaluate(`({record:${trainer}.viewingTrainingRecordId,snapshot:${trainer}.trainingRecords.selected().structuredReport.snapshot.id,scroll:document.getElementById('report-scroll').scrollTop,scope:document.querySelector('.round-action .practice-scope').value})`);
   await evaluate(`document.getElementById('btn-help').click();document.getElementById('close-surface').click()`);
   await saveProfile('i2-example');
-  assert.deepEqual(await evaluate(`({record:${trainer}.viewingTrainingRecordId,snapshot:${trainer}.trainingRecords.selected().structuredReport.snapshot.id,scroll:window.scrollY,scope:document.querySelector('.round-action .practice-scope').value})`),utilityContext,'Help and Settings preserve the fixed report and view context');
+  assert.deepEqual(await evaluate(`({record:${trainer}.viewingTrainingRecordId,snapshot:${trainer}.trainingRecords.selected().structuredReport.snapshot.id,scroll:document.getElementById('report-scroll').scrollTop,scope:document.querySelector('.round-action .practice-scope').value})`),utilityContext,'Help and Settings preserve the fixed report and view context');
   const chain = await history(cId,report(c).snapshot.id); assert.deepEqual(chain.map(row=>row.round),[1,2,3]);
   assert.equal(chain[0].reportId,aReport); assert.equal(chain[0].feedbackStatus,null,'baseline has no fabricated previous-round feedback');
   assert.equal(chain[2].feedbackStatus,'unchanged'); assert.ok(chain[2].evidence?.length>0,'history has saved key evidence');
@@ -195,7 +196,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   await startPractice({index:1,scope:'sentence'});
   const eId = await recordOnce(d.trainingPrompt,{practice:true}); const e = await assertPracticeReport(eId,2); await assertFeedback(e);
   assert.notEqual(e.practice.chainId,d.practice.chainId); assert.equal(e.practice.origin.sessionId,dId);
-  assert.equal(e.practice.origin.findingId,'framework-1'); assert.deepEqual(e.practice.history,[{sessionId:dId,reportId:report(d).snapshot.id,round:1}]);
+  assert.equal(e.practice.origin.findingId,'finding-2'); assert.deepEqual(e.practice.history,[{sessionId:dId,reportId:report(d).snapshot.id,round:1}]);
   assert.deepEqual(immutable(await session(dId)),immutable(d));
   const listed = (await invoke('listTrainingSessions',{requestId:'i3-no-duplicate-basis'})).value;
   assert.equal(listed.filter(row=>row.id===dId).length,1,'one Session can end one chain and start another');

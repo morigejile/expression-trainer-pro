@@ -37,7 +37,9 @@ async function fixture(t, provider = 'custom', {speechAvailable=false} = {}) {
       response.end('private upstream detail fixture-secret');
       return;
     }
-    const diagnosis = {schemaVersion:1,summary:'建议补充支持观点的具体例子。',findings:[{
+    const diagnosis = {schemaVersion:1,assessment:{status:'analyzable',reason:'转写包含观点与行动。',
+      categories:['organization','argument','delivery','wording'],frameworkAssessable:Boolean(context.analysisTarget),
+      evidenceRefs:[context.transcript.segments[0].id]},summary:'建议补充支持观点的具体例子。',findings:[{
       id:'finding-1',category:'argument',observation:'表达提出了先明确目标的主张。',
       interpretation:'具体事例可以帮助听者理解。',recommendation:'补充一个实际例子。',
       evidenceRefs:responseMode === 'invalid-ref' ? ['another-session'] : [context.transcript.segments[0].id,
@@ -47,6 +49,12 @@ async function fixture(t, provider = 'custom', {speechAvailable=false} = {}) {
     diagnosis.frameworkFindings = context.analysisTarget
       ? [{...diagnosis.findings[0],id:'framework-1',evidenceRefs:[context.transcript.segments[0].id]}] : [];
     diagnosis.frameworkRecommendation = null;
+    if (responseMode==='insufficient') {
+      diagnosis.assessment={status:'insufficient',reason:'只有试音和问候，没有展开表达内容。',
+        categories:[],frameworkAssessable:false,evidenceRefs:[context.transcript.segments[0].id]};
+      diagnosis.summary='本次材料不足以形成表达诊断。';diagnosis.findings=[];
+      diagnosis.frameworkSummary=null;diagnosis.frameworkFindings=[];
+    }
     response.writeHead(200, {'Content-Type':'application/json'});
     response.end(JSON.stringify({choices:[{message:{content:JSON.stringify(diagnosis)}}]}));
   });
@@ -137,11 +145,27 @@ test('speech, metric and Finding evidence keep exact run ownership through HTTP 
   for (const ref of finding.evidenceRefs) assert.ok(Object.hasOwn(context.evidenceMap,ref));
   assert.deepEqual(context.quality.vad,{status:'degraded',reasons:['vad-thresholds-uncalibrated']});
   assert.equal(report.analysisRun.provenance.profileId,'approved');
-  assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v5');
+  assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v6');
   assert.equal((await f.command('analyze',{retry:true})).value.id,report.snapshot.id,'complete report is not reanalyzed');
   await f.app.close();
   const restored=(await f.command('get',{},f.open())).value;
   assert.deepEqual(selectStructuredReport(restored.results),report);
+  assert.equal(f.received.length,1);
+});
+
+test('insufficient-material assessment survives real HTTP, immutable persistence and restart as a successful result',async t=>{
+  const f=await fixture(t,'custom',{speechAvailable:true});f.mode('insufficient');
+  const saved=await f.complete(),report=selectStructuredReport(saved.results);
+  assert.equal(report.analysisRun.status,'completed');
+  assert.equal(report.analysisRun.value.assessment.status,'insufficient');
+  assert.equal(report.snapshot.value.availability,'complete');
+  assert.deepEqual(report.analysisRun.value.findings,[]);
+  assert.ok(report.metricRun.value.metrics.some(m=>m.status==='available'));
+  assert.equal(f.received.length,1);
+  await f.app.close();
+  const restored=(await f.command('get',{},f.open())).value;
+  assert.deepEqual(restored.results,saved.results);
+  assert.equal(selectStructuredReport(restored.results).analysisRun.value.assessment.status,'insufficient');
   assert.equal(f.received.length,1);
 });
 

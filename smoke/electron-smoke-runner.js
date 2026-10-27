@@ -97,22 +97,43 @@ const fakeLlm = {
     if (profile.model==='i2-timeout') throw Object.assign(new Error('Injected timeout'),{code:'timeout'});
     if (profile.model==='i2-pending') await new Promise(resolve=>{fakeLlm.releaseDiagnosis=resolve;});
     const {parseStructuredDiagnosisResponse} = require('../lib/structured-diagnosis');
-    const data = {schemaVersion:1,summary:'先说明目标，再给出支持理由。',
+    const data = {schemaVersion:1,assessment:{status:'analyzable',reason:'受控用例包含可评价的转写。',
+      categories:['organization','argument','delivery','wording'],frameworkAssessable:Boolean(context.analysisTarget),
+      evidenceRefs:context.transcript.segments.slice(0,1).map(segment=>segment.id)},summary:'先说明目标，再给出支持理由。',
       findings:context.transcript.segments.length ? [{id:'finding-1',category:'organization',observation:'表达可以先说明目标。',
         interpretation:'先给出重点可以帮助听者理解。',recommendation:'下一次先用一句话说明重点。',
         evidenceRefs:[context.transcript.segments[0].id]}] : []};
-    if (profile.model.startsWith('i2-') && data.findings[0]) data.findings[0].example=profile.model==='i2-null'?null:'我建议先明确这次表达的目标，再说明支持这个目标的理由。';
+    if (profile.model.startsWith('i2-') && data.findings[0]) {
+      data.findings[0].example=profile.model==='i2-null'?null:context.transcript.segments[0].text;
+      data.findings[0].exampleEvidenceRefs=data.findings[0].example ? [context.transcript.segments[0].id] : [];
+    }
     if (profile.model==='i2-empty') {data.summary='本次未形成有充分证据的改善建议。';data.findings=[];}
-    if (context.analysisTarget) data.frameworkAnalysis = {...context.analysisTarget,summary:'先说明观点，再补充与观点相关的具体支撑。',
+    if (profile.model==='i2-insufficient') {
+      data.assessment={...data.assessment,status:'insufficient',reason:'受控材料只有试音和问候。',categories:[],frameworkAssessable:false};
+      data.summary='本次材料不足以形成表达诊断。';data.findings=[];
+    }
+    if (profile.model==='i2-limited') {
+      data.assessment={...data.assessment,status:'limited',reason:'受控材料只足以评价措辞。',categories:['wording'],frameworkAssessable:false};
+      for (const finding of data.findings) finding.category='wording';
+    }
+    if (context.analysisTarget && data.assessment.frameworkAssessable) data.frameworkAnalysis = {...context.analysisTarget,summary:'先说明观点，再补充与观点相关的具体支撑。',
       findings:data.findings.map(finding => ({...finding,id:'framework-1'}))};
+    if (['sentence','segment'].includes(context.practiceComparison?.scope) && data.findings.length) {
+      // A scoped round has no full-framework Finding. Keep a distinct, local
+      // target so the new-goal/chain test can still exercise a genuine choice.
+      data.findings.push({...data.findings[0],id:'finding-2',category:'wording',
+        observation:'练习片段可使用更具体的措辞。',interpretation:'具体措辞让所选片段更易理解。',recommendation:'下一遍把所选片段中的对象说具体。'});
+    }
     if (context.practiceComparison) {
       const previous = context.practiceComparison.previous?.transcript.segments[0];
       const current = context.transcript.segments[0];
       data.practiceFeedback = previous && current
         ? {status:'unchanged',summary:'前后都保留了同一表达目标，可以继续练习清晰开场。',previousEvidenceRefs:[previous.id],currentEvidenceRefs:[current.id]}
         : {status:'unavailable',summary:'来源证据不可用，暂时无法可靠比较。',previousEvidenceRefs:[],currentEvidenceRefs:[]};
+      data.practiceFeedback.comparability={status:previous && current?'comparable':'unavailable',
+        reason:previous && current?'受控用例两侧有对应目标的转写。':'来源证据不可用。'};
     }
-    return parseStructuredDiagnosisResponse(JSON.stringify(data),context);
+    return parseStructuredDiagnosisResponse(JSON.stringify(data),context,{requireAssessment:true});
   },
   createRequestCoordinator,
   runCoordinatedRequest,

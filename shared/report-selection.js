@@ -12,13 +12,33 @@
   const finding = value => value && Object.hasOwn(CATEGORIES,value.category) &&
     ['id','observation','interpretation','recommendation'].every(key => typeof value[key] === 'string') &&
     refs(value.evidenceRefs) && exampleValid(value);
+  function assessmentValid(value) {
+    const a=value.assessment;
+    if (a===undefined) return true;
+    if (!a || !['analyzable','limited','insufficient'].includes(a.status) ||
+        typeof a.reason!=='string' || !a.reason.trim() || a.reason.length>800 ||
+        !Array.isArray(a.categories) || a.categories.length>4 || new Set(a.categories).size!==a.categories.length ||
+        a.categories.some(category=>!Object.hasOwn(CATEGORIES,category)) ||
+        typeof a.frameworkAssessable!=='boolean' || !refs(a.evidenceRefs) || a.evidenceRefs.length>20 ||
+        new Set(a.evidenceRefs).size!==a.evidenceRefs.length) return false;
+    if (a.status==='insufficient' && (a.categories.length || a.frameworkAssessable || value.findings?.length ||
+        value.frameworkAnalysis || value.frameworkRecommendation)) return false;
+    if (a.status!=='insufficient' && (!a.evidenceRefs.length || (!a.categories.length && !a.frameworkAssessable))) return false;
+    if (!Array.isArray(value.findings) || value.frameworkAnalysis && !Array.isArray(value.frameworkAnalysis.findings)) return false;
+    const findings=[...value.findings,...(value.frameworkAnalysis?.findings || [])];
+    return (!value.frameworkAnalysis || a.frameworkAssessable) && findings.every(f=>f && a.categories.includes(f.category));
+  }
   function extensionsValid(value) {
     const f = value.frameworkAnalysis, r = value.frameworkRecommendation, p = value.practiceFeedback;
-    return (!f || Boolean(frameworks?.getFramework(f.framework,f.definitionVersion)) && typeof f.summary === 'string' &&
+    return assessmentValid(value) && (!f || Boolean(frameworks?.getFramework(f.framework,f.definitionVersion)) && typeof f.summary === 'string' &&
       Array.isArray(f.findings) && f.findings.every(finding)) &&
       (!r || Boolean(frameworks?.getFramework(r.framework)) && typeof r.reason === 'string' && refs(r.evidenceRefs)) &&
       (!p || ['improved','partly-improved','unchanged','needs-practice','unavailable'].includes(p.status) &&
-        typeof p.summary === 'string' && refs(p.previousEvidenceRefs) && refs(p.currentEvidenceRefs));
+        typeof p.summary === 'string' && refs(p.previousEvidenceRefs) && refs(p.currentEvidenceRefs) &&
+        (!p.comparability || ['comparable','unavailable'].includes(p.comparability.status) &&
+          typeof p.comparability.reason==='string' && Boolean(p.comparability.reason.trim()) &&
+          (p.comparability.status!=='unavailable' || p.status==='unavailable')) &&
+        (value.assessment?.status!=='insufficient' || p.status==='unavailable'));
   }
   function selectStructuredReport(results, {snapshotId} = {}) {
     if (!Array.isArray(results)) return null;

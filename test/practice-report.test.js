@@ -11,7 +11,7 @@ class Node {
 const element=(tag,className,text)=>new Node(tag,className,text);
 const find=(node,name)=>[...(node.className.split(' ').includes(name)?[node]:[]),...node.children.flatMap(child=>find(child,name))];
 const tick=()=>new Promise(resolve=>setImmediate(resolve));
-function fixture({missing=false,failed=false,invalidRef=false,withoutReport=false,unsaved=false,historyRows,audioAvailable=false,apiOverrides}={}) {
+function fixture({missing=false,failed=false,invalidRef=false,withoutReport=false,unsaved=false,historyRows,audioAvailable=false,apiOverrides,feedbackOverride}={}) {
   const wrap=(id,kind,value,status='completed')=>({id,kind,value,status,sessionId:'previous',inputRevision:1});
   const previous={id:'previous',status:'completed',trainingMode:'free',framework:null,trainingPrompt:null,artifact:{state:'missing'},transcript:{revision:1,segments:[{id:'p',text:'上一轮真实原文',startMs:100,endMs:1000,timingSource:'estimated'}]},results:[
     wrap('e','speech-evidence',{schemaVersion:1,segments:[]}),wrap('m','common-analysis',{schemaVersion:1,speechEvidenceRunId:'e',metrics:[]}),
@@ -21,11 +21,22 @@ function fixture({missing=false,failed=false,invalidRef=false,withoutReport=fals
   if(unsaved){record.factsSaved=false;record.saveState='failed';}
   if(audioAvailable){previous.artifact.state='available';record.audioState='available';}
   const projection=withoutReport?null:{snapshot:{id:'current-r'},analysisRun:{status:failed?'failed':'completed',value:{reason:failed?'timeout':null,practiceFeedback:{status:'improved',summary:'已保存的改善结论',previousEvidenceRefs:[invalidRef?'missing':'p'],currentEvidenceRefs:['c']}}}};
+  if (feedbackOverride) Object.assign(projection.analysisRun.value.practiceFeedback,feedbackOverride);
   const calls=[],opens=[];const api={getTrainingSession:async command=>{calls.push(command);return {ok:true,value:missing?null:previous};},getPracticeHistory:async command=>{calls.push(command);return {ok:true,value:historyRows || [{round:1,sessionId:'origin',reportId:'origin-r',deleted:false,summary:'基准表达',evidence:[]},{round:2,sessionId:'previous',reportId:'r',deleted:true,summary:null},{round:3,sessionId:'current',reportId:'current-r',deleted:false,summary:'当前反馈',evidence:[]}]};}};
   Object.assign(api,apiOverrides);
   const root=element('div'),dispose=renderPractice(element,root,{record,projection,api,frozen:true,onPractice:()=>{},onOpen:(...args)=>opens.push(args)});
   return {root,record,previous,projection,calls,opens,api,dispose};
 }
+
+test('unavailable comparability is not displayed as unchanged even when both reference sets exist',async()=>{
+  const f=fixture({feedbackOverride:{status:'unchanged',summary:'无法判断组织层面的改善。',
+    comparability:{status:'unavailable',reason:'当前材料不对应所选目标。'}}});
+  await tick();
+  assert.match(find(f.root,'practice-change')[0].textContent,/暂时无法可靠比较/);
+  assert.doesNotMatch(find(f.root,'practice-change')[0].textContent,/变化不明显/);
+  assert.match(find(f.root,'practice-source-status')[0].textContent,/当前材料不对应所选目标/);
+  f.dispose();
+});
 test('frozen targeted report orders evidence and history before scope/continuation and pins history',async()=>{
   const f=fixture();await tick();const section=find(f.root,'practice-result')[0];
   assert.ok(section.children.indexOf(find(section,'practice-evidence')[0])<section.children.indexOf(find(section,'practice-goal')[0]));

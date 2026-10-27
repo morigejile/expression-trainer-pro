@@ -93,6 +93,7 @@
       const previousIds=new Set(source?.transcript?.segments?.map(segment=>segment.id) || []),currentIds=new Set(record.segments?.map(segment=>segment.id) || []);
       const validRefs=(refs,ids)=>Array.isArray(refs) && refs.length>0 && refs.length<=20 && new Set(refs).size===refs.length && refs.every(ref=>ids.has(ref));
       const verified=analysis?.status==='completed' && sourceReport && feedback && feedback.status!=='unavailable' &&
+        analysis.value.assessment?.status!=='insufficient' && feedback.comparability?.status!=='unavailable' &&
         validRefs(feedback.previousEvidenceRefs,previousIds) && validRefs(feedback.currentEvidenceRefs,currentIds);
       status.textContent=`相比上一轮：${verified?states[feedback.status]:states.unavailable} · 本轮范围：${{sentence:'句子',segment:'片段',full:'完整表达'}[practice.scope]} · 目标来源：第 1 轮基准`;
       feedbackSummary.textContent=verified?feedback.summary:localTitle;
@@ -104,7 +105,9 @@
           : reason==='not-configured'?'尚未配置分析模型，本轮事实仍可查看，暂时无法可靠比较。'
           : reason==='disclosure-required'?'尚未完成 AI 数据告知，本轮尚无可靠的目标反馈。'
           : reason==='timeout'?'本轮分析超时，已有训练与可用结果仍可查看，暂时无法可靠比较。':'本轮分析未完成，已有训练与可用结果仍可查看，暂时无法可靠比较。';
-      } else if (!verified) sourceStatus.textContent=feedback?.status==='unavailable'?feedback.summary:'前后对比依据不足，尚无可靠的练习变化结论。';
+      } else if (!verified) sourceStatus.textContent=analysis.value.assessment?.status==='insufficient' ? analysis.value.assessment.reason
+        : feedback?.comparability?.status==='unavailable' ? feedback.comparability.reason
+        : feedback?.status==='unavailable'?feedback.summary:'前后对比依据不足，尚无可靠的练习变化结论。';
       else sourceStatus.textContent='';
     }
     function loadSource() {

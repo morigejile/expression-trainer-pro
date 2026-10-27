@@ -71,8 +71,9 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   assert.equal(await evaluate(modal),false);assert.equal(calls.llmDiagnosis,1,'complete history keeps existing reanalysis policy');
   await evaluate(`document.getElementById('report-information').open=true;document.getElementById('report-materials').open=true;document.querySelector('.finding-open').click()`);
   assert.equal(await evaluate(`document.querySelector('.finding-details').open`),true);
-  assert.match(await evaluate(`document.querySelector('.example').textContent`),/我建议/);
-  assert.equal(await evaluate(`document.querySelector('.evidence-quote').textContent.includes('我建议')`),false);
+  const savedExample=reportValue=>reportValue.results.filter(run=>run.kind==='diagnosis' && run.status==='completed').at(-1).value.findings[0].example;
+  assert.equal(await evaluate(`document.querySelector('.example').textContent`),savedExample(await session(id)));
+  assert.equal(await evaluate(`document.querySelector('.example').classList.contains('evidence-quote')`),false,'reference and original evidence retain separate roles');
   await require('./i2-report-visual-smoke').run({mainWindow,BrowserWindow,evaluate,capture});
   // Effective endpoint decides local/remote; coverage remains independent of configuration identity.
   await setProfile('i2-null',{provider:'ollama',endpoint:'http://127.0.0.1:11434',enabled:true});
@@ -86,6 +87,15 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   await setProfile('i2-timeout');await analyze('star');assert.equal((await session(id)).results.at(-2).value.reason,'timeout');
   await setProfile('i2-empty');await analyze('star');assert.equal(await evaluate(`document.querySelectorAll('.finding').length`),0);
   assert.match(await evaluate(`document.getElementById('report-body').textContent`),/充分证据/);
+  await setProfile('i2-insufficient');await analyze('star');
+  assert.equal((await session(id)).results.at(-2).status,'completed','material insufficiency is not an API failure');
+  assert.match(await evaluate(`document.getElementById('report-summary-copy').textContent`),/材料不足/);
+  assert.equal(await evaluate(`document.querySelectorAll('#report-body .finding').length`),0);
+  assert.equal(await evaluate(`document.getElementById('report-analysis-actions').offsetParent`),null,'no repeated diagnosis button for insufficient material');
+  await setProfile('i2-example');await analyze('prep');
+  assert.notEqual(await evaluate(`document.getElementById('report-analysis-actions').offsetParent===null`),true,'actions recover for a later ordinary report');
+  await setProfile('i2-limited');await analyze('star');
+  assert.match(await evaluate(`document.getElementById('report-summary-copy').textContent`),/有限分析/,'assessment limitation is visible beside the summary');
   await setProfile('i2-example');await analyze('prep');
   saved=await session(id);assert.equal(saved.trainingMode,original.trainingMode);assert.equal(saved.framework,original.framework);assert.deepEqual(saved.trainingPrompt,original.trainingPrompt);assert.deepEqual(saved.transcript,original.transcript);
   // A genuine PREP Session keeps its identity in Report and History after a separate analysis view.

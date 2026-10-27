@@ -3,6 +3,15 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const {reportModel,present} = require('../src/frozen-report');
 
+test('material-insufficient content is distinct from a failed request and from a positive diagnosis', () => {
+  const record={factsSaved:true,saveState:'saved',durationMs:1000,
+    structuredReport:{analysisRun:{status:'completed',value:{summary:'不能将这段摘要当成完整诊断。',
+      assessment:{status:'insufficient',reason:'只有试音和问候。'}}},metricRun:{value:{metrics:[]}}}};
+  assert.equal(reportModel(record).title,'本次材料不足以形成表达诊断');
+  assert.equal(reportModel(record).assessmentReason,'只有试音和问候。');
+  assert.equal(reportModel(record).summary,null);
+});
+
 test('AI-off report projects saved facts without creating a summary, Finding or score', () => {
   const record = {trainingMode:'structured',framework:'prep',frameworkDefinitionVersion:'prep-v1',
     trainingPrompt:null,durationMs:2000,fullText:'这是真实转写。',stats:{totalWords:6,fillers:0},metricsAvailable:true,

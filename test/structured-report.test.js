@@ -50,6 +50,52 @@ function descendants(node,predicate) {
 function byClass(node,name) {return descendants(node,child=>child.className.split(' ').includes(name));}
 function container() {return new Document().createElement('div');}
 
+test('an insufficient saved report keeps local measurements without problem, framework or practice controls', () => {
+  const source=runs('1',{findings:0});
+  source[2].value.assessment={status:'insufficient',reason:'只有试音，没有展开表达内容。',
+    categories:[],frameworkAssessable:false,evidenceRefs:['segment-1']};
+  const projection=api().selectStructuredReport(source);
+  assert.ok(projection);
+  const target=container();
+  api().renderStructuredReport(target,projection,{frozen:true,onReanalyze:()=>assert.fail('must not offer another framework'),
+    onPractice:()=>assert.fail('must not invent practice')});
+  assert.match(target.textContent,/材料不足/);
+  assert.match(target.textContent,/只有试音/);
+  assert.match(target.textContent,/文字与数字字符数/);
+  assert.equal(byClass(target,'finding').length,0);
+  assert.equal(byClass(target,'framework-reanalysis').length,0);
+  assert.equal(byClass(target,'practice-start').length,0);
+  assert.doesNotMatch(target.textContent,/优先改善|本次分析未形成有充分证据的改善建议/);
+});
+
+test('a saved assessment cannot admit contradictory Findings or replace a valid legacy snapshot', () => {
+  const before=runs(),after=runs('2');
+  after[2].value.assessment={status:'insufficient',reason:'缺少表达内容。',categories:[],
+    frameworkAssessable:false,evidenceRefs:['segment-1']};
+  assert.equal(api().selectStructuredReport([...before,...after]).snapshot.id,'report-snapshot-1');
+});
+
+test('damaged assessed snapshots are skipped without making the prior report unreadable',()=>{
+  for(const change of [value=>{value.findings=[null];},value=>{value.frameworkAnalysis={framework:'prep',definitionVersion:'prep-v1',summary:'专项',findings:{}};}]) {
+    const before=runs(),after=runs('2');
+    after[2].value.assessment={status:'analyzable',reason:'有可评价内容。',categories:['organization'],
+      frameworkAssessable:true,evidenceRefs:['segment-1']};
+    change(after[2].value);
+    assert.equal(api().selectStructuredReport([...before,...after]).snapshot.id,'report-snapshot-1');
+  }
+});
+
+test('limited report exposes its assessment boundary and keeps only supported existing practice targets', () => {
+  const source=runs();
+  source[2].value.assessment={status:'limited',reason:'只足以评价措辞，无法评价完整结构。',
+    categories:['wording'],frameworkAssessable:false,evidenceRefs:['segment-1']};
+  source[2].value.findings[0].category='wording';
+  const target=container();api().renderStructuredReport(target,api().selectStructuredReport(source),{onPractice:()=>{}});
+  assert.match(target.textContent,/有限分析/);
+  assert.match(target.textContent,/只足以评价措辞/);
+  assert.equal(byClass(target,'practice-start').length,1);
+});
+
 test('framework report keeps common advice and evidence while recommendation requires an explicit click', () => {
   const source = runs();
   source[2].value.frameworkAnalysis = {framework:'star',definitionVersion:'star-v1',summary:'需要补充结果',

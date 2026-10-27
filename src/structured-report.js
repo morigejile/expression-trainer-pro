@@ -48,8 +48,12 @@
     const practiceView = typeof module === 'object' && module.exports ? require('./practice-report') : globalThis.PracticeReport;
     const dispose = record?.practice ? practiceView.renderPractice(element,root,{record,projection,api,onPractice,onOpen,onEvidence,frozen,onLayout}) : () => {};
     const successful = analysisRun.status === 'completed';
+    const assessment=successful ? analysisRun.value.assessment : null;
+    const insufficient=assessment?.status==='insufficient';
     root.appendChild(element('h2','report-title','本次表现摘要'));
-    root.appendChild(element('p','report-summary',successful ? analysisRun.value.summary : '本地分析已保留，AI 诊断暂不可用。'));
+    root.appendChild(element('p','report-summary',insufficient ? '本次材料不足以形成表达诊断。' : successful ? analysisRun.value.summary : '本地分析已保留，AI 诊断暂不可用。'));
+    if (assessment && assessment.status!=='analyzable') root.appendChild(element('p','report-status',
+      `${insufficient?'材料不足':'有限分析'}：${assessment.reason}${insufficient?' 原文、录音与本地指标仍可查看；可以回到首页重新表达。':''}`));
     if (!successful) root.appendChild(element('p','report-status',reasonText(analysisRun.value.reason)));
     if (latestAttempt) {
       const status = element('p','report-status',`最近一次重试未完成：${reasonText(latestAttempt.reason)}。当前显示此前已保存的诊断。`);
@@ -140,7 +144,7 @@
       if (frozen && typeof onPractice==='function') {controls.querySelector('button').textContent='练习这一点';controls.querySelector('button').className+=' practice-action';content.appendChild(controls);}
       return card;
     }
-    if (successful) {
+    if (successful && !insufficient) {
       const framework = analysisRun.value.frameworkAnalysis;
       const findings = frozen ? [...analysisRun.value.findings,...(framework?.findings || [])] : analysisRun.value.findings;
       const priorityCount=frozen?2:3;
@@ -172,7 +176,7 @@
       }
     }
     root.appendChild(metricDetails);
-    if (typeof onReanalyze === 'function') {
+    if (typeof onReanalyze === 'function' && !insufficient) {
       const actions = element('details','framework-reanalysis');
       actions.appendChild(element('summary',null,'换个框架分析这次表达'));
       actions.appendChild(element('p',null,'使用已保存的转写与证据追加分析，保留原训练方式和历史结果。'));

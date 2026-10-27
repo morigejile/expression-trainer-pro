@@ -114,7 +114,7 @@ M1 完成录音的音频随 Session 保留至用户明确删除；不按条数�
 | R-A01 | 应用以版本化、可重算的方式计算确定性表达指标。 | 相同事实输入与相同规则版本得到相同结果；每项结果带计算版本和证据；同一 Common 可测事实跨训练方式使用同一口径；旧结果不会被无声覆盖，AI 不重复测量这些事实。 | P0 | Accepted | M2 |
 | R-A02 | 应用判断语言组织能力。 | 结果覆盖主题聚焦、信息顺序、衔接或同等明确定义的维度；每个结论关联原文证据；无法判断时允许返回未知。 | P1 | Accepted | M2 |
 | R-A03 | 应用判断表达结构合理性。 | 结果说明主张、理由、事实或结论之间的关系；结构建议定位到相关片段；不把单个词汇直接判为逻辑错误。 | P1 | Accepted | M2 |
-| R-A04 | 每个完成且可分析的 Session 默认进入 AI 诊断与建议流程。 | 存在有效且显式启用的当前 AI profile 时自动生成版本化、结构化诊断；Schema 与 `evidenceRefs` 校验后才可产生 Observation → Interpretation → Recommendation Finding；证据不足不凑 Finding。未配置、未启用、技术失败或无效结果时显示明确状态、引导配置或重试，本地事实与确定性分析仍保留。 | P0 | Accepted | M2 |
+| R-A04 | 每个完成且可分析的 Session 默认进入 AI 诊断与建议流程。 | 存在有效且显式启用的当前 AI profile 时自动生成版本化、结构化诊断；Schema 与 `evidenceRefs` 校验后才可产生 Observation → Interpretation → Recommendation Finding；证据不足不凑 Finding，按 [Training Flow §7.1](training-flow.md#71-完整分析与训练重点分层) 验收材料不足/有限分析及事实保留参考，不用字数阈值代替材料判断。未配置、未启用、技术失败或无效结果时显示明确状态、引导配置或重试，本地事实与确定性分析仍保留。 | P0 | Accepted | M2；M4 可信度扩展 |
 | R-A05 | 雷达按证据成熟度展示表达维度或明确的未校准状态。 | M2 验收 uncalibrated / unavailable 的诚实呈现，不产生分数或多边形；完整雷达校准不阻塞 M2，后续按 Backlog B-20 重开。启用数值投影前，每个维度须有固定名称、证据来源、mapping、版本及 unavailable 条件，相近维度通过 MECE 检查；只投影已有证据、确定性结果和经验证解释，缺证据不补零，不预设统一 0–100。 | P1 | Accepted | M2 缺失态；完整校准延后 |
 | R-A06 | 时间维度用于分析速度、停顿、流畅度和卡壳。 | 语速、停顿和片段时长使用 capability-based Timing Contract 声明的时间来源；ASR 成功不代表具 token timing，近似时间与模型时间戳可区分且禁止伪造；时间轴或 Speech Evidence 缺失时仅相关指标显式降级。 | P0 | Accepted | M2 |
 | R-A07 | 每个可分析的 Session 都具有 Common Analysis。 | Common Analysis 使用跨训练方式一致的维度和版本规则；Free 仍可分析聚焦、顺序、衔接和一般结构问题，但在用户未请求框架视角时不得按 PREP、STAR 或金字塔槽位判定。 | P0 | Accepted | M2 |

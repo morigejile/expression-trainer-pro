@@ -9,7 +9,8 @@
   function reportModel(record) {
     const projection = record.structuredReport;
     const analysis = projection?.analysisRun;
-    const summary = analysis?.status === 'completed' ? analysis.value.summary : record.report || null;
+    const assessment=analysis?.status==='completed' ? analysis.value.assessment : null;
+    const summary = assessment?.status==='insufficient' ? null : analysis?.status === 'completed' ? analysis.value.summary : record.report || null;
     const reason = analysis?.value?.reason;
     const mode = context.formatTrainingContext({...record,trainingPrompt:null});
     const measured = id => {
@@ -19,8 +20,10 @@
     const fallback = (value,key) => value !== undefined ? value
       : record.metricsAvailable !== false && Number.isFinite(record.stats?.[key]) ? record.stats[key] : null;
     return {mode,analysisContext:context.formatTrainingContext(record),summary,
+      assessmentStatus:assessment?.status,assessmentReason:assessment?.reason,
       title:record.saveState === 'failed' && !record.factsSaved ? '训练尚未保存'
         : record.dataQuality?.includes('asr-error') ? '转写暂时不可用'
+        : assessment?.status==='insufficient' ? '本次材料不足以形成表达诊断'
         : summary ? null : record.reportPending ? '正在分析这一次'
         : reason === 'disclosure-required' ? '等待 AI 数据告知'
         : reason === 'not-enabled' ? '本次未生成 AI 分析'
@@ -70,6 +73,7 @@
       notice.append(node('p',model.title === '训练尚未保存'
         ? '本次内容仍暂存在当前会话中。请重试保存；关闭应用可能丢失未保存内容。'
         : model.title === '转写暂时不可用' ? '保留已保存的录音及可用证据。转写未完成，可改选模型进行新训练。'
+        : model.title==='本次材料不足以形成表达诊断' ? `${model.assessmentReason} 原文、录音与本地指标仍可查看；可以回到首页重新表达。`
         : record.reportPending ? '分析完成后显示结果。原文、录音与本地指标仍可查看。'
         : model.reason === 'disclosure-required' ? '确认 AI 数据说明后执行本次分析。暂不分析仍可查看已保存的训练。'
         : model.reason === 'not-enabled'
@@ -89,7 +93,7 @@
     info.append(node('p',`ASR：${record.sourceSnapshot?.asr?.modelId || record.sourceSnapshot?.asr?.provider || '来源信息不可用'}。片段时间按保存的来源标记，不表示精确词语起止。`,'source-note'));
     if (root) {
       for (const element of root.querySelectorAll('.report-title,.report-summary')) element.remove();
-      (model.summary && record.structuredReport?.latestAttempt ? copy : info).append(...statuses);
+      (model.assessmentStatus==='limited' || model.summary && record.structuredReport?.latestAttempt ? copy : info).append(...statuses);
     } else if (!record.report) body.replaceChildren();
     info.append(...details);
     for (const line of byId('subtitle-container').querySelectorAll('[data-segment-id]')) {
@@ -100,6 +104,8 @@
       line.title=segment.timingSource === 'estimated' ? '片段播放位置为估计值' : '保存的片段播放位置';
     }
     if (actions) {
+      actions.hidden=record.structuredReport?.analysisRun?.value.assessment?.status==='insufficient';
+      actions.classList?.toggle('hidden',actions.hidden);
       (model.summary ? info : copy).append(actions);
       const label=actions.querySelector('.btn-label');
       if (label) label.textContent=record.reportPending ? '分析中…' : !model.summary && ['not-enabled','not-configured','disclosure-required'].includes(model.reason) ? '分析这一次' : '重试诊断';

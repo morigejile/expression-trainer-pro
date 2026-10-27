@@ -301,7 +301,11 @@ AI 输入是有界的 `AnalysisContext`：同一 Session/revision 的 transcript
 
 输出严格为 `schemaVersion = 1`、`summary`、`findings`。每个 Finding 包含唯一 `id`、受控 `category`、`observation`、`interpretation`、`recommendation`、至少一个实际 `evidenceRefs`，以及可选 `example`；通用与框架 Finding 使用相同字段语义。类别的唯一产品定义见 [Training Flow §7.1](../product/training-flow.md#71-完整分析与训练重点分层)。未知字段、未知引用、重复 ID 或无效类型均拒绝；没有充分证据时 Findings 可以为空。解析与边界上限见 [Structured Diagnosis](../../lib/structured-diagnosis.js)。
 
+`structured-diagnosis-v6` 的新请求必须返回 `assessment:{status,reason,categories,frameworkAssessable,evidenceRefs}`；保留 schemaVersion=1 的扩展兼容，历史缺失该字段不补算、不改写。status 为 `analyzable / limited / insufficient`，reason 为 1～800 字符，categories 为不重复的受控类别，frameworkAssessable 为布尔值；evidenceRefs 最多20个、不重复且只引用当前转写，有可评价内容时至少一个。Finding 只能属于声明可评价的类别；frameworkAssessable=false 时不产生专项结果。insufficient 必须没有可评价类别、专项结果、Finding 或框架推荐。材料充分程度独立于请求/报告技术可用性：成功的不足判定仍是 completed Diagnosis，不改成网络/模型失败，不丢弃本地指标。
+
 `recommendation` 是具体、可执行的下一轮表达练习建议，仍使用既有字段，不新增 tip。`example` 是一种建议表达方式，不是用户原文或 Evidence，不得虚构现实中的负责人、时间、经历或事实。字段可缺失或为 null；提供字符串时必须为非空文本且不超过1600字符。旧结果缺失/null时正常读取并省略表达参考区，不复制 recommendation、不填固定示例、不自动重分析或改写历史。扩展沿用 schemaVersion=1 的可选字段兼容及现有提示/报告版本机制，不改变 Session/SQLite schema，其他字段的类型、长度和引用校验保持严格。
+
+新诊断中的非空参考还须提供 `exampleEvidenceRefs`（1～20个不重复的当前转写 ID）。首批采用保守整理：只选择/重排由标点分隔的完整原文分句，不允许分句内部增删文字，防止通过子串匹配删掉否定词。缺少来源、出现新的分句/数字/常见日历数量表达或参考中混入补充占位时，只将该参考规范为 null 和空引用，保留有效 Finding；字段类型或长度非法仍拒绝。所需补充信息放在建议中作为问题或占位提示，不能拼成已经发生的事实/承诺。引用和字面检查不构成语义真实性证明，跨句因果、条件依赖或省略后含义改变仍需内容验收；本批不将自由改写视为已验证能力。
 
 AI 解释已测事实，不重算时长、频次、比例或给出雷达/总分；不推断未提供的精确词时刻、声学特征或情绪质量。输出没有 severity/priority 必填字段、重练执行控制或自动范围选择字段。启用与失败恢复按 Training Flow §6.1/§7.6，结构化失败不改写 Source、Metric 或训练事实。
 
@@ -328,6 +332,8 @@ AI 解释已测事实，不重算时长、频次、比例或给出雷达/总分�
 M4 的专项结果嵌入不可变 `diagnosis.value.frameworkAnalysis`，记录 framework、definitionVersion、summary 和带引用的 findings，复用所属 run 的 status/analyzerVersion/inputRevision。`analysisTarget` 与 Session 的训练方式分开；显式框架重分析追加 Diagnosis / Report snapshot，复用已有 Speech Evidence / Common Analysis 的确切 ID。Free 推荐记录在 `frameworkRecommendation`，只提供选择建议。
 
 针对性练习的 `practiceFeedback` 保存状态、结论、前一轮和本轮转写引用；非 unavailable 结论必须两侧有证据。它只回答已选目标，不承担 B-25 的任意历史 Finding 自动对应。删除来源后既有派生快照保持不可变，展示时检查引用可用性并降级，不能把不可复核的历史结论继续作为当前改善证明。
+
+v6 新反馈还必须有 `comparability:{status,reason}`，status 为 comparable/unavailable，reason 为 1～800 字符；模型平铺返回 `comparisonStatus / comparisonReason`，Main 校验后组装该保存形状，不混用两套表示。先判断所选目标是否有足够的前后材料，再产生变化状态；不可比较、当前材料不足、来源不可用或摘要/比较理由明确无法判断目标变化时，只能保存 unavailable，并使用同一限制形成摘要。对显式无法判断语句的保守检查只做降级，不推断改善，不将局部练习对全文的限制扩大为目标不可比，也不能替代语义验收。句子/片段练习不保存完整框架评价；移除该评价后若没有可评价类别，归为当前范围材料不足，不能保存不可读取的 completed 结果。保存期间删除来源时同时降级变化状态和可比性；旧反馈缺少该扩展仍按既有来源检查读取。
 
 ## 7. Persistence boundary
 

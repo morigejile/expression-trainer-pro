@@ -7,7 +7,7 @@ async function run({mainWindow, BrowserWindow, evaluate, capture}) {
   const frozen = 'C:/Users/mr/.codex/worktrees/29dd/expression-trainer-pro/design-preview-merged';
   assert.ok(fs.existsSync(path.join(frozen, 'freeze-v1.json')), 'protected Frozen reference is available');
   const reference = new BrowserWindow({show:false, width:1200, height:800,
-    webPreferences:{contextIsolation:true, nodeIntegration:false}});
+    webPreferences:{contextIsolation:true, nodeIntegration:false,backgroundThrottling:false}});
   const original = mainWindow.getSize();
   const measurements = [];
   const style = selector => `(() => {
@@ -20,13 +20,22 @@ async function run({mainWindow, BrowserWindow, evaluate, capture}) {
   })()`;
   try {
     await reference.loadFile(path.join(frozen, 'index.html'), {query:{screen:'practice'}});
+    // The reference scrolls the whole document; the product scrolls inside its
+    // workspace. A native document scrollbar otherwise steals 15px only from
+    // the reference at 960px, despite both reporting the same innerWidth.
+    await reference.webContents.insertCSS('html{scrollbar-width:none}');
     await reference.webContents.executeJavaScript('document.fonts.ready');
     await evaluate('document.fonts.ready');
     for (const width of [1200,960,1280,1440]) {
       mainWindow.setSize(width,800); reference.setContentSize(width,800);
-      await new Promise(resolve => setTimeout(resolve,120));
+      for (let n=0;n<80;n++) {
+        const sizes=await Promise.all([evaluate('innerWidth'),reference.webContents.executeJavaScript('innerWidth')]);
+        if(sizes.every(value=>value===width)) break;
+        await new Promise(resolve=>setTimeout(resolve,25));
+      }
       assert.equal(await evaluate('innerWidth'), width);
       assert.equal(await reference.webContents.executeJavaScript('innerWidth'),width,'reference and application use the same CSS viewport');
+      assert.equal(await reference.webContents.executeJavaScript('document.documentElement.clientWidth'),width,'reference has the same available layout width');
       assert.equal(await evaluate('document.documentElement.scrollWidth<=innerWidth'), true,
         `${width}: targeted Report has no horizontal overflow`);
       const actualFrame = await evaluate(style('#frozen-report'));
