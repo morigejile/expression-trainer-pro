@@ -37,8 +37,9 @@ test('app icon preserves the master glyph and is wired to executable and install
   const svg = fs.readFileSync(path.join(assets, 'app-icon.svg'), 'utf8');
   const master = fs.readFileSync(path.join(assets, 'brand-mark.svg'), 'utf8');
   assert.equal(svg.match(/<path[^>]* d="([^"]+)"/)[1], master.match(/<path[^>]* d="([^"]+)"/)[1]);
-  assert.match(svg, /viewBox="0 0 28 28"/); assert.match(svg, /stroke-width="2.6"/);
-  assert.match(svg, /stroke="#6B6150"/); assert.match(svg, /fill="#FAF8F2"/);
+  assert.match(svg, /viewBox="0 0 28 28"/); assert.match(svg, /stroke-width="2.05"/);
+  assert.match(svg, /stroke="#6B6150"/); assert.match(master, /stroke="#6B6150"/);
+  assert.match(svg, /rx="6.4"/); assert.match(svg, /fill="url\(#app-icon-surface\)"/);
   const config = require('../forge.config').createForgeConfig({environment:{}});
   assert.equal(config.packagerConfig.icon, path.join(assets, 'app-icon.ico'));
   assert.equal(config.makers[0].config.setupIcon, config.packagerConfig.icon);

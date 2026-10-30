@@ -42,8 +42,8 @@ async function generate() {
   if (!dataDir || !path.isAbsolute(dataDir)) throw Error('Supply --data-dir=<absolute isolated directory>');
   fs.mkdirSync(dataDir, {recursive:true}); app.setPath('userData', dataDir);
   const master = fs.readFileSync(path.join(assets, 'brand-mark.svg'), 'utf8');
-  const glyph = master.match(/<path\b[^>]*\/>/)[0].replace('stroke="#365b48"', 'stroke="#6B6150"');
-  const svg = `<!-- Generated from brand-mark.svg by scripts/generate-app-icon.js -->\n<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 28 28"><title>表达训练</title><rect width="28" height="28" rx="5" fill="#FAF8F2"/>${glyph}</svg>\n`;
+  const glyph = master.match(/<path\b[^>]*\/>/)[0];
+  const svg = `<!-- Generated from brand-mark.svg by scripts/generate-app-icon.js -->\n<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 28 28"><title>表达训练</title><defs><linearGradient id="app-icon-surface" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#FFFEF8"/><stop offset="1" stop-color="#EEEEE3"/></linearGradient></defs><rect width="28" height="28" rx="6.4" fill="url(#app-icon-surface)"/><rect x="0.1" y="0.1" width="27.8" height="27.8" rx="6.3" fill="none" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="0.2"/>${glyph}</svg>\n`;
   await app.whenReady();
   const win = new BrowserWindow({show:false, webPreferences:{contextIsolation:true, nodeIntegration:false, backgroundThrottling:false}});
   await win.loadURL('data:text/html,<html><body></body></html>');

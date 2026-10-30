@@ -346,3 +346,28 @@ html:root[data-theme="frosted-mist"][data-material-fallback="solid"] body.beo #p
  html:root[data-theme="frosted-mist"] body.beo .topbar.app-header .utility-menu>summary,
  html:root[data-theme="frosted-mist"] body.beo #prepare-context-slot #training-settings-anchor{--frost-control-rest:#d6e1ef;--frost-control-hover:#ccdbee;--frost-control-pressed:#c4d5ea}
 }
+
+/* Reading-panel material only: the 65% reference mixes surface colors, while
+   transparency belongs to the background fill, never the panel's contents. */
+html:root body.beo[data-frozen-ui="history"] #history-screen,
+html:root body.beo[data-frozen-ui="report"] #frozen-report{
+ --workspace-frost-fill:color-mix(in srgb,var(--reading,var(--panel)) 65%,var(--bg));
+ background-color:var(--workspace-frost-fill);
+ border-radius:18px;
+ box-shadow:0 8px 38px -14px var(--shadow,color-mix(in srgb,var(--ink) 18%,transparent));
+}
+@supports(backdrop-filter:blur(1px)){
+ html:root:not([data-material-fallback="solid"]) body.beo[data-frozen-ui="history"] #history-screen,
+ html:root:not([data-material-fallback="solid"]) body.beo[data-frozen-ui="report"] #frozen-report{
+  background-color:color-mix(in srgb,var(--workspace-frost-fill) 72%,transparent);
+  backdrop-filter:blur(18px) saturate(.85);
+ }
+}
+@media(prefers-reduced-transparency:reduce){
+ html:root:not([data-material-fallback="solid"]) body.beo[data-frozen-ui="history"] #history-screen,
+ html:root:not([data-material-fallback="solid"]) body.beo[data-frozen-ui="report"] #frozen-report{
+  background-color:var(--workspace-frost-fill);
+  backdrop-filter:none;
+ }
+}
+html:root body.beo:is([data-frozen-ui="history"],[data-frozen-ui="report"]) .layout>.topbar.app-header{border-bottom-color:transparent}
