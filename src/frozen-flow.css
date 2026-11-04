@@ -146,11 +146,9 @@ body[data-frozen-ui="report"] .finding-category{font-size:9px;color:var(--muted)
 body[data-frozen-ui="report"] :is(.finding-details,.metric-details,.framework-reanalysis)>summary{display:flex;align-items:center;justify-content:space-between;padding:6px 0;min-height:32px;font-size:11px;color:#84735b}
 body[data-frozen-ui="report"] :is(.metric-details,.framework-reanalysis)>summary::after{content:'⌄';font-size:18px;font-weight:300}
 body[data-frozen-ui="report"] :is(.metric-details,.framework-reanalysis)[open]>summary::after{content:'⌃'}
-body[data-frozen-ui="report"] .framework-recommendation-title{font-size:12px;font-weight:500;line-height:1.7;color:var(--ink);margin:20px 0 8px}
-body[data-frozen-ui="report"] .framework-reason{margin:0 0 10px}
 body[data-frozen-ui="report"] .finding-evidence blockquote{background:#eae4d83d;border-left:2px solid #c4b493;padding:16px 20px}
 body[data-frozen-ui="report"] .practice-actions{display:flex;gap:12px;margin-top:18px;align-items:end}
-body[data-frozen-ui="report"] :is(.evidence-button,.practice-start,.framework-recommendation,.framework-reanalysis button,#btn-retry-save){font-size:11px;padding:8px 16px;border:1px solid var(--line);border-radius:4px;min-height:39px}
+body[data-frozen-ui="report"] :is(.evidence-button,.practice-start,.framework-reanalysis button,#btn-retry-save){font-size:11px;padding:8px 16px;border:1px solid var(--line);border-radius:4px;min-height:39px}
 body[data-frozen-ui="report"] .practice-scope{padding:8px 12px;background:none;color:inherit;border:1px solid var(--line);border-radius:4px}
 body[data-frozen-ui="report"] #frozen-findings .practice-scope{color:#393831}
 /* Saved recording playback: native media drives a light, single-column surface. */

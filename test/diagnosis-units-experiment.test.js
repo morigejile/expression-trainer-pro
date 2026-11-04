@@ -96,9 +96,9 @@ test('unified and local-scope experiments preserve complete v8 user material; sc
   assert.doesNotMatch(scopeCards,/\[ARG-|\[ORG-|DEL-03/);assert.match(scopeCards,/不猜/);
 });
 
-test('all protected production-default sources remain byte-for-byte unchanged',()=>{
+test('frozen baseline sources remain byte-for-byte unchanged as production evolves',()=>{
   const root=path.join(__dirname,'../benchmark/prompt-evaluation/diagnosis-units-v1'),manifest=require(path.join(root,'baseline/manifest.json'));
-  for(const [file,hash] of Object.entries(manifest.files))assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(__dirname,'..',file))).digest('hex'),hash,file);
+  for(const [file,hash] of Object.entries(manifest.files))assert.equal(crypto.createHash('sha256').update(fs.readFileSync(path.join(root,'baseline/sources',path.basename(file)))).digest('hex'),hash,file);
 });
 
 test('second-call experiment receives original task, transcript, evidence limits and actual candidates',()=>{

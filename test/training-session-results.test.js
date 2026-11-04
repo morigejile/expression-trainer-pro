@@ -85,9 +85,12 @@ test('duplicate result IDs keep the first snapshot while stale and foreign evide
 test('normalization receipt is optional, bounded and survives actual storage reopening without changing report fields',async t=>{
   const f=fixture(t);let store=await f.open();const id=await saved(store);
   const receipt={code:'selected-framework-recommendation-null',field:'frameworkRecommendation',value:null,rawResponse:'{"synthetic":"raw before null completion"}'};
-  await store.appendResult(id,result({kind:'diagnosis',provenance:{responseNormalization:receipt}}));
+  const legacyValue={schemaVersion:1,summary:'旧报告',findings:[],frameworkRecommendation:{framework:'prep',reason:'旧推荐',evidenceRefs:['segment-1']}};
+  await store.appendResult(id,result({kind:'diagnosis',provenance:{responseNormalization:receipt},value:legacyValue}));
   store.close();store=await f.open();
   assert.deepEqual((await store.get(id)).results[0].provenance.responseNormalization,receipt);
+  assert.deepEqual((await store.get(id)).results[0].value,legacyValue);
+  assert.equal((await store.get(id)).resultIntegrity,'ok');
   for(const change of [x=>{x.code='other';},x=>{x.field='summary';},x=>{x.value='not-null';},x=>{x.extra=true;},
     x=>{delete x.rawResponse;},x=>{x.rawResponse='x'.repeat(64001);}]){
     const bad=structuredClone(receipt);change(bad);
@@ -95,7 +98,7 @@ test('normalization receipt is optional, bounded and survives actual storage reo
   }
 });
 
-test('real old E06 bytes pass the synthetic provider, strict parser and session pipeline into reopened SQLite with receipt intact',async t=>{
+test('E06 without the retired field passes HTTP and reopened SQLite without normalization',async t=>{
   const f=fixture(t);let store=await f.open();
   const input=require('../scripts/evaluate-problem-library').buildCases()[5].context;
   const raw=require('../benchmark/prompt-evaluation/problem-library-v03/refined/actual-results.json').cases.find(x=>x.id==='E06').outputs.new.raw;
@@ -108,13 +111,13 @@ test('real old E06 bytes pass the synthetic provider, strict parser and session 
   const analyzer=createSessionAnalysis({store,
     runSpeechEvidence:async()=>({schemaVersion:1,status:'unavailable',segments:[],quality:{vad:{status:'unavailable',reasons:['model-unavailable']}}}),
     getDiagnosisProfile:()=>({profile}),
-    diagnose:({profile,signal,onNormalization,...source})=>require('../lib/ai-feedback').sendStructuredDiagnosis(buildAnalysisContext(source),profile,
-      {signal,onNormalization,fetchImpl:async()=>{requests++;return {ok:true,status:200,json:async()=>({choices:[{message:{content:raw}}]})};}})});
+    diagnose:({profile,signal,...source})=>require('../lib/ai-feedback').sendStructuredDiagnosis(buildAnalysisContext(source),profile,
+      {signal,fetchImpl:async()=>{requests++;return {ok:true,status:200,json:async()=>({choices:[{message:{content:raw}}]})};}})});
   await analyzer.start(id);await analyzer.close();store.close();store=await f.open();
   const record=await store.get(id),diagnosis=record.results.find(x=>x.kind==='diagnosis');
   assert.equal(requests,1,'synthetic HTTP only; no repair call or external model');
-  assert.equal(diagnosis.status,'completed');assert.equal(diagnosis.value.frameworkRecommendation,null);
-  assert.deepEqual(diagnosis.provenance.responseNormalization,{code:'selected-framework-recommendation-null',field:'frameworkRecommendation',value:null,rawResponse:raw});
+  assert.equal(diagnosis.status,'completed');assert.equal(Object.hasOwn(diagnosis.value,'frameworkRecommendation'),false);
+  assert.equal(Object.hasOwn(diagnosis.provenance,'responseNormalization'),false);
   assert.equal(diagnosis.value.findings.length,2);assert.equal(diagnosis.value.frameworkAnalysis.findings.length,2);
   assert.deepEqual(record.transcript,before.transcript);
 });

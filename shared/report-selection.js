@@ -29,6 +29,7 @@
     return (!value.frameworkAnalysis || a.frameworkAssessable) && findings.every(f=>f && a.categories.includes(f.category));
   }
   function extensionsValid(value) {
+    // Read-only compatibility for recommendations already saved by v9 and earlier.
     const f = value.frameworkAnalysis, r = value.frameworkRecommendation, p = value.practiceFeedback;
     return assessmentValid(value) && (!f || Boolean(frameworks?.getFramework(f.framework,f.definitionVersion)) && typeof f.summary === 'string' &&
       Array.isArray(f.findings) && f.findings.every(finding)) &&

@@ -1495,13 +1495,7 @@ class ExpressionTrainer {
         onOpen:(id,reportId,round) => this.openHistoryRecord(id,{reportId,returnTo:this.reportSource==='practice' && this.practiceReturn ? this.practiceReturn : {id:record.id,
           reportId:record.structuredReport.snapshot.id,source:this.reportSource,viewState:ReportViewState.capture(document,record,round)}}),
         onLayout:part=>this.restorePracticeLayout(record,part),
-        onReanalyze:framework => this.trackAnalysis(() => this.awaitTrainingAnalysis(record,true,framework)),
-        onFramework:framework => {
-          const definition = TrainingFrameworks.getFramework(framework);
-          if (!definition) return;
-          this.showTraining();
-          this.trainingSetup.configure({...record,trainingMode:'structured',framework,frameworkDefinitionVersion:definition.version});
-        }});
+        onReanalyze:framework => this.trackAnalysis(() => this.awaitTrainingAnalysis(record,true,framework))});
       this.reportAiStatus.textContent=record.dataQuality?.includes('asr-error') ? '转写未完成，已保存录音及可用证据；可改选模型进行新训练。' : '';
       this.btnReport.querySelector?.('.btn-label') && (this.btnReport.querySelector('.btn-label').textContent='重试诊断');
     } else {

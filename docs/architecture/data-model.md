@@ -301,7 +301,7 @@ AI 输入是有界的 `AnalysisContext`：同一 Session/revision 的 transcript
 
 输出严格为 `schemaVersion = 1`、`summary`、`findings`。每个 Finding 包含唯一 `id`、受控 `category`、`observation`、`interpretation`、`recommendation`、至少一个实际 `evidenceRefs`，以及可选 `example`；通用与框架 Finding 使用相同字段语义。类别的唯一产品定义见 [Training Flow §7.1](../product/training-flow.md#71-完整分析与训练重点分层)。未知字段、未知引用、重复 ID 或无效类型均拒绝；没有充分证据时 Findings 可以为空。解析与边界上限见 [Structured Diagnosis](../../lib/structured-diagnosis.js)。
 
-`structured-diagnosis-v6` 及后续版本的新请求必须返回 `assessment:{status,reason,categories,frameworkAssessable,evidenceRefs}`；保留 schemaVersion=1 的扩展兼容，历史缺失该字段不补算、不改写。status 为 `analyzable / limited / insufficient`，reason 为 1～800 字符，categories 为不重复的受控类别，frameworkAssessable 为布尔值；evidenceRefs 最多20个、不重复且只引用当前转写，有可评价内容时至少一个。Finding 只能属于声明可评价的类别；frameworkAssessable=false 时不产生专项结果。insufficient 必须没有可评价类别、专项结果、Finding 或框架推荐。材料充分程度独立于请求/报告技术可用性：成功的不足判定仍是 completed Diagnosis，不改成网络/模型失败，不丢弃本地指标。
+`structured-diagnosis-v6` 及后续版本的新请求必须返回 `assessment:{status,reason,categories,frameworkAssessable,evidenceRefs}`；保留 schemaVersion=1 的扩展兼容，历史缺失该字段不补算、不改写。status 为 `analyzable / limited / insufficient`，reason 为 1～800 字符，categories 为不重复的受控类别，frameworkAssessable 为布尔值；evidenceRefs 最多20个、不重复且只引用当前转写，有可评价内容时至少一个。Finding 只能属于声明可评价的类别；frameworkAssessable=false 时不产生专项结果。insufficient 必须没有可评价类别、专项结果、Finding。材料充分程度独立于请求/报告技术可用性：成功的不足判定仍是 completed Diagnosis，不改成网络/模型失败，不丢弃本地指标。
 
 `recommendation` 是具体、可执行的下一轮表达练习建议，仍使用既有字段，不新增 tip。`example` 是一种建议表达方式，不是用户原文或 Evidence，不得虚构现实中的负责人、时间、经历或事实。字段可缺失或为 null；提供字符串时必须为非空文本且不超过1600字符。旧结果缺失/null时正常读取并省略表达参考区，不复制 recommendation、不填固定示例、不自动重分析或改写历史。扩展沿用 schemaVersion=1 的可选字段兼容及现有提示/报告版本机制，不改变 Session/SQLite schema，其他字段的类型、长度和引用校验保持严格。
 
@@ -311,7 +311,7 @@ AI 解释已测事实，不重算时长、频次、比例或给出雷达/总分�
 
 主诊断 `structured-diagnosis-v9` 沿用上述输出字段，在本地 result 的现有 provenance 中增加可选 `problemLibraryVersion`，记录实际使用的问题库版本（首次接入为 `expression-problem-library-v0.3`，本轮质量候选为 v0.4）；它不是 AI 响应字段，也不混入用户分析指令快照。旧来源缺失该字段时保持缺失，不用当前库版本补写历史；`promptVersion` 和 ReportSnapshot.analysisVersion 记录本次提示词版本。不新增 SQLite／Session schema，原有四类、Finding ID 和历史读取规则不变。
 
-v8 的窄格式兼容只处理新平铺响应：可信上下文选中有效框架／定义版本，返回缺少且按规则只能为 null 的 `frameworkRecommendation` 时补 null，随后执行全部原有严格校验。Free 不普遍补字段，不覆盖已有非 null，不补 assessment、摘要、Finding、引用或其他缺失，不接受未知字段和非法引用；旧嵌套格式兼容不变。只有整体成功才记录可选来源 `responseNormalization:{code,field,value,rawResponse}`：code 固定为 `selected-framework-recommendation-null`、field 固定为 `frameworkRecommendation`、value=null、原始 rawResponse 为 1～64000 字符，四字段精确校验且仍受整体 JSON 快照上限约束。原始字符串不改写；旧结果无此字段保持缺失，最终报告与 Finding 不增加字段，不触发模型修复重试或第二次审核请求。
+历史 v8/v9 曾在所选框架的平铺响应缺失 `frameworkRecommendation` 时补 null，并保存 `responseNormalization:{code,field,value,rawResponse}` 回执。v10 不再生成推荐字段、补 null 或写新回执；生产新响应包含该字段（包括 null）时按未知字段拒绝。旧快照及历史回执原样保留，不重算、不迁移；读取时仍验证旧回执的四字段、固定 code=`selected-framework-recommendation-null`、field=`frameworkRecommendation`、value=null 和 1～64000 字符的 rawResponse，避免将既有结果误判为损坏。
 
 ## 6. Analysis and retraining invariants
 
@@ -325,7 +325,7 @@ v8 的窄格式兼容只处理新平铺响应：可信上下文选中有效框�
 - AI result status is independent of session completion: unavailable/failed states do not change completed facts. Scheduling and enablement follow [R-A04/R-A11](../product/requirements.md#6-m2表达证据ai-分析与雷达图).
 - A Structured session automatically requests Framework Analysis for its selected framework in addition to Common Analysis.
 - A user may explicitly request a framework re-analysis of an existing session. That appends a new `FrameworkAnalysis` over the same transcript revision and evidence; it does not change how the session was trained.
-- AI Coaching consumes facts and validated Common/Framework results to explain priorities, suggest improvements, or recommend a framework. It is not an independent source of deterministic facts or scores.
+- AI Coaching consumes facts and validated Common/Framework results to explain priorities and suggest improvements. It is not an independent source of deterministic facts or scores.
 - 每次继续练习/重练均创建新的 `TrainingSession`，包括句子/片段/完整表达范围的 Free 重练；自动保存新事实与新结果，不复用源 Session identity，不覆盖原表达、原分析或此前 attempts。
 - Finding-aware 重练的新 Session 必须持久化来源 Session 与来源 Finding 的关系。Finding 引用应能定位其所属来源 Session 和分析结果/版本，不能仅靠显示名称或当前页面状态识别。
 - 来源关系记录训练意图与前后关联，独立于 `trainingMode`、framework 和训练题目，不产生独立 Session 类型；继承的准备值在新 Session 开始时形成它自己的事实快照，不引用一个可变的源上下文替代快照。继承与用户调整流程由 [Training Flow §9](../product/training-flow.md#9-带上下文再次进入-training-workspace) 定义。History 不展示上/下游报告不取消这些关系或持久化义务。
@@ -333,7 +333,7 @@ v8 的窄格式兼容只处理新平铺响应：可信上下文选中有效框�
 - Session identity 不等于链成员 identity：某记录可在旧链是末轮，同时被新链历史引用为第 1 轮。沿当前目标继续时保留链和 origin，更新相邻 Session/Report 引用；改选 Finding 新建链。来源删除后保留最小定位元数据及本轮练习目标，不级联后续练习；缺失来源按 Flow §10.2 降级，不能用另一条记录补位。
 - Training-time Guidance is framework-definition content shown before a session. Post-training Framework Analysis is versioned derived output. They may share a definition but not a storage record or UI responsibility.
 
-M4 的专项结果嵌入不可变 `diagnosis.value.frameworkAnalysis`，记录 framework、definitionVersion、summary 和带引用的 findings，复用所属 run 的 status/analyzerVersion/inputRevision。`analysisTarget` 与 Session 的训练方式分开；显式框架重分析追加 Diagnosis / Report snapshot，复用已有 Speech Evidence / Common Analysis 的确切 ID。Free 推荐记录在 `frameworkRecommendation`，只提供选择建议。
+M4 的专项结果嵌入不可变 `diagnosis.value.frameworkAnalysis`，记录 framework、definitionVersion、summary 和带引用的 findings，复用所属 run 的 status/analyzerVersion/inputRevision。`analysisTarget` 与 Session 的训练方式分开；显式框架重分析追加 Diagnosis / Report snapshot，复用已有 Speech Evidence / Common Analysis 的确切 ID。v10 新诊断不含 `frameworkRecommendation`；旧字段仅作历史读取兼容，报告不再展示或提供采用动作，历史结果保持不可变。
 
 针对性练习的 `practiceFeedback` 保存状态、结论、前一轮和本轮转写引用；非 unavailable 结论必须两侧有证据。它只回答已选目标，不承担 B-25 的任意历史 Finding 自动对应。删除来源后既有派生快照保持不可变，展示时检查引用可用性并降级，不能把不可复核的历史结论继续作为当前改善证明。
 

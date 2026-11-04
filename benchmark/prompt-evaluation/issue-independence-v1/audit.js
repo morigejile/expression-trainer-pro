@@ -1,12 +1,14 @@
 'use strict';
 // Strictly offline. Validates provenance and renders all calls, including failures.
-const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict'),cp=require('node:child_process');
+const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict');
 const ROOT=path.resolve(__dirname,'../../..'),hash=x=>crypto.createHash('sha256').update(x).digest('hex');
 const read=name=>JSON.parse(fs.readFileSync(path.join(__dirname,name),'utf8'));
 const m=read('manifest.json'),inputs=read('inputs.json'),prompts=read('prompts.json'),results=read('results.json'),review=read('review.json');
 assert.equal(hash(fs.readFileSync(path.join(__dirname,'run.js'))),m.runnerSha256);
-for(const f of m.protectedFiles)assert.equal(hash(fs.readFileSync(path.join(ROOT,f.path))),f.sha256);
-assert.equal(hash(cp.execFileSync('git',['diff','--binary'],{cwd:ROOT,stdio:['ignore','pipe','ignore']})),m.trackedDiffSha256);
+const {loadFrozenBaseline,loadFrozenExperiment,verifyHistoricalSources}=require('../../../scripts/evaluate-diagnosis-quality');
+const replay=loadFrozenBaseline(path.join(ROOT,'benchmark/prompt-evaluation/report-concision-v9/comparison-start.json'));
+const sourceMetadataOnly=verifyHistoricalSources(m.protectedFiles,replay);
+// Keep the original recorded diff hash without comparing a later working tree.
 const frozen=JSON.parse(fs.readFileSync(path.join(ROOT,'benchmark/prompt-evaluation/report-concision-v9/comparison-start.json'),'utf8'));
 for(const s of m.specs){
   const original=JSON.parse(fs.readFileSync(path.join(ROOT,s.source),'utf8')).outputs[s.sourceIndex];
@@ -30,6 +32,6 @@ for(let i=0;i<12;i++){
  else counts[r.variant].failed++;
  md+=`\n## ${r.sequence}/12 · ${r.pair} · ${r.variant} · 第 ${r.repeat} 次\n\n状态：${r.status}；模型：${r.responseModel??'未知'}；HTTP：${r.httpStatus??'无响应'}。\n\n**模型原始返回**\n\n\`\`\`json\n${r.raw??'(未收到模型内容；失败详情见 results.json)'}\n\`\`\`\n\n**助手评阅（不改写上述返回）**\n\n${v.reasonAssessment}\n\n${v.contentAssessment}\n`;
 }
-fs.writeFileSync(path.join(__dirname,'all-results.md'),md);
-const audit={actualCalls:12,completed:results.outputs.filter(x=>x.status==='completed').length,failed:results.outputs.filter(x=>x.status==='failed').length,fullFrozenInputsAndOriginalFeedback:true,singleFactorOnly:true,rawAndParsedIdentical:true,productionAndEarlierEvidenceUnchanged:true,trackedDiffUnchanged:true,counts,interpretation:'Label agreement only, not content-quality pass rate; manual reasons and fidelity assessments are separate.'};
-fs.writeFileSync(path.join(__dirname,'audit.json'),JSON.stringify(audit,null,2)+'\n');console.log(JSON.stringify(audit,null,2));
+if(!process.argv.includes('--check')) fs.writeFileSync(path.join(__dirname,'all-results.md'),md);
+const audit={actualCalls:12,completed:results.outputs.filter(x=>x.status==='completed').length,failed:results.outputs.filter(x=>x.status==='failed').length,fullFrozenInputsAndOriginalFeedback:true,singleFactorOnly:true,rawAndParsedIdentical:true,frozenSourcesAndEarlierEvidenceUnchanged:true,sourceMetadataOnly,counts,interpretation:'Label agreement only, not content-quality pass rate; manual reasons and fidelity assessments are separate.'};
+if(!process.argv.includes('--check')) fs.writeFileSync(path.join(__dirname,'audit.json'),JSON.stringify(audit,null,2)+'\n');console.log(JSON.stringify(audit,null,2));

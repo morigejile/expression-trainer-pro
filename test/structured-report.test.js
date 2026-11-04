@@ -96,7 +96,7 @@ test('limited report exposes its assessment boundary and keeps only supported ex
   assert.equal(byClass(target,'practice-start').length,1);
 });
 
-test('framework report keeps common advice and evidence while recommendation requires an explicit click', () => {
+test('framework report keeps common advice while saved legacy recommendations have no display or action', () => {
   const source = runs();
   source[2].value.frameworkAnalysis = {framework:'star',definitionVersion:'star-v1',summary:'需要补充结果',
     findings:[{...source[2].value.findings[0],id:'framework-1',observation:'未交代处理结果'}]};
@@ -110,9 +110,9 @@ test('framework report keeps common advice and evidence while recommendation req
   source[2].value.frameworkRecommendation = {framework:'prep',reason:'适合练习观点支撑',evidenceRefs:['segment-1']};
   api().renderStructuredReport(target,api().selectStructuredReport(source),{onFramework:id => clicked.push(id)});
   assert.deepEqual(clicked,[]);
-  const button = byClass(target,'framework-recommendation')[0];
-  assert.match(button.textContent,/PREP/); button.click();
-  assert.deepEqual(clicked,['prep']);
+  assert.equal(byClass(target,'framework-recommendation').length,0);
+  assert.equal(byClass(target,'framework-reason').length,0);
+  assert.doesNotMatch(target.textContent,/适合练习观点支撑|准备下一次表达/);
 });
 
 test('finding practice actions expose adjustable scope and the current goal keeps a distinct continuation action', () => {

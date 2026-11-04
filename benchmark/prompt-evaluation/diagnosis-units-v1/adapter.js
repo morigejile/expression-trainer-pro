@@ -1,7 +1,9 @@
 'use strict';
 // Experimental only: no production entrypoint imports this module.
-const diagnosis=require('../../../lib/structured-diagnosis');
-const {selectProblemCards}=require('../../../lib/expression-problem-library');
+// Replay this historical experiment against its original v8 contract.
+const frozen=require('../../../scripts/evaluate-diagnosis-quality').loadFrozenBaseline(require('node:path').join(__dirname,'baseline'));
+const diagnosis=frozen.diagnosis;
+const {selectProblemCards}=frozen.library;
 const {getFramework}=require('../../../shared/training-frameworks');
 const UNIFIED_VERSION='diagnosis-units-v1.1';
 const SCOPE_VERSION='diagnosis-scope-v1';

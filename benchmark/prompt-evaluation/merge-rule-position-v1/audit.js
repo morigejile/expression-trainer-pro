@@ -1,17 +1,19 @@
 'use strict';
 // Offline only: verify the frozen experiment and render every raw response.
 const fs=require('node:fs'),path=require('node:path'),assert=require('node:assert/strict');
-const crypto=require('node:crypto'),cp=require('node:child_process');
+const crypto=require('node:crypto');
 const ROOT=path.resolve(__dirname,'../../..'),hash=x=>crypto.createHash('sha256').update(x).digest('hex');
 const read=n=>JSON.parse(fs.readFileSync(path.join(__dirname,n),'utf8'));
 const manifest=read('manifest.json'),results=read('results.json'),inputs=read('inputs.json'),prompts=read('prompts.json'),review=read('review.json');
 const baseline=JSON.parse(fs.readFileSync(path.join(ROOT,manifest.baselineManifest.path),'utf8'));
-const api=require('../../../lib/structured-diagnosis'),library=require('../../../lib/expression-problem-library.generated.json');
+const {loadFrozenBaseline,loadFrozenExperiment,verifyHistoricalSources}=require('../../../scripts/evaluate-diagnosis-quality');
+const replay=loadFrozenBaseline(path.join(ROOT,'benchmark/prompt-evaluation/report-concision-v9/comparison-start.json'));
+const api=replay.diagnosis,library=replay.libraryData;
 assert.equal(hash(fs.readFileSync(path.join(__dirname,'run.js'))),manifest.runnerSha256);
 assert.equal(hash(fs.readFileSync(path.join(ROOT,manifest.baselineManifest.path))),manifest.baselineManifest.sha256);
-for(const f of manifest.sources)assert.equal(hash(fs.readFileSync(path.join(ROOT,f.path))),f.sha256);
+const sourceMetadataOnly=verifyHistoricalSources(manifest.sources,replay);
 for(const f of baseline.evidenceFiles)assert.equal(hash(fs.readFileSync(path.join(ROOT,f.path))),f.sha256);
-assert.equal(hash(cp.execFileSync('git',['diff','--binary'],{cwd:ROOT,stdio:['ignore','pipe','ignore']})),manifest.trackedDiffSha256);
+// The recorded workspace diff is provenance, not a constraint on future production.
 for(const id of ['E05','E07']){
  assert.deepEqual(prompts[id].baseline,api.getStructuredDiagnosisPrompt(inputs[id]));
  assert.equal(prompts[id].moved.user,prompts[id].baseline.user);
@@ -39,7 +41,7 @@ for(let i=0;i<8;i++){
  summary.push({sequence:row.sequence,id:row.id,variant:row.variant,repeat:row.repeat,status:row.status,findings:note.findings,duplicateGroups:note.duplicateGroups,assessmentStatus:row.parsed?.assessment?.status,categories:row.parsed?.assessment?.categories});
  md+=`\n## ${row.sequence}/8 · ${row.id} · ${row.variant} · 第 ${row.repeat} 次\n\n状态：${row.status}；HTTP：${row.httpStatus??'无响应'}；响应模型：${row.responseModel??'未知'}；耗时：${row.elapsedMs} ms。\n\n**助手评阅（不是模型返回）**\n\n${note.judgment}\n\n${note.contentConcerns.map(x=>'- '+x).join('\n')}\n\n**模型原始返回（逐字保留）**\n\n\`\`\`json\n${row.raw??'(未取得模型内容；失败记录见 results.json)'}\n\`\`\`\n`;
 }
-fs.writeFileSync(path.join(__dirname,'all-results.md'),md);
-const audit={actualCalls:8,completed:results.outputs.filter(x=>x.status==='completed').length,failed:results.outputs.filter(x=>x.status==='failed').length,oneMovedBlockOnly:true,inputAndParametersIdentical:true,productionSourcesUnchanged:true,existingTrackedDiffUnchanged:true,earlierEvidenceUnchanged:true,rawParsedFindingsIdentical:true,reviewIsSemanticAssistantAssessmentNotAutomatedQualityScore:true,rows:summary};
-fs.writeFileSync(path.join(__dirname,'audit.json'),JSON.stringify(audit,null,2)+'\n');
+if(!process.argv.includes('--check')) fs.writeFileSync(path.join(__dirname,'all-results.md'),md);
+const audit={actualCalls:8,completed:results.outputs.filter(x=>x.status==='completed').length,failed:results.outputs.filter(x=>x.status==='failed').length,oneMovedBlockOnly:true,inputAndParametersIdentical:true,frozenSourcesAndEarlierEvidenceUnchanged:true,sourceMetadataOnly,rawParsedFindingsIdentical:true,reviewIsSemanticAssistantAssessmentNotAutomatedQualityScore:true,rows:summary};
+if(!process.argv.includes('--check')) fs.writeFileSync(path.join(__dirname,'audit.json'),JSON.stringify(audit,null,2)+'\n');
 console.log(JSON.stringify(audit,null,2));

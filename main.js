@@ -537,10 +537,10 @@ app.whenReady().then(async () => {
       }).run,
       getDiagnosisProfile:options => aiAnalysisGate.resolve(options),
       getAnalysisInputs:(session,options) => buildSessionAnalysisInputs(session,loadCustomPrompt(),options),
-      diagnose:({profile,signal,trigger,onNormalization,...input}) => {
+      diagnose:({profile,signal,trigger,...input}) => {
         const context=buildAnalysisContext(input);
         aiAnalysisGate.requireUnchanged(profile,{trigger});
-        return (isSmokeTest ? smokeTest.fakeLlm.sendStructuredDiagnosis : require('./lib/ai-feedback').sendStructuredDiagnosis)(context,profile,{signal,onNormalization});
+        return (isSmokeTest ? smokeTest.fakeLlm.sendStructuredDiagnosis : require('./lib/ai-feedback').sendStructuredDiagnosis)(context,profile,{signal});
       }
     },
     sourceSnapshot: () => {

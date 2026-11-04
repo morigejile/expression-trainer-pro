@@ -5,7 +5,9 @@ const fs=require('node:fs');
 const path=require('node:path');
 const {buildCases}=require('../scripts/evaluate-problem-library');
 const records=require('../benchmark/prompt-evaluation/problem-library-v03/refined/actual-results.json');
-const {parseStructuredDiagnosisResponse:parse}=require('../lib/structured-diagnosis');
+// These format-normalization cases belong to the frozen v8 experiment only.
+const frozen=require('../scripts/evaluate-diagnosis-quality').loadFrozenBaseline(path.join(__dirname,'../benchmark/prompt-evaluation/diagnosis-units-v1/baseline'));
+const {parseStructuredDiagnosisResponse:parse}=frozen.diagnosis;
 function fixture(){return {context:buildCases()[5].context,raw:records.cases.find(x=>x.id==='E06').outputs.new.raw};}
 
 test('original E06 missing-null field is narrowly normalized with an explicit receipt and original bytes preserved',()=>{
@@ -47,7 +49,7 @@ test('missing-null compatibility does not relax Free, invalid targets, non-null 
 
 test('the provider boundary emits original raw and normalization receipt after one synthetic HTTP response, without a second model call',async()=>{
   const {context,raw}=fixture(),receipts=[];let calls=0;
-  const result=await require('../lib/ai-feedback').sendStructuredDiagnosis(context,{provider:'deepseek',model:'synthetic',apiKey:'fixture-only'},
+  const result=await frozen.client.sendStructuredDiagnosis(context,{provider:'deepseek',model:'synthetic',apiKey:'fixture-only'},
     {onNormalization:r=>receipts.push(r),fetchImpl:async()=>{calls++;return {ok:true,status:200,json:async()=>({choices:[{message:{content:raw}}]})};}});
   assert.equal(calls,1);assert.equal(result.frameworkRecommendation,null);
   assert.deepEqual(receipts,[{code:'selected-framework-recommendation-null',field:'frameworkRecommendation',value:null,rawResponse:raw}]);
@@ -56,7 +58,7 @@ test('the provider boundary emits original raw and normalization receipt after o
 
 test('production cards omit per-card practice while the full source retains it and merge counterexamples remain in the rules',()=>{
   const {getStructuredDiagnosisPrompt,DIAGNOSIS_PROMPT_VERSION}=require('../lib/structured-diagnosis');
-  assert.equal(DIAGNOSIS_PROMPT_VERSION,'structured-diagnosis-v9');
+  assert.equal(DIAGNOSIS_PROMPT_VERSION,'structured-diagnosis-v10');
   const {system}=getStructuredDiagnosisPrompt(buildCases()[5].context);
   const cards=system.slice(system.indexOf('【2 本次通用检查卡】'),system.indexOf('【4 本次证据与质量限制】'));
   assert.doesNotMatch(cards,/可选练习：/);

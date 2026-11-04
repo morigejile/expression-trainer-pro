@@ -31,7 +31,7 @@
     'occurrences/recorded-minute':'次/录音分钟'};
   const reasonText = reason => REASONS[reason] || '当前证据或分析不可用';
 
-  function renderStructuredReport(container,projection,{onEvidence,onFramework,onReanalyze,onPractice,onOpen,onLayout,record,api,frozen:useFrozen=false,segments = []} = {}) {
+  function renderStructuredReport(container,projection,{onEvidence,onReanalyze,onPractice,onOpen,onLayout,record,api,frozen:useFrozen=false,segments = []} = {}) {
     container.replaceChildren();
     if (!projection) return;
     const document = container.ownerDocument;
@@ -165,15 +165,6 @@
         target.appendChild(element('p','framework-summary',framework.summary));
         if (frozen) root.appendChild(target);
         else for (const finding of framework.findings) root.appendChild(findingCard(finding));
-      }
-      const rec = analysisRun.value.frameworkRecommendation;
-      if (rec) {
-        if (frozen) root.appendChild(element('h3','framework-recommendation-title','下一次表达的结构建议'));
-        root.appendChild(element('p','framework-reason',rec.reason));
-        const button = element('button','framework-recommendation',`用 ${labels[rec.framework]} 准备下一次表达`);
-        button.type = 'button'; button.disabled = typeof onFramework !== 'function';
-        button.addEventListener('click',() => onFramework?.(rec.framework));
-        root.appendChild(button);
       }
     }
     root.appendChild(metricDetails);

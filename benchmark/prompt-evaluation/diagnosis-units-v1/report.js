@@ -1,8 +1,12 @@
 'use strict';
 // Render existing evidence only. All content labels were written before unblinding.
 const fs=require('node:fs'),path=require('node:path');
-const root=__dirname,read=p=>JSON.parse(fs.readFileSync(path.join(root,p),'utf8')),write=(p,s)=>fs.writeFileSync(path.join(root,p),s+'\n');
-const datasets=read('datasets.json'),adapter=require('./adapter'),production=require('../../../lib/structured-diagnosis');
+const root=__dirname,read=p=>JSON.parse(fs.readFileSync(path.join(root,p),'utf8')),write=(p,s)=>{
+  if(process.argv.includes('--check')){
+    if(fs.readFileSync(path.join(root,p),'utf8').replace(/\r\n/g,'\n')!==s+'\n')throw new Error('Frozen preview mismatch: '+p);
+  }else fs.writeFileSync(path.join(root,p),s+'\n');
+};
+const datasets=read('datasets.json'),adapter=require('./adapter'),production=require('../../../scripts/evaluate-diagnosis-quality').loadFrozenBaseline(path.join(__dirname,'baseline')).diagnosis;
 const evidence=[];
 for(const group of ['screening','review','final']){
   const rows=read(group+'/results.json').outputs,key=read(group+'/blind/key.json'),labels=read(group+'/blind/review-before-unblinding.json').labels;

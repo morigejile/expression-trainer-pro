@@ -3,17 +3,21 @@
 const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto'),assert=require('node:assert/strict'),Module=require('node:module');
 const ROOT=path.resolve(__dirname,'../../..'),hash=x=>crypto.createHash('sha256').update(x).digest('hex');
 const read=p=>JSON.parse(fs.readFileSync(path.join(__dirname,p),'utf8'));
-const production=require('../../../lib/structured-diagnosis');
+const frozen=require('../../../scripts/evaluate-diagnosis-quality').loadFrozenBaseline(path.join(__dirname,'baseline'));
+const production=frozen.diagnosis;
 const datasets=read('datasets.json');
 function snapshot(name){
   const file=path.join(__dirname,'adapter.js'),m=new Module(file,module);m.filename=file;m.paths=Module._nodeModulePaths(__dirname);
+  const requireOriginal=m.require.bind(m);
+  m.require=id=>id==='../../../lib/structured-diagnosis'?production:id==='../../../lib/expression-problem-library'?frozen.library:requireOriginal(id);
   m._compile(fs.readFileSync(path.join(__dirname,name),'utf8'),file);return m.exports;
 }
 function audit(){
   const manifest=read('baseline/manifest.json');
-  for(const [file,expected] of Object.entries({...manifest.files,...manifest.priorEvidence}))assert.equal(hash(fs.readFileSync(path.join(ROOT,file))),expected,file);
+  for(const [file,expected] of Object.entries(manifest.files))assert.equal(hash(fs.readFileSync(path.join(__dirname,'baseline/sources',path.basename(file)))),expected,file);
+  for(const [file,expected] of Object.entries(manifest.priorEvidence))assert.equal(hash(fs.readFileSync(path.join(ROOT,file))),expected,file);
   const candidate=read('candidate.json'),prereg=read('preregistration.json');
-  for(const [file,expected] of Object.entries(candidate.hashes))assert.equal(hash(fs.readFileSync(path.join(__dirname,file))),expected,file);
+  for(const [file,expected] of Object.entries(candidate.hashes))assert.equal(hash(fs.readFileSync(path.join(__dirname,['adapter.js','run.js'].includes(file)?'candidate-source/'+file:file))),expected,file);
   for(const [file,key] of [['rubric.md','rubricHash'],['datasets.json','datasetHash'],['screening/source/adapter.js','adapterHash'],['screening/source/run.js','runHash']])
     assert.equal(hash(fs.readFileSync(path.join(__dirname,file))),prereg[key],file);
   for(const file of ['adapter.js','run.js'])assert.equal(hash(fs.readFileSync(path.join(__dirname,'candidate-source',file))),candidate.hashes[file]);
@@ -62,7 +66,7 @@ function audit(){
   }
   // The structural experiment leaves the full quoted user input identical.
   for(const item of datasets){assert.equal(production.getStructuredDiagnosisPrompt(item.context).user,final.getUnifiedPrompt(item.context).user);}
-  return {kind:'offline-structural-evidence-audit',checkedAt:new Date().toISOString(),productionAndPriorEvidenceUnchanged:true,
+  return {kind:'offline-structural-evidence-audit',checkedAt:new Date().toISOString(),frozenBaselineAndPriorEvidenceUnchanged:true,
     preregisteredDate:prereg.date,requests:stats.reduce((n,x)=>n+x.n,0),stats};
 }
 if(require.main===module){const result=audit();fs.writeFileSync(path.join(__dirname,'offline-audit.json'),JSON.stringify(result,null,2)+'\n');console.log(JSON.stringify(result,null,2));}

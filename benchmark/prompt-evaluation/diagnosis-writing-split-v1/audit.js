@@ -4,11 +4,13 @@ const fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypt
 const ROOT=path.resolve(__dirname,'../../..'),hash=x=>crypto.createHash('sha256').update(x).digest('hex');
 const read=n=>JSON.parse(fs.readFileSync(path.join(__dirname,n),'utf8'));
 const p=read('protocol.json'),r=read('results.json'),ref=read('reference-diagnoses.json'),review=read('review.json');
-const {parse,diagnosisPrompt,protect}=require('./run');
+const {loadFrozenBaseline,loadFrozenExperiment,verifyHistoricalSources}=require('../../../scripts/evaluate-diagnosis-quality');
+const replay=loadFrozenBaseline(path.join(ROOT,'benchmark/prompt-evaluation/report-concision-v9/comparison-start.json'));
+const {parse,diagnosisPrompt}=loadFrozenExperiment('benchmark/prompt-evaluation/diagnosis-writing-split-v1/run.js',replay);
 assert.equal(hash(fs.readFileSync(path.join(__dirname,'run.js'))),p.runnerSha256);
-assert.equal(hash(fs.readFileSync(path.join(__dirname,'reference-diagnoses.json'))),p.referenceSha256);protect(p);
+assert.equal(hash(fs.readFileSync(path.join(__dirname,'reference-diagnoses.json'))),p.referenceSha256);const sourceMetadataOnly=verifyHistoricalSources(p.protectedFiles,replay);
 const baseline=JSON.parse(fs.readFileSync(path.join(ROOT,'benchmark/prompt-evaluation/report-concision-v9/comparison-start.json'),'utf8'));
-const api=require('../../../lib/structured-diagnosis'),library=require('../../../lib/expression-problem-library');
+const api=replay.diagnosis,library=replay.library;
 let md='# 诊断与写作分离实验：完整原文、参考诊断与全部结果\n\n2026-11-04。A 为完整原文＋参考诊断的写作测试；B 为完整原文＋既有诊断规则的自主诊断测试。两组任务不同，不是单因素因果证明。以下完整展示原文、参考诊断和每次模型返回，未改写原始返回。助手评阅单独标注。\n\n见[简明结论](summary.md)、[冻结输入、提示、调用顺序与逐项差异](protocol.json)、[完整请求和原始返回](results.json)、[逐次评阅](review.json)。\n';
 for(const id of ['E02','E05','E07']){
  const c=p.inputs[id],frozen=baseline.cases.find(x=>x.id===id);assert.deepEqual(c,frozen.input);
@@ -30,6 +32,6 @@ for(let i=0;i<12;i++){
  counts[row.group].calls++;counts[row.group][row.status]++;
  md+=`\n## ${row.sequence}/12 · ${row.group} 组 · ${row.id} · 第 ${row.repeat} 次\n\n状态：${row.status}；响应模型：${row.responseModel??'未知'}；HTTP：${row.httpStatus??'无响应'}；耗时：${row.elapsedMs} ms。\n\n**模型原始返回（逐字保留）**\n\n\`\`\`json\n${row.raw??'(未收到模型内容；失败记录见 results.json)'}\n\`\`\`\n\n**助手评阅**\n\n${v.shortVerdict}\n\n- 误报：${v.falsePositives.join('；')||'未发现。'}\n- 独立问题遗漏：${v.omissions.join('；')||'未发现。'}\n- 重复诊断：${v.duplicates.join('；')||'未发现。'}\n- 事实与限定：${v.fidelityConcerns.join('；')||'未发现改变关键事实或限定。'}\n- 建议：${v.advice}\n${row.group==='A'?'- 摘要：'+v.summary+'\n- 参考冲突处理：'+v.referenceHandling+'\n':''}`;
 }
-fs.writeFileSync(path.join(__dirname,'all-results.md'),md);
-const audit={actualCalls:r.networkCalls,groups:counts,models:[...new Set(r.outputs.map(x=>x.responseModel))],allInputsMatchFrozen:true,referenceOnlyInA:true,BKeepsExistingLibraryBlocks:true,BDifferencesReconstructedExactly:true,allRequestsMatchFrozenPromptsAndControls:true,rawReparseEqualsStored:true,productionAndEarlierEvidenceUnchanged:true,trackedDiffUnchanged:true,preflight:p.preflight,limits:'Content review is manual and separate from structural checks. No evidence of reliable generalization, conflict-detection ability, or integrated automatic report improvement.'};
-fs.writeFileSync(path.join(__dirname,'audit.json'),JSON.stringify(audit,null,2)+'\n');console.log(JSON.stringify(audit,null,2));
+if(!process.argv.includes('--check')) fs.writeFileSync(path.join(__dirname,'all-results.md'),md);
+const audit={actualCalls:r.networkCalls,groups:counts,models:[...new Set(r.outputs.map(x=>x.responseModel))],allInputsMatchFrozen:true,referenceOnlyInA:true,BKeepsExistingLibraryBlocks:true,BDifferencesReconstructedExactly:true,allRequestsMatchFrozenPromptsAndControls:true,rawReparseEqualsStored:true,frozenSourcesAndEarlierEvidenceUnchanged:true,sourceMetadataOnly,preflight:p.preflight,limits:'Content review is manual and separate from structural checks. No evidence of reliable generalization, conflict-detection ability, or integrated automatic report improvement.'};
+if(!process.argv.includes('--check')) fs.writeFileSync(path.join(__dirname,'audit.json'),JSON.stringify(audit,null,2)+'\n');console.log(JSON.stringify(audit,null,2));

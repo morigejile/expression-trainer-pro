@@ -1,7 +1,8 @@
 'use strict';
 const fs=require('node:fs'),path=require('node:path'),Module=require('node:module'),crypto=require('node:crypto');
 const ROOT=path.resolve(__dirname,'../../..');
-const baseline=require('../../../lib/structured-diagnosis');
+const frozen=require('../../../scripts/evaluate-diagnosis-quality').loadFrozenBaseline(path.join(__dirname,'baseline'));
+const baseline=frozen.diagnosis;
 const {buildQualityCases}=require('../../../scripts/evaluate-diagnosis-quality');
 const {buildAnalysisContext}=require('../../../lib/analysis-context');
 const {computeCommonAnalysis}=require('../../../lib/common-analysis');
@@ -38,7 +39,7 @@ function createClient(prompt,context,variant){
   m.filename=filename;m.paths=Module._nodeModulePaths(path.dirname(filename));const original=m.require.bind(m);
   m.require=id=>id==='./structured-diagnosis'?{...baseline,getStructuredDiagnosisPrompt:()=>prompt,
     parseStructuredDiagnosisResponse:['unified','review'].includes(variant)?raw=>adapter.parseUnifiedResponse(raw,context):baseline.parseStructuredDiagnosisResponse}:original(id);
-  m._compile(fs.readFileSync(filename,'utf8'),filename);return m.exports;
+  m._compile(frozen.clientSource,filename);return m.exports;
 }
 async function run({output,jobs,userData,live=false}){
   if(fs.existsSync(output))throw new Error('Use a new immutable output directory');fs.mkdirSync(output,{recursive:true});

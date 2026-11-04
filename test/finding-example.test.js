@@ -61,7 +61,7 @@ async function fixture(t,framework) {
     const item = {...finding,...(example === undefined ? {} : {example})};
     const raw = {schemaVersion:1,summary:'结尾可以补充已确认的下一步。',findings:[item],
       frameworkSummary:framework?'专项表达反馈':null,
-      frameworkFindings:framework?[{...item,id:'framework-1'}]:[],frameworkRecommendation:null};
+      frameworkFindings:framework?[{...item,id:'framework-1'}]:[]};
     const parsed = parseStructuredDiagnosisResponse(JSON.stringify(raw),analysisContext);
     const result = await append('diagnosis',{...parsed,speechEvidenceRunId:evidence.id,metricRunId:metrics.id},
       legacy?'structured-diagnosis-v4':'structured-diagnosis-v5');

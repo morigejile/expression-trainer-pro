@@ -48,7 +48,6 @@ async function fixture(t, provider = 'custom', {speechAvailable=false} = {}) {
     diagnosis.frameworkSummary = context.analysisTarget ? '专项反馈保留原转写证据。' : null;
     diagnosis.frameworkFindings = context.analysisTarget
       ? [{...diagnosis.findings[0],id:'framework-1',evidenceRefs:[context.transcript.segments[0].id]}] : [];
-    diagnosis.frameworkRecommendation = null;
     if (responseMode==='insufficient') {
       diagnosis.assessment={status:'insufficient',reason:'只有试音和问候，没有展开表达内容。',
         categories:[],frameworkAssessable:false,evidenceRefs:[context.transcript.segments[0].id]};
@@ -145,7 +144,7 @@ test('speech, metric and Finding evidence keep exact run ownership through HTTP 
   for (const ref of finding.evidenceRefs) assert.ok(Object.hasOwn(context.evidenceMap,ref));
   assert.deepEqual(context.quality.vad,{status:'degraded',reasons:['vad-thresholds-uncalibrated']});
   assert.equal(report.analysisRun.provenance.profileId,'approved');
-  assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v9');
+  assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v10');
   assert.equal(report.analysisRun.provenance.problemLibraryVersion,'expression-problem-library-v0.4');
   assert.equal((await f.command('analyze',{retry:true})).value.id,report.snapshot.id,'complete report is not reanalyzed');
   await f.app.close();

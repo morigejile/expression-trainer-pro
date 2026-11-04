@@ -30,7 +30,7 @@ test('new diagnosis provenance records the problem library without changing old 
   const saved=await store.get(id);
   const run=saved.results.find(x=>x.kind==='diagnosis');
   assert.equal(run.provenance.problemLibraryVersion,'expression-problem-library-v0.4');
-  assert.equal(run.provenance.promptVersion,'structured-diagnosis-v9');
+  assert.equal(run.provenance.promptVersion,'structured-diagnosis-v10');
   assert.deepEqual(run.value.findings,[]);
   const before=structuredClone(saved.results);
   assert.equal((await analyzer.start(id)).id,first.id);
@@ -38,15 +38,14 @@ test('new diagnosis provenance records the problem library without changing old 
   await analyzer.close();
 });
 
-test('accepted response normalization retains original raw and receipt only in diagnosis provenance',async t=>{
+test('new diagnosis requests no recommendation normalization callback or provenance receipt',async t=>{
   const {createSessionAnalysis}=require('../lib/session-analysis');
   const {store,id}=await fixture(t);
-  const event={code:'selected-framework-recommendation-null',field:'frameworkRecommendation',value:null,rawResponse:'{"synthetic":"original model bytes"}'};
   const analyzer=createSessionAnalysis({store,getDiagnosisProfile:()=>({profile:{id:'synthetic',provider:'local',model:'fake'}}),
-    diagnose:async({onNormalization})=>{onNormalization(event);return {schemaVersion:1,summary:'只验证来源链路，不是模型内容测试',findings:[],frameworkRecommendation:null};}});
+    diagnose:async input=>{assert.equal(Object.hasOwn(input,'onNormalization'),false);return {schemaVersion:1,summary:'只验证来源链路，不是模型内容测试',findings:[]};}});
   await analyzer.start(id);
   const saved=await store.get(id),run=saved.results.find(x=>x.kind==='diagnosis');
-  assert.deepEqual(run.provenance.responseNormalization,event);
+  assert.equal(Object.hasOwn(run.provenance,'responseNormalization'),false);
   assert.equal(Object.hasOwn(run.value,'responseNormalization'),false);
   assert.deepEqual((await store.get(id)).results,saved.results);
   await analyzer.close();

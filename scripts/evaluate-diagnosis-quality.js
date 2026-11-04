@@ -17,16 +17,39 @@ function compile(file,source,overrides={}){
   const requireOriginal=m.require.bind(m);m.require=id=>Object.hasOwn(overrides,id)?overrides[id]:requireOriginal(id);
   m._compile(source,name);return m.exports;
 }
-function loadFrozenBaseline(){
-  const manifest=JSON.parse(fs.readFileSync(path.join(SNAPSHOT,'manifest.json'),'utf8'));
+function loadFrozenBaseline(snapshot=SNAPSHOT){
+  const manifest=JSON.parse(fs.readFileSync(snapshot.endsWith('.json')?snapshot:path.join(snapshot,'manifest.json'),'utf8'));
+  const sourcePath=file=>manifest.sourceFiles
+    ? manifest.sourceFiles.find(f=>f.original===file)?.frozen
+    : Object.hasOwn(manifest.files,file)?path.relative(ROOT,path.join(snapshot,'sources',path.basename(file))):null;
   const source=file=>{
-    const bytes=fs.readFileSync(path.join(SNAPSHOT,'sources',path.basename(file)));
-    if(hash(bytes)!==manifest.files[file]) throw new Error('Frozen source hash mismatch');return bytes.toString('utf8');
+    const captured=sourcePath(file),expected=manifest.sourceFiles?.find(f=>f.original===file)?.sha256??manifest.files?.[file];
+    if(!captured)throw new Error('Missing frozen source: '+file);
+    const bytes=fs.readFileSync(path.join(ROOT,captured));
+    if(hash(bytes)!==expected) throw new Error('Frozen source hash mismatch: '+file);return bytes.toString('utf8');
   };
   const data=JSON.parse(source('lib/expression-problem-library.generated.json'));
   const lib=compile('lib/expression-problem-library.js',source('lib/expression-problem-library.js'),{'./expression-problem-library.generated.json':data});
   const diagnosis=compile('lib/structured-diagnosis.js',source('lib/structured-diagnosis.js'),{'./expression-problem-library':lib});
-  return {diagnosis,manifest};
+  return {diagnosis,library:lib,libraryData:data,manifest,sourcePath,get clientSource(){return source('lib/ai-feedback.js');},get client(){
+    return compile('lib/ai-feedback.js',source('lib/ai-feedback.js'),{'./structured-diagnosis':diagnosis});
+  }};
+}
+function loadFrozenExperiment(file,frozen){
+  return compile(file,fs.readFileSync(path.join(ROOT,file),'utf8'),{
+    '../../../lib/structured-diagnosis':frozen.diagnosis,'../../../lib/expression-problem-library':frozen.library
+  });
+}
+function verifyHistoricalSources(files,frozen){
+  const metadataOnly=[];
+  for(const entry of files){
+    const file=entry.path??entry.original,captured=frozen.sourcePath(file);
+    // Mutable prose not captured at experiment time is provenance metadata only.
+    // The injected runtime rules are checked through their frozen generated data.
+    if(!captured&&(file==='AGENTS.md'||file.startsWith('docs/'))){metadataOnly.push(file);continue;}
+    if(hash(fs.readFileSync(path.join(ROOT,captured||file)))!==entry.sha256)throw new Error('Frozen evidence hash mismatch: '+file);
+  }
+  return metadataOnly;
 }
 function buildQualityCases(){
   const cases=buildCases();
@@ -92,6 +115,7 @@ async function runQualityExperiment({output,userData,jobs,live=false}){
   if(!selection.profile){result.unavailable=selection.reason;save();return result;}
   const profile=selection.profile;result.provider=profile.provider;result.requestModel=getEffectiveLlmModel(profile);
   const clientSource=fs.readFileSync(path.join(ROOT,'lib/ai-feedback.js'),'utf8');
+  const historical=loadFrozenBaseline(path.join(ROOT,'benchmark/prompt-evaluation/diagnosis-units-v1/baseline'));
   for(const job of resolved){
     let raw=null,usage=null,responseModel=null;const normalizations=[];const start=Date.now();
     const row={id:job.id,variant:job.variant,repeat:job.repeat||1,promptHash:job.promptHash,inputHash:job.inputHash,
@@ -99,7 +123,8 @@ async function runQualityExperiment({output,userData,jobs,live=false}){
       request:{system:job.prompt.system,user:job.prompt.user,model:result.requestModel,temperature:0.2,max_tokens:8192}};
     try{
       gate.requireUnchanged(profile,{trigger:'manual'});
-      const client=compile('lib/ai-feedback.js',clientSource,{'./structured-diagnosis':{...current,getStructuredDiagnosisPrompt:()=>job.prompt}});
+      const final=job.variant==='final';
+      const client=compile('lib/ai-feedback.js',final?clientSource:historical.clientSource,{'./structured-diagnosis':{...(final?current:historical.diagnosis),getStructuredDiagnosisPrompt:()=>job.prompt}});
       row.parsed=await client.sendStructuredDiagnosis(structuredClone(job.item.context),profile,{timeoutMs:60000,
         onNormalization:event=>normalizations.push({code:event.code,field:event.field,value:event.value}),
         fetchImpl:async(url,options)=>{
@@ -121,4 +146,4 @@ if(require.main===module){
   runQualityExperiment({output:path.resolve(arg('output')),userData:arg('user-data'),jobs,live:args.includes('--live')})
     .then(x=>console.log(JSON.stringify(x))).catch(()=>{console.error('Quality experiment failed; existing evidence and settings were not overwritten.');process.exitCode=1;});
 }
-module.exports={loadFrozenBaseline,buildQualityCases,experimentalPrompt,runQualityExperiment};
+module.exports={loadFrozenBaseline,loadFrozenExperiment,verifyHistoricalSources,buildQualityCases,experimentalPrompt,runQualityExperiment};

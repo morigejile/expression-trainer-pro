@@ -36,7 +36,7 @@ test('material-insufficient diagnosis is a successful explicit result without fa
     const source=context();
     if (framework) source.analysisTarget={framework,definitionVersion:`${framework}-v1`};
     const data=assessed({schemaVersion:1,summary:'本次只有试音和问候。',findings:[],
-      frameworkSummary:null,frameworkFindings:[],frameworkRecommendation:null},
+      frameworkSummary:null,frameworkFindings:[]},
     {status:'insufficient',reason:'只有试音和问候，没有展开表达内容。',categories:[],frameworkAssessable:false});
     const parsed=parse(JSON.stringify(data),source);
     assert.equal(parsed.assessment.status,'insufficient');
@@ -142,7 +142,7 @@ test('comparison uncertainty follows the selected scope and checks the explanati
 test('narrow practice cannot save an assessment with no remaining evaluable dimension after full-framework suppression',()=>{
   const source=context();source.analysisTarget={framework:'prep',definitionVersion:'prep-v1'};
   source.practiceComparison={status:'available',scope:'sentence',previous:{transcript:{segments:[{id:'p'}]}}};
-  const data=assessed({schemaVersion:1,summary:'仅有框架观察。',findings:[],frameworkSummary:'框架摘要',frameworkFindings:[],frameworkRecommendation:null,
+  const data=assessed({schemaVersion:1,summary:'仅有框架观察。',findings:[],frameworkSummary:'框架摘要',frameworkFindings:[],
     practiceFeedback:{status:'unchanged',summary:'可比较。',comparisonStatus:'comparable',comparisonReason:'框架可比较。',previousEvidenceRefs:['p'],currentEvidenceRefs:['segment-1']}},
     {status:'limited',categories:[],frameworkAssessable:true});
   const parsed=parse(JSON.stringify(data),source);
@@ -180,7 +180,7 @@ test('optional expression references keep common and framework Finding evidence 
     source.analysisTarget = {framework:'prep',definitionVersion:'prep-v1'};
     const data = {...response(),frameworkSummary:'专项反馈',frameworkFindings:[{
       ...response().findings[0],id:'framework-1'
-    }],frameworkRecommendation:null};
+    }]};
     if (example !== undefined) {
       data.findings[0].example = example;
       data.frameworkFindings[0].example = example;
@@ -202,7 +202,7 @@ test('expression reference extension rejects invalid types without relaxing Find
     for (const example of [false,1,{},[], '', '   ', '字'.repeat(1601)]) {
       const data = {...response(),frameworkSummary:'专项反馈',frameworkFindings:[{
         ...response().findings[0],id:'framework-1'
-      }],frameworkRecommendation:null};
+      }]};
       (target === 'common' ? data.findings : data.frameworkFindings)[0].example = example;
       assert.throws(()=>parse(JSON.stringify(data),source),{code:'invalid-response'});
     }
@@ -220,8 +220,8 @@ test('flat framework output becomes the existing snapshot shape using the reques
     const source = context();
     source.trainingContext = {trainingMode:'structured',framework:'star',frameworkDefinitionVersion:'star-v1'};
     source.analysisTarget = {framework,definitionVersion:`${framework}-v1`};
-    const data = {...response(),frameworkSummary:'专项反馈',frameworkFindings:[{...response().findings[0],id:'framework-1'}],frameworkRecommendation:null};
-    assert.deepEqual(parse(JSON.stringify(data),source),{...response(),frameworkRecommendation:null,
+    const data = {...response(),frameworkSummary:'专项反馈',frameworkFindings:[{...response().findings[0],id:'framework-1'}]};
+    assert.deepEqual(parse(JSON.stringify(data),source),{...response(),
       frameworkAnalysis:{framework,definitionVersion:`${framework}-v1`,summary:'专项反馈',findings:data.frameworkFindings}});
     for (const change of [d=>{d.frameworkFindings[0].evidenceRefs=['invented'];},
       d=>{d.frameworkFindings[0].evidenceRefs=['metric:text-character-count'];},
@@ -237,10 +237,10 @@ test('flat framework output becomes the existing snapshot shape using the reques
 
 test('flat Free output and practice feedback keep their existing evidence and availability rules', () => {
   const source=context();
-  const data={...response(),frameworkSummary:null,frameworkFindings:[],frameworkRecommendation:null,
+  const data={...response(),frameworkSummary:null,frameworkFindings:[],
     practiceFeedback:{status:'improved',summary:'本轮先说结论',previousEvidenceRefs:['previous-1'],currentEvidenceRefs:['segment-1']}};
   source.practiceComparison={status:'available',previous:{transcript:{segments:[{id:'previous-1'}]}}};
-  assert.deepEqual(parse(JSON.stringify(data),source),{...response(),frameworkAnalysis:null,frameworkRecommendation:null,practiceFeedback:data.practiceFeedback});
+  assert.deepEqual(parse(JSON.stringify(data),source),{...response(),frameworkAnalysis:null,practiceFeedback:data.practiceFeedback});
   for (const change of [d=>{d.frameworkSummary='不应有专项分析';},d=>{d.frameworkFindings=[response().findings[0]];},
     d=>{d.practiceFeedback.previousEvidenceRefs=['invented'];},
     d=>{d.practiceFeedback.previousEvidenceRefs=['我觉得这个事情再看看。'];},
@@ -262,7 +262,7 @@ test('prompt examples teach parallel Finding arrays and remain consumable by the
       const {system}=getStructuredDiagnosisPrompt(source);
       const template=JSON.parse(system.match(/\n(\{\n[\s\S]+?\n\})\n/)[1]);
       assert.deepEqual(Object.keys(template).sort(),['schemaVersion','assessment','summary','findings','frameworkSummary',
-        'frameworkFindings','frameworkRecommendation',...(practice?['practiceFeedback']:[])].sort());
+        'frameworkFindings',...(practice?['practiceFeedback']:[])].sort());
       assert.equal(template.frameworkSummary===null,!framework);
       // Replace only the declared placeholder citations with supplied source IDs.
       // All other example fields must satisfy the same parser used for real output.
@@ -280,7 +280,7 @@ test('DeepSeek diagnosis requests JSON output for Free and each reanalysis targe
   for (const framework of [null,'prep','star','pyramid']) {
     const source = context();
     if (framework) source.analysisTarget = {framework,definitionVersion:`${framework}-v1`};
-    const data = assessed({...response(),frameworkAnalysis:null,frameworkRecommendation:null},{frameworkAssessable:Boolean(framework)});
+    const data = assessed({...response(),frameworkAnalysis:null},{frameworkAssessable:Boolean(framework)});
     if (framework) data.frameworkAnalysis = {framework,definitionVersion:`${framework}-v1`,summary:'专项反馈',findings:[]};
     let request;
     const fetchImpl = async (_url,options) => {
@@ -323,15 +323,11 @@ test('selected framework feedback retains common findings and rejects another fr
   }
 });
 
-test('Free recommendations require an explained supported framework and never become framework analysis', () => {
+test('Free analysis never creates selected-framework analysis implicitly', () => {
   const source = context();
-  const data = {...response(),frameworkRecommendation:{framework:'prep',reason:'观点清楚，可以练习补充理由和例子。',evidenceRefs:['segment-1']}};
+  const data = response();
   assert.deepEqual(parse(JSON.stringify(data),source),data);
-  for (const change of [d => {d.frameworkRecommendation.framework='unknown';},d => {d.frameworkRecommendation.reason='';},
-    d => {d.frameworkRecommendation.evidenceRefs=['invented'];}, d => {d.frameworkAnalysis={framework:'prep'};}]) {
-    const invalid = structuredClone(data); change(invalid);
-    assert.throws(() => parse(JSON.stringify(invalid),source),{code:'invalid-response'});
-  }
+  assert.throws(() => parse(JSON.stringify({...data,frameworkAnalysis:{framework:'prep'}}),source),{code:'invalid-response'});
 });
 
 test('practice improvement requires evidence from both adjacent rounds and cannot compare a deleted source', () => {
@@ -446,9 +442,9 @@ test('provider response validation pins the selected framework and both practice
     source.analysisTarget.framework='prep';source.practiceComparison.previous.transcript.segments=[];
     const {frameworkAnalysis,...common}=data;
     return apiResponse(JSON.stringify({...common,frameworkSummary:frameworkAnalysis.summary,
-      frameworkFindings:frameworkAnalysis.findings,frameworkRecommendation:null}));
+      frameworkFindings:frameworkAnalysis.findings}));
   }});
-  assert.deepEqual(result,{...data,frameworkRecommendation:null});
+  assert.deepEqual(result,{...data});
 });
 
 test('structured invalid output uses the existing safe invalid-response envelope', async () => {

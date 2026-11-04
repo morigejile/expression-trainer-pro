@@ -52,6 +52,10 @@ v7 → v8 历史对照工具 `scripts/evaluate-diagnosis-quality.js` 读取冻�
 
 统一列表实验位于 `benchmark/prompt-evaluation/diagnosis-units-v1/`，不从生产入口加载。`run.js --jobs=<jobs.json> --output=<全新目录>` 默认仅预览；实际请求仍须显式 `--live --user-data=<已授权配置目录>`。`audit.js` 仅离线校验冻结源码、真实请求与适配重放，`report.js` 仅重建可读证据；不会调用模型。独立局部范围、单调用统一列表和有界二次复核分别记录，未切换生产默认；使用限制和真实结果见[实验结论](../benchmark/prompt-evaluation/diagnosis-units-v1/summary.md)。
 
+历史 v7/v8 格式测试与统一列表实验使用已校验哈希的冻结解析器／请求客户端；其离线审计检查冻结源码和既有证据，不要求后续生产源码与旧版本相同。v10 生产响应不再接受框架推荐字段；旧归一化回执测试仅验证历史兼容，不代表生产仍在补字段。
+
+合并规则位置、诊断写作分离、问题独立性三个 v9 实验的原 `run.js` 是带哈希的历史执行材料，保留原样，不承诺直接跟随后续生产版本复跑。当前离线复核使用各目录的 `node audit.js --check`，按对应冻结 v9 源重建，不写回结果。未冻结的可变文档只保留来源元数据（`sourceMetadataOnly`），不声称已校验其历史全文；原工作区 diff 的哈希同样仅作当时记录。统一列表的 `node report.js --check` 可只读检查派生预览，避免将当前生产提示混入旧对照。
+
 ### 内测快速交付口径
 
 - 日常迭代只运行与改动直接相关的 focused tests，不为未交付的本地构建虚增应用版本。

@@ -41,7 +41,7 @@
 
 | 按需查阅 | 资料身份与入口 |
 |---|---|
-| 当前报告的比较起点 | [v9 固定材料与判断草案](../benchmark/prompt-evaluation/report-concision-v9/comparison-start.md)：当前源码／配置身份、固定输入与六次匹配结果；判断待用户确认，E04 当前结果待补跑，不代表质量验收通过 |
+| 删除自动框架推荐前的报告比较记录 | [v9 固定材料与判断草案](../benchmark/prompt-evaluation/report-concision-v9/comparison-start.md)：当前源码／配置身份、固定输入与六次匹配结果；判断待用户确认，E04 当前结果待补跑，不代表质量验收通过 |
 | 问题单位、任务标准与生成结构 | [统一列表实验结论](../benchmark/prompt-evaluation/diagnosis-units-v1/summary.md)：开发实验，未替换生产默认；包含独立范围与有界二次复核的失败和限制 |
 | v7 到 v8 的质量对照 | [质量收尾结论](../benchmark/prompt-evaluation/problem-library-v08/summary.md)：当时的版本／内容证据，不代表后续整体质量通过 |
 | 最初的问题库接入 | [首批接入结论](../benchmark/prompt-evaluation/problem-library-v03/summary.md)：v7 阶段历史，不能当作当前提示版本说明 |
