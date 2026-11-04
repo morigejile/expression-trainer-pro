@@ -85,9 +85,21 @@ body[data-frozen-ui="training"] .subtitle-line :is(.filler,.hedge,.vague,.strong
 #transport-actions #btn-stop .icon{width:19px;height:19px}
 #transport-actions :is(#btn-resume,#btn-stop) .icon{fill:currentColor;stroke:none}
 #transport-time #timer{font-size:13px;line-height:1.8;color:#80715d;font-weight:400;font-variant-numeric:tabular-nums;margin-left:6px}
-body[data-frozen-ui="report"] .report-header{width:100%;margin:0;padding:0;border:0;background:none}
+body[data-frozen-ui="report"] .report-header{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:16px;align-items:start;width:100%;margin:0;padding:0;border:0;background:none}
+body[data-frozen-ui="report"] .report-header h1{grid-column:1;grid-row:1}
+body[data-frozen-ui="report"] .report-header .record-identity{grid-column:1 / -1;grid-row:2}
+body[data-frozen-ui="report"] .report-header #btn-report-back{grid-column:2;grid-row:1;justify-self:end;margin:0;white-space:nowrap}
+body[data-frozen-ui="report"] #frozen-report-context:empty{display:none}
+body[data-frozen-ui="report"] .study-materials{margin-top:20px;padding-top:12px}
+body[data-frozen-ui="report"] .study-materials::before{content:'';display:block;border-top:1px solid var(--line);margin-bottom:12px}
+body[data-frozen-ui="report"] .record-identity{display:flex;align-items:center;flex-wrap:wrap;gap:6px 14px}
+body[data-frozen-ui="report"] .record-date{white-space:pre}
+body[data-frozen-ui="report"] .record-mode{display:inline-block;padding:1px 7px;background:var(--soft,#eae4d83d);border-radius:3px}
+body[data-frozen-ui="report"] #report-persistence-state:has(#record-save-status[hidden]){display:none}
 body[data-frozen-ui="report"] .report-header h1{margin:0 0 7px;font-size:28px;font-weight:300;line-height:1.4;letter-spacing:.035em}
 body[data-frozen-ui="report"] .record-identity{margin:0;color:#857e70;font-size:11px;line-height:1.8;overflow-wrap:anywhere}
+body[data-frozen-ui="report"] #report-summary-copy>h2{font-size:22.4px}
+@media(max-width:720px){body[data-frozen-ui="report"] #report-summary-copy>h2{font-size:18.4px}}
 body[data-frozen-ui="report"] .record-save-state{font-size:10px;color:#857e70;line-height:1.8}
 body[data-frozen-ui="report"] .record-save-state:has(#record-save-status[role="alert"]){color:#8c503e}
 body[data-frozen-ui="report"] #btn-report-back{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:0 6px;margin:0 0 12px -6px;border:0;border-radius:2px;background:transparent;font-size:13px;font-weight:400;color:#6b6150}
@@ -114,9 +126,17 @@ body[data-frozen-ui="report"] .round-result .chain-item p{margin:0;font-size:12p
 body[data-frozen-ui="report"] .structured-report>h2{font-size:14px;font-weight:350;margin:24px 0 12px}
 body[data-frozen-ui="report"] .structured-report .finding{padding:16px 0;background:none;border:0;border-bottom:1px solid var(--line);border-radius:0}
 body[data-frozen-ui="report"] .structured-report .frozen-finding{padding:0}
-body[data-frozen-ui="report"] .frozen-finding .finding-observation{margin:0 0 6px;font-size:15px}
+body[data-frozen-ui="report"] .frozen-finding .finding-row{row-gap:8px}
+body[data-frozen-ui="report"] .frozen-finding .finding-row>div{grid-column:2;grid-row:2}
+body[data-frozen-ui="report"] .frozen-finding .finding-row .finding-category{margin:0;align-self:center}
+body[data-frozen-ui="report"] .session-report .frozen-finding .finding-observation{margin:0 0 6px;font-size:15px;font-weight:400}
 body[data-frozen-ui="report"] .frozen-finding .finding-details{margin:0}
 body[data-frozen-ui="report"] .frozen-finding .finding-detail{padding-bottom:22px}
+body[data-frozen-ui="report"] .frozen-finding .finding-guidance{padding-bottom:10px}
+body[data-frozen-ui="report"] .session-report .findings-section .finding-guidance>h4:first-child{margin-top:4px}
+body[data-frozen-ui="report"] .session-report .findings-section .finding-guidance>h4:not(:first-child){margin-top:14px}
+body[data-frozen-ui="report"] .frozen-finding .finding-details>summary{margin-left:42px;width:fit-content;justify-content:flex-start;gap:8px;color:var(--accent)}
+@media(max-width:460px){body[data-frozen-ui="report"] .frozen-finding .finding-details>summary{margin-left:32px}}
 body[data-frozen-ui="report"] .frozen-finding .finding-open svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.3}
 body[data-frozen-ui="report"] .frozen-finding .finding-open[aria-expanded="true"] svg{transform:rotate(180deg)}
 body[data-frozen-ui="report"] .frozen-finding .evidence-block+.evidence-block{margin-top:10px}
@@ -124,8 +144,10 @@ body[data-frozen-ui="report"] .frozen-finding .finding-evidence blockquote{backg
 body[data-frozen-ui="report"] .finding-observation{font-size:16px;font-weight:350;line-height:1.65;margin:8px 0}
 body[data-frozen-ui="report"] .finding-category{font-size:9px;color:var(--muted);margin:0}
 body[data-frozen-ui="report"] :is(.finding-details,.metric-details,.framework-reanalysis)>summary{display:flex;align-items:center;justify-content:space-between;padding:6px 0;min-height:32px;font-size:11px;color:#84735b}
-body[data-frozen-ui="report"] :is(.finding-details,.metric-details,.framework-reanalysis)>summary::after{content:'⌄';font-size:18px;font-weight:300}
-body[data-frozen-ui="report"] :is(.finding-details,.metric-details,.framework-reanalysis)[open]>summary::after{content:'⌃'}
+body[data-frozen-ui="report"] :is(.metric-details,.framework-reanalysis)>summary::after{content:'⌄';font-size:18px;font-weight:300}
+body[data-frozen-ui="report"] :is(.metric-details,.framework-reanalysis)[open]>summary::after{content:'⌃'}
+body[data-frozen-ui="report"] .framework-recommendation-title{font-size:12px;font-weight:500;line-height:1.7;color:var(--ink);margin:20px 0 8px}
+body[data-frozen-ui="report"] .framework-reason{margin:0 0 10px}
 body[data-frozen-ui="report"] .finding-evidence blockquote{background:#eae4d83d;border-left:2px solid #c4b493;padding:16px 20px}
 body[data-frozen-ui="report"] .practice-actions{display:flex;gap:12px;margin-top:18px;align-items:end}
 body[data-frozen-ui="report"] :is(.evidence-button,.practice-start,.framework-recommendation,.framework-reanalysis button,#btn-retry-save){font-size:11px;padding:8px 16px;border:1px solid var(--line);border-radius:4px;min-height:39px}

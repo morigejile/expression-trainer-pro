@@ -1,0 +1,16 @@
+{
+  "promptVersion": "structured-diagnosis-v7",
+  "libraryVersion": "expression-problem-library-v0.3",
+  "source": "uncommitted working tree at quality-closeout start",
+  "files": {
+    "lib/structured-diagnosis.js": "f1909dcbc838e6c99fa501844d99443faf55c330b4a5680ce39073fe75a7154f",
+    "lib/expression-problem-library.js": "a2b5000281428b4349423f4d94a2010a7f3e88da64882766c9a98e44cceb4293",
+    "lib/expression-problem-library.generated.json": "e8b206379435ff9caf1d3d305bc9e825b75af4528d6482c2eec048f65d74a006",
+    "lib/ai-feedback.js": "69685ca9bf52f9f080e2cb210e84b563fc0c1732e0ebad8be08843da031518cd"
+  },
+  "priorArtifacts": {
+    "benchmark/prompt-evaluation/problem-library-v03/refined/actual-results.json": "9398fc346ddbe9c6bcec8de741fb70e76997785aa66a65e54c3f986a9f308cf1",
+    "benchmark/prompt-evaluation/problem-library-v03/refined/inputs.json": "04cae11d805b0887d7f66ad65f152440a1a7ed009cb623fa965bf8452400484b",
+    "benchmark/prompt-evaluation/problem-library-v03/refined/prompt-preview.md": "5f9c2e5325bb797a7f1699ad8ce03a43319f775cbdd548e26b4a2d2d8d9c2a84"
+  }
+}

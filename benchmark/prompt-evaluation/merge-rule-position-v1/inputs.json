@@ -1,0 +1,507 @@
+{
+  "E05": {
+    "schemaVersion": 1,
+    "sessionId": "synthetic-E05",
+    "transcriptRevision": 1,
+    "transcript": {
+      "segments": [
+        {
+          "id": "s1",
+          "text": "试点组上月订单增加了。同期我们更换了首页。",
+          "startMs": null,
+          "endMs": null,
+          "timingSource": "unavailable"
+        },
+        {
+          "id": "s2",
+          "text": "因此，可以确定订单增长完全是首页改版带来的，应该立即全量推广。",
+          "startMs": null,
+          "endMs": null,
+          "timingSource": "unavailable"
+        }
+      ]
+    },
+    "metricsDefinitionVersion": "common-metrics-v1",
+    "metrics": [
+      {
+        "id": "metric:text-character-count",
+        "metricId": "text-character-count",
+        "label": "文字与数字字符数",
+        "value": 47,
+        "unit": "characters",
+        "status": "available",
+        "reason": null,
+        "evidenceRefs": [
+          "s1",
+          "s2"
+        ]
+      },
+      {
+        "id": "metric:audio-duration-ms",
+        "metricId": "audio-duration-ms",
+        "label": "已保存录音时长",
+        "value": null,
+        "unit": "ms",
+        "status": "unavailable",
+        "reason": "audio-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:filler-count",
+        "metricId": "filler-count",
+        "label": "填充词命中次数",
+        "value": null,
+        "unit": "occurrences",
+        "status": "unavailable",
+        "reason": "local-stats-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:hedge-count",
+        "metricId": "hedge-count",
+        "label": "犹豫词命中次数",
+        "value": null,
+        "unit": "occurrences",
+        "status": "unavailable",
+        "reason": "local-stats-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:vague-word-count",
+        "metricId": "vague-word-count",
+        "label": "笼统词命中次数",
+        "value": null,
+        "unit": "occurrences",
+        "status": "unavailable",
+        "reason": "local-stats-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:text-rate-per-recorded-minute",
+        "metricId": "text-rate-per-recorded-minute",
+        "label": "每录音分钟字符数（含静音）",
+        "value": null,
+        "unit": "characters/recorded-minute",
+        "status": "unavailable",
+        "reason": "audio-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:filler-rate-per-recorded-minute",
+        "metricId": "filler-rate-per-recorded-minute",
+        "label": "每录音分钟填充词命中次数",
+        "value": null,
+        "unit": "occurrences/recorded-minute",
+        "status": "unavailable",
+        "reason": "local-stats-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:hedge-character-percent",
+        "metricId": "hedge-character-percent",
+        "label": "犹豫词字符占比",
+        "value": null,
+        "unit": "percent",
+        "status": "unavailable",
+        "reason": "local-stats-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:non-filler-hedge-character-percent",
+        "metricId": "non-filler-hedge-character-percent",
+        "label": "非填充词与犹豫词字符占比",
+        "value": null,
+        "unit": "percent",
+        "status": "unavailable",
+        "reason": "local-stats-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:speech-duration-ms",
+        "metricId": "speech-duration-ms",
+        "label": "VAD 检测语音时长",
+        "value": null,
+        "unit": "ms",
+        "status": "unavailable",
+        "reason": "audio-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:non-speech-duration-ms",
+        "metricId": "non-speech-duration-ms",
+        "label": "VAD 检测非语音时长",
+        "value": null,
+        "unit": "ms",
+        "status": "unavailable",
+        "reason": "audio-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:between-speech-gap-count",
+        "metricId": "between-speech-gap-count",
+        "label": "语音区间之间的间隔次数",
+        "value": null,
+        "unit": "occurrences",
+        "status": "unavailable",
+        "reason": "audio-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:between-speech-gap-total-ms",
+        "metricId": "between-speech-gap-total-ms",
+        "label": "语音区间之间的间隔总时长",
+        "value": null,
+        "unit": "ms",
+        "status": "unavailable",
+        "reason": "audio-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:between-speech-gap-max-ms",
+        "metricId": "between-speech-gap-max-ms",
+        "label": "语音区间之间的最长间隔",
+        "value": null,
+        "unit": "ms",
+        "status": "unavailable",
+        "reason": "audio-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:text-rate-per-speech-minute",
+        "metricId": "text-rate-per-speech-minute",
+        "label": "每检测语音分钟字符数（非逐字对齐）",
+        "value": null,
+        "unit": "characters/speech-minute",
+        "status": "unavailable",
+        "reason": "audio-unavailable",
+        "evidenceRefs": []
+      }
+    ],
+    "speech": {
+      "status": "unavailable",
+      "sampleRateHz": null,
+      "sampleCount": null,
+      "segments": [],
+      "provenance": null,
+      "limitations": [
+        "vad-unavailable"
+      ]
+    },
+    "trainingContext": {
+      "trainingMode": "free",
+      "framework": null,
+      "frameworkDefinitionVersion": null,
+      "trainingPrompt": {
+        "schemaVersion": 2,
+        "topic": {
+          "source": "user",
+          "text": "向团队解释为什么应全面推广一次改版，完整论证。"
+        },
+        "scenario": null
+      }
+    },
+    "frameworkDefinition": null,
+    "analysisTarget": null,
+    "quality": {
+      "audio": {
+        "status": "unavailable",
+        "reasons": [
+          "audio-unavailable"
+        ]
+      },
+      "timing": {
+        "status": "degraded",
+        "reasons": [
+          "timing-unavailable"
+        ]
+      },
+      "vad": {
+        "status": "unavailable",
+        "reasons": [
+          "vad-unavailable"
+        ]
+      },
+      "asr": {
+        "status": "ok",
+        "reasons": []
+      }
+    },
+    "analysisInstructions": {
+      "schemaVersion": 1,
+      "goals": "",
+      "customRules": "",
+      "styleRef": "",
+      "customWords": ""
+    },
+    "evidenceMap": {
+      "s1": {
+        "type": "transcript",
+        "index": 0
+      },
+      "s2": {
+        "type": "transcript",
+        "index": 1
+      },
+      "metric:text-character-count": {
+        "type": "metric",
+        "index": 0
+      }
+    },
+    "allowedEvidenceRefs": [
+      "s1",
+      "s2",
+      "metric:text-character-count"
+    ]
+  },
+  "E07": {
+    "schemaVersion": 1,
+    "sessionId": "synthetic-E07",
+    "transcriptRevision": 1,
+    "transcript": {
+      "segments": [
+        {
+          "id": "s1",
+          "text": "我先说上线时间，先说功能，不，还是说上线时间，刚才那个先不说，我们，还是先说功能……",
+          "startMs": null,
+          "endMs": null,
+          "timingSource": "unavailable"
+        }
+      ]
+    },
+    "metricsDefinitionVersion": "common-metrics-v1",
+    "metrics": [
+      {
+        "id": "metric:text-character-count",
+        "metricId": "text-character-count",
+        "label": "文字与数字字符数",
+        "value": 34,
+        "unit": "characters",
+        "status": "available",
+        "reason": null,
+        "evidenceRefs": [
+          "s1"
+        ]
+      },
+      {
+        "id": "metric:audio-duration-ms",
+        "metricId": "audio-duration-ms",
+        "label": "已保存录音时长",
+        "value": null,
+        "unit": "ms",
+        "status": "unavailable",
+        "reason": "audio-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:filler-count",
+        "metricId": "filler-count",
+        "label": "填充词命中次数",
+        "value": null,
+        "unit": "occurrences",
+        "status": "unavailable",
+        "reason": "local-stats-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:hedge-count",
+        "metricId": "hedge-count",
+        "label": "犹豫词命中次数",
+        "value": null,
+        "unit": "occurrences",
+        "status": "unavailable",
+        "reason": "local-stats-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:vague-word-count",
+        "metricId": "vague-word-count",
+        "label": "笼统词命中次数",
+        "value": null,
+        "unit": "occurrences",
+        "status": "unavailable",
+        "reason": "local-stats-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:text-rate-per-recorded-minute",
+        "metricId": "text-rate-per-recorded-minute",
+        "label": "每录音分钟字符数（含静音）",
+        "value": null,
+        "unit": "characters/recorded-minute",
+        "status": "unavailable",
+        "reason": "audio-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:filler-rate-per-recorded-minute",
+        "metricId": "filler-rate-per-recorded-minute",
+        "label": "每录音分钟填充词命中次数",
+        "value": null,
+        "unit": "occurrences/recorded-minute",
+        "status": "unavailable",
+        "reason": "local-stats-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:hedge-character-percent",
+        "metricId": "hedge-character-percent",
+        "label": "犹豫词字符占比",
+        "value": null,
+        "unit": "percent",
+        "status": "unavailable",
+        "reason": "local-stats-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:non-filler-hedge-character-percent",
+        "metricId": "non-filler-hedge-character-percent",
+        "label": "非填充词与犹豫词字符占比",
+        "value": null,
+        "unit": "percent",
+        "status": "unavailable",
+        "reason": "local-stats-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:speech-duration-ms",
+        "metricId": "speech-duration-ms",
+        "label": "VAD 检测语音时长",
+        "value": null,
+        "unit": "ms",
+        "status": "unavailable",
+        "reason": "audio-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:non-speech-duration-ms",
+        "metricId": "non-speech-duration-ms",
+        "label": "VAD 检测非语音时长",
+        "value": null,
+        "unit": "ms",
+        "status": "unavailable",
+        "reason": "audio-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:between-speech-gap-count",
+        "metricId": "between-speech-gap-count",
+        "label": "语音区间之间的间隔次数",
+        "value": null,
+        "unit": "occurrences",
+        "status": "unavailable",
+        "reason": "audio-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:between-speech-gap-total-ms",
+        "metricId": "between-speech-gap-total-ms",
+        "label": "语音区间之间的间隔总时长",
+        "value": null,
+        "unit": "ms",
+        "status": "unavailable",
+        "reason": "audio-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:between-speech-gap-max-ms",
+        "metricId": "between-speech-gap-max-ms",
+        "label": "语音区间之间的最长间隔",
+        "value": null,
+        "unit": "ms",
+        "status": "unavailable",
+        "reason": "audio-unavailable",
+        "evidenceRefs": []
+      },
+      {
+        "id": "metric:text-rate-per-speech-minute",
+        "metricId": "text-rate-per-speech-minute",
+        "label": "每检测语音分钟字符数（非逐字对齐）",
+        "value": null,
+        "unit": "characters/speech-minute",
+        "status": "unavailable",
+        "reason": "audio-unavailable",
+        "evidenceRefs": []
+      }
+    ],
+    "speech": {
+      "status": "unavailable",
+      "sampleRateHz": null,
+      "sampleCount": null,
+      "segments": [],
+      "provenance": null,
+      "limitations": [
+        "vad-unavailable"
+      ]
+    },
+    "trainingContext": {
+      "trainingMode": "free",
+      "framework": null,
+      "frameworkDefinitionVersion": null,
+      "trainingPrompt": {
+        "schemaVersion": 2,
+        "topic": {
+          "source": "user",
+          "text": "只练汇报开头，要求先确定本段讲哪一点；不评价整篇完整性。"
+        },
+        "scenario": null
+      }
+    },
+    "frameworkDefinition": null,
+    "analysisTarget": null,
+    "quality": {
+      "audio": {
+        "status": "unavailable",
+        "reasons": [
+          "audio-unavailable"
+        ]
+      },
+      "timing": {
+        "status": "degraded",
+        "reasons": [
+          "timing-unavailable"
+        ]
+      },
+      "vad": {
+        "status": "unavailable",
+        "reasons": [
+          "vad-unavailable"
+        ]
+      },
+      "asr": {
+        "status": "ok",
+        "reasons": []
+      }
+    },
+    "analysisInstructions": {
+      "schemaVersion": 1,
+      "goals": "",
+      "customRules": "",
+      "styleRef": "",
+      "customWords": ""
+    },
+    "evidenceMap": {
+      "s1": {
+        "type": "transcript",
+        "index": 0
+      },
+      "metric:text-character-count": {
+        "type": "metric",
+        "index": 0
+      }
+    },
+    "allowedEvidenceRefs": [
+      "s1",
+      "metric:text-character-count"
+    ],
+    "practiceComparison": {
+      "status": "unavailable",
+      "reason": "source-unavailable",
+      "goal": {
+        "category": "delivery",
+        "observation": "局部开头反复重启",
+        "recommendation": "确定本段要点，再完成它"
+      },
+      "scope": "segment"
+    }
+  }
+}

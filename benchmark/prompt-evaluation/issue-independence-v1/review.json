@@ -1,0 +1,17 @@
+{
+  "reviewer": "assistant; user-confirmed E05/E07 boundaries reused; not independent human acceptance",
+  "rows": [
+    {"sequence":1,"expected":"independent","labelMatches":true,"reasonAssessment":"区分了因果排他结论与推广外推、时机，依据成立。","contentAssessment":"对人群信息的提醒有依据；改为证据匹配的程度是建议，不因原文未给出具体改写就构成新事实。风险列表不等于实际错误列表。"},
+    {"sequence":2,"expected":"independent","labelMatches":true,"reasonAssessment":"正确指出修好因果判断后，推广范围与立即推广仍需支持。","contentAssessment":"提出需要真实依据、区分建议与原事实是合理边界提醒；但未证明原反馈把待补信息写成已有事实。不得将这些提醒计作已发现错误。"},
+    {"sequence":3,"expected":"duplicate","labelMatches":true,"reasonAssessment":"正确将过渡问题识别为同一因果推理缺口，未发现额外组织障碍。","contentAssessment":"不要代拟缺失事实的提醒合理，但原建议要求实际依据，不能据此认定已经编造。"},
+    {"sequence":4,"expected":"duplicate","labelMatches":false,"reasonAssessment":"仍以证据不足和推理压缩两个名称认定独立，没有说明第三条有何原文支持的独立障碍。","contentAssessment":"把合理的听者理解负担分析仅因无听者实测而标为风险，混淆推断性训练反馈与事实编造；不能据此禁止分析表达影响。"},
+    {"sequence":5,"expected":"duplicate","labelMatches":true,"reasonAssessment":"识别出同一反复改口，但理由仍写未确定先讲哪一点，未保留最终选择状态的不确定性。","contentAssessment":"新增无依据的“两次改口”计数：按主题切换可见上线时间→功能→上线时间→功能；原反馈仅称多次，并未给错误次数。要求原文直接说明重点是否立住，也不能代替任务效果判断。"},
+    {"sequence":6,"expected":"duplicate","labelMatches":true,"reasonAssessment":"修复同一次重启后另一条共同消失，归并成立；仍沿用未确定主题的过强表述。","contentAssessment":"把开口前先选一点、不再中途改口的训练建议说成新增心理过程或额外要求，混淆建议和对既有事实的断言。对后续展开超出开头的提醒最多是范围疑问，不能仅凭建议涉及下一步就判错。"},
+    {"sequence":7,"expected":"independent","labelMatches":true,"reasonAssessment":"正确区分因果判断与推广外推及时机。","contentAssessment":"风险提醒主要是勿把待补依据、待验证事项当事实；原反馈并未断言已有数据或既定计划，不能计作发现了事实错误。"},
+    {"sequence":8,"expected":"independent","labelMatches":true,"reasonAssessment":"正确区分因果断言与推广结论。","contentAssessment":"人群维度不应预设，提醒有依据；调整结论强度属于合法建议，不能因为原文未给出新措辞就视为缺陷。"},
+    {"sequence":9,"expected":"duplicate","labelMatches":false,"reasonAssessment":"仍将同一因果缺口按证据和组织衔接拆开，没有证实额外障碍。","contentAssessment":"注意原文已有“因此”合理；要求理解影响必须有听者实测证据不成立。"},
+    {"sequence":10,"expected":"duplicate","labelMatches":false,"reasonAssessment":"保留不确定，没有确认重复。提出修复后可能仍没呈现推理步骤，但这是对未知改写的假设，原反馈未证明独立障碍；不据此重开已确认的案例判断。","contentAssessment":"新错误：称“两条均未限定‘完全’一词的排他性程度”，第一条解释已明确写“‘完全’这一排他结论”，建议也要求匹配证据强度。其余勿代拟事实为边界提醒，不是已发生错误。"},
+    {"sequence":11,"expected":"duplicate","labelMatches":true,"reasonAssessment":"正确识别同一开头障碍，但仍未保留最终主题状态的不确定性。","contentAssessment":"局部开头可以有组织问题，不能因类别为 organization 就认为评价整篇；下一轮建议也不是对未来安排的事实断言。风险项混淆类别、范围与建议身份。"},
+    {"sequence":12,"expected":"duplicate","labelMatches":true,"reasonAssessment":"正确识别重启和方向切换实质重合；“方向未定”仍有过强表述风险。","contentAssessment":"“多次重启”可由原文核实，不必先量化次数；下一轮建议不等于已验证改善，这个边界提醒不能当成原反馈已错误承诺效果。"}
+  ]
+}

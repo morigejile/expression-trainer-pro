@@ -1772,10 +1772,15 @@ class ExpressionTrainer {
 
   renderRecordStatus(record) {
     if (this.viewingTrainingRecordId !== record.id || !this.recordSaveStatus) return;
-    this.recordIdentity.textContent = `${new Date(record.createdAt).toLocaleString()} · ${Math.round(record.durationMs / 1000)} 秒 · ${TrainingContext.formatTrainingContext(record)}`;
-    const states = {saving:'正在保存…',saved:'这次训练已经保存',failed:record.factsSaved ? '训练已保存，部分分析结果保存失败，请重试。' : '训练保存失败，请重试；关闭应用将丢失未保存内容。',incomplete:'这条记录未完成或已损坏，现有可读内容仍可查看。'};
+    if (typeof document !== 'undefined' && document.body?.dataset?.frozenUi === 'report' && globalThis.FrozenReport?.renderIdentity) {
+      globalThis.FrozenReport.renderIdentity(document,record);
+    } else this.recordIdentity.textContent = `${new Date(record.createdAt).toLocaleString()} · ${Math.round(record.durationMs / 1000)} 秒 · ${TrainingContext.formatTrainingContext(record)}`;
+    const states = {saving:'正在保存…',saved:'这次训练已保存',failed:record.factsSaved ? '训练已保存，部分分析结果保存失败，请重试。' : '训练保存失败，请重试；关闭应用将丢失未保存内容。',incomplete:'这条记录未完成或已损坏，现有可读内容仍可查看。'};
     const audio = record.audioState === 'missing' ? '音频缺失，无法播放。' : record.audioState === 'corrupt' ? '音频损坏，无法播放。' : '';
-    this.recordSaveStatus.textContent = [states[record.saveState] || '记录状态未知',audio,record.resultIntegrity === 'corrupt' ? '部分分析结果损坏。' : '', record.metricsAvailable === false ? '本地统计未保存，无法生成原有 AI 报告。' : '', record.segments.length ? '片段时间为估计值。' : ''].filter(Boolean).join(' ');
+    const warnings=[audio,record.resultIntegrity === 'corrupt' ? '部分分析结果损坏。' : '',record.metricsAvailable === false ? '本地统计未保存，无法生成原有 AI 报告。' : ''].filter(Boolean);
+    const quiet=record.saveState === 'saved' && !warnings.length;
+    this.recordSaveStatus.textContent=quiet ? '' : [states[record.saveState] || '记录状态未知',...warnings].join(' · ');
+    this.recordSaveStatus.hidden=quiet;
     this.recordSaveStatus.setAttribute?.('role',record.saveState === 'failed' ? 'alert' : 'status');
     this.retrySave?.classList.toggle('hidden',record.saveState !== 'failed');
     if (this.retrySave) this.retrySave.disabled = record.saveState === 'saving';

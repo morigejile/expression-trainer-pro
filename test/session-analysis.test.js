@@ -21,6 +21,37 @@ async function fixture(t) {
   return {store,id:session.id};
 }
 
+test('new diagnosis provenance records the problem library without changing old snapshots or Finding fields',async t=>{
+  const {createSessionAnalysis}=require('../lib/session-analysis');
+  const {store,id}=await fixture(t);
+  const analyzer=createSessionAnalysis({store,getDiagnosisProfile:()=>({profile:{id:'synthetic',provider:'local',model:'fake'}}),
+    diagnose:async()=>({schemaVersion:1,summary:'仅验证来源记录',findings:[]})});
+  const first=await analyzer.start(id);
+  const saved=await store.get(id);
+  const run=saved.results.find(x=>x.kind==='diagnosis');
+  assert.equal(run.provenance.problemLibraryVersion,'expression-problem-library-v0.4');
+  assert.equal(run.provenance.promptVersion,'structured-diagnosis-v9');
+  assert.deepEqual(run.value.findings,[]);
+  const before=structuredClone(saved.results);
+  assert.equal((await analyzer.start(id)).id,first.id);
+  assert.deepEqual((await store.get(id)).results,before);
+  await analyzer.close();
+});
+
+test('accepted response normalization retains original raw and receipt only in diagnosis provenance',async t=>{
+  const {createSessionAnalysis}=require('../lib/session-analysis');
+  const {store,id}=await fixture(t);
+  const event={code:'selected-framework-recommendation-null',field:'frameworkRecommendation',value:null,rawResponse:'{"synthetic":"original model bytes"}'};
+  const analyzer=createSessionAnalysis({store,getDiagnosisProfile:()=>({profile:{id:'synthetic',provider:'local',model:'fake'}}),
+    diagnose:async({onNormalization})=>{onNormalization(event);return {schemaVersion:1,summary:'只验证来源链路，不是模型内容测试',findings:[],frameworkRecommendation:null};}});
+  await analyzer.start(id);
+  const saved=await store.get(id),run=saved.results.find(x=>x.kind==='diagnosis');
+  assert.deepEqual(run.provenance.responseNormalization,event);
+  assert.equal(Object.hasOwn(run.value,'responseNormalization'),false);
+  assert.deepEqual((await store.get(id)).results,saved.results);
+  await analyzer.close();
+});
+
 test('completed facts receive immutable local evidence and metric/report snapshots without any configured AI', async t => {
   const {createSessionAnalysis} = require('../lib/session-analysis');
   const {store,id} = await fixture(t);

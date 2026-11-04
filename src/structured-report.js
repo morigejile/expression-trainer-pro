@@ -94,19 +94,17 @@
       const card = element('article','finding');
       const details = element('details','finding-details');
       details.setAttribute('data-finding-id',finding.id);
-      details.appendChild(element('summary',frozen?'visually-hidden':null,'解释、建议与证据'));
+      const summary=element('summary',frozen?'finding-evidence-toggle':null,frozen?'查看证据':'解释、建议与证据');
+      details.appendChild(summary);
       let content=details;
       if (frozen) {
         card.className+=' frozen-finding';
         const row=element('div','finding-row');row.appendChild(element('span','finding-index',String(++findingIndex).padStart(2,'0')));
-        const title=element('div');title.append(element('h3','finding-observation',finding.observation),element('p','finding-category',CATEGORIES[finding.category]));
-        const toggle=element('button','finding-open');toggle.type='button';toggle.setAttribute('aria-label',`展开：${finding.observation}`);
-        details.id=`finding-detail-${finding.id}`;toggle.setAttribute('aria-controls',details.id);toggle.setAttribute('aria-expanded','false');
-        const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');svg.setAttribute('viewBox','0 0 24 24');svg.setAttribute('aria-hidden','true');
-        const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d','m6 9 6 6 6-6');svg.appendChild(path);toggle.appendChild(svg);
-        toggle.addEventListener('click',()=>{details.open=!details.open;toggle.setAttribute('aria-expanded',String(details.open));});
-        details.addEventListener('toggle',()=>toggle.setAttribute('aria-expanded',String(details.open)));
-        row.append(title,toggle);card.appendChild(row);content=element('div','finding-detail');details.appendChild(content);
+        row.appendChild(element('p','finding-category',CATEGORIES[finding.category]));
+        const title=element('div');title.appendChild(element('h3','finding-observation',finding.observation));
+        details.id=`finding-detail-${finding.id}`;
+        details.addEventListener('toggle',()=>{summary.textContent=details.open?'收起证据':'查看证据';});
+        row.append(title);card.appendChild(row);content=element('div','finding-detail');details.appendChild(content);
       } else card.append(element('p','finding-category',CATEGORIES[finding.category]),element('h3','finding-observation',finding.observation));
       const evidence = element('div','finding-evidence');
       for (const ref of finding.evidenceRefs) {
@@ -114,7 +112,7 @@
         const speech = speechById.get(ref);
         const transcript = segmentById.get(ref);
         const button = element('button','evidence-button',metric ? `查看指标：${metric.label}`
-          : speech ? '查看语音区间' : '查看原文证据');
+          : speech ? '查看语音区间' : '定位到录音');
         button.type = 'button';
         button.setAttribute('data-evidence-ref',ref);
         button.addEventListener('click',() => {
@@ -134,9 +132,11 @@
         block.appendChild(button);if (frozen) evidence.appendChild(block);
       }
       content.appendChild(evidence);
-      content.append(element('h4',null,frozen?'为什么值得练':'解释'),element('p','finding-interpretation',finding.interpretation));
+      const guidance=frozen?element('div','finding-detail finding-guidance'):content;
+      guidance.append(element('h4',null,frozen?'为什么值得练':'解释'),element('p','finding-interpretation',finding.interpretation));
       if (typeof finding.example==='string' && finding.example.trim()) content.append(element('h4',null,'一种表达参考'),element('p','example',finding.example));
-      content.append(element('h4',null,frozen?'下一轮怎么练':'建议'),element('p','finding-recommendation',finding.recommendation));
+      guidance.append(element('h4',null,frozen?'下一轮怎么练':'建议'),element('p','finding-recommendation',finding.recommendation));
+      if (frozen) card.appendChild(guidance);
       card.appendChild(details);
       const controls=frozen?element('div','practice-controls'):content;
       practiceView?.practiceAction(element,controls,finding,onPractice,
@@ -152,7 +152,7 @@
       for (const finding of findings.slice(0,priorityCount)) root.appendChild(findingCard(finding));
       if (findings.length > priorityCount) {
         const more = element('details',frozen?'more-findings report-disclosure':'more-findings');
-        more.appendChild(element('summary',null,`更多发现（${findings.length - priorityCount}）`));
+        more.appendChild(element('summary',null,`${frozen?'其他问题':'更多发现'}（${findings.length - priorityCount}）`));
         for (const finding of findings.slice(priorityCount)) more.appendChild(findingCard(finding));
         root.appendChild(more);
       } else if (!findings.length) {
@@ -168,6 +168,7 @@
       }
       const rec = analysisRun.value.frameworkRecommendation;
       if (rec) {
+        if (frozen) root.appendChild(element('h3','framework-recommendation-title','下一次表达的结构建议'));
         root.appendChild(element('p','framework-reason',rec.reason));
         const button = element('button','framework-recommendation',`用 ${labels[rec.framework]} 准备下一次表达`);
         button.type = 'button'; button.disabled = typeof onFramework !== 'function';

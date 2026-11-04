@@ -1,0 +1,20 @@
+{
+  "date": "2026-10-31",
+  "rubricHash": "b9b8123e2fd1ec7365761c6096b3dbcf8864cde9067ae7ce2c9f598668df3179",
+  "datasetHash": "e3b98dc7ffc94b4364e0376847e3a8685147ce33d11e6f62e989445989b8c190",
+  "adapterHash": "310ca5b108cb19ee1f7d5ba82162f5b66bdf1b87e52eb36839fb4380120034a1",
+  "runHash": "1481bf05eb3fe2af63a7c9126151f0a95ef4de9fce129e056ed5320ff2dae0a9",
+  "versions": [
+    "diagnosis-units-v1",
+    "diagnosis-scope-v1"
+  ],
+  "twoStepGate": "After human content review, only if unified still has necessity/independence failures on at least two focus cases; second step must include original task and complete original context, limited to 4 focus cases initially.",
+  "heldOut": [
+    "H01",
+    "H02",
+    "H03"
+  ],
+  "scopePretest": [
+    "H04"
+  ]
+}

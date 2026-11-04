@@ -1,0 +1,29 @@
+{
+  "frozenAt": "2026-10-31T06:18:52.667Z",
+  "version": "diagnosis-units-v1.1",
+  "changesFromScreening": "Parser-only: explicit category mapping before assessment validation, independent of types order. System version string changes; other unified prompt content unchanged. No scope combination or content tuning.",
+  "hashes": {
+    "adapter.js": "b0bd4ffff9a5e60250d77736743e47ce85c4983e94d183b11286ac3b1f7fb05b",
+    "run.js": "ea0f584fa96cb3b50babc834ba84f08d524804547f9f091d743442d934ff3cdd",
+    "datasets.json": "e3b98dc7ffc94b4364e0376847e3a8685147ce33d11e6f62e989445989b8c190",
+    "rubric.md": "b9b8123e2fd1ec7365761c6096b3dbcf8864cde9067ae7ce2c9f598668df3179"
+  },
+  "reviewGate": {
+    "met": true,
+    "evidence": "screening/blind/review-before-unblinding.json",
+    "persistentCases": [
+      "E03",
+      "E06",
+      "P06-vague"
+    ],
+    "boundedSecondCalls": 4,
+    "sourceVersion": "diagnosis-units-v1"
+  },
+  "heldOut": [
+    "H01",
+    "H02",
+    "H03"
+  ],
+  "scopePretest": "H04 (not final heldout)",
+  "finalJobs": 40
+}

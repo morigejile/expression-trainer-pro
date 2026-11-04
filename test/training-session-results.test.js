@@ -64,6 +64,7 @@ test('append-only result snapshots survive restart without changing completed fa
     ['run-1', 'completed'], ['run-2', 'failed'], ['run-3', 'unavailable']]);
   assert.equal(after.results[0].value.score, 90);
   assert.deepEqual(after.results[0].provenance.promptSnapshot, {goals: ['clarity']});
+  assert.equal(Object.hasOwn(after.results[0].provenance,'problemLibraryVersion'),false,'legacy provenance is not backfilled');
   assert.deepEqual({...after, results: []}, {...before, results: []});
 });
 
@@ -79,6 +80,43 @@ test('duplicate result IDs keep the first snapshot while stale and foreign evide
   const otherId = await saved(store);
   await assert.rejects(store.appendResult(otherId, result()), {code: 'INVALID_SESSION'});
   assert.equal((await store.get(otherId)).results.length, 0);
+});
+
+test('normalization receipt is optional, bounded and survives actual storage reopening without changing report fields',async t=>{
+  const f=fixture(t);let store=await f.open();const id=await saved(store);
+  const receipt={code:'selected-framework-recommendation-null',field:'frameworkRecommendation',value:null,rawResponse:'{"synthetic":"raw before null completion"}'};
+  await store.appendResult(id,result({kind:'diagnosis',provenance:{responseNormalization:receipt}}));
+  store.close();store=await f.open();
+  assert.deepEqual((await store.get(id)).results[0].provenance.responseNormalization,receipt);
+  for(const change of [x=>{x.code='other';},x=>{x.field='summary';},x=>{x.value='not-null';},x=>{x.extra=true;},
+    x=>{delete x.rawResponse;},x=>{x.rawResponse='x'.repeat(64001);}]){
+    const bad=structuredClone(receipt);change(bad);
+    await assert.rejects(store.appendResult(id,result({id:'bad-receipt',kind:'diagnosis',provenance:{responseNormalization:bad}})),{code:'INVALID_SESSION'});
+  }
+});
+
+test('real old E06 bytes pass the synthetic provider, strict parser and session pipeline into reopened SQLite with receipt intact',async t=>{
+  const f=fixture(t);let store=await f.open();
+  const input=require('../scripts/evaluate-problem-library').buildCases()[5].context;
+  const raw=require('../benchmark/prompt-evaluation/problem-library-v03/refined/actual-results.json').cases.find(x=>x.id==='E06').outputs.new.raw;
+  const {id}=store.create({...start(),trainingMode:'structured',framework:'star',frameworkDefinitionVersion:'star-v1'});
+  const complete=completion();complete.transcript={text:input.transcript.segments.map(x=>x.text).join(''),segments:input.transcript.segments};
+  await store.finalize(id,complete);const before=await store.get(id);let requests=0;
+  const {createSessionAnalysis}=require('../lib/session-analysis');
+  const {buildAnalysisContext}=require('../lib/analysis-context');
+  const profile={id:'synthetic',provider:'deepseek',model:'synthetic',apiKey:'fixture-only'};
+  const analyzer=createSessionAnalysis({store,
+    runSpeechEvidence:async()=>({schemaVersion:1,status:'unavailable',segments:[],quality:{vad:{status:'unavailable',reasons:['model-unavailable']}}}),
+    getDiagnosisProfile:()=>({profile}),
+    diagnose:({profile,signal,onNormalization,...source})=>require('../lib/ai-feedback').sendStructuredDiagnosis(buildAnalysisContext(source),profile,
+      {signal,onNormalization,fetchImpl:async()=>{requests++;return {ok:true,status:200,json:async()=>({choices:[{message:{content:raw}}]})};}})});
+  await analyzer.start(id);await analyzer.close();store.close();store=await f.open();
+  const record=await store.get(id),diagnosis=record.results.find(x=>x.kind==='diagnosis');
+  assert.equal(requests,1,'synthetic HTTP only; no repair call or external model');
+  assert.equal(diagnosis.status,'completed');assert.equal(diagnosis.value.frameworkRecommendation,null);
+  assert.deepEqual(diagnosis.provenance.responseNormalization,{code:'selected-framework-recommendation-null',field:'frameworkRecommendation',value:null,rawResponse:raw});
+  assert.equal(diagnosis.value.findings.length,2);assert.equal(diagnosis.value.frameworkAnalysis.findings.length,2);
+  assert.deepEqual(record.transcript,before.transcript);
 });
 
 test('deleted and deletion-pending sessions never accept late results and delete cascades snapshots', async t => {

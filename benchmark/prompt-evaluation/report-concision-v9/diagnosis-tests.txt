@@ -1,0 +1,40 @@
+✔ material-insufficient diagnosis is a successful explicit result without fabricated problems or framework analysis (10.6279ms)
+✔ limited assessment admits only declared dimensions and does not impose a character threshold (1.2676ms)
+✔ new expression references retain supported rewrites and omit unsupported facts without discarding the diagnosis (1.0656ms)
+✔ practice comparability and explicit inability to assess improvement cannot become an unchanged outcome (0.8905ms)
+✔ current provider boundary requires assessment rather than accepting an old unassessed response or retrying silently (3.3511ms)
+✔ flat comparison fields normalize to one saved comparability decision without allowing mixed shapes (0.3491ms)
+✔ comparison uncertainty follows the selected scope and checks the explanation as well as the summary (0.7895ms)
+✔ narrow practice cannot save an assessment with no remaining evaluable dimension after full-framework suppression (0.2894ms)
+✔ source-cited references cannot introduce new factual clauses even when they contain no date or number (0.2906ms)
+✔ unsupported calendar, Chinese quantities and placeholders are omitted but source-supported quantities remain readable (0.9968ms)
+✔ optional expression references keep common and framework Finding evidence separate (0.5172ms)
+✔ expression reference extension rejects invalid types without relaxing Finding or evidence validation (1.0805ms)
+✔ flat framework output becomes the existing snapshot shape using the requested target, not the original training framework (1.4948ms)
+✔ flat Free output and practice feedback keep their existing evidence and availability rules (0.5965ms)
+✔ prompt examples teach parallel Finding arrays and remain consumable by the snapshot parser (1.3974ms)
+✔ DeepSeek diagnosis requests JSON output for Free and each reanalysis target while still validating evidence (2.5807ms)
+✔ JSON output is limited to the known DeepSeek structured endpoint and does not change text feedback (1.2215ms)
+✔ selected framework feedback retains common findings and rejects another framework, version or unsupported evidence (0.5563ms)
+✔ Free recommendations require an explained supported framework and never become framework analysis (0.4329ms)
+✔ practice improvement requires evidence from both adjacent rounds and cannot compare a deleted source (0.4785ms)
+✔ diagnosis accepts the four approved categories with explicit evidence-linked observation, interpretation and recommendation (0.1893ms)
+✔ diagnosis permits a positive summary with no Findings and never invents replacements (0.156ms)
+✔ diagnosis rejects unknown refs and references to unavailable metrics (0.3038ms)
+✔ diagnosis rejects extra score, severity, framework and automatic retake fields anywhere in the response contract (0.4567ms)
+✔ diagnosis rejects malformed schema, categories, empty fields, duplicate IDs and non-JSON wrappers (3.5037ms)
+✔ diagnosis bounds total response size, Finding count, text fields and reference count (1.1857ms)
+✔ structured request separates untrusted quoted source data from system instructions and returns only parsed data (0.5086ms)
+✔ structured request snapshots the allowed references before awaiting external response (0.3188ms)
+✔ provider response validation pins the selected framework and both practice evidence sets before awaiting HTTP (0.6682ms)
+✔ structured invalid output uses the existing safe invalid-response envelope (1.238ms)
+✔ structured request uses a sixty-second default deadline and supports external cancellation (2.3364ms)
+✔ structured request rejects missing configuration before dispatching any source data (0.2573ms)
+ℹ tests 32
+ℹ suites 0
+ℹ pass 32
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 187.7928

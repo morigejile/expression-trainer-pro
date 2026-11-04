@@ -1,0 +1,14 @@
+{
+  "version": "structured-diagnosis-v8",
+  "capturedAt": "2026-11-02T13:38:48.609Z",
+  "files": {
+    "lib/structured-diagnosis.js": "540316a73586796d8d3b0667abccdfd8ac8bb985086a1a8ea5b2c0db4111e2c0",
+    "test/diagnosis-quality-closeout.test.js": "7797da5a5fe46c4d55d4e25665b7d55132beeff041d6f98e816c6390bda4c255",
+    "test/expression-problem-library.test.js": "aaea7217ea1a25096df53fd64abb7e454700b08e7faea7e1ba9ec1e2836346a4",
+    "test/session-analysis.test.js": "a26e9764498363ceee3cf07af160b3661be071ba4c87cfab2dad07234d935f09",
+    "test/session-analysis-http.test.js": "9d5e6962a75555fc7428ac66e08f54dc7ddffed0cbc07c435616fb570d7735f2",
+    "docs/product/training-flow.md": "4b3fee2a08d0b71130a9534f534c1d8c4a5b3017a96fe19ab55cffeb87cd9fc4",
+    "docs/architecture/current.md": "b4b62d6d4fb16d187ea4ef9d2a8cafca27eebed71cfc3643baee336280e90582",
+    "docs/architecture/data-model.md": "6c6860b3ede463d28b5e147909213823d8510c6f091cd38694f69ad5a3708804"
+  }
+}

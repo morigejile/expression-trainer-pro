@@ -145,7 +145,8 @@ test('speech, metric and Finding evidence keep exact run ownership through HTTP 
   for (const ref of finding.evidenceRefs) assert.ok(Object.hasOwn(context.evidenceMap,ref));
   assert.deepEqual(context.quality.vad,{status:'degraded',reasons:['vad-thresholds-uncalibrated']});
   assert.equal(report.analysisRun.provenance.profileId,'approved');
-  assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v6');
+  assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v9');
+  assert.equal(report.analysisRun.provenance.problemLibraryVersion,'expression-problem-library-v0.4');
   assert.equal((await f.command('analyze',{retry:true})).value.id,report.snapshot.id,'complete report is not reanalyzed');
   await f.app.close();
   const restored=(await f.command('get',{},f.open())).value;

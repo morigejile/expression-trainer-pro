@@ -1,0 +1,36 @@
+{
+  "actualCalls": 12,
+  "groups": {
+    "A": {
+      "calls": 6,
+      "completed": 6,
+      "failed": 0
+    },
+    "B": {
+      "calls": 6,
+      "completed": 6,
+      "failed": 0
+    }
+  },
+  "models": [
+    "deepseek-flash"
+  ],
+  "allInputsMatchFrozen": true,
+  "referenceOnlyInA": true,
+  "BKeepsExistingLibraryBlocks": true,
+  "BDifferencesReconstructedExactly": true,
+  "allRequestsMatchFrozenPromptsAndControls": true,
+  "rawReparseEqualsStored": true,
+  "productionAndEarlierEvidenceUnchanged": true,
+  "trackedDiffUnchanged": true,
+  "preflight": {
+    "networkCalls": 0,
+    "mockSuccessRequests": 2,
+    "mockFailureRequests": 1,
+    "fullFrozenInputs": true,
+    "referenceOnlyInA": true,
+    "allLibraryBlocksUnchangedInB": true,
+    "invalidJsonAndReferencesRejected": true
+  },
+  "limits": "Content review is manual and separate from structural checks. No evidence of reliable generalization, conflict-detection ability, or integrated automatic report improvement."
+}

@@ -1,0 +1,301 @@
+{
+  "kind": "same-assistant-content-review",
+  "reviewedAt": "2026-10-31T06:23:16.091Z",
+  "labels": {
+    "B1": {
+      "optional": [
+        0,
+        1
+      ],
+      "note": "普通想法不要求机制与负责人未定的作用；建议引导补未证实关系。"
+    },
+    "B2": {
+      "defects": [
+        0
+      ],
+      "duplicates": [
+        1
+      ]
+    },
+    "B3": {
+      "defects": [
+        0,
+        1
+      ],
+      "duplicates": [
+        2
+      ]
+    },
+    "B4": {
+      "defects": [
+        0
+      ],
+      "duplicates": [
+        1
+      ]
+    },
+    "B5": {
+      "defects": [
+        0
+      ],
+      "duplicates": [
+        1
+      ]
+    },
+    "B6": {
+      "optional": [
+        0
+      ],
+      "falsePositive": [
+        1
+      ],
+      "note": "失败和反思已交代；后续非必需。"
+    },
+    "B7": {
+      "optional": [
+        0
+      ],
+      "factRisk": "建议预设错误记录不完整导致受阻，再给条件退路。"
+    },
+    "B8": {
+      "defects": [
+        0,
+        1
+      ]
+    },
+    "B9": {
+      "defects": [
+        0
+      ],
+      "duplicates": [
+        1
+      ],
+      "factRisk": "建议称回归测试未完成，原文只是建议完成回归。"
+    },
+    "B10": {
+      "satisfied": true
+    },
+    "B11": {
+      "defects": [
+        0
+      ]
+    },
+    "B12": {
+      "optional": [
+        0,
+        2
+      ],
+      "falsePositive": [
+        1
+      ],
+      "duplicates": [
+        2
+      ],
+      "note": "同句情境任务可辨，不要求分句；0和2同一额外追问。"
+    },
+    "B13": {
+      "defects": [
+        0,
+        1
+      ]
+    },
+    "B14": {
+      "defects": [
+        0
+      ],
+      "duplicates": [
+        1
+      ]
+    },
+    "B15": {
+      "satisfied": true
+    },
+    "B16": {
+      "defects": [
+        0,
+        1
+      ],
+      "optional": [
+        2
+      ]
+    },
+    "B17": {
+      "defects": [
+        0
+      ]
+    },
+    "B18": {
+      "defects": [
+        0,
+        1
+      ],
+      "duplicates": [
+        2
+      ],
+      "factRisk": "basis将不需要到岗转述为不到岗，义务与实际出席不同。"
+    },
+    "B19": {
+      "optional": [
+        0
+      ],
+      "defects": [
+        1
+      ],
+      "duplicates": [
+        0
+      ],
+      "note": "压缩会议即可解决同一背景目标。"
+    },
+    "B20": {
+      "defects": [
+        0
+      ],
+      "optional": [
+        1
+      ]
+    },
+    "B21": {
+      "satisfied": true
+    },
+    "B22": {
+      "defects": [
+        0,
+        1
+      ],
+      "duplicates": [
+        2
+      ]
+    },
+    "B23": {
+      "optional": [
+        0
+      ],
+      "note": "上线条件已给，具体标准未证实必需。"
+    },
+    "B24": {
+      "optional": [
+        0
+      ],
+      "note": "赞成/如果/还没定已区分状态，无须强制分句。"
+    },
+    "B25": {
+      "satisfied": true
+    },
+    "B26": {
+      "defects": [
+        0
+      ],
+      "duplicates": [
+        1
+      ],
+      "optional": [
+        1
+      ]
+    },
+    "B27": {
+      "defects": [
+        0
+      ],
+      "duplicates": [
+        1
+      ]
+    },
+    "B28": {
+      "defects": [
+        0
+      ],
+      "duplicates": [
+        1
+      ],
+      "collapsedIndependent": true,
+      "note": "两独立矛盾合一，非漏看但独立单位丢失；限定位置不是独立缺陷，摘要也未准确区分同范围限定与不同条件解释。"
+    },
+    "B29": {
+      "optional": [
+        0,
+        1
+      ],
+      "factRisk": "建议预设记录不完整导致受阻或低效，可能诱导补因果。"
+    },
+    "B30": {
+      "defects": [
+        0,
+        1
+      ]
+    },
+    "B31": {
+      "satisfied": true
+    },
+    "B32": {
+      "defects": [
+        0,
+        1
+      ],
+      "duplicates": [
+        2
+      ]
+    },
+    "B33": {
+      "defects": [
+        0
+      ],
+      "duplicates": [
+        1
+      ]
+    },
+    "B34": {
+      "defects": [
+        0
+      ],
+      "duplicates": [
+        1
+      ]
+    },
+    "B35": {
+      "defects": [
+        0
+      ]
+    },
+    "B36": {
+      "defects": [
+        0,
+        2
+      ],
+      "optional": [
+        1
+      ],
+      "duplicates": [
+        1
+      ],
+      "note": "样本幅度等未证明每项必需；作为支撑应合入对应因果或推广缺口。"
+    },
+    "B37": {
+      "defects": [
+        0
+      ]
+    },
+    "B38": {
+      "defects": [
+        0
+      ]
+    },
+    "B39": {
+      "defects": [
+        0
+      ],
+      "duplicates": [
+        1
+      ],
+      "factRisk": "尚不能排除即可消除笼统问题，至少点名一因素可能诱导猜测。"
+    },
+    "B40": {
+      "defects": [
+        0
+      ],
+      "duplicates": [
+        1
+      ]
+    }
+  },
+  "limitations": "先读隐藏版本内容，写评审后才打开来源key；同一助手自评，非独立人工验收，文风可能泄露来源。索引从0起；optional写为Finding即为深化升级，有时同时重复。"
+}

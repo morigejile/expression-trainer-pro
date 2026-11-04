@@ -1,0 +1,156 @@
+{
+  "actualCalls": 8,
+  "completed": 8,
+  "failed": 0,
+  "oneMovedBlockOnly": true,
+  "inputAndParametersIdentical": true,
+  "productionSourcesUnchanged": true,
+  "existingTrackedDiffUnchanged": true,
+  "earlierEvidenceUnchanged": true,
+  "rawParsedFindingsIdentical": true,
+  "reviewIsSemanticAssistantAssessmentNotAutomatedQualityScore": true,
+  "rows": [
+    {
+      "sequence": 1,
+      "id": "E05",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "findings": 3,
+      "duplicateGroups": [
+        [
+          "common-1",
+          "common-3"
+        ]
+      ],
+      "assessmentStatus": "analyzable",
+      "categories": [
+        "argument",
+        "wording"
+      ]
+    },
+    {
+      "sequence": 2,
+      "id": "E05",
+      "variant": "moved",
+      "repeat": 1,
+      "status": "completed",
+      "findings": 3,
+      "duplicateGroups": [
+        [
+          "common-1",
+          "common-3"
+        ]
+      ],
+      "assessmentStatus": "analyzable",
+      "categories": [
+        "organization",
+        "argument"
+      ]
+    },
+    {
+      "sequence": 3,
+      "id": "E07",
+      "variant": "moved",
+      "repeat": 1,
+      "status": "completed",
+      "findings": 3,
+      "duplicateGroups": [
+        [
+          "common-1",
+          "common-2",
+          "common-3"
+        ]
+      ],
+      "assessmentStatus": "analyzable",
+      "categories": [
+        "organization",
+        "delivery",
+        "wording"
+      ]
+    },
+    {
+      "sequence": 4,
+      "id": "E07",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "findings": 1,
+      "duplicateGroups": [],
+      "assessmentStatus": "limited",
+      "categories": [
+        "delivery"
+      ]
+    },
+    {
+      "sequence": 5,
+      "id": "E05",
+      "variant": "moved",
+      "repeat": 2,
+      "status": "completed",
+      "findings": 3,
+      "duplicateGroups": [
+        [
+          "common-1",
+          "common-3"
+        ]
+      ],
+      "assessmentStatus": "analyzable",
+      "categories": [
+        "organization",
+        "argument"
+      ]
+    },
+    {
+      "sequence": 6,
+      "id": "E05",
+      "variant": "baseline",
+      "repeat": 2,
+      "status": "completed",
+      "findings": 3,
+      "duplicateGroups": [
+        [
+          "common-1",
+          "common-3"
+        ]
+      ],
+      "assessmentStatus": "analyzable",
+      "categories": [
+        "organization",
+        "argument"
+      ]
+    },
+    {
+      "sequence": 7,
+      "id": "E07",
+      "variant": "baseline",
+      "repeat": 2,
+      "status": "completed",
+      "findings": 1,
+      "duplicateGroups": [],
+      "assessmentStatus": "limited",
+      "categories": [
+        "delivery"
+      ]
+    },
+    {
+      "sequence": 8,
+      "id": "E07",
+      "variant": "moved",
+      "repeat": 2,
+      "status": "completed",
+      "findings": 2,
+      "duplicateGroups": [
+        [
+          "common-1",
+          "common-2"
+        ]
+      ],
+      "assessmentStatus": "limited",
+      "categories": [
+        "organization",
+        "delivery"
+      ]
+    }
+  ]
+}

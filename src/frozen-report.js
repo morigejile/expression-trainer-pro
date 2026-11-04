@@ -6,6 +6,22 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this, function(context) {
   'use strict';
   const presentations = new WeakMap();
+  function renderIdentity(document,record) {
+    const identity=document.getElementById('record-identity');
+    if (!identity) return;
+    const date=new Date(record.createdAt);
+    const time=document.createElement('time');time.className='record-date';
+    time.textContent=Number.isFinite(date.getTime())
+      ? `${date.getFullYear()}-${date.getMonth()+1}-${date.getDate()}  ${String(date.getHours()).padStart(2,'0')}:${String(date.getMinutes()).padStart(2,'0')}` : '时间未知';
+    if (Number.isFinite(date.getTime())) time.setAttribute('datetime',date.toISOString());
+    const mode=document.createElement('span');mode.className='record-mode';
+    mode.textContent=context.formatTrainingContext({...record,trainingPrompt:null});
+    identity.replaceChildren(time,mode);
+    const prompt=context.formatTrainingContext(record).slice(mode.textContent.length).replace(/^ · /,'');
+    if (prompt) {
+      const label=document.createElement('span');label.className='record-context';label.textContent=prompt;identity.append(label);
+    }
+  }
   function reportModel(record) {
     const projection = record.structuredReport;
     const analysis = projection?.analysisRun;
@@ -110,7 +126,7 @@
       const label=actions.querySelector('.btn-label');
       if (label) label.textContent=record.reportPending ? '分析中…' : !model.summary && ['not-enabled','not-configured','disclosure-required'].includes(model.reason) ? '分析这一次' : '重试诊断';
     }
-    byId('record-identity').textContent = `${new Date(record.createdAt).toLocaleString()} · ${model.analysisContext}`;
+    renderIdentity(document,record);
   }
-  return {reportModel,present};
+  return {reportModel,present,renderIdentity};
 });

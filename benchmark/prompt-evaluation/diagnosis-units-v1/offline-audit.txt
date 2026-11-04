@@ -1,0 +1,196 @@
+{
+  "kind": "offline-structural-evidence-audit",
+  "checkedAt": "2026-10-31T06:29:04.989Z",
+  "productionAndPriorEvidenceUnchanged": true,
+  "preregisteredDate": "2026-10-31",
+  "requests": 61,
+  "stats": [
+    {
+      "group": "screening",
+      "variant": "baseline",
+      "n": 8,
+      "statuses": {
+        "completed": 8
+      },
+      "inputTokens": [
+        8479,
+        9576
+      ],
+      "outputTokens": [
+        263,
+        669
+      ],
+      "elapsedMs": [
+        2366,
+        4928
+      ],
+      "meanInputTokens": 8904,
+      "meanOutputTokens": 491,
+      "meanElapsedMs": 3684,
+      "requestModels": [
+        "deepseek-chat"
+      ],
+      "responseModels": [
+        "deepseek-flash"
+      ]
+    },
+    {
+      "group": "screening",
+      "variant": "unified",
+      "n": 7,
+      "statuses": {
+        "completed": 6,
+        "mapping-limited": 1
+      },
+      "inputTokens": [
+        8456,
+        9584
+      ],
+      "outputTokens": [
+        194,
+        628
+      ],
+      "elapsedMs": [
+        1783,
+        4261
+      ],
+      "meanInputTokens": 8859,
+      "meanOutputTokens": 482,
+      "meanElapsedMs": 3393,
+      "requestModels": [
+        "deepseek-chat"
+      ],
+      "responseModels": [
+        "deepseek-flash"
+      ]
+    },
+    {
+      "group": "screening",
+      "variant": "scope",
+      "n": 2,
+      "statuses": {
+        "completed": 2
+      },
+      "inputTokens": [
+        6307,
+        6405
+      ],
+      "outputTokens": [
+        291,
+        752
+      ],
+      "elapsedMs": [
+        2514,
+        5425
+      ],
+      "meanInputTokens": 6356,
+      "meanOutputTokens": 522,
+      "meanElapsedMs": 3970,
+      "requestModels": [
+        "deepseek-chat"
+      ],
+      "responseModels": [
+        "deepseek-flash"
+      ]
+    },
+    {
+      "group": "review",
+      "variant": "review",
+      "n": 4,
+      "statuses": {
+        "completed": 4
+      },
+      "inputTokens": [
+        9084,
+        10267
+      ],
+      "outputTokens": [
+        438,
+        663
+      ],
+      "elapsedMs": [
+        2577,
+        3122
+      ],
+      "meanInputTokens": 9784,
+      "meanOutputTokens": 549,
+      "meanElapsedMs": 2861,
+      "requestModels": [
+        "deepseek-chat"
+      ],
+      "responseModels": [
+        "deepseek-flash"
+      ],
+      "twoStepInputTokens": [
+        17552,
+        19851
+      ],
+      "twoStepOutputTokens": [
+        877,
+        1291
+      ],
+      "twoStepElapsedMs": [
+        6202,
+        7226
+      ]
+    },
+    {
+      "group": "final",
+      "variant": "baseline",
+      "n": 20,
+      "statuses": {
+        "completed": 20
+      },
+      "inputTokens": [
+        8461,
+        9576
+      ],
+      "outputTokens": [
+        139,
+        774
+      ],
+      "elapsedMs": [
+        1620,
+        5707
+      ],
+      "meanInputTokens": 8718,
+      "meanOutputTokens": 526,
+      "meanElapsedMs": 3942,
+      "requestModels": [
+        "deepseek-chat"
+      ],
+      "responseModels": [
+        "deepseek-flash"
+      ]
+    },
+    {
+      "group": "final",
+      "variant": "unified",
+      "n": 20,
+      "statuses": {
+        "completed": 20
+      },
+      "inputTokens": [
+        8440,
+        9586
+      ],
+      "outputTokens": [
+        150,
+        832
+      ],
+      "elapsedMs": [
+        1387,
+        5251
+      ],
+      "meanInputTokens": 8707,
+      "meanOutputTokens": 550,
+      "meanElapsedMs": 3893,
+      "requestModels": [
+        "deepseek-chat"
+      ],
+      "responseModels": [
+        "deepseek-flash"
+      ]
+    }
+  ]
+}

@@ -301,13 +301,17 @@ AI 输入是有界的 `AnalysisContext`：同一 Session/revision 的 transcript
 
 输出严格为 `schemaVersion = 1`、`summary`、`findings`。每个 Finding 包含唯一 `id`、受控 `category`、`observation`、`interpretation`、`recommendation`、至少一个实际 `evidenceRefs`，以及可选 `example`；通用与框架 Finding 使用相同字段语义。类别的唯一产品定义见 [Training Flow §7.1](../product/training-flow.md#71-完整分析与训练重点分层)。未知字段、未知引用、重复 ID 或无效类型均拒绝；没有充分证据时 Findings 可以为空。解析与边界上限见 [Structured Diagnosis](../../lib/structured-diagnosis.js)。
 
-`structured-diagnosis-v6` 的新请求必须返回 `assessment:{status,reason,categories,frameworkAssessable,evidenceRefs}`；保留 schemaVersion=1 的扩展兼容，历史缺失该字段不补算、不改写。status 为 `analyzable / limited / insufficient`，reason 为 1～800 字符，categories 为不重复的受控类别，frameworkAssessable 为布尔值；evidenceRefs 最多20个、不重复且只引用当前转写，有可评价内容时至少一个。Finding 只能属于声明可评价的类别；frameworkAssessable=false 时不产生专项结果。insufficient 必须没有可评价类别、专项结果、Finding 或框架推荐。材料充分程度独立于请求/报告技术可用性：成功的不足判定仍是 completed Diagnosis，不改成网络/模型失败，不丢弃本地指标。
+`structured-diagnosis-v6` 及后续版本的新请求必须返回 `assessment:{status,reason,categories,frameworkAssessable,evidenceRefs}`；保留 schemaVersion=1 的扩展兼容，历史缺失该字段不补算、不改写。status 为 `analyzable / limited / insufficient`，reason 为 1～800 字符，categories 为不重复的受控类别，frameworkAssessable 为布尔值；evidenceRefs 最多20个、不重复且只引用当前转写，有可评价内容时至少一个。Finding 只能属于声明可评价的类别；frameworkAssessable=false 时不产生专项结果。insufficient 必须没有可评价类别、专项结果、Finding 或框架推荐。材料充分程度独立于请求/报告技术可用性：成功的不足判定仍是 completed Diagnosis，不改成网络/模型失败，不丢弃本地指标。
 
 `recommendation` 是具体、可执行的下一轮表达练习建议，仍使用既有字段，不新增 tip。`example` 是一种建议表达方式，不是用户原文或 Evidence，不得虚构现实中的负责人、时间、经历或事实。字段可缺失或为 null；提供字符串时必须为非空文本且不超过1600字符。旧结果缺失/null时正常读取并省略表达参考区，不复制 recommendation、不填固定示例、不自动重分析或改写历史。扩展沿用 schemaVersion=1 的可选字段兼容及现有提示/报告版本机制，不改变 Session/SQLite schema，其他字段的类型、长度和引用校验保持严格。
 
 新诊断中的非空参考还须提供 `exampleEvidenceRefs`（1～20个不重复的当前转写 ID）。首批采用保守整理：只选择/重排由标点分隔的完整原文分句，不允许分句内部增删文字，防止通过子串匹配删掉否定词。缺少来源、出现新的分句/数字/常见日历数量表达或参考中混入补充占位时，只将该参考规范为 null 和空引用，保留有效 Finding；字段类型或长度非法仍拒绝。所需补充信息放在建议中作为问题或占位提示，不能拼成已经发生的事实/承诺。引用和字面检查不构成语义真实性证明，跨句因果、条件依赖或省略后含义改变仍需内容验收；本批不将自由改写视为已验证能力。
 
 AI 解释已测事实，不重算时长、频次、比例或给出雷达/总分；不推断未提供的精确词时刻、声学特征或情绪质量。输出没有 severity/priority 必填字段、重练执行控制或自动范围选择字段。启用与失败恢复按 Training Flow §6.1/§7.6，结构化失败不改写 Source、Metric 或训练事实。
+
+主诊断 `structured-diagnosis-v9` 沿用上述输出字段，在本地 result 的现有 provenance 中增加可选 `problemLibraryVersion`，记录实际使用的问题库版本（首次接入为 `expression-problem-library-v0.3`，本轮质量候选为 v0.4）；它不是 AI 响应字段，也不混入用户分析指令快照。旧来源缺失该字段时保持缺失，不用当前库版本补写历史；`promptVersion` 和 ReportSnapshot.analysisVersion 记录本次提示词版本。不新增 SQLite／Session schema，原有四类、Finding ID 和历史读取规则不变。
+
+v8 的窄格式兼容只处理新平铺响应：可信上下文选中有效框架／定义版本，返回缺少且按规则只能为 null 的 `frameworkRecommendation` 时补 null，随后执行全部原有严格校验。Free 不普遍补字段，不覆盖已有非 null，不补 assessment、摘要、Finding、引用或其他缺失，不接受未知字段和非法引用；旧嵌套格式兼容不变。只有整体成功才记录可选来源 `responseNormalization:{code,field,value,rawResponse}`：code 固定为 `selected-framework-recommendation-null`、field 固定为 `frameworkRecommendation`、value=null、原始 rawResponse 为 1～64000 字符，四字段精确校验且仍受整体 JSON 快照上限约束。原始字符串不改写；旧结果无此字段保持缺失，最终报告与 Finding 不增加字段，不触发模型修复重试或第二次审核请求。
 
 ## 6. Analysis and retraining invariants
 

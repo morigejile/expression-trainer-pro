@@ -1,6 +1,12 @@
 # 文档入口与唯一职责矩阵
 
-本页由原架构入口迁移而来，是唯一的文档职责与治理入口。用户安装和使用见根 [README](../README.md)。先按问题找到 Owner；同一个文件可以承担相邻职责，但同一规则只能有一个主定义。
+本页是唯一的文档职责与治理入口。用户安装和使用见根 [README](../README.md)。先按问题找到 Owner；同一个文件可以承担相邻职责，但同一规则只能有一个主定义。
+
+## 从当前任务开始
+
+阅读顺序：**当前任务 → 下表对应的主文档 → 必要实现 → 有需要才查历史证据**。不默认通读全部文档、归档或实验原始返回。
+
+当前交付范围与未完成项先看 [M4 剩余工作](milestones/m4-structured-training.md#remaining-work-and-blockers)，跨阶段顺序看 [Roadmap](roadmap.md)。主报告的生产状态、质量限制与未接入实验见 [Current §17](architecture/current.md#17-i2-普通报告与真实-ai-接入)；已有阶段验证不能代替当前整体验收。
 
 ## Canonical Map
 
@@ -9,6 +15,7 @@
 | 产品定位、目标与边界 | [Requirements §3](product/requirements.md#3-产品目标与原则) | 不另建产品定义副本 |
 | 必须做到什么、如何验收？ | [Requirements](product/requirements.md) | R-/NFR-/AC- 编号、优先级与验收；不维护按钮/Screen 清单 |
 | 用户怎么完成训练、理解 Finding、继续练习？ | [Training Flow §2–§11](product/training-flow.md#2-core-experience-flow-v1) | 用户流程、报告交互和 Practice Chain 产品语义 |
+| 表达问题的定义、检查、排除与证据边界？ | [表达问题库](product/expression-problem-library.md) | 运行时规则的内容源；生成与一致性验证见 Development，实际接入范围见 Current，不另维护规则副本 |
 | Screen / Workspace、Settings / Help / History 如何组织？ | [Training Flow §3、§12–§14](product/training-flow.md#13-screen-structure-收敛基线) | Home/准备检查、Screen × State Map、Utility 与导航的唯一 Owner；deferred 定位在 §13.5，实现细节在 §14 |
 | Session、Finding/Report 快照、Comparison、Persistence 的数据含义？ | [Data Model](architecture/data-model.md) | 实体、事实/派生结果、关系、版本与不变量；不定义页面导航 |
 | 当前实际实现是什么？ | [Current As-Is](architecture/current.md) | 包含已接入的录音持久化、History/Report 与验证边界；实现与设备验收分开 |
@@ -29,6 +36,21 @@
 - **Canonical**：上述职责范围内的当前主定义。目标文档中的 Accepted 不等于已实现；具体待决段落仍未决。
 - **Supporting**：[BM-02](benchmark/bm02-comparison-2026-08-27.md)、[BM-03](benchmark/bm03-five-model-comparison-2026-08-30.md)、[BM-04](benchmark/bm04-seven-model-comparison-2026-08-30.md)、[timestamp spike](spikes/token-timestamps.md)、[语料来源](../benchmark/datasets/SOURCES.md)、[spike 复现入口](../benchmark/spikes/README.md)、根 README 与 [CHANGELOG](../CHANGELOG.md)。提供入门、证据或版本历史，不自行批准产品行为。
 - **Archived**：下列历史评审/提案、[旧图集](archive/diagrams/README.md)，以及原位保留的 Superseded ADR。只能追溯当时判断，不能作为当前事实、目标设计或验收依据。
+
+### 主报告实验：先结论，后原始证据
+
+| 按需查阅 | 资料身份与入口 |
+|---|---|
+| 当前报告的比较起点 | [v9 固定材料与判断草案](../benchmark/prompt-evaluation/report-concision-v9/comparison-start.md)：当前源码／配置身份、固定输入与六次匹配结果；判断待用户确认，E04 当前结果待补跑，不代表质量验收通过 |
+| 问题单位、任务标准与生成结构 | [统一列表实验结论](../benchmark/prompt-evaluation/diagnosis-units-v1/summary.md)：开发实验，未替换生产默认；包含独立范围与有界二次复核的失败和限制 |
+| v7 到 v8 的质量对照 | [质量收尾结论](../benchmark/prompt-evaluation/problem-library-v08/summary.md)：当时的版本／内容证据，不代表后续整体质量通过 |
+| 最初的问题库接入 | [首批接入结论](../benchmark/prompt-evaluation/problem-library-v03/summary.md)：v7 阶段历史，不能当作当前提示版本说明 |
+
+各结论已链接实际请求、原始返回、失败记录、冻结源码和校验值；只在核对具体判断或复跑时进入这些材料。预览与完整对照展示是派生阅读材料，不是新的规则源，生成方式见 [Development](development.md#问题库与主诊断提示)。部分原始返回和冻结源码被测试、复跑与哈希校验直接引用，不移动、改写或只保留成功结果。
+
+`.superpowers/` 中的旧计划、日志、源码备份和截图是本地历史执行材料；被忽略不代表可删除，其中的命令与待办不作为当前指令。`docs/superpowers/` 当前空目录不承载任务状态。当前规则仍由上面的职责矩阵定义，归档材料按下表追溯。
+
+### 已归档评审
 
 | 历史材料 | 当前承接位置 |
 |---|---|

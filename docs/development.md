@@ -40,6 +40,18 @@ npm run smoke:package
 
 内部快速迭代默认只运行与改动直接相关的 focused tests。完整 `npm test` 只在 Roadmap 里程碑收尾运行；`benchmark:dry-run` 只在 Benchmark、model registry/candidate、adapter 或 manifest/schema 变化时运行；`npm audit` 只在依赖变化时运行；`npm ci`、package/make 和 packaged smoke 只在依赖、打包、native、安装相关改动或里程碑验收时运行。
 
+### 问题库与主诊断提示
+
+[问题库](product/expression-problem-library.md)的规则与卡片是唯一编辑源；改动后执行 `node scripts/generate-problem-library.js` 更新生成产物，`node scripts/generate-problem-library.js --check` 验证一致。运行时不读取整份 Markdown。
+
+以下工具仅供按需复跑已有实验，不是生产入口；先按[资料身份与结论入口](README.md#主报告实验先结论后原始证据)定位需要的证据。
+
+首批历史对照工具 `scripts/evaluate-problem-library.js` 默认只生成合成输入与可读提示；实际对照需要显式 `--live`、`--user-data=<当前已授权配置目录>`、`--output=<新证据目录>`、`--baseline-ref=<基线提交>`。仅使用 E01～E08 合成文本和当前选中配置，逐次核对授权／配置不变，不写配置、不启服务、不自动重试。真实结果与人工预期分开，已有证据及限制见[首批对照](../benchmark/prompt-evaluation/problem-library-v03/summary.md)。
+
+v7 → v8 历史对照工具 `scripts/evaluate-diagnosis-quality.js` 读取冻结 v7 的源码和哈希，按显式 jobs 文件运行单因素／最终版本，输出目录必须全新，默认仅预览、`--live` 才使用当前已授权配置。保留每次 raw、parsed、补全回执及 strictV7Format；不使用真实录音，不重试模型、不覆盖旧证据。实际结果和未解决问题见[质量对照](../benchmark/prompt-evaluation/problem-library-v08/summary.md)。
+
+统一列表实验位于 `benchmark/prompt-evaluation/diagnosis-units-v1/`，不从生产入口加载。`run.js --jobs=<jobs.json> --output=<全新目录>` 默认仅预览；实际请求仍须显式 `--live --user-data=<已授权配置目录>`。`audit.js` 仅离线校验冻结源码、真实请求与适配重放，`report.js` 仅重建可读证据；不会调用模型。独立局部范围、单调用统一列表和有界二次复核分别记录，未切换生产默认；使用限制和真实结果见[实验结论](../benchmark/prompt-evaluation/diagnosis-units-v1/summary.md)。
+
 ### 内测快速交付口径
 
 - 日常迭代只运行与改动直接相关的 focused tests，不为未交付的本地构建虚增应用版本。

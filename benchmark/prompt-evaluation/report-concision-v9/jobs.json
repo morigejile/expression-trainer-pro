@@ -1,0 +1,32 @@
+[
+  {
+    "id": "E02",
+    "variant": "final",
+    "repeat": 1
+  },
+  {
+    "id": "E05",
+    "variant": "final",
+    "repeat": 1
+  },
+  {
+    "id": "E06",
+    "variant": "final",
+    "repeat": 1
+  },
+  {
+    "id": "E07",
+    "variant": "final",
+    "repeat": 1
+  },
+  {
+    "id": "E05",
+    "variant": "final",
+    "repeat": 2
+  },
+  {
+    "id": "E07",
+    "variant": "final",
+    "repeat": 2
+  }
+]
