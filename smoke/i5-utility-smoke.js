@@ -60,8 +60,8 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     assert.equal(await evaluate(`document.querySelectorAll('dialog[open]').length`),1,'at most one native Utility is open');
     assert.equal(await evaluate(`document.getElementById('utility').matches(':modal')`),true,`Utility participates in the native dialog top layer; before=${JSON.stringify(beforeDialog)}`);
     assert.equal(BrowserWindow.getAllWindows().filter(window=>!window.isDestroyed() && !window.webContents.getURL().includes('/design-preview-merged/index.html')).length,1,'Utility uses the existing business window');
-    assert.equal(await evaluate(`document.querySelectorAll('#local-nav button').length`),surface==='settings'?3:4);
-    assert.doesNotMatch(await evaluate(`document.getElementById('local-nav').textContent`),/外观|主题|布局|关于/);
+    assert.equal(await evaluate(`document.querySelectorAll('#local-nav button').length`),4);
+    assert.doesNotMatch(await evaluate(`document.getElementById('local-nav').textContent`),/主题|布局|关于/);
   };
   const close = async () => {
     await click('#close-surface');
@@ -328,11 +328,12 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     check('Speech page uses the real sanitized Catalog; test-owned progress/failure/installed display snapshots expose cancel/retry/switch without downloading or claiming an actual installation');
 
     await open('help','start');
-    await evaluate(`(()=>{const e=document.getElementById('help-search');e.value='本机';e.dispatchEvent(new Event('input',{bubbles:true}));})()`);
-    await wait('Help search filters real content',`document.getElementById('help-results').textContent.includes('本机')`);
+    assert.equal(await evaluate(`document.getElementById('help-search')`),null,'quick-start shows its full content without search');
+    await open('help','report');
+    assert.match(await evaluate(`document.getElementById('help-results').textContent`),/比较/);
     await evaluate(`document.querySelector('#utility details').open=true`);
     assert.equal(await evaluate(`document.querySelector('#utility details').open`),true);
-    await capture('i5-help-search-expanded');
+    await capture('i5-help-report-expanded');
     await open('help','privacy');
     const privacy=await evaluate(`document.getElementById('content').textContent`);
     assert.match(privacy,/明文|尚未.*安全|尚未.*系统/);assert.match(privacy,/原始音频|原始录音/);assert.doesNotMatch(privacy,/此预览/);

@@ -36,7 +36,6 @@ contextBridge.exposeInMainWorld('api', {
   openPromptEditor: () => ipcRenderer.invoke('open-prompt-editor'),
   getCustomPrompt: () => ipcRenderer.invoke('get-custom-prompt'),
   saveCustomPrompt: (data) => ipcRenderer.invoke('save-custom-prompt', data),
-  closeWindow: () => ipcRenderer.invoke('close-current-window'),
 
   // 语音识别 - 使用 Web Audio 方案
   prepareASR: () => ipcRenderer.invoke('prepare-asr'),
@@ -91,8 +90,7 @@ contextBridge.exposeInMainWorld('api', {
   testLLMConnection: (settings) => ipcRenderer.invoke('test-llm-connection', settings),
   cancelLLMRequests: () => ipcRenderer.invoke('cancel-llm-requests'),
 
-  // 文件保存
-  saveFile: (content, filename) => ipcRenderer.invoke('save-file', content, filename),
+  // 诊断与反馈
   exportDiagnostics: (audioRates) => ipcRenderer.invoke('export-diagnostics', audioRates),
   openSupportLink: (url) => ipcRenderer.invoke('open-support-link', url),
 });

@@ -226,17 +226,17 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       'getLlmProfileSummaries', 'selectLlmProfile', 'onLlmProviderSettingsChanged',
       'getAppearance', 'saveAppearance', 'onAppearanceChanged',
       'getRecordingPolicy', 'acknowledgeRecordingPolicy',
-      'openPromptEditor', 'getCustomPrompt', 'saveCustomPrompt', 'closeWindow',
+      'openPromptEditor', 'getCustomPrompt', 'saveCustomPrompt',
       'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText',
       'createTrainingSession', 'finalizeTrainingSession', 'appendTrainingResult',
       'listTrainingSessions', 'getTrainingSession', 'deleteTrainingSession', 'readTrainingAudio',
       'getRealtimeFeedback', 'getFinalReport', 'analyzePlayback', 'testLLMConnection',
-      'cancelLLMRequests', 'saveFile', 'exportDiagnostics', 'openSupportLink'
+      'cancelLLMRequests', 'exportDiagnostics', 'openSupportLink'
     ];
     return {
       title: document.title,
       missing: expected.filter(name => typeof window.api?.[name] !== 'function'),
-      removedApis: ['analyzeTexts'].filter(name => name in window.api),
+      removedApis: ['analyzeTexts', 'closeWindow', 'saveFile'].filter(name => name in window.api),
       removedUi: ['btn-paste','paste-modal','btn-copy-text','btn-save-text','btn-clear',
         'report-modal','training-record-select','btn-diagnostics'].filter(id => document.getElementById(id)),
       missingUi: [
@@ -409,7 +409,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
 
   await mainWindow.webContents.executeJavaScript(`document.getElementById('btn-help').click()`);
   await waitUntil('Help Utility opens', () => mainWindow.webContents.executeJavaScript(
-    `document.getElementById('utility').open && document.getElementById('help-search') !== null`
+    `document.getElementById('utility').open && document.getElementById('utility').dataset.surface === 'help' && document.getElementById('help-results') !== null`
   ));
   await mainWindow.webContents.executeJavaScript(`document.querySelector('#local-nav [data-page="feedback"]').click()`);
   await waitUntil('Help feedback content loads', () => mainWindow.webContents.executeJavaScript(
@@ -610,7 +610,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
 
   await mainWindow.webContents.executeJavaScript(`document.getElementById('btn-help').click()`);
   await waitUntil('Help Utility keyboard content ready', () => mainWindow.webContents.executeJavaScript(
-    `document.getElementById('utility').open && document.getElementById('help-search') !== null`
+    `document.getElementById('utility').open && document.getElementById('utility').dataset.surface === 'help' && document.getElementById('help-results') !== null`
   ));
   const modalKeyboardState = await mainWindow.webContents.executeJavaScript(`(() => {
     const opener = document.getElementById('btn-help');

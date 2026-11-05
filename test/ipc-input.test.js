@@ -4,14 +4,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
-  MAX_MARKDOWN_LENGTH,
-  MAX_TEXT_BATCH_ITEMS,
   MAX_TEXT_LENGTH,
   requireBoundedText,
-  requireBoundedTextBatch,
   validateFinalReportPayload,
-  validatePlaybackAnalysisPayload,
-  validateMarkdownSaveRequest
+  validatePlaybackAnalysisPayload
 } = require('../lib/ipc-input');
 
 test('bounded IPC text accepts product text and rejects invalid or oversized values', () => {
@@ -127,62 +123,6 @@ test('playback payload permits 600 segments and rejects a 601st', () => {
   assert.deepEqual(validatePlaybackAnalysisPayload({profileId: 'p1', segments}), {profileId: 'p1', segments});
   assert.throws(
     () => validatePlaybackAnalysisPayload({profileId: 'p1', segments: [...segments, {id: 'segment-600', text: 'x', startMs: 1200, endMs: 1201}]}),
-    error => error.code === 'invalid-ipc-input'
-  );
-});
-
-test('Markdown save request is bounded and uses a plain Markdown filename', () => {
-  assert.deepEqual(validateMarkdownSaveRequest('# 报告', '表达训练.md'), {
-    content: '# 报告',
-    filename: '表达训练.md'
-  });
-
-  for (const filename of ['../报告.md', 'folder/报告.md', '报告.txt', '.md']) {
-    assert.throws(
-      () => validateMarkdownSaveRequest('# 报告', filename),
-      error => error.code === 'invalid-ipc-input' && error.message === 'filename must be a plain .md filename'
-    );
-  }
-
-  assert.throws(
-    () => validateMarkdownSaveRequest('x'.repeat(MAX_MARKDOWN_LENGTH + 1), '报告.md'),
-    error => error.code === 'invalid-ipc-input' && error.message === `content exceeds ${MAX_MARKDOWN_LENGTH} characters`
-  );
-});
-
-test('bounded IPC text batches accept whole transcripts and reject unbounded ones', () => {
-  const sentences = ['第一句。', '第二句。', '第三句。'];
-  assert.equal(requireBoundedTextBatch(sentences, {label: 'texts'}), sentences);
-  assert.deepEqual(requireBoundedTextBatch([], {label: 'texts'}), []);
-
-  for (const value of [null, 'not-an-array', {length: 1}, new Uint8Array([1])]) {
-    assert.throws(
-      () => requireBoundedTextBatch(value, {label: 'texts'}),
-      error => error.code === 'invalid-ipc-input'
-    );
-  }
-
-  for (const value of [[1], [null], [undefined], ['ok', {}]]) {
-    assert.throws(
-      () => requireBoundedTextBatch(value, {label: 'texts'}),
-      error => error.code === 'invalid-ipc-input'
-    );
-  }
-});
-
-test('bounded IPC text batches cap item count and combined length', () => {
-  const maxItems = Array.from({length: MAX_TEXT_BATCH_ITEMS}, () => '句');
-  assert.equal(requireBoundedTextBatch(maxItems, {label: 'texts'}).length, MAX_TEXT_BATCH_ITEMS);
-  assert.throws(
-    () => requireBoundedTextBatch([...maxItems, '句'], {label: 'texts'}),
-    error => error.code === 'invalid-ipc-input'
-  );
-
-  // 单句都在上限内，但合计超过 analyze/report 共用的文本上限
-  const half = 'x'.repeat(MAX_TEXT_LENGTH / 2);
-  assert.equal(requireBoundedTextBatch([half, half], {label: 'texts'}).length, 2);
-  assert.throws(
-    () => requireBoundedTextBatch([half, half, 'x'], {label: 'texts'}),
     error => error.code === 'invalid-ipc-input'
   );
 });

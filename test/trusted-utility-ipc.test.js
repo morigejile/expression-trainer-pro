@@ -54,7 +54,7 @@ test('Utility commands accept only the current Main document and reject same-URL
       assert.equal((await f.handlers.get(channel)(event, value)).errorCode, 'forbidden', channel);
     }
   }
-  for (const url of ['https://fixture.invalid', `${mainUrl}?surface=settings`, 'file:///D:/app/src/settings.html']) {
+  for (const url of ['https://fixture.invalid', `${mainUrl}?surface=settings`, 'file:///D:/app/other.html']) {
     f.frame.url = url;
     assert.equal((await f.call('get-llm-provider-settings')).errorCode, 'forbidden');
   }

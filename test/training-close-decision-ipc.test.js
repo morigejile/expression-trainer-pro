@@ -46,7 +46,7 @@ test('only exact Main boolean decision notifications can suspend a pending nativ
   for (const event of [null, {}, {sender: {}, senderFrame: f.frame}, {sender: f.contents},
     {sender: f.contents, senderFrame: {url: mainUrl}}]) f.decision(event, true);
   for (const value of [undefined, null, 0, 1, 'true', {}, []]) f.decision(f.event, value);
-  for (const url of [`${mainUrl}?decision=true`, 'file:///D:/app/src/settings.html', 'https://fixture.invalid']) {
+  for (const url of [`${mainUrl}?decision=true`, 'file:///D:/app/other.html', 'https://fixture.invalid']) {
     f.frame.url = url;
     f.decision(f.event, true);
   }

@@ -67,18 +67,14 @@ async function modelState({installed = [LARGE], service = {}, task = {}, catalog
   const result = await router.getModelState(); assert.equal(result.ok, true); return result.state;
 }
 
-test('quick-start has no search field and ignores stale searches without hiding steps or FAQs', () => {
+test('quick-start shows all steps and FAQs without search', () => {
   const fixture = view();
-  const result = help(fixture, 'start');
-  assert.equal(result.searchInput, null);
+  help(fixture, 'start');
   assert.equal(fixture.parent.querySelector('#help-search'), null);
   assert.equal(fixture.parent.querySelector('.help-search'), null);
-  for (const query of ['原始音频', 'totally-unmatched', '']) {
-    result.search(query);
-    assert.equal(fixture.parent.querySelectorAll('.steps').length, 1);
-    assert.equal(fixture.parent.querySelectorAll('.faq').length, 2);
-    assert.doesNotMatch(fixture.parent.textContent, /搜索结果|没有找到/);
-  }
+  assert.equal(fixture.parent.querySelectorAll('.steps').length, 1);
+  assert.equal(fixture.parent.querySelectorAll('.faq').length, 2);
+  assert.doesNotMatch(fixture.parent.textContent, /搜索结果|没有找到/);
 });
 
 test('quick-start describes optional AI and renders two full answers without disclosure controls', () => {
@@ -100,20 +96,18 @@ test('quick-start describes optional AI and renders two full answers without dis
   assert.equal(fixture.parent.querySelectorAll('.quick-start-faq').length,0);
 });
 
-test('other Help sections retain local FAQ search and clearing restores their own content', () => {
-  const fixture = view(); const actions = [];
-  const result = help(fixture, 'report', {onHelp: page => actions.push(page)});
-  result.search('原始音频');
-  assert.match(fixture.parent.querySelector('#help-results').textContent, /远程 AI 分析/);
-  assert.equal(fixture.parent.querySelectorAll('.steps').length, 0);
-  result.search('第一次怎么开始');
-  assert.match(fixture.parent.querySelector('#help-results').textContent, /首次录音/);
-  result.search('totally-unmatched');
-  assert.match(fixture.parent.textContent, /没有找到/); assert.deepEqual(actions, []);
-  click(fixture.parent.querySelector('[data-help="feedback"]')); assert.deepEqual(actions, ['feedback']);
-  result.search(' ');
-  assert.equal(fixture.parent.querySelectorAll('.help-facts').length, 1);
-  assert.equal(fixture.parent.querySelectorAll('.steps').length, 0);
+test('Help navigation replaces each page with its own full content', () => {
+  const fixture = view();
+  for (const page of ['report', 'privacy', 'feedback', 'report']) {
+    help(fixture, page);
+    assert.equal(fixture.parent.querySelector('#help-search'), null);
+    assert.equal(fixture.parent.querySelectorAll('#help-results').length, 1);
+    assert.equal(fixture.parent.querySelectorAll('.steps').length, 0);
+    assert.doesNotMatch(fixture.parent.textContent, /搜索结果|没有找到|第一次怎么开始练习/);
+    if (page === 'report') assert.match(fixture.parent.textContent, /怎样比较两次训练/);
+    if (page === 'privacy') assert.match(fixture.parent.textContent, /原始音频/);
+    if (page === 'feedback') assert.equal(fixture.parent.querySelectorAll('.feedback-faq').length, 3);
+  }
 });
 
 test('privacy keeps the actual disclosure, credential and selected-record deletion boundaries', () => {
@@ -160,17 +154,16 @@ test('feedback and export invoke only the explicit Help actions and render app i
   assert.equal(fixture.parent.querySelectorAll('.help-facts').length, 1);
 });
 
-test('feedback shows all three original answers without disclosures and search clears back to the full page',()=>{
+test('feedback shows all three original answers and their settings actions without disclosures',()=>{
   const fixture=view(),actions=[];
-  const result=help(fixture,'feedback',{onSettings:page=>actions.push(page),appInfo:{version:'1.0.1'}});
+  help(fixture,'feedback',{onSettings:page=>actions.push(page),appInfo:{version:'1.0.1'}});
   assert.doesNotMatch(fixture.parent.textContent,/找到遇到的问题，按提示检查/);
   assert.equal(fixture.parent.querySelectorAll('details').length,0);assert.equal(fixture.parent.querySelectorAll('summary').length,0);
   assert.equal(fixture.parent.querySelectorAll('.feedback-faq').length,3);
   assert.match(fixture.parent.textContent,/系统默认输入设备/);assert.match(fixture.parent.textContent,/之前可用的模型仍会保留/);
   assert.match(fixture.parent.textContent,/测试成功后仍需保存配置/);assert.match(fixture.parent.textContent,/1\.0\.1/);
-  result.search('模型下载失败');assert.match(fixture.parent.textContent,/模型下载失败/);assert.equal(fixture.parent.querySelectorAll('details').length,0);
   click(fixture.parent.querySelector('[data-setting="speech"]'));assert.deepEqual(actions,['speech']);
-  result.search('');assert.equal(fixture.parent.querySelectorAll('.feedback-faq').length,3);assert.ok(fixture.parent.querySelector('[data-export]'));
+  assert.ok(fixture.parent.querySelector('[data-export]'));
   help(fixture,'privacy');assert.ok(fixture.parent.querySelectorAll('details').length>0);
 });
 

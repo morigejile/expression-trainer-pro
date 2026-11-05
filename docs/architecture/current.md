@@ -162,7 +162,7 @@ Main 负责 Electron 控制面、词库分析、小型 userData JSON 原子文�
 - 管理窗口、应用生命周期、IPC handlers、词库、对话框和小型 userData JSON；设置使用同目录临时文件、fsync 和 rename 原子写。
 - 通过配置模块规范化和单向迁移旧 schema；损坏文件保留原文，future schema 可读已知字段但拒绝降级保存。
 - ASR 命令通过 Router/Controller 返回安全 envelope；Main 不加载 Sherpa，utility 退出后在下一次 start 重建。
-- 本地分析、有超时的 LLM fetch、回放输入校验和 Markdown 保存均在 Main 执行；同类新 LLM 请求取消旧请求。
+- 本地分析、有超时的 LLM fetch 和回放输入校验均在 Main 执行；同类新 LLM 请求取消旧请求。
 - Fake ASR/LLM 只在显式 smoke 参数和隔离 `userData` 下组合，普通启动不进入该路径。
 
 ### 5.4 ASR Provider / session、managed provider 与 Factory
@@ -278,7 +278,7 @@ Settings/Prompt Renderer 通过 Preload 调用 Main 中的 userData JSON store�
 | TD-07 | `ExpressionTrainer` 仍编排多个训练阶段 | session、stop single-flight、迟到结果和 overrun 已分别受控 | 新状态使现有局部状态无法可靠组合时再抽取状态机 |
 | TD-08 | 无 CI，Experimental 平台无制品证据 | Windows x64 Node/Electron/安装/升级 smoke 已建立 | OPS-01 或实际新增支持平台时增加最小验证 |
 | TD-09 | API Key 仍明文保存在 userData | 原子写、future-schema 防降级与日志脱敏已覆盖 | 公开发布且 keychain 收益超过 native/跨平台成本时复审 |
-| TD-10 | 页面尚未启用 CSP/sandbox | I5 Utility 的 LLM profile / custom-prompt 命令已有精确字段、类型、数量和长度边界；既有 ASR、文本分析、实时反馈、报告统计和 Markdown 保存继续使用各自输入边界，Renderer 无 Node integration | 对应具体风险或公开发布安全收口时逐项处理 |
+| TD-10 | 页面尚未启用 CSP/sandbox | I5 Utility 的 LLM profile / custom-prompt 命令已有精确字段、类型、数量和长度边界；既有 ASR、文本分析、实时反馈和报告统计继续使用各自输入边界，Renderer 无 Node integration | 对应具体风险或公开发布安全收口时逐项处理 |
 | TD-12 | LLM 瞬时失败仍需用户重试 | 超时、取消、迟到抑制、响应验证和错误脱敏已覆盖 | 产品确认重试语义后再实现，不在 fetch 层盲目重试 |
 | TD-17 | Forge/Squirrel 的仅开发传递依赖仍有安全告警 | 生产依赖审计为 0，当前组合已有完整打包证据 | 出现具体安全/兼容风险时受控升级并重跑 make/native smoke |
 
@@ -573,11 +573,11 @@ I4 阶段的验证使用隔离 userData、确定性采集与 Fake ASR/LLM，实�
 
 ## 20. I5 Settings / Help 完整接入
 
-主窗口新增同一原生 `dialog#utility`，复用冻结的 [utility.css](../../src/frozen-ui/utility.css) 和原字体/许可，AI、语音识别、分析偏好及四组帮助子页在该 Surface 内导航。既有设置、偏好及报告隐私帮助入口统一接入；旧独立窗口代码/文件不再由用户入口打开。旧主题／布局控件按确认隐藏，原配置与底层能力保留，不覆盖已迁移界面的冻结样式。版本显示在设置底部；结构与交互规则只由 [Training Flow §13.1](../product/training-flow.md#131-已确认的-ia-归属) 维护。
+主窗口新增同一原生 `dialog#utility`，复用冻结的 [utility.css](../../src/frozen-ui/utility.css) 和原字体/许可，AI、语音识别、分析偏好及四组帮助子页在该 Surface 内导航。既有设置、偏好及报告隐私帮助入口统一接入；旧独立设置／提示词窗口及其页面、控制器已移除，原打开接口继续路由到主窗口 Utility。旧窗口关闭 IPC、无界面调用的 Markdown 保存 IPC 和旧批量文本校验已移除；报告导出仍按 Backlog D-11 跟踪。旧主题／布局控件按确认隐藏，原配置与底层能力保留，不覆盖已迁移界面的冻结样式。版本显示在设置底部；结构与交互规则只由 [Training Flow §13.1](../product/training-flow.md#131-已确认的-ia-归属) 维护。
 
 [Frozen Utility](../../src/frozen-utility.js) 仅管理界面草稿，持久化仍使用既有 LLM profile、custom-prompt 和模型管理 API。AI 新建、复制、删除、当前选择、自动开关及编辑保存读取真实存储；连接测试绑定当前编辑配置，不保存或触发训练分析。身份变更后的自动撤销以 Main 保存结果为准，再读取实际状态；失败保留草稿。分析偏好将冻结标签映射至已有 `goals / styleRef / customRules / customWords`，不新增配置文件、不修改训练主题/场景/目标或旧结果。I2 的告知文件与请求门禁保持独立，查看/编辑设置和连接测试不代替告知。
 
-[Utility Content](../../src/utility-content.js) 读取实际 Catalog / 模型管理 DTO，分开显示持久选择与生效模型，按真实 action 接入安装、取消、重试、重新安装和切换。只有可信下载阶段与完整分母显示百分比，未知总量和校验阶段显示等待；没有初始化麦克风或移植模拟安装。FAQ 分组及搜索在本地完成，快速开始直接显示步骤与 FAQ、忽略搜索词；帮助与隐私说明同步当前保存、删除、AI 告知和恢复事实，不承诺 MB3 重新转写。诊断只在问题与反馈导出，调用既有脱敏快照和保存能力；反馈仍由用户主动打开白名单文档，不自动提交。
+[Utility Content](../../src/utility-content.js) 读取实际 Catalog / 模型管理 DTO，分开显示持久选择与生效模型，按真实 action 接入安装、取消、重试、重新安装和切换。只有可信下载阶段与完整分母显示百分比，未知总量和校验阶段显示等待；没有初始化麦克风或移植模拟安装。帮助按子页直接显示正文及 FAQ；未呈现的搜索逻辑及其专用条目已移除；帮助与隐私说明同步当前保存、删除、AI 告知和恢复事实，不承诺 MB3 重新转写。诊断只在问题与反馈导出，调用既有脱敏快照和保存能力；反馈仍由用户主动打开白名单文档，不自动提交。
 
 [Trusted Utility IPC](../../lib/trusted-utility-ipc.js) 将必要完整配置、偏好、连接测试、模型、版本、诊断与反馈入口限定为当前主窗口、主 frame、精确主文档 URL。字段、类型、数量和长度有界，非法窗口/子 frame/文档和参数拒绝，失败不透传密钥、私有地址或原始错误。模型广播同时到主窗口，下载、校验、缓存、ASR 与存储机制未重写。Utility 关闭及替换时保护未保存修改，原生 Dialog 承担可见控件的 Tab 遍历；Escape 仍走草稿保护。真正的应用退出先等待明确草稿决定，再沿用既有训练排空与超时保护，决定等待不被误判为渲染器挂起。读取与操作完成按界面代际隔离，不让旧设置读取、模型、诊断导出或反馈响应覆盖新子页。
 

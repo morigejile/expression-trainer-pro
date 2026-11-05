@@ -94,15 +94,13 @@ test('a newer broadcast is not overwritten by an older initial read', async () =
   assert.deepEqual(root.dataset, {theme: 'ink-night', layout: 'coach-rail'});
 });
 
-test('all renderer HTML entries load shared appearance validation before the controller',()=>{
+test('the main renderer loads shared appearance validation before the controller',()=>{
   const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm');
-  for(const page of ['index.html','settings.html','prompt-editor.html']){
-    const text=fs.readFileSync(path.join(__dirname,'../src',page),'utf8');
-    const config=text.indexOf('src="../lib/appearance-config.js"'),controller=text.indexOf('src="appearance.js"');
-    assert(config>=0&&config<controller,page+' shared dependency order');
-    const context=vm.createContext({});
-    vm.runInContext(fs.readFileSync(path.join(__dirname,'../lib/appearance-config.js'),'utf8'),context);
-    vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/appearance.js'),'utf8'),context);
-    const root={dataset:{}};context.Appearance.applyAppearance(root,{theme:'ink-night'});assert.equal(root.dataset.theme,'ink-night');
-  }
+  const text=fs.readFileSync(path.join(__dirname,'../src/index.html'),'utf8');
+  const config=text.indexOf('src="../lib/appearance-config.js"'),controller=text.indexOf('src="appearance.js"');
+  assert(config>=0&&config<controller,'shared dependency order');
+  const context=vm.createContext({});
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../lib/appearance-config.js'),'utf8'),context);
+  vm.runInContext(fs.readFileSync(path.join(__dirname,'../src/appearance.js'),'utf8'),context);
+  const root={dataset:{}};context.Appearance.applyAppearance(root,{theme:'ink-night'});assert.equal(root.dataset.theme,'ink-night');
 });

@@ -69,7 +69,7 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
       preload: path.resolve(__dirname, '../preload.js'), contextIsolation: true, nodeIntegration: false
     }});
     try {
-      await deniedWindow.loadFile(path.resolve(__dirname, '../src/settings.html'));
+      await deniedWindow.loadFile(path.join(__dirname, 'audio-graph-fixture.html'));
       const denied = await deniedWindow.webContents.executeJavaScript(
         "window.api.listTrainingSessions({requestId: 'other-window'})"
       );

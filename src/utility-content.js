@@ -8,7 +8,6 @@
   const questions = [
     {title: '怎样比较两次训练？', group: 'report', answer: '在训练历史中勾选两条记录，点击对比。较早的一次作为基线。对比读取已有结果，不会重新调用 AI。'},
     {title: '针对性练习后，先看哪里？', group: 'report', answer: '先看顶部的本轮目标反馈，再展开上一轮与本轮的证据。完整报告和其他建议仍可继续查看。'},
-    {title: '第一次怎么开始练习？', group: 'start', searchOnly: true, answer: '在准备页点击开始，主题、场景和框架都可选。首次录音先阅读数据说明，确认后再授权麦克风。录音中可以暂停、继续或结束。'},
     {title: '没有配置 AI，还能使用吗？', group: 'start', answer: '可以录音、转写、回放，查看本地统计和历史。AI 分析需要有效配置；保存不依赖 AI 分析成功。'},
     {title: '为什么录音时没有字幕？', group: 'start', answer: '是否提供实时字幕取决于当前语音识别模型：流式识别模型会在录音中显示字幕，结束后转写模型会在录音结束后生成转写。可在语音识别设置中查看当前模型并按需选择。', action: 'speech'},
     {title: '主题、框架和练习目标有什么区别？', group: 'report', answer: '主题是讲什么，场景是对谁、在什么情境下讲，框架是如何组织表达。练习目标来自你选定的具体问题；分析偏好则是长期关注点。'},
@@ -53,7 +52,7 @@
   }
 
   function groupedQuestions(document, parent, page, options) {
-    for (const question of questions) if (question.group === page && !question.searchOnly) faq(document, parent, question, options, page === 'start' || page === 'feedback');
+    for (const question of questions) if (question.group === page) faq(document, parent, question, options, page === 'start' || page === 'feedback');
   }
 
   function facts(document, parent, rows) {
@@ -138,23 +137,8 @@
     parent.replaceChildren();
     const selected = ['start', 'report', 'privacy', 'feedback'].includes(page) ? page : 'start';
     const results = element(document, 'div'); results.id = 'help-results';
-    let searchInput = null;
-    function search(query) {
-      // Quick Start always shows its steps and FAQ, including after stale queries.
-      const normalized = selected === 'start' ? '' : String(query ?? '').trim().toLowerCase();
-      results.replaceChildren();
-      if (!normalized) { ({start, report, privacy, feedback})[selected](document, results, options); return; }
-      const matches = questions.filter(question => (question.title + question.answer).toLowerCase().includes(normalized));
-      results.appendChild(element(document, 'p', 'help-filter-meta', `搜索结果 · ${matches.length} 项`));
-      for (const question of matches) faq(document, results, question, options, selected === 'feedback');
-      if (!matches.length) {
-        results.appendChild(element(document, 'p', 'intro', '没有找到匹配内容。试试“录音”“AI”或“隐私”。'));
-        results.appendChild(button(document, '前往问题与反馈', 'help', 'feedback',
-          typeof options.onHelp === 'function' ? () => options.onHelp('feedback') : null));
-      }
-    }
-    parent.appendChild(results); search('');
-    return {searchInput, results, search};
+    ({start, report, privacy, feedback})[selected](document, results, options);
+    parent.appendChild(results);
   }
 
   const actionLabels = Object.freeze({install: '安装', retry: '重试', reinstall: '重新安装', cancel: '取消安装', switch: '使用'});

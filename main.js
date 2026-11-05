@@ -47,8 +47,7 @@ const {runManagedModelSmoke} = require('./lib/managed-model-smoke');
 const {
   requireBoundedText,
   validateFinalReportPayload,
-  validatePlaybackAnalysisPayload,
-  validateMarkdownSaveRequest
+  validatePlaybackAnalysisPayload
 } = require('./lib/ipc-input');
 const modelRegistry = require('./models/registry.json');
 const bundledModelArchive = resolveBundledModelArchive({
@@ -234,8 +233,6 @@ const asrModelManagement = createAsrModelManagementRouter({
 app.setName('宇宙无敌表达训练');
 
 let mainWindow;
-let settingsWindow;
-let promptEditorWindow;
 const recordingScheduler=createAsrRecordingScheduler({getWebContents:()=>mainWindow?.webContents});
 const llmRequests = createRequestCoordinator();
 const aiAnalysisGate=createAiAnalysisGate({
@@ -264,10 +261,8 @@ app.on('second-instance', () => {
 });
 
 function publishAsrModelState(state) {
-  for (const window of [mainWindow, settingsWindow]) {
-    if (window && !window.isDestroyed() && !window.webContents.isDestroyed()) {
-      window.webContents.send('asr-model-state-changed', state);
-    }
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
+    mainWindow.webContents.send('asr-model-state-changed', state);
   }
 }
 
@@ -399,89 +394,15 @@ function createMainWindow() {
 }
 
 function broadcastAppearance(appearance) {
-  for (const window of [mainWindow, settingsWindow, promptEditorWindow]) {
-    if (window && !window.isDestroyed()) {
-      window.webContents.send('appearance-changed', appearance);
-    }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('appearance-changed', appearance);
   }
 }
 
 function broadcastLlmProviderSettingsChanged() {
-  for (const window of [mainWindow, settingsWindow, promptEditorWindow]) {
-    if (window && !window.isDestroyed()) {
-      window.webContents.send('llm-provider-settings-changed');
-    }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('llm-provider-settings-changed');
   }
-}
-
-function createPromptEditorWindow() {
-  if (promptEditorWindow) {
-    promptEditorWindow.focus();
-    return;
-  }
-
-  promptEditorWindow = new BrowserWindow({
-    icon: applicationIcon(),
-    width: 720,
-    height: 700,
-    resizable: true,
-    backgroundColor: '#1a1a1a',
-    titleBarStyle: 'hiddenInset',
-    parent: settingsWindow && !settingsWindow.isDestroyed() ? settingsWindow : mainWindow,
-    modal: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false
-    }
-  });
-
-  promptEditorWindow.loadFile(path.join(__dirname, 'src', 'prompt-editor.html'));
-
-  promptEditorWindow.webContents.on('will-prevent-unload', event => {
-    const choice = dialog.showMessageBoxSync(promptEditorWindow, {
-      type: 'warning',
-      buttons: ['放弃修改并离开', '继续编辑'],
-      defaultId: 1,
-      cancelId: 1,
-      title: '未保存的训练规则',
-      message: '训练规则尚未保存，确定要离开吗？'
-    });
-    if (choice === 0) event.preventDefault();
-  });
-
-  promptEditorWindow.on('closed', () => {
-    promptEditorWindow = null;
-  });
-}
-
-function createSettingsWindow() {
-  if (settingsWindow) {
-    settingsWindow.focus();
-    return;
-  }
-
-  settingsWindow = new BrowserWindow({
-    icon: applicationIcon(),
-    width: 600,
-    height: 500,
-    resizable: false,
-    backgroundColor: '#1a1a1a',
-    titleBarStyle: 'hiddenInset',
-    parent: mainWindow,
-    modal: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false
-    }
-  });
-
-  settingsWindow.loadFile(path.join(__dirname, 'src', 'settings.html'));
-
-  settingsWindow.on('closed', () => {
-    settingsWindow = null;
-  });
 }
 
 // App lifecycle
@@ -667,11 +588,6 @@ ipcMain.handle('acknowledge-recording-policy', () => {
   }
 });
 
-ipcMain.handle('close-current-window', (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender);
-  if (win) win.close();
-});
-
 // 语音识别相关 - Web Audio方案
 ipcMain.handle('prepare-asr', () => trackAsrResult(asrIpc.prepare()));
 
@@ -743,23 +659,6 @@ ipcMain.handle('analyze-text', (event, text) => {
   const normalizedText = requireBoundedText(text, {label: 'text'});
   const customPrompt = loadCustomPrompt();
   return analyzeText(normalizedText, {extraFillers: customWordsToFillers(customPrompt.customWords)});
-});
-
-// 文件保存
-ipcMain.handle('save-file', async (event, content, filename) => {
-  const request = validateMarkdownSaveRequest(content, filename);
-  const { dialog } = require('electron');
-  const result = await dialog.showSaveDialog(mainWindow, {
-    title: '保存报告',
-    defaultPath: path.join(app.getPath('desktop'), request.filename),
-    filters: [{ name: 'Markdown', extensions: ['md'] }]
-  });
-
-  if (!result.canceled && result.filePath) {
-    fs.writeFileSync(result.filePath, request.content, 'utf-8');
-    return { success: true, path: result.filePath };
-  }
-  return { success: false };
 });
 
 async function exportDiagnostics(audioRates) {
