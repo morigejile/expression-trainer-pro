@@ -4,9 +4,7 @@ const assert = require('node:assert/strict');
 const {
   createRequestCoordinator,
   runCoordinatedRequest,
-  sendFeedback,
-  sendReport,
-  sendPlaybackAnalysis,
+  sendStructuredDiagnosis,
   testConnection
 } = require('../lib/ai-feedback');
 
@@ -27,6 +25,14 @@ beforeEach(() => {
 afterEach(() => {
   globalThis.fetch = originalFetch;
 });
+
+function diagnosisJson(summary) {
+  return JSON.stringify({schemaVersion:1,summary,assessment:{status:'analyzable',reason:'有表达内容',categories:['argument'],frameworkAssessable:false,evidenceRefs:['segment-1']},findings:[],frameworkFindings:[]});
+}
+async function diagnoseText(text,settings,_unused,options) {
+  const context={schemaVersion:1,allowedEvidenceRefs:['segment-1'],transcript:{segments:[{id:'segment-1',text}]},trainingContext:{trainingMode:'free'}};
+  return (await sendStructuredDiagnosis(context,settings,options)).summary;
+}
 
 function jsonResponse(data, status = 200) {
   return {
@@ -60,11 +66,11 @@ test('successful feedback passes an AbortSignal and returns content', async () =
   const fetchImpl = async (url, options) => {
     receivedSignal = options.signal;
     return jsonResponse({
-      choices: [{ message: { content: '说结论' } }]
+      choices: [{ message: { content: diagnosisJson('说结论') } }]
     });
   };
 
-  const feedback = await sendFeedback('这是一段待分析的表达', OPENAI_SETTINGS, null, {
+  const feedback = await diagnoseText('这是一段待分析的表达', OPENAI_SETTINGS, null, {
     fetchImpl,
     timeoutMs: 50
   });
@@ -81,7 +87,7 @@ test('missing API key fails before any network request', async () => {
   };
 
   await assert.rejects(
-    sendFeedback('文本', { ...OPENAI_SETTINGS, apiKey: '' }, null, { fetchImpl }),
+    diagnoseText('文本', { ...OPENAI_SETTINGS, apiKey: '' }, null, { fetchImpl }),
     { message: '请先配置 API Key' }
   );
   assert.equal(called, false);
@@ -101,7 +107,7 @@ test('rate limiting produces a stable error without exposing response data', asy
   });
 
   await assert.rejects(
-    sendFeedback('文本', OPENAI_SETTINGS, null, { fetchImpl }),
+    diagnoseText('文本', OPENAI_SETTINGS, null, { fetchImpl }),
     (error) => {
       assert.equal(error.message, '大模型请求过于频繁，请稍后重试');
       assert.equal(error.message.includes(OPENAI_SETTINGS.apiKey), false);
@@ -121,7 +127,7 @@ test('other HTTP failures expose only the status code', async () => {
   });
 
   await assert.rejects(
-    sendFeedback('文本', OPENAI_SETTINGS, null, { fetchImpl }),
+    diagnoseText('文本', OPENAI_SETTINGS, null, { fetchImpl }),
     { message: '大模型服务请求失败（HTTP 503）' }
   );
 });
@@ -136,7 +142,7 @@ test('invalid JSON produces a stable error', async () => {
   });
 
   await assert.rejects(
-    sendFeedback('文本', OPENAI_SETTINGS, null, { fetchImpl }),
+    diagnoseText('文本', OPENAI_SETTINGS, null, { fetchImpl }),
     { message: '大模型返回了无效 JSON' }
   );
 });
@@ -157,7 +163,7 @@ test('timeout while reading JSON reports timeout instead of invalid JSON', async
   });
 
   await assert.rejects(
-    sendFeedback('文本', OPENAI_SETTINGS, null, { fetchImpl, timeoutMs: 5 }),
+    diagnoseText('文本', OPENAI_SETTINGS, null, { fetchImpl, timeoutMs: 5 }),
     { message: '大模型请求超时，请稍后重试' }
   );
 });
@@ -183,7 +189,7 @@ test('cancellation while reading JSON reports cancellation instead of invalid JS
     }
   });
 
-  const request = sendFeedback('文本', OPENAI_SETTINGS, null, {
+  const request = diagnoseText('文本', OPENAI_SETTINGS, null, {
     fetchImpl,
     timeoutMs: 1000,
     signal: controller.signal
@@ -205,7 +211,7 @@ for (const [name, payload] of [
     const fetchImpl = async () => jsonResponse(payload);
 
     await assert.rejects(
-      sendFeedback('文本', OPENAI_SETTINGS, null, { fetchImpl }),
+      diagnoseText('文本', OPENAI_SETTINGS, null, { fetchImpl }),
       { message: '大模型响应结构无效' }
     );
   });
@@ -213,7 +219,7 @@ for (const [name, payload] of [
 
 test('timeout aborts the fetch and reports a stable timeout error', async () => {
   await assert.rejects(
-    sendFeedback('文本', OPENAI_SETTINGS, null, {
+    diagnoseText('文本', OPENAI_SETTINGS, null, {
       fetchImpl: abortableFetch(),
       timeoutMs: 10
     }),
@@ -223,7 +229,7 @@ test('timeout aborts the fetch and reports a stable timeout error', async () => 
 
 test('external cancellation aborts the fetch and reports cancellation', async () => {
   const controller = new AbortController();
-  const request = sendFeedback('文本', OPENAI_SETTINGS, null, {
+  const request = diagnoseText('文本', OPENAI_SETTINGS, null, {
     fetchImpl: abortableFetch(),
     timeoutMs: 1000,
     signal: controller.signal
@@ -242,7 +248,7 @@ test('timeout suppresses a late success from a fetch that ignores abort', async 
   });
 
   await assert.rejects(
-    sendFeedback('文本', OPENAI_SETTINGS, null, { fetchImpl, timeoutMs: 5 }),
+    diagnoseText('文本', OPENAI_SETTINGS, null, { fetchImpl, timeoutMs: 5 }),
     { message: '大模型请求超时，请稍后重试' }
   );
 });
@@ -274,7 +280,7 @@ test('unknown fetch errors are generalized without leaking credentials', async (
   };
 
   await assert.rejects(
-    sendFeedback('文本', OPENAI_SETTINGS, null, { fetchImpl }),
+    diagnoseText('文本', OPENAI_SETTINGS, null, { fetchImpl }),
     (error) => {
       assert.equal(error.message, '无法连接大模型服务，请稍后重试');
       assert.equal(error.message.includes(OPENAI_SETTINGS.apiKey), false);
@@ -358,7 +364,7 @@ test('coordinated request returns a safe cancellation result', async () => {
     7,
     'realtime',
     'feedback',
-    (signal) => sendFeedback('文本', OPENAI_SETTINGS, null, {
+    (signal) => diagnoseText('文本', OPENAI_SETTINGS, null, {
       fetchImpl: abortableFetch(),
       timeoutMs: 1000,
       signal
@@ -479,112 +485,4 @@ test('custom endpoint appends the chat path before query parameters', async () =
     requestedEndpoint,
     'https://example.test/openai/chat/completions?api-version=2026-08-31'
   );
-});
-
-for (const {duration, durationLabel, speechRate, fillerRate} of [
-  {duration: 0, durationLabel: '不适用（无有效录音时长）', speechRate: '不适用', fillerRate: '不适用'},
-  {duration: 30, durationLabel: '30秒', speechRate: '20字/分钟', fillerRate: '4次/分钟'},
-  {duration: 0.5, durationLabel: '0.5秒', speechRate: '1200字/分钟', fillerRate: '240次/分钟'}
-]) {
-  test(`report statistics are computed locally with duration ${duration}`, async () => {
-    let request;
-    const stats = {
-      duration, totalWords: 10, fillers: 2, hedges: 1, vagueWords: 1,
-      excludedCharacters: 6, hedgeCharacters: 3
-    };
-    const report = await sendReport('嗯，我觉得这个方案很好。', stats, OPENAI_SETTINGS, null, {
-      fetchImpl: async (_url, options) => {
-        request = JSON.parse(options.body);
-        return jsonResponse({choices: [{message: {content: '## 总评\n80分，表达清楚。'}}]});
-      }
-    });
-
-    assert.ok(report.includes(`| 时长 | ${durationLabel} |`));
-    assert.ok(report.includes('| 总字数 | 10字 |'));
-    assert.ok(report.includes(`| 语速 | ${speechRate} |`));
-    assert.ok(report.includes(`| 填充词频率 | ${fillerRate} |`));
-    assert.ok(report.includes('| 表达密度（字符占比） | 40% |'));
-    assert.ok(report.includes('| 犹豫词占比（字符） | 30% |'));
-    assert.ok(report.includes('总分为 AI 主观评价，仅供参考，不代表客观测评结果或训练进步。'));
-    assert.ok(request.messages[1].content.includes('| 总字数 | 10字 |'));
-    if (duration === 0) {
-      assert.ok(request.messages[0].content.includes('没有有效录音时长，禁止推测时长、语速或每分钟频率'));
-      assert.equal(request.messages[0].content.includes('X次/分钟'), false);
-      assert.equal(report.includes('NaN'), false);
-      assert.equal(report.includes('Infinity'), false);
-    }
-  });
-}
-
-test('report failures do not mutate local analysis input', async () => {
-  const stats = {
-    duration: 12,
-    totalWords: 8,
-    fillers: 1,
-    hedges: 1,
-    vagueWords: 2,
-    excludedCharacters: 4,
-    hedgeCharacters: 3
-  };
-  const snapshot = structuredClone(stats);
-
-  await assert.rejects(
-    sendReport('嗯我觉得很好', stats, OPENAI_SETTINGS, null, {
-      fetchImpl: async () => jsonResponse({}, 429)
-    }),
-    { message: '大模型请求过于频繁，请稍后重试' }
-  );
-
-  assert.deepEqual(stats, snapshot);
-});
-
-test('playback analysis uses the structured prompt, lower temperature, and strict response parser', async () => {
-  let request;
-  const segments = [{id: 's1', text: '我觉得这个方案很好。', startMs: 0, endMs: 1200}];
-
-  const result = await sendPlaybackAnalysis(segments, OPENAI_SETTINGS, null, {
-    fetchImpl: async (url, options) => {
-      request = JSON.parse(options.body);
-      return jsonResponse({
-        choices: [{message: {content: '{"items":[{"segmentId":"s1","advice":"先给结论，再补充原因。"}]}'}}]
-      });
-    }
-  });
-
-  assert.deepEqual(result, [{segmentId: 's1', advice: '先给结论，再补充原因。'}]);
-  assert.equal(request.max_tokens, 4096);
-  assert.equal(request.temperature, 0.2);
-  assert.match(request.system ? request.system : request.messages[0].content, /segmentId/);
-});
-
-test('playback analysis rejects a model response that does not reference an input segment', async () => {
-  await assert.rejects(
-    sendPlaybackAnalysis([{id: 's1', text: '文本', startMs: 0, endMs: 1000}], OPENAI_SETTINGS, null, {
-      fetchImpl: async () => jsonResponse({
-        choices: [{message: {content: '{"items":[{"segmentId":"other","advice":"建议"}]}'}}]
-      })
-    }),
-    error => error.code === 'invalid-response'
-  );
-});
-
-test('coordinated playback analysis returns a safe invalid-response result', async () => {
-  const result = await runCoordinatedRequest(
-    createRequestCoordinator(),
-    7,
-    'playback',
-    'analysis',
-    signal => sendPlaybackAnalysis([{id: 's1', text: '文本', startMs: 0, endMs: 1000}], OPENAI_SETTINGS, null, {
-      signal,
-      fetchImpl: async () => jsonResponse({
-        choices: [{message: {content: '{"items":[{"segmentId":"missing","advice":"建议"}]}'}}]
-      })
-    })
-  );
-
-  assert.deepEqual(result, {
-    success: false,
-    error: '大模型响应结构无效',
-    errorCode: 'invalid-response'
-  });
 });

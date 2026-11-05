@@ -32,7 +32,8 @@ function loadFrozenBaseline(snapshot=SNAPSHOT){
   const lib=compile('lib/expression-problem-library.js',source('lib/expression-problem-library.js'),{'./expression-problem-library.generated.json':data});
   const diagnosis=compile('lib/structured-diagnosis.js',source('lib/structured-diagnosis.js'),{'./expression-problem-library':lib});
   return {diagnosis,library:lib,libraryData:data,manifest,sourcePath,get clientSource(){return source('lib/ai-feedback.js');},get client(){
-    return compile('lib/ai-feedback.js',source('lib/ai-feedback.js'),{'./structured-diagnosis':diagnosis});
+    return compile('lib/ai-feedback.js',source('lib/ai-feedback.js'),{
+      ...require('./historical-client-dependencies'),'./structured-diagnosis':diagnosis});
   }};
 }
 function loadFrozenExperiment(file,frozen){

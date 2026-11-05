@@ -197,7 +197,7 @@ Secrets, complete settings snapshots, endpoints containing credentials, and API 
 | `SpeechEvidenceRun` | M2 | Belongs to one audio artifact/session; records neural-VAD engine/model/threshold versions and derived intervals without replacing transcript facts |
 | `MetricRun` | M2 | Belongs to a session/transcript revision; immutable Common metric result with analyzer definition version and evidence references; the same measurable fact uses one definition across training modes |
 | `AIAnalysis` | M2 | Default derived result for each analyzable session; consumes a versioned `AnalysisContext` of facts, speech evidence and deterministic metrics, then stores a schema- and evidence-reference-validated interpretation with provider/model/prompt versions, status, and explicit unavailable/failed states |
-| `Finding` | M2 | First-class, immutable diagnostic object in an analysis result: controlled category, observation, interpretation, recommendation, `evidenceRefs`, and provenance. It is the Report diagnosis single source of truth; insufficient evidence produces no fabricated Finding |
+| `Finding` | M2 | First-class, immutable diagnostic object in an analysis result: controlled category, observation, optional interpretation, recommendation, `evidenceRefs`, and provenance. It is the Report diagnosis single source of truth; insufficient evidence produces no fabricated Finding |
 | `ReportSnapshot` | M2 | Composes exact MetricRun/AIAnalysis/Finding/evidence versions and availability into one stable Report; internally retains `evidenceVersion`, `metricsVersion`, `analysisVersion`, and `radarVersion` when applicable. Radar values are projections retained with their source/mapping/version, never a second analyzer |
 | `Comparison` | M3 | References explicit baseline and target sessions plus the metric/analysis versions used |
 | `Conversation` / `Message` | Deferred；M3 候选 | 未来优先引用来源 Session / Report、Finding 所属分析版本及 Evidence；声明使用的上下文，messages 不修改 Session facts；具体 schema 随 B-17 / D-05 重开 |
@@ -253,6 +253,8 @@ quality 表示证据本身的可用性、缺损及局限，不是用户表达质
 
 ### 5.2 M2 结果快照与证据引用
 
+历史 `kind = report` 的自由文本结果与原 provenance 保持兼容读取；退出旧生成方式不删除或重写已有快照，也不改变通用 results 存储契约。新诊断由下述 Main 流水线生成。
+
 M2 V1 复用现有 SQLite results 存储版本化 JSON payload，不新增 Evidence aggregate 或平行事实表。每条结果沿用 §3.2 的 `id`、`sessionId`、`inputRevision`、`definitionVersion`、`analyzerVersion`、`createdAt`、执行 `status` 和来源信息；同一次报告通过精确结果 ID 绑定输入，不以“某类最新结果”在读取时重新拼装。下列 M2 kinds 仅由 Main 的 Session analysis 服务生成，Renderer 不能直接提交伪造的 M2 结果。
 
 | Result kind | Payload 与输入绑定 | 版本 / 边界 |
@@ -299,13 +301,13 @@ VAD 是模型观察。当前 `vad-thresholds-uncalibrated` 作为降级原因随
 
 AI 输入是有界的 `AnalysisContext`：同一 Session/revision 的 transcript、可用音频时间事实、Speech Evidence、Common Metrics、分区 quality 和已捕获的分析指令；不附带原始录音、完整设置或凭据。`allowedEvidenceRefs` 由上述真实输入生成；超过输入上限或 revision 不匹配时显式不可用，不静默截断后假装证据完整。可执行边界见 [Analysis Context](../../lib/analysis-context.js)。
 
-输出严格为 `schemaVersion = 1`、`summary`、`findings`。每个 Finding 包含唯一 `id`、受控 `category`、`observation`、`interpretation`、`recommendation`、至少一个实际 `evidenceRefs`，以及可选 `example`；通用与框架 Finding 使用相同字段语义。类别的唯一产品定义见 [Training Flow §7.1](../product/training-flow.md#71-完整分析与训练重点分层)。未知字段、未知引用、重复 ID 或无效类型均拒绝；没有充分证据时 Findings 可以为空。解析与边界上限见 [Structured Diagnosis](../../lib/structured-diagnosis.js)。
+新主诊断使用 `structured-diagnosis-v11`，响应为 `schemaVersion=1`、唯一的整体 `summary`、`assessment`、通用 `findings`、所选框架的 `frameworkFindings`，针对性练习另含 `practiceFeedback`。每个 Finding 必须包含唯一 `id`、受控 `category`、`observation`、`recommendation` 和至少一个真实 `evidenceRefs`；`interpretation` 可省略，提供时必须为 1～1200 字符的非空字符串，只补充必要影响或限定。新响应不接受 `frameworkSummary`、`example`、`exampleEvidenceRefs` 或自动推荐字段。其他未知字段、未知引用、重复 ID 或无效类型仍拒绝；没有充分证据时 Findings 可以为空。类别定义见 [Training Flow §7.1](../product/training-flow.md#71-完整分析与训练重点分层)，边界实现见 [Structured Diagnosis](../../lib/structured-diagnosis.js)。
 
 `structured-diagnosis-v6` 及后续版本的新请求必须返回 `assessment:{status,reason,categories,frameworkAssessable,evidenceRefs}`；保留 schemaVersion=1 的扩展兼容，历史缺失该字段不补算、不改写。status 为 `analyzable / limited / insufficient`，reason 为 1～800 字符，categories 为不重复的受控类别，frameworkAssessable 为布尔值；evidenceRefs 最多20个、不重复且只引用当前转写，有可评价内容时至少一个。Finding 只能属于声明可评价的类别；frameworkAssessable=false 时不产生专项结果。insufficient 必须没有可评价类别、专项结果、Finding。材料充分程度独立于请求/报告技术可用性：成功的不足判定仍是 completed Diagnosis，不改成网络/模型失败，不丢弃本地指标。
 
-`recommendation` 是具体、可执行的下一轮表达练习建议，仍使用既有字段，不新增 tip。`example` 是一种建议表达方式，不是用户原文或 Evidence，不得虚构现实中的负责人、时间、经历或事实。字段可缺失或为 null；提供字符串时必须为非空文本且不超过1600字符。旧结果缺失/null时正常读取并省略表达参考区，不复制 recommendation、不填固定示例、不自动重分析或改写历史。扩展沿用 schemaVersion=1 的可选字段兼容及现有提示/报告版本机制，不改变 Session/SQLite schema，其他字段的类型、长度和引用校验保持严格。
+`recommendation` 是具体、可执行的下一轮表达练习建议，不新增 tip。v10 及以前的 `interpretation`、框架摘要及可选 `example` / `exampleEvidenceRefs` 继续只读兼容；历史参考不是原文或 Evidence，类型和引用规则仍保留，不因关闭生成而重写旧结果。当前 Report / Comparison 不展示历史参考与第二份摘要，也不复制 recommendation 填补这些字段。Session / SQLite schema 不变。
 
-新诊断中的非空参考还须提供 `exampleEvidenceRefs`（1～20个不重复的当前转写 ID）。首批采用保守整理：只选择/重排由标点分隔的完整原文分句，不允许分句内部增删文字，防止通过子串匹配删掉否定词。缺少来源、出现新的分句/数字/常见日历数量表达或参考中混入补充占位时，只将该参考规范为 null 和空引用，保留有效 Finding；字段类型或长度非法仍拒绝。所需补充信息放在建议中作为问题或占位提示，不能拼成已经发生的事实/承诺。引用和字面检查不构成语义真实性证明，跨句因果、条件依赖或省略后含义改变仍需内容验收；本批不将自由改写视为已验证能力。
+历史参考的解析仍使用当时保守分句规则：非空参考由当前转写引用支持，只允许选择／重排完整分句；不支持的参考局部降级为空，非法类型或长度拒绝。该兼容路径不用于 v11 新请求；现有历史证据与冻结实验不改写，字面检查也不代表语义真实性验收。
 
 AI 解释已测事实，不重算时长、频次、比例或给出雷达/总分；不推断未提供的精确词时刻、声学特征或情绪质量。输出没有 severity/priority 必填字段、重练执行控制或自动范围选择字段。启用与失败恢复按 Training Flow §6.1/§7.6，结构化失败不改写 Source、Metric 或训练事实。
 
@@ -320,11 +322,11 @@ AI 解释已测事实，不重算时长、频次、比例或给出雷达/总分�
 - A `SpeechEvidenceRun` preserves the source engine/model, thresholds, normalization/segment-rule versions, canonical absolute sample boundaries, and unavailable/failed status. Its leading/trailing silence is not counted as pause unless a versioned metric rule explicitly says otherwise.
 - Deterministic metrics own stable, directly measurable facts. They share their Common definitions across Free and Structured training, record threshold/algorithm versions, and do not ask AI to re-measure those facts.
 - `AnalysisContext` is a bounded, versioned input assembled from the applicable facts, evidence and MetricRuns. AI may interpret it, but a validated Finding must retain references to the evidence actually supporting its observation; an invalid schema or unknown reference makes that AI result locally unavailable rather than inventing a replacement.
-- A Finding uses `Observation → Interpretation → Recommendation`. Recommendation can suggest a Finding-aware next action but never directly starts, scopes, or selects a Retake; the user action and resulting new Session remain separate.
+- A Finding uses `Observation → optional Interpretation → Recommendation`. Recommendation can suggest a Finding-aware next action but never directly starts, scopes, or selects a Retake; the user action and resulting new Session remain separate.
 - 主 ASR 结果归属该 Session 的 transcript/segments，模型、版本和 timing 能力归属 ASR 来源快照；后续切换模型不重写已保存事实。SenseVoiceSmall 的角色按 [R-A10](../product/requirements.md#6-m2表达证据ai-分析与雷达图)，不另建辅助转写实体。
 - AI result status is independent of session completion: unavailable/failed states do not change completed facts. Scheduling and enablement follow [R-A04/R-A11](../product/requirements.md#6-m2表达证据ai-分析与雷达图).
 - A Structured session automatically requests Framework Analysis for its selected framework in addition to Common Analysis.
-- A user may explicitly request a framework re-analysis of an existing session. That appends a new `FrameworkAnalysis` over the same transcript revision and evidence; it does not change how the session was trained.
+- 报告不再接受外部 framework 参数或提供换框架重分析；训练前框架选择和对应专项发现保留。重试历史失败结果时仍恢复该结果固定的分析目标，不能借重试改写原训练身份。
 - AI Coaching consumes facts and validated Common/Framework results to explain priorities and suggest improvements. It is not an independent source of deterministic facts or scores.
 - 每次继续练习/重练均创建新的 `TrainingSession`，新练习固定为完整表达（`practice.scope = full`）；自动保存新事实与新结果，不复用源 Session identity，不覆盖原表达、原分析或此前 attempts。历史 `sentence / segment` 快照继续按原值读取和比较，不迁移、不改写；从这些记录发起的新轮仍为 `full`，保留前后范围不同的比较限制。
 - Finding-aware 重练的新 Session 必须持久化来源 Session 与来源 Finding 的关系。Finding 引用应能定位其所属来源 Session 和分析结果/版本，不能仅靠显示名称或当前页面状态识别。
@@ -333,7 +335,7 @@ AI 解释已测事实，不重算时长、频次、比例或给出雷达/总分�
 - Session identity 不等于链成员 identity：某记录可在旧链是末轮，同时被新链历史引用为第 1 轮。沿当前目标继续时保留链和 origin，更新相邻 Session/Report 引用；改选 Finding 新建链。来源删除后保留最小定位元数据及本轮练习目标，不级联后续练习；缺失来源按 Flow §10.2 降级，不能用另一条记录补位。
 - Training-time Guidance is framework-definition content shown before a session. Post-training Framework Analysis is versioned derived output. They may share a definition but not a storage record or UI responsibility.
 
-M4 的专项结果嵌入不可变 `diagnosis.value.frameworkAnalysis`，记录 framework、definitionVersion、summary 和带引用的 findings，复用所属 run 的 status/analyzerVersion/inputRevision。`analysisTarget` 与 Session 的训练方式分开；显式框架重分析追加 Diagnosis / Report snapshot，复用已有 Speech Evidence / Common Analysis 的确切 ID。v10 新诊断不含 `frameworkRecommendation`；旧字段仅作历史读取兼容，报告不再展示或提供采用动作，历史结果保持不可变。
+M4 的专项结果嵌入不可变 `diagnosis.value.frameworkAnalysis`，记录 framework、definitionVersion 和带引用的 findings；summary 仅在历史结果中可选保留，复用所属 run 的 status/analyzerVersion/inputRevision。`analysisTarget` 与 Session 的训练方式分开；报告内换框架分析已移除；历史失败重试仍按固定目标复用原证据，追加结果且不覆盖旧快照。v10 新诊断不含 `frameworkRecommendation`；旧字段仅作历史读取兼容，报告不再展示或提供采用动作，历史结果保持不可变。
 
 针对性练习的 `practiceFeedback` 保存状态、结论、前一轮和本轮转写引用；非 unavailable 结论必须两侧有证据。它只回答已选目标，不承担 B-25 的任意历史 Finding 自动对应。删除来源后既有派生快照保持不可变，展示时检查引用可用性并降级，不能把不可复核的历史结论继续作为当前改善证明。
 

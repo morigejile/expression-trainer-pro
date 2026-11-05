@@ -92,7 +92,7 @@
       for(const [index,side] of sides.entries()){
         const column=el('div');pair.appendChild(column);column.appendChild(el('small',null,index?'目标':'基线'));const findings=side.findings.filter(finding=>finding.category===category);
         if(!findings.length)column.appendChild(el('p','source-note','此类别未保存分析项，无法判断问题是否存在或改善。'));
-        findings.forEach((finding,i)=>{const card=el('article','comparison-finding');column.appendChild(card);card.appendChild(el('h4','finding-observation',finding.observation));card.appendChild(el('p',null,finding.interpretation));card.appendChild(el('small',null,'下一轮怎么练'));card.appendChild(el('p',null,finding.recommendation));if(typeof finding.example==='string' && finding.example.trim()){card.appendChild(el('small',null,'一种表达参考'));card.appendChild(el('p','example',finding.example));}disclosure(card,`finding-${index?'target':'baseline'}-${category}-${i}`,'查看证据',body=>evidence(body,side,finding.evidenceRefs));});
+        findings.forEach((finding,i)=>{const card=el('article','comparison-finding');column.appendChild(card);card.appendChild(el('h4','finding-observation',finding.observation));if(typeof finding.interpretation==='string' && finding.interpretation.trim())card.appendChild(el('p',null,finding.interpretation));card.appendChild(el('small',null,'下一轮怎么练'));card.appendChild(el('p',null,finding.recommendation));disclosure(card,`finding-${index?'target':'baseline'}-${category}-${i}`,'查看证据',body=>evidence(body,side,finding.evidenceRefs));});
       }
     }
     for(const [i,side] of sides.entries())if(side.diagnosisStatus!=='completed')analysis.appendChild(el('p','source-note',`${i?'目标':'基线'}分析暂不可用；保存的原文、录音与健康指标仍可查看。`));
@@ -112,7 +112,7 @@
       });
     }
     table.appendChild(el('caption',null,'转写字符数不含标点；填充词命中频率单位为次／录音分钟，分母包含静音。变化为目标减基线，数值不表示能力评分。'));
-    disclosure(metrics,'compare-limits','比较范围与限制',detail=>{detail.appendChild(el('p',null,'本页固定两条所选记录与进入时的报告版本；训练方式、主题或练习范围不同时，需要结合上下文阅读。'));detail.appendChild(el('p',null,'对比只读取两次保存的结果，不重新运行识别或分析。某项缺失不影响其他资料查看，也不能据此认定问题已解决。'));detail.appendChild(el('p',null,'VAD 表示模型检测事实及局限；雷达未校准，暂不提供数值对比。'));});
+    disclosure(metrics,'compare-limits','比较范围与限制',detail=>{detail.appendChild(el('p',null,'本页固定两条所选记录与进入时的报告版本；训练方式、主题或练习范围不同时，需要结合上下文阅读。'));detail.appendChild(el('p',null,'对比只读取两次保存的结果，不重新运行识别或分析。某项缺失不影响其他资料查看，也不能据此认定问题已解决。'));detail.appendChild(el('p',null,'VAD 表示模型检测事实，不代表对表达质量的评价。'));});
   }
 
   function createComparisonController({trainer,api,document}) {

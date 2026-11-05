@@ -37,7 +37,9 @@ function loadBaseline(ref){
     const name=path.join(ROOT,file),instance=new Module(name,module);
     instance.filename=name;instance.paths=Module._nodeModulePaths(path.dirname(name));
     const original=instance.require.bind(instance);
-    instance.require=request=>dependency&&request==='./structured-diagnosis'?dependency:original(request);
+    const retired=require('./historical-client-dependencies');
+    instance.require=request=>dependency&&request==='./structured-diagnosis'?dependency
+      :Object.hasOwn(retired,request)?retired[request]:original(request);
     instance._compile(execFileSync('git',['show',`${ref}:${file}`],{cwd:ROOT,encoding:'utf8'}),name);
     return instance.exports;
   };

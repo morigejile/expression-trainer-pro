@@ -4,6 +4,25 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 function api() {return require('../src/structured-report');}
 
+test('concise report reads findings without explanations and has no empty explanation heading',()=>{
+  const source=runs();delete source[2].value.findings[0].interpretation;
+  source[2].value.frameworkAnalysis={framework:'prep',definitionVersion:'prep-v1',findings:[]};
+  const projection=api().selectStructuredReport(source);assert.ok(projection);
+  const target=container();api().renderStructuredReport(target,projection,{onPractice:()=>{}});
+  assert.match(target.textContent,/观察 0/);assert.match(target.textContent,/建议 0/);
+  assert.doesNotMatch(target.textContent,/为什么值得练|undefined/);
+});
+
+test('legacy report retains findings and evidence but never displays retired summaries, examples, reanalysis or radar placeholders',()=>{
+  const source=runs();Object.assign(source[2].value.findings[0],{example:'旧表达参考',exampleEvidenceRefs:['segment-1']});
+  source[2].value.frameworkAnalysis={framework:'prep',definitionVersion:'prep-v1',summary:'旧专项摘要',findings:[]};
+  const before=JSON.stringify(source),target=container();
+  api().renderStructuredReport(target,api().selectStructuredReport(source),{onReanalyze:()=>assert.fail('retired')});
+  assert.match(target.textContent,/观察 0/);
+  assert.doesNotMatch(target.textContent,/旧表达参考|一种表达参考|旧专项摘要|换个框架|雷达|为什么值得练/);
+  assert.equal(JSON.stringify(source),before);
+});
+
 function runs(suffix = '1', {status = 'completed', reason = null, findings = 1} = {}) {
   const wrap = (kind,value,runStatus = 'completed') => ({id:`${kind}-${suffix}`,kind,status:runStatus,
     sessionId:'session-1',inputRevision:1,createdAt:`2026-09-19T00:00:0${suffix}.000Z`,value});
@@ -103,7 +122,7 @@ test('framework report keeps common advice while saved legacy recommendations ha
     findings:[{...source[2].value.findings[0],id:'framework-1',observation:'未交代处理结果'}]};
   const target = container(); const clicked = [];
   api().renderStructuredReport(target,api().selectStructuredReport(source),{onFramework:id => clicked.push(id)});
-  assert.match(target.textContent,/STAR.*专项分析/);
+  assert.doesNotMatch(target.textContent,/需要补充结果/);
   assert.match(target.textContent,/未交代处理结果/);
   assert.match(target.textContent,/观察 0/);
   assert.equal(byClass(target,'finding').length,2);
@@ -304,7 +323,7 @@ test('unavailable metric values render as unknown rather than zero and radar nev
   assert.match(unavailable.textContent,/语音活动证据不可用/);
   assert.match(target.textContent,/短停顿可能合并/);
   assert.match(target.textContent,/尚未完成代表性标注校准/);
-  assert.match(byClass(target,'radar-unavailable')[0].textContent,/量程尚未校准/);
+  assert.equal(byClass(target,'radar-unavailable').length,0);
   assert.equal(descendants(target,node=>['SVG','POLYGON','CANVAS'].includes(node.tagName)).length,0);
 });
 
@@ -334,12 +353,12 @@ test('clearing the projection removes the previous report without leaving stale 
   assert.equal(target.children.length,0);
 });
 
-test('common and framework expression references are optional suggestions separate from original evidence',()=>{
+test('legacy expression references remain readable but hidden while original evidence and recommendations remain available',()=>{
   for (const example of [undefined,null,'建议参考，不是原文 <script>evil()</script>']) {
     const source=runs();if (example!==undefined) source[2].value.findings[0].example=example;
     source[2].value.frameworkAnalysis={framework:'prep',definitionVersion:'prep-v1',summary:'框架摘要',findings:[{...source[2].value.findings[0],id:'framework-example'}]};
     const target=container();api().renderStructuredReport(target,api().selectStructuredReport(source),{segments:[{id:'segment-1',text:'用户原文'}]});
-    const references=byClass(target,'example');assert.equal(references.length,typeof example==='string'?2:0);
+    const references=byClass(target,'example');assert.equal(references.length,0);
     assert.ok(byClass(target,'evidence-quote').every(node=>node.textContent==='用户原文'));
     assert.equal(descendants(target,node=>node.tagName==='SCRIPT').length,0);
     assert.match(target.textContent,/建议 0/);

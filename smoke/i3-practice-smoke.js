@@ -161,8 +161,8 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   assert.deepEqual(immutable(await session(aId)),immutable(a)); assert.deepEqual(immutable(await session(bId)),immutable(b));
   await require('./i3-practice-visual-smoke').run({mainWindow,BrowserWindow,evaluate,capture});
   await openHistory(aId);
-  await evaluate(`${trainer}.awaitTrainingAnalysis(${trainer}.trainingRecords.selected(),true,'star')`); await ready();
-  const laterA = await session(aId); assert.notEqual(report(laterA).snapshot.id,aReport); assert.deepEqual(immutable(laterA),immutable(a));
+  await evaluate(`${trainer}.awaitTrainingAnalysis(${trainer}.trainingRecords.selected(),true)`); await ready();
+  const laterA = await session(aId); assert.equal(report(laterA).snapshot.id,aReport); assert.deepEqual(immutable(laterA),immutable(a));
   await openHistory(cId); await ready(); await restoreHistoryView(c,aId,aReport);
   const utilityContext=await evaluate(`({record:${trainer}.viewingTrainingRecordId,snapshot:${trainer}.trainingRecords.selected().structuredReport.snapshot.id,scroll:document.getElementById('report-scroll').scrollTop})`);
   await evaluate(`document.getElementById('btn-help').click();document.getElementById('close-surface').click()`);

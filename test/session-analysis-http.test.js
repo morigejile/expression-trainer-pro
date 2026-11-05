@@ -17,7 +17,7 @@ test.before(() => require('../lib/lexicon').loadLexicon());
 
 // Exercise the real HTTP/JSON/provider boundary with generated text and silence.
 // This is protocol evidence, not an external model or microphone acceptance test.
-async function fixture(t, provider = 'custom', {speechAvailable=false} = {}) {
+async function fixture(t, provider = 'custom', {speechAvailable=false,framework=null} = {}) {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'session-analysis-http-'));
   const received = [];
   let responseMode = 'valid';
@@ -41,18 +41,17 @@ async function fixture(t, provider = 'custom', {speechAvailable=false} = {}) {
       categories:['organization','argument','delivery','wording'],frameworkAssessable:Boolean(context.analysisTarget),
       evidenceRefs:[context.transcript.segments[0].id]},summary:'建议补充支持观点的具体例子。',findings:[{
       id:'finding-1',category:'argument',observation:'表达提出了先明确目标的主张。',
-      interpretation:'具体事例可以帮助听者理解。',recommendation:'补充一个实际例子。',
+      recommendation:'补充一个实际例子。',
       evidenceRefs:responseMode === 'invalid-ref' ? ['another-session'] : [context.transcript.segments[0].id,
         ...(speechAvailable ? ['metric:speech-duration-ms','speech-0'] : [])]
     }]};
-    diagnosis.frameworkSummary = context.analysisTarget ? '专项反馈保留原转写证据。' : null;
     diagnosis.frameworkFindings = context.analysisTarget
       ? [{...diagnosis.findings[0],id:'framework-1',evidenceRefs:[context.transcript.segments[0].id]}] : [];
     if (responseMode==='insufficient') {
       diagnosis.assessment={status:'insufficient',reason:'只有试音和问候，没有展开表达内容。',
         categories:[],frameworkAssessable:false,evidenceRefs:[context.transcript.segments[0].id]};
       diagnosis.summary='本次材料不足以形成表达诊断。';diagnosis.findings=[];
-      diagnosis.frameworkSummary=null;diagnosis.frameworkFindings=[];
+      diagnosis.frameworkFindings=[];
     }
     response.writeHead(200, {'Content-Type':'application/json'});
     response.end(JSON.stringify({choices:[{message:{content:JSON.stringify(diagnosis)}}]}));
@@ -85,7 +84,7 @@ async function fixture(t, provider = 'custom', {speechAvailable=false} = {}) {
   });
   const app = open();
   const invoke = (target,operation,fields={}) => target.execute(operation,{requestId:randomUUID(),...fields});
-  const created = await invoke(app,'create',{input:{createdAt:'2026-09-19T00:00:00Z',source:'microphone'}});
+  const created = await invoke(app,'create',{input:{createdAt:'2026-09-19T00:00:00Z',source:'microphone',...(framework?{trainingMode:'structured',framework,frameworkDefinitionVersion:`${framework}-v1`}:{})}});
   assert.equal(created.ok,true);
   const sessionId = created.sessionId;
   const audio = Buffer.alloc(32044);
@@ -128,6 +127,21 @@ for (const provider of ['custom','ollama']) test(`${provider} protocol preserves
   assert.equal(f.received.length,1);
 });
 
+for(const framework of ['prep','star','pyramid'])test(`${framework} diagnosis persists optional explanations and selected-framework findings with only one summary`,async t=>{
+  const f=await fixture(t,'custom',{speechAvailable:true,framework});
+  const saved=await f.complete(),report=selectStructuredReport(saved.results);
+  assert.equal(report.analysisRun.status,'completed');
+  assert.equal(report.analysisRun.value.frameworkAnalysis.framework,framework);
+  assert.equal(Object.hasOwn(report.analysisRun.value.frameworkAnalysis,'summary'),false);
+  assert.equal(Object.hasOwn(report.analysisRun.value.findings[0],'interpretation'),false);
+  assert.equal(report.analysisRun.value.frameworkAnalysis.findings.length,1);
+  assert.deepEqual(report.analysisRun.value.frameworkAnalysis.findings[0].evidenceRefs,['segment-1']);
+  await f.app.close();
+  const restored=(await f.command('get',{},f.open())).value;
+  assert.deepEqual(restored.results,saved.results);assert.ok(selectStructuredReport(restored.results));
+  assert.equal(f.received.length,1);
+});
+
 test('speech, metric and Finding evidence keep exact run ownership through HTTP and restart',async t=>{
   const f=await fixture(t,'custom',{speechAvailable:true});
   const saved=await f.complete();
@@ -144,7 +158,7 @@ test('speech, metric and Finding evidence keep exact run ownership through HTTP 
   for (const ref of finding.evidenceRefs) assert.ok(Object.hasOwn(context.evidenceMap,ref));
   assert.deepEqual(context.quality.vad,{status:'degraded',reasons:['vad-thresholds-uncalibrated']});
   assert.equal(report.analysisRun.provenance.profileId,'approved');
-  assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v10');
+  assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v11');
   assert.equal(report.analysisRun.provenance.problemLibraryVersion,'expression-problem-library-v0.4');
   assert.equal((await f.command('analyze',{retry:true})).value.id,report.snapshot.id,'complete report is not reanalyzed');
   await f.app.close();
@@ -169,38 +183,13 @@ test('insufficient-material assessment survives real HTTP, immutable persistence
   assert.equal(f.received.length,1);
 });
 
-test('flat HTTP output supports all framework switches and explicit retry without overwriting facts or prior reports',async t=>{
-  const f=await fixture(t,'custom',{speechAvailable:true});
-  const original=await f.complete();
-  const initial=selectStructuredReport(original.results);
-  for (const framework of ['prep','star','pyramid']) {
-    assert.equal((await f.command('analyze',{framework})).ok,true);
-    const saved=(await f.command('get')).value;
-    const report=selectStructuredReport(saved.results);
-    assert.equal(report.analysisRun.status,'completed');
-    assert.equal(report.analysisRun.value.frameworkAnalysis.framework,framework);
-    assert.equal(report.analysisRun.value.frameworkAnalysis.definitionVersion,`${framework}-v1`);
-    assert.deepEqual(report.analysisRun.value.frameworkAnalysis.findings[0].evidenceRefs,['segment-1']);
-    assert.equal(saved.trainingMode,'free');assert.equal(saved.framework,null);
-    assert.deepEqual(saved.transcript,original.transcript);assert.deepEqual(saved.artifact,original.artifact);
-    assert.deepEqual(saved.results.slice(0,original.results.length),original.results);
-    assert.equal(report.evidenceRun.id,initial.evidenceRun.id);assert.equal(report.metricRun.id,initial.metricRun.id);
+test('saved reports reject all external framework switches without HTTP or new snapshots',async t=>{
+  const f=await fixture(t,'custom',{speechAvailable:true});const original=await f.complete();
+  for(const framework of ['prep','star','pyramid']) {
+    const result=await f.command('analyze',{framework});assert.equal(result.error.code,'INVALID_SESSION');
   }
-  const beforeFailure=(await f.command('get')).value;
-  f.mode('invalid-ref');
-  await f.command('analyze',{framework:'star'});
-  const failed=selectStructuredReport((await f.command('get')).value.results);
-  assert.equal(failed.analysisRun.value.frameworkAnalysis.framework,'pyramid');
-  assert.equal(failed.latestAttempt.reason,'invalid-response');
-  f.mode('valid');
-  await f.command('analyze',{retry:true});
   const saved=(await f.command('get')).value;
-  assert.equal(selectStructuredReport(saved.results).analysisRun.value.frameworkAnalysis.framework,'star');
-  assert.deepEqual(saved.results.slice(0,beforeFailure.results.length),beforeFailure.results);
-  assert.deepEqual(f.received.map(request=>request.context.analysisTarget?.framework ?? null),[null,'prep','star','pyramid','star','star']);
-  await f.app.close();
-  const restored=(await f.command('get',{},f.open())).value;
-  assert.deepEqual(restored.results,saved.results);assert.equal(f.received.length,6);
+  assert.deepEqual(saved.results,original.results);assert.equal(f.received.length,1);
 });
 
 for (const [status,reason] of [[401,'unauthorized'],[429,'rate-limited'],[503,'analysis-failed']]) {

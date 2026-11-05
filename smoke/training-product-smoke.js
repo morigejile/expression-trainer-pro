@@ -99,7 +99,7 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
     const config = {schemaVersion:3,activeProfileId:'product-smoke',profiles:[{id:'product-smoke',name:'Product smoke',provider:'deepseek',apiKey:'smoke-only-key',model,ollamaUrl:'',baseUrl:'',customModel:'',autoDiagnosisEnabled}]};
     const saved = await invoke('saveLlmProviderSettings',config);
     assert.equal(saved.success, true);
-    await wait('provider selection reached renderer', `window.__trainingProductTrainer.playbackProfileSummary.profiles.some(p => p.model===${JSON.stringify(model)})`);
+    await wait('provider selection reached renderer', `(async()=>{const summary=await window.api.getLlmProfileSummaries();return summary.profiles.some(p=>p.model===${JSON.stringify(model)});})()`);
     await evaluate('window.__trainingProductTrainer.utility.requestClose()');
   };
 
@@ -147,7 +147,7 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
     assert.equal(await evaluate(`document.getElementById('training-topic').disabled`),true);
     assert.equal(await evaluate(`document.getElementById('training-scenario').disabled`),true);
     assert.equal(await evaluate(`document.getElementById('training-framework').disabled`),true);
-    for (const part of Object.values(require('../shared/training-context').getPromptParts(prompt)).filter(Boolean)) assert.ok((await evaluate(`document.getElementById('training-context-label').textContent`)).includes(part.text));
+    for (const [kind,part] of Object.entries(require('../shared/training-context').getPromptParts(prompt))) if(part) assert.ok((await evaluate(`document.getElementById('training-${kind}').title`)).includes(part.text));
     // Even a synthetic edit cannot change the context captured for this recording.
     assert.equal(await evaluate(`window.__trainingProductTrainer.trainingSetup.configure({trainingPrompt:null})`),false);
     await evaluate(`document.getElementById('btn-stop').click()`);
@@ -197,8 +197,8 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
     await wait('comparison evidence audio decodes and plays',`document.querySelector('[data-detail-key="original-target"] audio').dataset.played==='true'`);
     const pinned=await evaluate(`window.__trainingProductTrainer.comparison.context.projection.baseline.snapshot`);
     await evaluate(`document.querySelector('[data-detail-key="metric-text-character-count"]').open=true`);
-    const scroll=await evaluate(`(()=>{window.scrollTo(0,600);return window.scrollY;})()`);
-    assert.ok(scroll>0,'comparison uses the Frozen page scrolling');
+    const scroll=await evaluate(`(()=>{const node=document.getElementById('comparison-scroll');node.scrollTop=600;return node.scrollTop;})()`);
+    assert.ok(scroll>0,'comparison uses its workspace scrolling');
     await capture(offline?'comparison-offline':'comparison');
     await evaluate(`document.querySelector('[data-comparison-report="baseline"]').click()`);
     await wait('comparison drills into the shared report',`document.body.dataset.screen==='report' && window.__trainingProductTrainer.reportSource==='comparison'`);
@@ -207,7 +207,7 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
     await wait('pinned comparison restored',`document.body.dataset.screen==='comparison' && !window.__trainingProductTrainer.comparison.loading`);
     assert.deepEqual(await evaluate(`window.__trainingProductTrainer.comparison.context.projection.baseline.snapshot`),pinned);
     assert.equal(await evaluate(`document.querySelector('[data-detail-key="metric-text-character-count"]').open`),true);
-    assert.equal(await evaluate(`window.scrollY`),scroll,'Report return restores the comparison scroll position');
+    assert.equal(await evaluate(`document.getElementById('comparison-scroll').scrollTop`),scroll,'Report return restores the comparison scroll position');
     await evaluate(`document.getElementById('btn-help').click();document.getElementById('close-surface').click()`);
     assert.equal(await evaluate(`document.querySelector('[data-detail-key="metric-text-character-count"]').open`),true);
     await evaluate(`document.getElementById('btn-comparison-back').click()`);
@@ -306,16 +306,11 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
       await require('./training-preparation-smoke').run({mainWindow,evaluate,wait,capture,choose,setCustom});
       await saveProfile('smoke-model');
       const a = await recordOnce(null,{framework:'prep',bank:true});
-      await wait('selected framework analysis',`document.getElementById('report-analysis-info').textContent.includes('PREP 专项分析')`);
+      await wait('selected framework analysis',`window.__trainingProductTrainer.trainingRecords.selected().structuredReport?.analysisRun.value.frameworkAnalysis?.framework==='prep'`);
       const original = (await invoke('getTrainingSession',{requestId:'original',sessionId:a})).value;
       const prompt = original.trainingPrompt;
       assert.equal(prompt.topic.source,'bank');assert.equal(prompt.scenario.source,'bank');assert.equal(original.framework,'prep');
       await capture('m4-prep-report');
-      await evaluate(`(()=>{const detail=document.querySelector('.framework-reanalysis');detail.open=true;detail.querySelectorAll('button')[1].click();})()`);
-      await wait('explicit STAR reanalysis',`!window.__trainingProductTrainer.trainingRecords.selected().reportPending && document.getElementById('report-analysis-info').textContent.includes('STAR 专项分析')`);
-      const revised = (await invoke('getTrainingSession',{requestId:'revised',sessionId:a})).value;
-      assert.equal(revised.framework,'prep');assert.deepEqual(revised.transcript,original.transcript);
-      assert.equal(revised.results.filter(run=>run.kind==='speech-evidence').length,1);
       await startPractice(false);await capture('m4-practice-preparing');
       const b = await recordOnce(prompt,{practice:true});
       assert.equal((await current()).practice.round,2);
@@ -352,7 +347,7 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
       await wait('four persisted rounds',`document.querySelectorAll('.practice-round').length===4`);
       await evaluate(`document.querySelector('.practice-round button').click()`);
       await wait('original pinned report',`window.__trainingProductTrainer.viewingTrainingRecordId===${JSON.stringify(f.a)} && window.__trainingProductTrainer.reportSource==='practice'`);
-      assert.match(await evaluate(`document.getElementById('report-analysis-info').textContent`),/STAR 专项分析/);
+      assert.equal(await evaluate(`window.__trainingProductTrainer.trainingRecords.selected().structuredReport.analysisRun.value.frameworkAnalysis.framework`),'prep');
       await evaluate(`document.getElementById('btn-report-back').click()`);
       await wait('return to current practice',`window.__trainingProductTrainer.trainingRecords.selected()?.practice?.round===4`);
     }
@@ -375,19 +370,14 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
       await wait('automatic structured report saved', `window.__trainingProductTrainer.trainingRecords.selected().structuredReport?.analysisRun?.status==='completed' && !window.__trainingProductTrainer.trainingRecords.selected().reportPending`);
       assert.equal(calls.llmDiagnosis,initialCalls.diagnosis+7);
       assert.match(await evaluate(`document.getElementById('report-summary-copy').textContent`),/先说明目标，再给出支持理由/);
-      await evaluate(`document.getElementById('btn-reanalyze').click()`);
-      await wait('explicit playback analysis saved', `window.__trainingProductTrainer.trainingRecords.selected().playbackAnalysis && !window.__trainingProductTrainer.trainingRecords.selected().playbackPending`);
-      assert.equal(calls.llmReport,initialCalls.report);
-      assert.equal(calls.llmPlayback,initialCalls.playback+1);
       const saved = await invoke('getTrainingSession',{requestId:'verify-results',sessionId:ids.at(-1)});
       assert.ok(saved.value.results.some(result=>result.kind==='metrics'));
       assert.equal(saved.value.results.filter(result=>result.kind==='diagnosis' && result.status==='completed').length, 1);
       assert.equal(saved.value.results.filter(result=>result.kind==='report-snapshot').length, 1);
-      assert.equal(saved.value.results.filter(result=>result.kind==='playback' && result.status==='completed').length, 1);
+      assert.equal(saved.value.results.filter(result=>result.kind==='playback' && result.status==='completed').length, 0);
       const report = saved.value.results.find(result=>result.kind==='diagnosis');
-      const playback = saved.value.results.find(result=>result.kind==='playback');
       await saveProfile('changed-model');
-      fs.writeFileSync(fixturePath, JSON.stringify({ids,report,playback,lastPrompt}));
+      fs.writeFileSync(fixturePath, JSON.stringify({ids,report,lastPrompt}));
       await capture('report');
     } else {
       const saved = await invoke('getTrainingSession',{requestId:'verify-local-results',sessionId:ids[0]});
@@ -416,9 +406,7 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
       assert.deepEqual(await evaluate('window.__trainingProductTrainer.trainingRecords.selected().timing'),saved.value.timing);
       if (!offline) {
         assert.deepEqual(saved.value.results.find(result=>result.id===fixture.report.id),fixture.report,'settings changes must not rewrite saved report provenance');
-        assert.deepEqual(saved.value.results.find(result=>result.id===fixture.playback.id),fixture.playback,'settings changes must not rewrite saved playback provenance');
         assert.match(await evaluate(`document.getElementById('report-summary-copy').textContent`),/先说明目标，再给出支持理由/);
-        assert.match(await evaluate(`document.getElementById('feedback-content').textContent`),/SMOKE_PLAYBACK_ADVICE/);
       } else {
         assert.ok(saved.value.transcript.text.trim());
         assert.ok(saved.value.results.some(result=>result.kind==='metrics' && result.status==='completed'));

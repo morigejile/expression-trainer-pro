@@ -103,10 +103,6 @@ const fakeLlm = {
       findings:context.transcript.segments.length ? [{id:'finding-1',category:'organization',observation:'表达可以先说明目标。',
         interpretation:'先给出重点可以帮助听者理解。',recommendation:'下一次先用一句话说明重点。',
         evidenceRefs:[context.transcript.segments[0].id]}] : []};
-    if (profile.model.startsWith('i2-') && data.findings[0]) {
-      data.findings[0].example=profile.model==='i2-null'?null:context.transcript.segments[0].text;
-      data.findings[0].exampleEvidenceRefs=data.findings[0].example ? [context.transcript.segments[0].id] : [];
-    }
     if (profile.model==='i2-empty') {data.summary='本次未形成有充分证据的改善建议。';data.findings=[];}
     if (profile.model==='i2-insufficient') {
       data.assessment={...data.assessment,status:'insufficient',reason:'受控材料只有试音和问候。',categories:[],frameworkAssessable:false};
@@ -116,7 +112,7 @@ const fakeLlm = {
       data.assessment={...data.assessment,status:'limited',reason:'受控材料只足以评价措辞。',categories:['wording'],frameworkAssessable:false};
       for (const finding of data.findings) finding.category='wording';
     }
-    if (context.analysisTarget && data.assessment.frameworkAssessable) data.frameworkAnalysis = {...context.analysisTarget,summary:'先说明观点，再补充与观点相关的具体支撑。',
+    if (context.analysisTarget && data.assessment.frameworkAssessable) data.frameworkAnalysis = {...context.analysisTarget,
       findings:data.findings.map(finding => ({...finding,id:'framework-1'}))};
     if (['sentence','segment'].includes(context.practiceComparison?.scope) && data.findings.length) {
       // A scoped round has no full-framework Finding. Keep a distinct, local
@@ -133,25 +129,11 @@ const fakeLlm = {
       data.practiceFeedback.comparability={status:previous && current?'comparable':'unavailable',
         reason:previous && current?'受控用例两侧有对应目标的转写。':'来源证据不可用。'};
     }
-    return parseStructuredDiagnosisResponse(JSON.stringify(data),context,{requireAssessment:true});
+    const {frameworkAnalysis,...wire}=data;
+    return parseStructuredDiagnosisResponse(JSON.stringify({...wire,frameworkFindings:frameworkAnalysis?.findings || []}),context,{requireAssessment:true,currentFormat:true});
   },
   createRequestCoordinator,
   runCoordinatedRequest,
-
-  async sendFeedback() {
-    calls.llmFeedback += 1;
-    return 'SMOKE_LLM_FEEDBACK';
-  },
-
-  async sendReport() {
-    calls.llmReport += 1;
-    return 'SMOKE_LLM_REPORT';
-  },
-
-  async sendPlaybackAnalysis() {
-    calls.llmPlayback += 1;
-    return [{segmentId: 'segment-1', advice: 'SMOKE_PLAYBACK_ADVICE'}];
-  },
 
   async testConnection() {
     calls.llmConnection += 1;
@@ -230,13 +212,13 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText',
       'createTrainingSession', 'finalizeTrainingSession', 'appendTrainingResult',
       'listTrainingSessions', 'getTrainingSession', 'deleteTrainingSession', 'readTrainingAudio',
-      'getRealtimeFeedback', 'getFinalReport', 'analyzePlayback', 'testLLMConnection',
+      'testLLMConnection',
       'cancelLLMRequests', 'exportDiagnostics', 'openSupportLink'
     ];
     return {
       title: document.title,
       missing: expected.filter(name => typeof window.api?.[name] !== 'function'),
-      removedApis: ['analyzeTexts', 'closeWindow', 'saveFile'].filter(name => name in window.api),
+      removedApis: ['analyzeTexts', 'closeWindow', 'saveFile', 'getFinalReport', 'getRealtimeFeedback', 'analyzePlayback'].filter(name => name in window.api),
       removedUi: ['btn-paste','paste-modal','btn-copy-text','btn-save-text','btn-clear',
         'report-modal','training-record-select','btn-diagnostics'].filter(id => document.getElementById(id)),
       missingUi: [
@@ -367,38 +349,6 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     assert.doesNotMatch(JSON.stringify(summary), /apiKey|baseUrl|ollamaUrl/);
   }
 
-  const playbackAnalysisIpcState = await mainWindow.webContents.executeJavaScript(`(async () => {
-    const {activeProfileId} = await window.api.getLlmProfileSummaries();
-    const success = await window.api.analyzePlayback({
-      profileId: activeProfileId,
-      segments: [{id: 'segment-1', text: '我觉得这个方案很好。', startMs: 0, endMs: 1000}]
-    });
-    const missing = await window.api.analyzePlayback({
-      profileId: 'missing-profile',
-      segments: []
-    });
-    return {success, missing};
-  })()`);
-  assert.equal(playbackAnalysisIpcState.success.success, true);
-  assert.deepEqual(playbackAnalysisIpcState.success.analysis.items, [
-    {segmentId: 'segment-1', advice: 'SMOKE_PLAYBACK_ADVICE'}
-  ]);
-  assert.deepEqual(playbackAnalysisIpcState.missing, {
-    success: false,
-    error: '所选模型配置不存在或不可用',
-    errorCode: 'invalid-profile-id'
-  });
-  assert.deepEqual(
-    Object.keys(playbackAnalysisIpcState.success.analysis.profile).sort(),
-    ['id', 'model', 'name', 'provider']
-  );
-  assert.doesNotMatch(JSON.stringify(playbackAnalysisIpcState.success.analysis.profile), /apiKey|baseUrl|ollamaUrl|customModel/);
-  assert.ok(Number.isFinite(Date.parse(playbackAnalysisIpcState.success.createdAt)));
-  assert.equal(playbackAnalysisIpcState.success.provenance.provider, 'deepseek');
-  assert.equal(playbackAnalysisIpcState.success.provenance.model, 'fake-model');
-  assert.equal(playbackAnalysisIpcState.success.provenance.profileId, 'smoke-profile');
-  assert.doesNotMatch(JSON.stringify(playbackAnalysisIpcState.success.provenance), /apiKey|baseUrl|ollamaUrl|smoke-key/);
-
   const initialRecordingPolicy = await mainWindow.webContents.executeJavaScript(
     'window.api.getRecordingPolicy()'
   );
@@ -482,7 +432,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   })()`);
   assert.deepEqual(desktopUsability.controls, [
     { id: 'btn-home', text: '' },
-    { id: 'btn-history', text: '训练历史' },
+    { id: 'btn-history', text: 'history' },
     { id: 'btn-settings', text: '设置' }
   ]);
   assert.match(desktopUsability.densityDescription, /字数.*不含标点.*同一字符只扣除一次/);
@@ -823,14 +773,14 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       return {playbackVisibleAfterStop:getComputedStyle(document.getElementById('playback-controls')).display !== 'none',
         screen:document.body.dataset.screen, saved:record.saveState === 'saved',
         reportAbsent:!record.report, playbackAnalysisAbsent:!record.playbackAnalysis,
-        modelLabels:Array.from(document.getElementById('playback-model').options, option => option.textContent),
+        modelLabels:[],
         audioType:audioBlob.type};
     })()`);
   });
   assert.equal(playbackSmokeState.reportAbsent, true);
   assert.equal(playbackSmokeState.playbackAnalysisAbsent, true);
   assert.equal(calls.llmReport, 0);
-  assert.equal(calls.llmPlayback, 1, 'only explicit IPC contract test requests playback analysis');
+  assert.equal(calls.llmPlayback, 0, 'retired playback analysis is never requested');
   await waitUntil('automatic AI diagnosis persisted', () => mainWindow.webContents.executeJavaScript(`(() => {
     const record = window.__recordingSmokeTrainer.trainingRecords?.selected();
     return !record?.reportPending && record?.saveState === 'saved'

@@ -5,7 +5,6 @@ const os = require('os');
 const {pathToFileURL} = require('node:url');
 const {createTrainingSessionApplication} = require('./lib/training-session-application');
 const {registerTrainingSessionIpc} = require('./lib/training-session-ipc');
-const {analysisProvenance} = require('./lib/analysis-provenance');
 const {customWordsToFillers} = require('./lib/custom-prompt-config');
 const {createCustomPromptStore} = require('./lib/custom-prompt-store');
 const {formatSafeError} = require('./lib/safe-log');
@@ -45,9 +44,7 @@ const {registerAsrModelManagementIpc} = require('./lib/asr-model-management-ipc'
 const {createModelInstallController} = require('./lib/model-install-controller');
 const {runManagedModelSmoke} = require('./lib/managed-model-smoke');
 const {
-  requireBoundedText,
-  validateFinalReportPayload,
-  validatePlaybackAnalysisPayload
+  requireBoundedText
 } = require('./lib/ipc-input');
 const modelRegistry = require('./models/registry.json');
 const bundledModelArchive = resolveBundledModelArchive({
@@ -71,9 +68,6 @@ const smokeTest = isSmokeTest ? require('./smoke/electron-smoke-runner') : null;
 const {
   createRequestCoordinator,
   runCoordinatedRequest,
-  sendFeedback,
-  sendPlaybackAnalysis,
-  sendReport,
   testConnection
 } = isSmokeTest
   ? smokeTest.fakeLlm
@@ -239,15 +233,6 @@ const aiAnalysisGate=createAiAnalysisGate({
   loadSettings:()=>loadLlmProviderSettings(app.getPath('userData')),
   loadDisclosure:()=>loadAiDisclosure(app.getPath('userData'))
 });
-function selectAnalysisProfile(options) {
-  try{return aiAnalysisGate.resolve(options);}catch{return {profile:null,reason:'configuration-unavailable'};}
-}
-function blockedAnalysis(reason) {
-  const messages={'disclosure-required':'请先阅读并确认 AI 分析数据说明。','not-enabled':'当前配置未开启自动分析。',
-    'not-configured':'请先选择有效的 AI 模型配置。','configuration-unavailable':'AI 配置暂时无法读取，请重试。'};
-  return {success:false,error:messages[reason] || 'AI 分析暂不可用。',
-    errorCode:reason==='disclosure-required'?'ai-disclosure-required':reason};
-}
 let applicationShutdownStarted = false;
 let applicationShutdownComplete = false;
 let trainingSessions;
@@ -704,70 +689,4 @@ registerTrustedUtilityIpc({
   testConnection,
   exportDiagnostics,
   openSupportLink: async url => {await shell.openExternal(url); return {success: true};}
-});
-
-// AI反馈（传入customPrompt）
-ipcMain.handle('get-realtime-feedback', async (event, text) => {
-  const normalizedText = requireBoundedText(text, {label: 'text'});
-  const {profile:providerConfig,reason}=selectAnalysisProfile({trigger:'automatic'});
-  if (!providerConfig) return blockedAnalysis(reason);
-  const customPrompt = loadCustomPrompt();
-  return runCoordinatedRequest(
-    llmRequests,
-    event.sender.id,
-    'realtime',
-    'feedback',
-    (signal) => {aiAnalysisGate.requireUnchanged(providerConfig,{trigger:'automatic'});return sendFeedback(
-      normalizedText,
-      providerConfig,
-      customPrompt,
-      { signal }
-    );}
-  );
-});
-
-ipcMain.handle('get-final-report', async (event, payload) => {
-  const {fullText, stats} = validateFinalReportPayload(payload);
-  const {profile:providerConfig,reason}=selectAnalysisProfile({trigger:'manual'});
-  if (!providerConfig) return blockedAnalysis(reason);
-  const customPrompt = loadCustomPrompt();
-  const result = await runCoordinatedRequest(
-    llmRequests,
-    event.sender.id,
-    'report',
-    'report',
-    (signal) => {aiAnalysisGate.requireUnchanged(providerConfig,{trigger:'manual'});return sendReport(
-      fullText,
-      stats,
-      providerConfig,
-      customPrompt,
-      { signal }
-    );}
-  );
-  return {...result, createdAt:new Date().toISOString(), provenance:analysisProvenance(providerConfig, customPrompt, 'report-v1')};
-});
-
-ipcMain.handle('analyze-playback', async (event, payload) => {
-  const requestPayload = validatePlaybackAnalysisPayload(payload);
-  const {profile,reason}=selectAnalysisProfile({trigger:'manual',profileId:requestPayload.profileId});
-  if (!profile) return reason==='not-configured'
-    ? {success:false,error:'所选模型配置不存在或不可用',errorCode:'invalid-profile-id'} : blockedAnalysis(reason);
-  const customPrompt = loadCustomPrompt();
-  const result = await runCoordinatedRequest(
-    llmRequests,
-    event.sender.id,
-    'playback',
-    'analysis',
-    signal => {aiAnalysisGate.requireUnchanged(profile,{trigger:'manual',profileId:requestPayload.profileId});
-      return sendPlaybackAnalysis(requestPayload.segments, profile, customPrompt, {signal});}
-  );
-  const metadata = {createdAt:new Date().toISOString(), provenance:analysisProvenance(profile, customPrompt, 'playback-v1')};
-  if (!result.success) return {...result,...metadata};
-  return {
-    ...metadata, success: true,
-    analysis: {
-      items: result.analysis,
-      profile: {id: profile.id, name: profile.name, provider: profile.provider, model: profile.model}
-    }
-  };
 });

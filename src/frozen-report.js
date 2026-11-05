@@ -69,7 +69,7 @@
       practiceSlot.replaceChildren();practiceSlot.hidden=!record.practice || !practice;
       if (record.practice && practice) practiceSlot.append(practice);
     }
-    const detailSelector = '.metric-details,.framework-analysis,.framework-reanalysis,.report-limitations,.radar-unavailable';
+    const detailSelector = '.metric-details,.report-limitations';
     const details = [...(root?.querySelectorAll(detailSelector) || [])];
     // A navigation/state refresh can project the same report twice; retain
     // already moved controls and listeners instead of deleting them.

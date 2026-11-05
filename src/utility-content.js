@@ -86,7 +86,7 @@
   function report(document, parent, options) {
     facts(document, parent, [
       ['先看结论', '了解这次表达的重点，找到一个值得改善的问题。'],
-      ['再看依据', '结合原话、解释和改进示例理解问题，示例仅供参考。'],
+      ['再看依据', '结合原话、必要解释和具体建议理解问题。'],
       ['继续练习', '从具体问题进入下一轮，带着一个目标继续练。']
     ]);
     parent.appendChild(element(document, 'h2', 'help-section-title', '报告与练习'));

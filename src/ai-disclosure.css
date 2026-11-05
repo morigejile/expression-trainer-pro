@@ -5,8 +5,6 @@
 #ai-disclosure-modal .modal-body{padding:0;font-size:11px;line-height:1.9;color:var(--muted,#817b6e)}
 #ai-disclosure-modal .modal-body p:not(#ai-disclosure-error){font-size:11px;font-weight:400;line-height:1.9;letter-spacing:normal;color:#797568}
 #ai-disclosure-modal h3{font-size:17px;font-weight:350;line-height:1.8;color:var(--ink,#393831)}
-#ai-disclosure-service{white-space:pre-line;overflow-wrap:anywhere}
-#ai-disclosure-data{padding-left:18px;margin:15px 0}
 #ai-disclosure-modal .ai-disclosure-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:12px;margin-top:22px}
 #ai-disclosure-modal button{font:inherit;color:inherit;background:transparent;border:1px solid #b8ac924f;border-radius:4px;padding:9px 16px;cursor:pointer}
 #ai-disclosure-modal #btn-ai-disclosure-confirm{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:8px 16px;font-size:13px;font-weight:400;line-height:1.9;letter-spacing:normal;color:#faf8f2;background:#6b6150;border:1px solid #6b6150;border-radius:3px;text-decoration:none}

@@ -9,7 +9,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   const modal=`!document.getElementById('ai-disclosure-modal').classList.contains('hidden')`;
   const click=id=>evaluate(`document.getElementById(${JSON.stringify(id)}).click()`);
   const session=async id=>(await invoke('getTrainingSession',{requestId:'i2-facts',sessionId:id})).value;
-  const analyze=async framework=>{await evaluate(`${trainer}.awaitTrainingAnalysis(${trainer}.trainingRecords.selected(),true,${JSON.stringify(framework)})`);
+  const analyze=async ()=>{await evaluate(`${trainer}.awaitTrainingAnalysis(${trainer}.trainingRecords.selected(),true)`);
     await wait('analysis finished',`!${trainer}.trainingRecords.selected().reportPending`);};
   const setProfile=async (model,{provider='deepseek',endpoint='',enabled=false}={})=>{
     await evaluate('window.api.openSettings()');
@@ -27,9 +27,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
       assert.equal(await evaluate(modal),false,'opening saved history never asks or starts AI');
       await evaluate(`document.querySelectorAll('.finding-evidence-toggle').forEach(button=>button.click())`);
       const latest=value.results.filter(run=>run.kind==='diagnosis' && run.status==='completed').at(-1).value;
-      const count=[...latest.findings,...(latest.frameworkAnalysis?.findings || [])].filter(f=>typeof f.example==='string').length;
-      assert.equal(await evaluate(`document.querySelectorAll('.example').length`),count);
-      assert.ok(value.results.some(run=>run.kind==='diagnosis' && [...run.value.findings,...(run.value.frameworkAnalysis?.findings || [])].some(f=>typeof f.example==='string')));
+      assert.equal(await evaluate(`document.querySelectorAll('.example,.framework-reanalysis,.radar-unavailable').length`),0);
       if (live && !framework) {
         await evaluate(`document.getElementById('report-information').open=true;document.getElementById('report-materials').open=true`);
         await require('./i2-report-visual-smoke').run({mainWindow,BrowserWindow,evaluate,capture});
@@ -71,54 +69,41 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   assert.equal(await evaluate(modal),false);assert.equal(calls.llmDiagnosis,1,'complete history keeps existing reanalysis policy');
   await evaluate(`document.getElementById('report-information').open=true;document.getElementById('report-materials').open=true;document.querySelector('.finding-evidence-toggle').click()`);
   assert.equal(await evaluate(`document.querySelector('.finding-details').open`),true);
-  const savedExample=reportValue=>reportValue.results.filter(run=>run.kind==='diagnosis' && run.status==='completed').at(-1).value.findings[0].example;
-  assert.equal(await evaluate(`document.querySelector('.example').textContent`),savedExample(await session(id)));
-  assert.equal(await evaluate(`document.querySelector('.example').classList.contains('evidence-quote')`),false,'reference and original evidence retain separate roles');
-  await require('./i2-report-visual-smoke').run({mainWindow,BrowserWindow,evaluate,capture});
-  // Effective endpoint decides local/remote; coverage remains independent of configuration identity.
-  await setProfile('i2-null',{provider:'ollama',endpoint:'http://127.0.0.1:11434',enabled:true});
-  let state=await invoke('getAiDisclosureState',{});assert.equal(state.profile.location,'local');assert.equal(state.required,false);assert.equal(state.profile.autoDiagnosisEnabled,false);
-  await analyze('prep');assert.equal(await evaluate(`document.querySelectorAll('.example').length`),0,'null expression reference is omitted');
-  await setProfile('i2-failure',{provider:'ollama',endpoint:'http://example.invalid:11434'});
-  state=await invoke('getAiDisclosureState',{});assert.equal(state.profile.location,'remote');assert.equal(state.required,false);
-  await analyze('star');saved=await session(id);assert.equal(saved.results.at(-2).value.reason,'network');
-  assert.equal(await evaluate(`${trainer}.trainingRecords.selected().structuredReport.analysisRun.status`),'completed','prior successful report remains readable');
-  assert.match(await evaluate(`document.getElementById('report-summary-copy').textContent`),/网络/);
-  await setProfile('i2-timeout');await analyze('star');assert.equal((await session(id)).results.at(-2).value.reason,'timeout');
-  await setProfile('i2-empty');await analyze('star');assert.equal(await evaluate(`document.querySelectorAll('.finding').length`),0);
-  assert.match(await evaluate(`document.getElementById('report-body').textContent`),/充分证据/);
-  await setProfile('i2-insufficient');await analyze('star');
-  assert.equal((await session(id)).results.at(-2).status,'completed','material insufficiency is not an API failure');
-  assert.match(await evaluate(`document.getElementById('report-summary-copy').textContent`),/材料不足/);
-  assert.equal(await evaluate(`document.querySelectorAll('#report-body .finding').length`),0);
-  assert.equal(await evaluate(`document.getElementById('report-analysis-actions').offsetParent`),null,'no repeated diagnosis button for insufficient material');
-  await setProfile('i2-example');await analyze('prep');
-  assert.notEqual(await evaluate(`document.getElementById('report-analysis-actions').offsetParent===null`),true,'actions recover for a later ordinary report');
-  await setProfile('i2-limited');await analyze('star');
-  assert.match(await evaluate(`document.getElementById('report-summary-copy').textContent`),/有限分析/,'assessment limitation is visible beside the summary');
-  await setProfile('i2-example');await analyze('prep');
-  saved=await session(id);assert.equal(saved.trainingMode,original.trainingMode);assert.equal(saved.framework,original.framework);assert.deepEqual(saved.trainingPrompt,original.trainingPrompt);assert.deepEqual(saved.transcript,original.transcript);
-  // A genuine PREP Session keeps its identity in Report and History after a separate analysis view.
-  const prep=await recordOnce(prompt,{framework:'prep'});assert.equal(await evaluate(modal),false);assert.equal((await session(prep)).results.at(-2).value.reason,'not-enabled');
-  await analyze('prep');records.push({id:prep,framework:'prep'});
+  assert.equal(await evaluate(`document.querySelectorAll('.example,.framework-reanalysis,.radar-unavailable,#btn-reanalyze,#playback-model').length`),0);
+  assert.equal(await evaluate(`['getRealtimeFeedback','getFinalReport','analyzePlayback'].some(name=>name in window.api)`),false);
+  assert.equal(original.results.at(-2).provenance.promptVersion,'structured-diagnosis-v11');
+  assert.equal(Object.hasOwn(original.results.at(-2).value.findings[0],'example'),false);
+  // Each new model fixture uses a new recording; a complete saved report is never silently regenerated.
+  for(const [model,reason]of [['i2-failure','network'],['i2-timeout','timeout']]) {
+    await setProfile(model);const failedId=await recordOnce(prompt);await analyze();
+    const failed=await session(failedId);assert.equal(failed.results.at(-2).value.reason,reason);
+    await setProfile('i2-null');await analyze();const recovered=await session(failedId);
+    assert.equal(recovered.results.at(-2).status,'completed');assert.deepEqual(recovered.results.slice(0,failed.results.length),failed.results);
+  }
+  for(const [model,status]of [['i2-insufficient','insufficient'],['i2-limited','limited']]) {
+    await setProfile(model);const assessmentId=await recordOnce(prompt);await analyze();
+    const value=await session(assessmentId);assert.equal(value.results.at(-2).value.assessment.status,status);
+    assert.match(await evaluate(`document.getElementById('report-summary-copy').textContent`),status==='insufficient'?/材料不足/:/有限分析/);
+    if(status==='insufficient')assert.equal(await evaluate(`document.querySelectorAll('.finding').length`),0);
+  }
+  await setProfile('i2-example');const prep=await recordOnce(prompt,{framework:'prep'});await analyze();
+  const selected=await session(prep),diagnosis=selected.results.at(-2).value;
+  assert.equal(diagnosis.frameworkAnalysis.framework,'prep');assert.equal(Object.hasOwn(diagnosis.frameworkAnalysis,'summary'),false);
   assert.match(await evaluate(`document.getElementById('record-identity').textContent`),/PREP/);
-  assert.match(await evaluate(`document.getElementById('report-analysis-info').textContent`),/PREP/);
-  // Pending task leaves navigation alone and retains only its original Session.
-  await setProfile('i2-pending');await evaluate(`void (window.__i2Pending=${trainer}.awaitTrainingAnalysis(${trainer}.trainingRecords.selected(),true,'star'))`);
-  await wait('real task pending',`${trainer}.trainingRecords.selected().reportPending && document.getElementById('report-ai-status').textContent.includes('正在分析')`);
+  records.push({id:prep,framework:'prep'});
+  const denied=await invoke('analyzeTrainingSession',{requestId:'retired-framework',sessionId:prep,framework:'star'});
+  assert.equal(denied.error.code,'INVALID_SESSION');assert.deepEqual((await session(prep)).results,selected.results);
+  await setProfile('i2-pending');const pendingId=await recordOnce(prompt);
+  await evaluate(`void (window.__i2Pending=${trainer}.awaitTrainingAnalysis(${trainer}.trainingRecords.selected(),true))`);
+  await wait('real task pending',`${trainer}.trainingRecords.selected().reportPending`);
   const fake=require('./electron-smoke-runner').fakeLlm;
-  for (let i=0;i<100 && typeof fake.releaseDiagnosis!=='function';i++) await new Promise(resolve=>setTimeout(resolve,30));
-  assert.equal(typeof fake.releaseDiagnosis,'function');
-  await evaluate(`${trainer}.showHistory()`);fake.releaseDiagnosis();
-  await evaluate('window.__i2Pending');
-  await wait('late result saved without navigation',`document.body.dataset.screen==='history' && !${trainer}.trainingRecords.selected()?.reportPending`);
-  assert.equal((await session(prep)).framework,'prep');await openHistory(prep);
-  // Latest successful result contains examples again for restart evidence.
-  await setProfile('i2-example');await analyze('prep');
-  // Finding launch configures real Preparing and cannot automatically start recording.
-  await evaluate(`document.querySelector('.finding .practice-start').click()`);
+  for(let i=0;i<100 && typeof fake.releaseDiagnosis!=='function';i++)await new Promise(resolve=>setTimeout(resolve,30));
+  assert.equal(typeof fake.releaseDiagnosis,'function');await evaluate(`${trainer}.showHistory()`);fake.releaseDiagnosis();
+  await evaluate('window.__i2Pending');assert.equal(await evaluate('document.body.dataset.screen'),'history');
+  assert.equal((await session(pendingId)).results.at(-2).status,'completed');
+  await openHistory(prep);await evaluate(`document.querySelector('.finding .practice-start').click()`);
   await wait('Finding to Preparing',`document.body.dataset.screen==='training' && ${trainer}.trainingSetup.snapshot().practiceRequest`);
   assert.equal(await evaluate(`${trainer}.isRecording`),false);assert.equal(await evaluate(`${trainer}.trainingSetup.snapshot().framework`),'prep');
-  await openHistory(id);await analyze('prep');fs.writeFileSync(fixture,JSON.stringify(records));
+  await openHistory(id);fs.writeFileSync(fixture,JSON.stringify(records));
 }
 module.exports={run};

@@ -31,7 +31,7 @@
     'occurrences/recorded-minute':'次/录音分钟'};
   const reasonText = reason => REASONS[reason] || '当前证据或分析不可用';
 
-  function renderStructuredReport(container,projection,{onEvidence,onReanalyze,onPractice,onOpen,onLayout,record,api,segments = []} = {}) {
+  function renderStructuredReport(container,projection,{onEvidence,onPractice,onOpen,onLayout,record,api,segments = []} = {}) {
     container.replaceChildren();
     if (!projection) return;
     const document = container.ownerDocument;
@@ -129,8 +129,7 @@
       }
       content.appendChild(evidence);
       const guidance=element('div','finding-detail finding-guidance');
-      guidance.append(element('h4',null,'为什么值得练'),element('p','finding-interpretation',finding.interpretation));
-      if (typeof finding.example==='string' && finding.example.trim()) content.append(element('h4',null,'一种表达参考'),element('p','example',finding.example));
+      if (typeof finding.interpretation==='string' && finding.interpretation.trim()) guidance.appendChild(element('p','finding-interpretation',finding.interpretation));
       guidance.append(element('h4',null,'下一轮怎么练'),element('p','finding-recommendation',finding.recommendation));
       const controls=element('div','practice-controls');
       const action=practiceView?.practiceAction(element,controls,finding,onPractice);
@@ -156,34 +155,11 @@
       } else if (!findings.length) {
         root.appendChild(element('p','report-empty-state','本次分析未形成有充分证据的改善建议。'));
       }
-      const labels = {prep:'PREP',star:'STAR',pyramid:'金字塔'};
-      if (framework) {
-        const target=element('details','framework-analysis');
-        target.appendChild(element('summary',null,`${labels[framework.framework]} 专项分析`));
-        target.appendChild(element('p','framework-summary',framework.summary));
-        root.appendChild(target);
-      }
     }
     root.appendChild(metricDetails);
-    if (typeof onReanalyze === 'function' && !insufficient) {
-      const actions = element('details','framework-reanalysis');
-      actions.appendChild(element('summary',null,'换个框架分析这次表达'));
-      actions.appendChild(element('p',null,'使用已保存的转写与证据追加分析，保留原训练方式和历史结果。'));
-      for (const [id,label] of Object.entries({prep:'PREP',star:'STAR',pyramid:'金字塔'})) {
-        const button = element('button',null,`按 ${label} 分析`); button.type = 'button';
-        button.addEventListener('click',async () => {
-          for (const child of actions.children) if (child.tagName === 'BUTTON') child.disabled = true;
-          try { await onReanalyze(id); }
-          finally { for (const child of actions.children) if (child.tagName === 'BUTTON') child.disabled = false; }
-        });
-        actions.appendChild(button);
-      }
-      root.appendChild(actions);
-    }
     root.appendChild(element('p','report-limitations',evidenceRun.value?.status === 'completed'
       ? '语音区间为模型估计，短停顿可能合并；尚未完成代表性标注校准。'
       : `语音活动分析暂不可用：${reasonText(evidenceRun.value?.reason)}。相关指标显示未知。`));
-    root.appendChild(element('p','radar-unavailable','雷达量程尚未校准，暂不提供分数或图形。'));
     container.appendChild(root);
     return dispose;
   }

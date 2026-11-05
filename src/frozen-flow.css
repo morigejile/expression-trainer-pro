@@ -1,5 +1,4 @@
-/* Renderer adapter for Frozen Demo v1. Frozen CSS is enabled only in the
-   migrated workspace; legacy screens keep their stylesheet and DOM homes. */
+/* Current workspace layout and shared-control placement over Frozen Demo v1 assets. */
 @font-face{font-family:'Panel Manrope';font-style:normal;font-weight:200 800;font-display:swap;src:url('frozen-ui/fonts/Manrope-VF.ttf') format('truetype');unicode-range:U+0020-007E,U+00A0-024F}
 @font-face{font-family:'Panel Source Han';font-style:normal;font-weight:250 900;font-display:swap;src:url('frozen-ui/fonts/SourceHanSansCN-VF.ttf') format('truetype')}
 .frozen-surface{display:none!important}
@@ -25,7 +24,7 @@ body[data-frozen-ui="training"] .topbar .utility-report-icon{display:none}
 body[data-frozen-ui]:not([data-frozen-ui=""]){min-height:100vh}
 body[data-frozen-ui]:not([data-frozen-ui=""]) .layout{display:block;height:auto;min-height:100vh}
 body[data-frozen-ui]:not([data-frozen-ui=""]) .main-area{display:block;border:0;background:none;overflow:visible;min-width:0}
-body[data-frozen-ui]:not([data-frozen-ui=""]) :is(.glow-border,.icon-sprite,.history-screen,.comparison-screen,.training-context,.start-control-area,.panel-left,.panel-right){display:none}
+body[data-frozen-ui]:not([data-frozen-ui=""]) :is(.icon-sprite,.training-context,.start-control-area,.panel-left,.panel-right){display:none}
 body[data-frozen-ui="training"] :is(#report-header,#report-ai-section,#frozen-report,#playback-controls){display:none!important}
 body[data-frozen-ui="training"][data-training-state="preparing"] #frozen-preparing,
 body[data-frozen-ui="training"][data-training-state="countdown"] :is(#frozen-preparing,#countdown-display,#btn-cancel-countdown),
@@ -151,12 +150,12 @@ body[data-frozen-ui="report"] .frozen-finding .evidence-block blockquote{margin:
 @media(pointer:coarse){body[data-frozen-ui="report"] #frozen-findings .frozen-finding .evidence-header>.evidence-button{min-height:44px}}
 body[data-frozen-ui="report"] .finding-observation{font-size:16px;font-weight:350;line-height:1.65;margin:8px 0}
 body[data-frozen-ui="report"] .finding-category{font-size:9px;color:var(--muted);margin:0}
-body[data-frozen-ui="report"] :is(.finding-details,.metric-details,.framework-reanalysis)>summary{display:flex;align-items:center;justify-content:space-between;padding:6px 0;min-height:32px;font-size:11px;color:#84735b}
-body[data-frozen-ui="report"] :is(.metric-details,.framework-reanalysis)>summary::after{content:'⌄';font-size:18px;font-weight:300}
-body[data-frozen-ui="report"] :is(.metric-details,.framework-reanalysis)[open]>summary::after{content:'⌃'}
+body[data-frozen-ui="report"] :is(.finding-details,.metric-details)>summary{display:flex;align-items:center;justify-content:space-between;padding:6px 0;min-height:32px;font-size:11px;color:#84735b}
+body[data-frozen-ui="report"] :is(.metric-details)>summary::after{content:'⌄';font-size:18px;font-weight:300}
+body[data-frozen-ui="report"] :is(.metric-details)[open]>summary::after{content:'⌃'}
 body[data-frozen-ui="report"] .finding-evidence blockquote{background:#eae4d83d;border-left:2px solid #c4b493;padding:16px 20px}
 body[data-frozen-ui="report"] .practice-actions{display:flex;gap:12px;margin-top:18px;align-items:end}
-body[data-frozen-ui="report"] :is(.evidence-button,.practice-start,.framework-reanalysis button,#btn-retry-save){font-size:11px;padding:8px 16px;border:1px solid var(--line);border-radius:4px;min-height:39px}
+body[data-frozen-ui="report"] :is(.evidence-button,.practice-start,#btn-retry-save){font-size:11px;padding:8px 16px;border:1px solid var(--line);border-radius:4px;min-height:39px}
 /* Saved recording playback: native media drives a light, single-column surface. */
 body[data-frozen-ui="report"] #report-audio .playback-controls{display:block;margin:12px 0 15px;padding:0;border:0;background:none;font-size:11px;color:var(--muted)}
 body[data-frozen-ui="report"] #recording-player[hidden]{display:none}
@@ -180,16 +179,6 @@ body[data-frozen-ui="report"] .playback-sound{display:flex;align-items:center;ga
 body[data-frozen-ui="report"] #playback-volume{width:56px}
 body[data-frozen-ui="report"] #playback-mute[aria-pressed="true"]{background:#eee9de}
 body[data-frozen-ui="report"] #playback-speed{font:inherit;font-size:11px;width:62px;min-height:36px;color:#6b6150;background:none;border:0;padding:0 2px}
-body[data-frozen-ui="report"] .playback-analysis-toolbar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:9px 18px;margin-top:17px}
-body[data-frozen-ui="report"] .playback-feedback-heading{display:flex;align-items:baseline;flex-wrap:wrap;gap:10px}
-body[data-frozen-ui="report"] .playback-feedback-heading h3{font-size:13px;font-weight:400;line-height:1.8;color:#6b6150;margin:0}
-body[data-frozen-ui="report"] #playback-feedback-status{font-size:11px;color:var(--muted)}
-body[data-frozen-ui="report"] .playback-analysis-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px;margin-left:auto;max-width:100%}
-body[data-frozen-ui="report"] .playback-analysis-actions label{font-size:11px;margin:0;color:var(--muted)}
-body[data-frozen-ui="report"] #playback-model{width:auto;max-width:min(180px,100%);font:inherit;font-size:11px;min-height:36px;border:0;background:transparent;padding:0 3px;color:#6b6150}
-body[data-frozen-ui="report"] #btn-reanalyze{font:inherit;font-size:12px;font-weight:400;min-height:36px;padding:6px 14px;border:1px solid #cfc5b4;border-radius:3px;color:#6b6150;white-space:nowrap}
-body[data-frozen-ui="report"] #btn-reanalyze:hover:not(:disabled){background:#eee9de}
-body[data-frozen-ui="report"] #btn-reanalyze:disabled{color:#a49b8c;cursor:default}
 body[data-frozen-ui="report"] .playback-note{font-size:11px;line-height:1.8;color:var(--muted);margin:7px 0 0}
 body[data-frozen-ui="report"] .playback-note:empty{display:none}
 body[data-frozen-ui="report"] #playback-segments{padding-top:3px}
@@ -200,8 +189,6 @@ body[data-frozen-ui="report"] .playback-segment-button[aria-pressed="true"]{back
 body[data-frozen-ui="report"] .playback-segment-time{font-size:10px;color:var(--muted);line-height:2.3;font-variant-numeric:tabular-nums}
 body[data-frozen-ui="report"] .playback-segment-text{font-size:13px;font-weight:350;line-height:1.8;letter-spacing:.025em;overflow-wrap:anywhere}
 body[data-frozen-ui="report"] .playback-position{font-size:10px;line-height:2.3;color:#8d7654;white-space:nowrap}
-body[data-frozen-ui="report"] .playback-inline-feedback{margin:8px 12px 19px 62px;color:#6b6150;font-size:12px;line-height:1.9}
-body[data-frozen-ui="report"] .playback-inline-feedback p{margin:3px 0 0;white-space:pre-wrap}
 body[data-frozen-ui="report"] .playback-advice-label{font-size:11px;color:var(--muted)}
 body[data-frozen-ui="report"] .playback-plain-transcript{font-size:13px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}
 body[data-frozen-ui="report"] :is(#playback-controls,#playback-segments) :is(button,input,select):focus-visible{outline:2px solid #8c7650;outline-offset:3px}

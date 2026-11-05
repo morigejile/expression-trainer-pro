@@ -6,7 +6,7 @@
   else root.TrainingSetup = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function(context,frameworks) {
   'use strict';
-  const {normalizeTrainingContext,normalizeTrainingPrompt,getPromptParts,formatTrainingContext,MAX_PROMPT_LENGTH} = context;
+  const {normalizeTrainingContext,normalizeTrainingPrompt,getPromptParts,MAX_PROMPT_LENGTH} = context;
   const {getFramework,getPromptOptions} = frameworks;
   // Preparation copy only. Shared framework definitions also feed analysis inputs.
   const frameworkHelp = {
@@ -37,7 +37,7 @@
     const picker = byId('training-picker'), title = byId('training-picker-title'), hint = byId('training-picker-hint'), content = byId('training-picker-content');
     const pickerActions = byId('training-picker-actions');
     const closeButton = byId('training-picker-close');
-    const label = byId('training-context-label'), status = byId('training-context-status'), focus = byId('training-practice-focus');
+    const status = byId('training-context-status'), focus = byId('training-practice-focus');
     const buttons = {framework:byId('training-framework'),topic:byId('training-topic'),scenario:byId('training-scenario')};
     const names = {framework:'表达框架',topic:'主题',scenario:'场景'};
     let draft = normalizeTrainingContext(), dirty = false, locked = false;
@@ -59,7 +59,6 @@
       },280);
     }
     function render() {
-      label.textContent = formatTrainingContext(draft);
       const definition = getFramework(draft.framework,draft.frameworkDefinitionVersion);
       buttons.framework.textContent = definition?.label || '自由表达';
       const parts = getPromptParts(draft.trainingPrompt);

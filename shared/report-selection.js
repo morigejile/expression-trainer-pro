@@ -9,8 +9,9 @@
   const refs = value => Array.isArray(value) && value.every(ref => typeof ref === 'string');
   const exampleValid = value => !Object.hasOwn(value,'example') || value.example === null ||
     typeof value.example === 'string' && value.example.length <= 1600 && Boolean(value.example.trim());
-  const finding = value => value && Object.hasOwn(CATEGORIES,value.category) &&
-    ['id','observation','interpretation','recommendation'].every(key => typeof value[key] === 'string') &&
+  const findingValid = value => value && Object.hasOwn(CATEGORIES,value.category) &&
+    ['id','observation','recommendation'].every(key => typeof value[key] === 'string') &&
+    (!Object.hasOwn(value,'interpretation') || typeof value.interpretation==='string' && Boolean(value.interpretation.trim()) && value.interpretation.length<=1200) &&
     refs(value.evidenceRefs) && exampleValid(value);
   function assessmentValid(value) {
     const a=value.assessment;
@@ -31,8 +32,8 @@
   function extensionsValid(value) {
     // Read-only compatibility for recommendations already saved by v9 and earlier.
     const f = value.frameworkAnalysis, r = value.frameworkRecommendation, p = value.practiceFeedback;
-    return assessmentValid(value) && (!f || Boolean(frameworks?.getFramework(f.framework,f.definitionVersion)) && typeof f.summary === 'string' &&
-      Array.isArray(f.findings) && f.findings.every(finding)) &&
+    return assessmentValid(value) && (!f || Boolean(frameworks?.getFramework(f.framework,f.definitionVersion)) && (!Object.hasOwn(f,'summary') || typeof f.summary === 'string' && Boolean(f.summary.trim())) &&
+      Array.isArray(f.findings) && f.findings.every(findingValid)) &&
       (!r || Boolean(frameworks?.getFramework(r.framework)) && typeof r.reason === 'string' && refs(r.evidenceRefs)) &&
       (!p || ['improved','partly-improved','unchanged','needs-practice','unavailable'].includes(p.status) &&
         typeof p.summary === 'string' && refs(p.previousEvidenceRefs) && refs(p.currentEvidenceRefs) &&
@@ -78,9 +79,9 @@
       if (!extensionsValid(analysisRun.value)) continue;
       if (analysisRun.status === 'completed' && (typeof analysisRun.value.summary !== 'string' ||
           analysisRun.value.findings.some(finding => !finding || !Object.hasOwn(CATEGORIES,finding.category) ||
-            ['observation','interpretation','recommendation'].some(key => typeof finding[key] !== 'string') ||
+            ['observation','recommendation'].some(key => typeof finding[key] !== 'string') ||
             !Array.isArray(finding.evidenceRefs) || finding.evidenceRefs.some(ref => typeof ref !== 'string') ||
-            !exampleValid(finding)))) continue;
+            !findingValid(finding)))) continue;
       valid.push({snapshot,evidenceRun,metricRun,analysisRun});
     }
     if (snapshotId !== undefined) return snapshotId === null ? null : valid.find(report => report.snapshot.id === snapshotId) || null;

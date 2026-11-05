@@ -45,7 +45,7 @@ M1 增量：[训练存储与产品集成](current.md#10-m1-training-storage-foun
              └→ Renderer 有界 Int16/WAV
 结束 → Application → SQLite 事实 + 受管 WAV → VAD/Common/按设置 AI → 保存报告快照 → 共享 Report
 训练历史 → 按 ID 读取同一 Session → 共享 Report/播放/手动分析/删除
-诊断重试与手动回放分析 → Main LLM → 带生成时来源的结果写回原 Session
+诊断重试 → Main LLM → 带生成时来源的结果写回原 Session
 ```
 
 具体产品能力与 Existing/Partial/Planned 状态统一维护在[需求基线](../product/requirements.md)；本文只描述这些能力如何在当前源码中运行。
@@ -62,7 +62,7 @@ M1 增量：[训练存储与产品集成](current.md#10-m1-training-storage-foun
 | ASR 引擎 | `sherpa-onnx-node` `1.13.3` | 仅由 utility process 内的当前 Provider 延迟加载，Main 不 require |
 | ASR 模型 | Paraformer、Zipformer Small、Zipformer Large、SenseVoice Small | schema-v2 Catalog 固定 archive/runtime；模型安装到 `appData/expression-trainer-pro-models`，权重不纳入 Git；默认仍为 Zipformer Large，SenseVoice 为可选整段识别；公开分发仍受许可约束 |
 | 本地分析 | `lib/lexicon.js` + `data/emotion-lexicon.json` + `shared/expression-rules.js` | 146 个情绪词；16 个填充词、14 个犹豫词、20 组笼统词映射由 Renderer/Main 共用；未启用数据不放入活跃 `data/` 目录 |
-| LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接/实时/报告/回放分析有独立超时，支持 AbortSignal、按 Renderer 取消和严格结构化响应验证；回放请求不含音频 |
+| LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接测试与结构化诊断有独立超时，支持 AbortSignal、按 Renderer 取消和严格结构化响应验证；诊断请求不含音频 |
 | 设置 | `userData/appearance.json`、`userData/asr-selection.json`、`userData/llm-provider-settings.json`、`userData/recording-policy.json`、legacy `userData/settings.json`、`userData/custom-prompt.json` | Appearance、ASR 选择、多 LLM profile 与录音策略确认各自持久化且互不覆盖；录音策略文件只保存确认布尔值，训练内容另存 SQLite/受管 WAV；小文件原子发布；API Key 明文 |
 | 构建/测试 | Node test + Electron smoke + Electron Forge 7.5/Squirrel | `package`/`make` 固定 Windows x64；packaged smoke 覆盖 Fake 产品流、utility-only Sherpa native load、完整 DLL unpack 和外部模型目录；尚无 CI |
 
@@ -142,9 +142,9 @@ Main 负责 Electron 控制面、词库分析、小型 userData JSON 原子文�
 - 音频以最多 10 块的串行队列送入 ASR，overrun 失败关闭；Renderer 只接受当前 session 且 sequence 递增的规范事件。
 - 同一 Float32 chunk 在 Renderer 转为有界 Int16。正常结束后组装 WAV 并通过 Application 持久化；内存仅缓存正在展示、保存失败或分析中的记录，离开、删除或退出时撤销不再使用的 Blob URL。
 - streaming 单条录音最长 20 分钟；SenseVoice utterance 最长 5 分钟，结束后才转写，不显示伪 partial。达到上限走正常结束并保存可回放记录。首次录音前告知本地持久化、手动删除及远程 AI 数据边界，帮助页长期保留该说明。
-- final 文本进入逐字稿、本地统计和单调片段时间轴；片段边界统一规范为严格递增的整毫秒，因此不足一整块的录音尾块不会让回放分析输入校验整体失败。播放只根据片段边界切换已完成建议，不触发推理。
-- 首次录音在申请麦克风前等待用户确认；回放分析的失败、取消或迟到响应不覆盖上一份成功结果。
-- Report 回放区由 `src/report-playback.js` 适配现有 audio、媒体事件和保存片段，负责轻量播放控件及就近显示已有逐段反馈；分析仍由原 Renderer / Preload 接口执行，只发送转写与时间。模型下拉框只显示模型名，切换仍保存活动配置且不自动请求，用户点击“生成反馈／重新生成”后才分析，生成来源来自保存结果。产品交互规则见 Training Flow §7.5。
+- final 文本进入逐字稿、本地统计和单调片段时间轴；片段边界统一规范为严格递增的整毫秒，不足一整块的录音尾块仍有可保存的片段边界。播放按保存时间定位片段，不触发推理。
+- 首次录音在申请麦克风前等待用户确认；结构化诊断的失败、取消或迟到响应不覆盖上一份成功结果。
+- Report 回放区由 `src/report-playback.js` 适配现有 audio、媒体事件和保存片段，只负责播放、拖动、音量、倍速和片段选择；不再提供逐段反馈、模型切换或独立分析请求。产品交互规则见 Training Flow §7.5。
 - 字幕与报告通过 text node、受控 `span` 和 Markdown 允许列表渲染；外观切换只改根节点属性，不重建训练 DOM。
 
 训练编排尚未形成全局显式状态机；当前通过 session 失效、stop single-flight、队列 drain 和请求代际过滤控制组合风险。
@@ -179,14 +179,13 @@ Main 只持有 `AsrProcessController`；实际 session wrapper、managed provide
 
 `lib/lexicon.js` 读取情绪词并输出填充词、犹豫词、笼统词、情绪词、密度和建议；录音模式逐句调用 `analyze-text`；粘贴入口、`analyzeTexts` Preload API 和 `analyze-texts` Main handler 已移除。Renderer 高亮与 Main 统计共用 `shared/expression-rules.js`；自定义词经去重、长度和 64 项上限后参与本地分析与 prompt。未接入运行时的词库不放在活跃 `data/` 目录。
 
-### 5.6 LLM / `lib/ai-feedback.js`、`lib/prompts.js`
+### 5.6 LLM / `lib/ai-feedback.js`、`lib/structured-diagnosis.js`
 
-历史实时反馈和自由文本报告接口保留兼容，但普通录音已不调用实时 AI，完成后的 M2 结构化诊断接线见 §13。手动回放分析仍保留。目标用户任务与 Workspace 归属以 [Training Flow §13](../product/training-flow.md#13-screen-structure-收敛基线) 为准；后续可选实时 AI 见 Backlog B-19。
+旧实时 AI、自由文本报告、逐段反馈的生成接口、提示词与 Renderer 调用均已移除；新诊断统一使用 §13 的结构化流水线。历史数据仍可读取，报告内不再显示独立逐段建议。目标用户任务见 [Training Flow §13](../product/training-flow.md#13-screen-structure-收敛基线)，未来实时 AI 若重开仍按 Backlog B-19 决策。
 
 - 支持 OpenAI、DeepSeek、Ollama 和自定义 OpenAI-compatible；自定义训练规则附加到 prompt。
-- 连接测试、实时反馈、报告和回放分析使用独立超时与 AbortSignal；同类请求互相 supersede，迟到结果由 Main 协调和 Renderer 代际双重抑制。
+- 连接测试与结构化诊断使用独立超时与 AbortSignal；同类请求互相 supersede，迟到结果由 Main 协调和 Renderer 代际双重抑制。
 - HTTP/超时/取消/响应结构错误返回稳定脱敏文本，不透传错误正文或自动重试。
-- 回放分析只提交有界文本片段与时间，并对 segment ID、JSON 字段和建议长度做严格验证；不提交音频或路径。
 
 ### 5.7 设置与数据
 
@@ -249,12 +248,10 @@ endpoint/final sentence
 录音结束 → 保存事实/WAV → Main VAD/Common/按 profile 启用的 AI 诊断 → 结果快照 → 共享 Report
 历史打开 → 读取原快照 → 共享 Report（不自动请求 AI）
 用户重试诊断 → Main 为同一训练追加结果 → 精确引用新快照，失败保留此前成功诊断
-用户手动回放分析 → profileId + 片段文本/估计时间 → Main 校验 → 结构化 fetch
-→ 将结果与实际使用的 profile/model/分析指令快照保存到原 Session
-→ 播放/拖动跨片段更新字幕与已有建议，不再次推理
+→ 播放/拖动跨片段更新字幕定位，不再次推理
 ```
 
-导航不改变结果归属；删除后的迟到结果不能恢复记录。失败状态单独保存，上一份成功报告/回放结果仍可读。缺失的指标显示未知，不补零；M2 Common 不以旧 metrics 快照是否存在阻止重试，但历史词项统计遵循 Data Model §5.3 的快照复用/缺失规则。旧自由文本报告仅留兼容接口。生成时无法获知的来源字段保持 null。
+导航不改变结果归属；删除后的迟到结果不能恢复记录。失败状态单独保存，上一份成功报告/回放结果仍可读。缺失的指标显示未知，不补零；M2 Common 不以旧 metrics 快照是否存在阻止重试，但历史词项统计遵循 Data Model §5.3 的快照复用/缺失规则。旧自由文本报告只保留已保存快照的读取与展示；事实未保存时先重试保存，不回退到另一种生成方式。生成时无法获知的来源字段保持 null。
 
 ### 6.4 设置与 Prompt
 
@@ -278,7 +275,7 @@ Settings/Prompt Renderer 通过 Preload 调用 Main 中的 userData JSON store�
 | TD-07 | `ExpressionTrainer` 仍编排多个训练阶段 | session、stop single-flight、迟到结果和 overrun 已分别受控 | 新状态使现有局部状态无法可靠组合时再抽取状态机 |
 | TD-08 | 无 CI，Experimental 平台无制品证据 | Windows x64 Node/Electron/安装/升级 smoke 已建立 | OPS-01 或实际新增支持平台时增加最小验证 |
 | TD-09 | API Key 仍明文保存在 userData | 原子写、future-schema 防降级与日志脱敏已覆盖 | 公开发布且 keychain 收益超过 native/跨平台成本时复审 |
-| TD-10 | 页面尚未启用 CSP/sandbox | I5 Utility 的 LLM profile / custom-prompt 命令已有精确字段、类型、数量和长度边界；既有 ASR、文本分析、实时反馈和报告统计继续使用各自输入边界，Renderer 无 Node integration | 对应具体风险或公开发布安全收口时逐项处理 |
+| TD-10 | 页面尚未启用 CSP/sandbox | I5 Utility 的 LLM profile / custom-prompt 命令已有精确字段、类型、数量和长度边界；ASR、文本分析和结构化诊断继续使用各自输入边界，Renderer 无 Node integration | 对应具体风险或公开发布安全收口时逐项处理 |
 | TD-12 | LLM 瞬时失败仍需用户重试 | 超时、取消、迟到抑制、响应验证和错误脱敏已覆盖 | 产品确认重试语义后再实现，不在 fetch 层盲目重试 |
 | TD-17 | Forge/Squirrel 的仅开发传递依赖仍有安全告警 | 生产依赖审计为 0，当前组合已有完整打包证据 | 出现具体安全/兼容风险时受控升级并重跑 make/native smoke |
 
@@ -354,7 +351,7 @@ M1 初始 Session 只接受 microphone/free、null framework/trainingPrompt，ti
 
 ### Writes, reads and deletion
 
-- 录音开始建立 Session 后才启用音频提交；建立失败停止采集。停止等待 ASR 尾部与本地分析，完成事实/WAV 后追加统计。M2 随后自动运行 §13 分析链；历史打开不重跑，回放分析仍为手动操作。
+- 录音开始建立 Session 后才启用音频提交；建立失败停止采集。停止等待 ASR 尾部与本地分析，完成事实/WAV 后追加统计。M2 随后自动运行 §13 分析链；历史打开不重跑，附加生成路径已经退出。
 - WAV 发布经过 finalizing intent、独占 staging、flush/close、hash、同目录 rename，最终事务提交逐字稿和音频元数据。并发完成共享一次操作，已完成不能覆写；失败留下 incomplete，使用保留的原录音重试。
 - 启动把中断的 recording/finalizing 变为 incomplete 并检查音频；只清理超过 24 小时且无引用的普通 staging 文件，不自动删除已保存录音。
 - get/readAudio 在异步 I/O 后复查记录生命周期；Renderer 也检查导航代际和删除集合，迟到读取/结果不恢复已删记录。音频缺失/损坏只禁用播放，健康文本/结果仍可读；损坏记录与其他行隔离。
@@ -417,7 +414,7 @@ npm run smoke:package
 - Silero VAD 使用独立 `models/speech-evidence-registry.json`，复用 Model Manager 的固定文件大小/hash 安装与离线缓存；首次分析按需安装到 modelRoot 下的 speech-evidence 目录。独立 utility process 隔离 native 崩溃，并支持硬取消/超时；单个 Main 串行执行 VAD，最多接纳三条分析任务。整个分析预算为 120 秒，AI 请求预算为 60 秒。失败保存 unavailable，已保存事实与可用指标继续可读。
 - Common 的 15 个指标是确定性观测值，不输出表达质量分。`session-analysis-inputs.js` 复用已保存词项输入，首次 finalize 的新训练才可采用当前词表；历史缺失统计不以当前设置补算。VAD 区间明确带未校准限制；缺失/不连续证据按依赖使指标 unknown，不用零填补。AnalysisContext 只携带当前文本、允许的指标/语音区间、质量及分析指令；没有音频字节、Key、endpoint、路径或其他记录。
 - LLM 配置 schema 3 增加每个 profile 的自动诊断开关；新配置为空、旧配置迁移默认关闭。Main 在实际发起前重新解析精确 active profile，未启用、缺失或删除不会自动选择其他服务。界面披露实际本地/远程目标与发送内容；改变 Provider、模型或地址会清除该 profile 的自动启用状态。
-- 训练中只使用本地规则。报告显示摘要、首三项 Finding、可展开的更多发现/指标、证据定位及缺失状态。四类 Finding 与未校准雷达的产品语义只见 [Training Flow](../product/training-flow.md)。Processing 在事实保存后可离开到 History，完成不会强制跳回；分析取消/失败可恢复，历史读取保持原快照。
+- 训练中只使用本地规则。报告显示摘要、首项 Finding、可展开的更多发现/指标、证据定位及缺失状态。四类 Finding 与未校准雷达的产品语义只见 [Training Flow](../product/training-flow.md)。Processing 在事实保存后可离开到 History，完成不会强制跳回；分析取消/失败可恢复，历史读取保持原快照。
 - 保存期间取消分析后，Renderer 只读取已保存结果，不再调用可能新建任务的分析入口。分析刷新保留尚未写入的结果、统计和失败提示；成功重试同一结果 ID 后才清除待保存状态。
 
 历史真实模型有限测量与本轮有限人工复核边界见 [M2](../milestones/m2-speech-evidence-and-ai-diagnosis.md#当前实施与有限证据)。真实 Electron 43.4.1 / 内置 Node 24.18.1 已验证 VAD 中文 WAV、损坏 ONNX 子进程退出隔离、取消及下一任务恢复；这些探测不代表准确率、资格线硬件或全部 M2 验收。
@@ -457,8 +454,8 @@ M3 首版按用户选择交付可靠指标变化与两侧证据复盘。实现�
 - Main 在成功创建录音记录后原子更新 `training/training-setup.json`（写入 schemaVersion 2，兼容读取 1）。该文件只保存准备配置，不保存 Practice Focus、凭据或音频。创建响应附 `setupSaved`，偏好写入失败不撤销已创建 Session；无法读取或未来版本的偏好文件保持原样。
 - Preparing 使用默认隐藏的框架/主题/场景胶囊与轻量锚点，支持悬停、点击和键盘焦点展开。原生 Popover 承载选项、独立问号说明及自定义编辑，根据可用空间定位；主操作保持居中。主题与场景可独立选取六项预设或自填，v2 上下文分别保存来源和文本。Recording 保留只读上下文，不展示准备控件；历史单项上下文保持原形读取。
 - Session 上下文和 `practice` 来源关系复用 facts_json；完成、分析或更改下次准备值不重写旧事实。SQLite 迁移/旧应用拒读见 §10。只读 VAD 检查脚本兼容 schema 2 / 3 / 4 / 5，不执行迁移。
-- `AnalysisContext` 增加题目、原训练方式、单独的分析目标与对应 v1 定义；针对性练习只补充所选目标和前轮转写/质量。原始音频留本机。设置、首次说明/帮助和练习准备区披露发送内容；远程请求前重新核对启用配置。`structured-diagnosis-v4` 保留独立主题/场景及旧单项表示，明确本次分析目标优先于原训练方式；模型平铺返回 `frameworkSummary` / `frameworkFindings`，Main 按请求时冻结的框架身份组装为原有 `frameworkAnalysis` 快照，再执行完整校验。旧嵌套返回仍按原规则校验；混合结构、额外字段、错误框架/版本、未知引用、重复 Finding ID 和仅单侧证据的改善结论均拒绝。DeepSeek 的结构化诊断启用 JSON Output；其他兼容端点与纯文本反馈不增加该参数，不新增自动重试。
-- 显式框架重分析复用已保存的 Speech Evidence / Common Analysis，追加 Diagnosis / Report snapshot；重试保持原请求框架。报告保留原训练身份与之前结果。自动框架推荐已随 v10 下线；用户仍可手动选择训练框架。
+- `AnalysisContext` 增加题目、原训练方式、单独的分析目标与对应 v1 定义；针对性练习只补充所选目标和前轮转写/质量。原始音频留本机。设置、首次说明/帮助和练习准备区披露发送内容；远程请求前重新核对启用配置。`structured-diagnosis-v4` 保留独立主题/场景及旧单项表示，明确本次分析目标优先于原训练方式；模型平铺返回 `frameworkSummary` / `frameworkFindings`，Main 按请求时冻结的框架身份组装为原有 `frameworkAnalysis` 快照，再执行完整校验。旧嵌套返回仍按原规则校验；混合结构、额外字段、错误框架/版本、未知引用、重复 Finding ID 和仅单侧证据的改善结论均拒绝。DeepSeek 的结构化诊断启用 JSON Output；其他兼容端点不增加该参数，不新增自动重试。
+- 报告内换框架分析与外部 framework 参数已移除；历史失败重试保持原分析目标和可复用证据。报告保留原训练身份与之前结果。自动框架推荐已随 v10 下线；用户仍可手动选择训练框架。
 - `practice-chain.js` 从来源报告的真实 Finding 建立关系快照；Renderer 不能写入链事实。报告展示目标、轮次、前后证据、前轮录音与内联历程；深入某轮报告后可以返回本轮。普通首页清除 Practice Focus，保留上次题目/框架。
 - 删除来源不级联后续练习；历程保留删除位置，当前反馈及历程中的相关结论降级为不可复核。保存新诊断时在事务内检查前轮仍可用，防止等待 AI 期间删除来源后写入新的改善结论。
 
@@ -508,21 +505,25 @@ M4 仍需复核原重分析失败场景、整理重练过程 UI 并验收真实 
 
 Main 新增独立 `ai-disclosure.json` 的原子持久化和统一请求门禁，记录覆盖的数据类别、处理位置、范围/说明版本及确认时间；不复用录音告知或配置凭据推断状态。Renderer 的报告弹窗通过受限 IPC 查询当前实际配置与范围并保存确认。首次自动请求先完成事实与本地结果保存、进入报告后确认；正常已覆盖的自动请求仍在 Processing 内完成。行为的唯一规则见 [Training Flow §6.1](../product/training-flow.md#61-m2-自动诊断的配置与启用)。
 
-结构化请求及旧报告、实时反馈、回放分析均在真实发送前核对告知和精确选中的有效配置。手动请求与自动启用分开；配置保存处撤销服务/实际模型/地址变更后的自动启用，回环地址判断实际 endpoint。自定义服务的旧双模型字段读取实际 `customModel || model`。同 Session 的自动本地整理与手动分析串行衔接，保留同类去重和取消，不让自动关闭状态吞掉主动请求。连接测试只发送固定测试文本，不发送训练内容。
+结构化诊断在真实发送前核对告知和精确选中的有效配置。手动请求与自动启用分开；配置保存处撤销服务/实际模型/地址变更后的自动启用，回环地址判断实际 endpoint。自定义服务的旧双模型字段读取实际 `customModel || model`。同 Session 的自动本地整理与手动分析串行衔接，保留同类去重和取消，不让自动关闭状态吞掉主动请求。连接测试只发送固定测试文本，不发送训练内容。
 
-普通报告以保存的精确快照展示真实摘要、通用与框架 Finding、可展开的原文/语音/指标证据、建议及可选表达参考；框架摘要放入分析信息，原训练身份保持不变。新诊断使用 `structured-diagnosis-v10`，扩展契约与旧记录兼容由 [Data Model §5.4](data-model.md#54-structured-diagnosis-v1) 定义，不新增 SQLite/Session schema，不自动改写或重新分析旧结果。重试失败仍保留成功快照，空 Finding 不补样例；等待、未配置、未告知、自动关闭、失败与超时来自真实任务或结果。Finding 入口沿用现有真实 Preparing。后台收尾只刷新忙碌布局，不取消另一记录的告知、不夺回页面。
+普通报告以保存的精确快照展示真实摘要、通用与框架 Finding、可展开的原文/语音/指标证据、建议及必要解释；通用与框架整体判断合入唯一摘要，原训练身份保持不变。新诊断使用 `structured-diagnosis-v11`，扩展契约与旧记录兼容由 [Data Model §5.4](data-model.md#54-structured-diagnosis-v1) 定义，不新增 SQLite/Session schema，不自动改写或重新分析旧结果。重试失败仍保留成功快照，空 Finding 不补样例；等待、未配置、未告知、自动关闭、失败与超时来自真实任务或结果。Finding 入口沿用现有真实 Preparing。后台收尾只刷新忙碌布局，不取消另一记录的告知、不夺回页面。
 
-主报告使用 `structured-diagnosis-v9`／问题库 v0.4，沿用单次诊断请求。[问题库](../product/expression-problem-library.md)是内容维护源，生成脚本与一致性检查见 [Development](../development.md#问题库与主诊断提示)。运行时按共同规则、通用卡、所选框架卡、证据限制、条件练习规则和输出契约组装；文档保留完整练习方向，生产卡只发送适用、检查、排除、证据及相邻边界，不逐卡发送练习处方。33＋15 个编号保留；声音禁评／仅观察卡、缺时长的时长要求卡和局部练习的完整框架卡按现有能力／范围过滤，不按关键词或本地候选缺失排除语义检查，不截断原文。
+主报告使用 `structured-diagnosis-v11`／问题库 v0.4，沿用单次诊断请求。[问题库](../product/expression-problem-library.md)是内容维护源，生成脚本与一致性检查见 [Development](../development.md#问题库与主诊断提示)。运行时按共同规则、通用卡、所选框架卡、证据限制、条件练习规则和输出契约组装；文档保留完整练习方向，生产卡只发送适用、检查、排除、证据及相邻边界，不逐卡发送练习处方。33＋15 个编号保留；声音禁评／仅观察卡、缺时长的时长要求卡和局部练习的完整框架卡按现有能力／范围过滤，不按关键词或本地候选缺失排除语义检查，不截断原文。
 
-Main 要求材料评价范围、参考表达的原文来源及练习可比性，解析时执行范围／状态约束并对不支持的参考局部降级；Report 明示材料不足／有限分析，保留本地事实与旧快照。产品行为由 [Training Flow §7.1 / §10](../product/training-flow.md#71-完整分析与训练重点分层) 定义，版本来源、E06 窄补 null、严格拒绝边界及可选 raw／回执来源由 [Data Model §5.4](data-model.md#54-structured-diagnosis-v1) 定义；Main 沿现有 provenance 保存成功补全回执，不改写历史结果。
+Main 要求材料评价范围及练习可比性，解析时执行范围／状态与严格引用约束；Report 明示材料不足／有限分析，保留本地事实与旧快照。产品行为由 [Training Flow §7.1 / §10](../product/training-flow.md#71-完整分析与训练重点分层) 定义，版本来源、E06 窄补 null、严格拒绝边界及可选 raw／回执来源由 [Data Model §5.4](data-model.md#54-structured-diagnosis-v1) 定义；Main 沿现有 provenance 保存成功补全回执，不改写历史结果。
 
-v10 在 v9 篇幅规则基础上移除自动框架推荐：新提示与响应不再包含推荐字段，删除补 null 归一化、回执生成及其 Main／AI／分析编排回调，Report 不再显示推荐标题、理由或准备按钮。手动框架选择、所选框架专项分析、重分析及 Finding 练习保留；旧推荐与回执仅保留读取兼容，不改写快照。v9 篇幅调整仅修改生成提示与文案示例，沿用现有字段、问题库、解析及展示路径；可读性规则见 [Training Flow §7.1](../product/training-flow.md#71-完整分析与训练重点分层)。同输入生成对照与验证边界见[篇幅对照](../../benchmark/prompt-evaluation/report-concision-v9/summary.md)，不把字数下降、结构通过或本轮风格确认当作报告语义质量验收。
+v10 在 v9 篇幅规则基础上移除自动框架推荐：新提示与响应不再包含推荐字段，删除补 null 归一化、回执生成及其 Main／AI／分析编排回调，Report 不再显示推荐标题、理由或准备按钮。训练前框架选择、所选框架专项发现及 Finding 练习保留，报告内换框架分析随 v11 移除；旧推荐与回执仅保留读取兼容，不改写快照。v9 篇幅调整仅修改生成提示与文案示例，沿用现有字段、问题库、解析及展示路径；可读性规则见 [Training Flow §7.1](../product/training-flow.md#71-完整分析与训练重点分层)。同输入生成对照与验证边界见[篇幅对照](../../benchmark/prompt-evaluation/report-concision-v9/summary.md)，不把字数下降、结构通过或本轮风格确认当作报告语义质量验收。
+
+v11 同时将解释改为可省略、移除表达参考和第二份框架摘要，并清理报告内换框架、逐段反馈和旧实时／自由文本生成接口。Report 与 Comparison 不显示雷达未校准占位；历史快照形状保持兼容。VAD、15 项 Common Metrics、问题排序及训练前选择不在本次精简范围。
+
+2026-11-05 精简验证：Node 24.22.1 下 373 项定向检查通过；Electron 核心、训练数据 API、普通报告手动／自动、针对性报告、M4 练习链及多记录保存／重启读取共 7 条相关流程通过。独立只读复核另验证了新旧快照混合对比与框架 Finding 重练，未发现严重或重要代码问题。未执行真实 AI 质量复评、物理麦克风验收、全仓测试或打包。
 
 **质量限制与未接入范围**
 
 现有真实合成材料对照仍发现过度诊断、同一缺口重复和分类波动；结构／引用校验、格式接受或旧阶段端到端通过均不能证明语义真实性与整体稳定率。统一列表、独立局部范围和有界二次复核只在开发实验中实现，生产没有导入实验适配器或增加第二次复核调用。
 
-生产仍由模型在同次诊断中判断语义合并和关注顺序；解析器只保证结构、引用与明确重复 ID 的校验，不保证语义去重。`src/structured-report.js` 在冻结报告中将通用与专项数组拼接后默认仅显示第一条，其余放入默认收起的“更多”（不显示数量），旧布局通用前列取三条再另列专项，不能表达真正的跨组优先顺序。问题库接入未迁移旧文本报告／回放提示、扩展上一轮比较证据、修改本地词表或15项指标、重构页面排序；手动主诊断和框架请求复用当前主提示，不自动重算历史。
+生产仍由模型在同次诊断中判断语义合并和关注顺序；解析器只保证结构、引用与明确重复 ID 的校验，不保证语义去重。`src/structured-report.js` 在冻结报告中将通用与专项数组拼接后默认仅显示第一条，其余放入默认收起的“更多”（不显示数量），旧布局通用前列取三条再另列专项，不能表达真正的跨组优先顺序。问题库接入未迁移旧文本报告／回放提示、扩展上一轮比较证据、修改本地词表或15项指标、重构页面排序；手动主诊断和针对性练习复用当前主提示，不自动重算历史。
 
 **实验与历史证据（按需查阅）**
 
@@ -565,7 +566,7 @@ History 和 Comparison 接入同一 Frozen App Shell，沿用冻结列表、空�
 
 主 Renderer 的长工作区使用 `history-scroll`、`report-scroll`、`comparison-scroll` 容器；Report View State 与既有导航控制器按容器位置保存和恢复上下文，继续校验异步材料/历程的记录、报告与导航身份。实时计时节点固定在 `transport-time`，不再还原到 Header；导航由居中 Flex 容器排列，取消按不同页面标题测量平移。固定区和滚动区的产品边界由 [Training Flow §12.1 / §13.6](../product/training-flow.md#121-跨-screen-的-ux-约束) 维护。
 
-[Comparison Renderer](../../src/comparison.js) 展示既有只读 [Comparison Core](../../lib/session-comparison.js) 投影。进入时固定双方角色、Report 与结果引用，新增分析不替换输入；单侧完整报告下钻和返回恢复快照、展开、位置与焦点。无结构化报告的旧记录仍可固定读取健康事实，通用和框架 Finding 均保留 recommendation、可选 example 和真实引用。删除输入会使原对比失效，不自动换记录或从缓存恢复证据；音频异步读取后继续检查固定输入和当前展开容器。
+[Comparison Renderer](../../src/comparison.js) 展示既有只读 [Comparison Core](../../lib/session-comparison.js) 投影。进入时固定双方角色、Report 与结果引用，新增分析不替换输入；单侧完整报告下钻和返回恢复快照、展开、位置与焦点。无结构化报告的旧记录仍可固定读取健康事实，通用和框架 Finding 均保留 recommendation、可选解释和真实引用；不展示旧表达参考。删除输入会使原对比失效，不自动换记录或从缓存恢复证据；音频异步读取后继续检查固定输入和当前展开容器。
 
 MB4 复用固定快照的填充词命中次数和每录音分钟频率，不新增单词/每百字统计，不以当前词表重算历史。录音时长来自已保存音频，指标定义与兼容规则仍由 [Data Model §5.3 / §10.1](data-model.md#101-m3-compatibility) 维护。保存值、原单位、词表、版本、ASR/VAD 来源、分母和覆盖逐项核对；缺失不补零，不能可靠比较时保留两侧保存值及原因、差值为空。总量、保存分母、实际识别来源差异与 VAD 未校准分别解释，只陈述观察，不生成好坏结论、雷达或跨录音 Finding 对应。
 

@@ -31,9 +31,5 @@
     return Number.isFinite(duration) && duration > 0;
   }
 
-  function formatDuration(duration) {
-    return hasDuration(duration) ? `${duration}秒` : '不适用（无有效录音时长）';
-  }
-
-  return {countCharacters, analysisCharacterCounts, percentage, densityPercent, hasDuration, formatDuration};
+  return {countCharacters, analysisCharacterCounts, percentage, densityPercent, hasDuration};
 });

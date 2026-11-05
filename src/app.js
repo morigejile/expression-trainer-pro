@@ -15,7 +15,7 @@ function mergeFinalText(fullText, finalText) {
 }
 
 // 片段时间轴必须是严格递增的整毫秒区间：录音尾块通常不足一整块，
-// durationMs 会带小数，直接用会被 analyze-playback 的输入校验整体拒绝。
+// 录音尾块时长可能带小数，保存与回放统一采用整毫秒。
 function toSegmentEndMs(previousEndMs, candidateMs) {
   const candidate = Number.isFinite(candidateMs) ? Math.round(candidateMs) : previousEndMs;
   return Math.max(previousEndMs + 1, candidate);
@@ -53,15 +53,7 @@ const { createTrainingRecordStore, findSegmentAtTime, formatRecordLabel } = Trai
 const TextStatistics = typeof module !== 'undefined' && module.exports
   ? require('../shared/text-statistics')
   : window.TextStatistics;
-const { analysisCharacterCounts, densityPercent, hasDuration, formatDuration } = TextStatistics;
-const CONFIG_ERROR_CODES = new Set([
-  'missing-api-key',
-  'missing-endpoint',
-  'missing-model',
-  'invalid-endpoint',
-  'invalid-provider',
-  'unauthorized'
-]);
+const { analysisCharacterCounts, densityPercent, hasDuration } = TextStatistics;
 const ASR_LOADING_MESSAGE = '语音模型加载中，预计数秒至数分钟（首次安装可能更久）；本次启动只需加载一次。';
 
 const Persistence = typeof module !== 'undefined' && module.exports ? require('./training-persistence') : window.TrainingPersistence;
@@ -94,7 +86,6 @@ class ExpressionTrainer {
     this.fullText = '';
     this.sentences = [];
     this.stats = { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 0, duration: 0, excludedCharacters: 0, hedgeCharacters: 0 };
-    this.lastFeedbackText = '';
     this.llmGeneration = 0;
     this.userMessageRequiresSettings = false;
     this.activeModal = null;
@@ -116,10 +107,6 @@ class ExpressionTrainer {
     this.limitStopPromise = null;
     this.trainingRecords = null;
     this.viewingTrainingRecordId = null;
-    this.playbackProfileSummary = {activeProfileId: null, profiles: []};
-    this.playbackProfileRefreshGeneration = 0;
-    this.playbackProfileRefreshPromise = null;
-    this.playbackAnalysisGeneration = 0;
     this.playbackSegmentId = null;
 
     this.persistence = Persistence.createTrainingPersistence({api:window.api,onChange:record => this.renderRecordStatus(record)});
@@ -148,7 +135,6 @@ class ExpressionTrainer {
     if (!this.showFirstRunHelp()) void this.showFirstRunRecordingPolicy();
     void this.prepareSpeechModel();
     void this.preflightMicrophone();
-    void this.refreshLlmProfileOptions();
   }
 
   initElements() {
@@ -183,8 +169,6 @@ class ExpressionTrainer {
     this.btnRecordingPolicyCancel = document.getElementById('btn-recording-policy-cancel');
     this.playbackControls = document.getElementById('playback-controls');
     this.audioPlayer = document.getElementById('recording-player');
-    this.playbackModel = document.getElementById('playback-model');
-    this.btnReanalyze = document.getElementById('btn-reanalyze');
     this.reportAiStatus = document.getElementById('report-ai-status');
     this.recordIdentity = document.getElementById('record-identity');
     this.recordSaveStatus = document.getElementById('record-save-status');
@@ -236,8 +220,6 @@ class ExpressionTrainer {
     this.btnRecordingPolicyCancel.addEventListener('click', () => this.resolveRecordingPolicyDecision(false));
     this.btnCloseRecordingPolicy.addEventListener('click', () => this.resolveRecordingPolicyDecision(false));
     this.audioPlayer.addEventListener('timeupdate', () => this.handlePlaybackTimeUpdate());
-    this.playbackModel.addEventListener('change', event => { void this.selectPlaybackProfile(event.target.value); });
-    this.btnReanalyze.addEventListener('click', () => { void this.analyzeSelectedRecording(); });
     window.addEventListener?.('beforeunload', () => this.disposeTrainingRecords());
     window.api.onPrepareTrainingClose?.(async () => {
       let ready = false;
@@ -378,8 +360,6 @@ class ExpressionTrainer {
       this.showUserMessage('录制正在启动，请稍候');
       return;
     }
-    this.playbackAnalysisGeneration += 1;
-    this.btnReanalyze.disabled = false;
     this.trainingStatus.textContent = '正在启动录制…';
     this.btnStart.disabled = true;
     const startAttempt = {};
@@ -575,7 +555,6 @@ class ExpressionTrainer {
     this.sentences = [];
     this.viewingTrainingRecordId = null;
     this.refreshPlaybackControls();
-    this.lastFeedbackText = '';
     this.resetStats();
     this.updateSoundActivity([]);
     this.subtitleContainer.replaceChildren();
@@ -1020,7 +999,7 @@ class ExpressionTrainer {
               await this.refreshTrainingRecord(completed);
             } else {
               this.trainingStatus.textContent = tailSucceeded ? '训练已保存，正在整理语音证据和诊断…' : '转写未完成，录音已保存，正在整理可用证据…';
-              await this.awaitTrainingAnalysis(completed,false,undefined,{trigger:'automatic',prompt:false});
+              await this.awaitTrainingAnalysis(completed,false,{trigger:'automatic',prompt:false});
             }
           }
           if (completed && !this.recordingStopOperation?.left) this.showRecord(completed);
@@ -1278,49 +1257,6 @@ class ExpressionTrainer {
     this.statDensity.textContent = density === null ? '--' : `${density}%`;
   }
 
-  // ===== 实时反馈 =====
-
-  async requestRealtimeFeedback() {
-    const generation = this.llmGeneration;
-    this.lastFeedbackText = this.fullText;
-    this.feedbackStatus.textContent = '本地分析正常，AI 建议生成中…';
-    let result;
-    try {
-      result = await window.api.getRealtimeFeedback(this.fullText);
-    } catch {
-      result = { success: false, error: '实时反馈请求失败，请重试', errorCode: 'generic' };
-    }
-    if (generation !== this.llmGeneration) return;
-    if (result.success && result.feedback === '') {
-      this.feedbackStatus.textContent = '内容为空：暂无建议';
-    } else if (result.success && result.feedback) {
-      this.feedbackStatus.textContent = '本地分析正常，AI 建议已更新';
-      const lines = result.feedback.split('\n').filter(l => l.trim());
-      lines.forEach(line => {
-        const type = this.classifyFeedback(line.trim());
-        this.addFeedbackItem(line.trim(), type);
-      });
-    } else if (result.errorCode !== 'cancelled') {
-      this.feedbackStatus.textContent = '本地分析正常，AI 建议暂不可用';
-      this.showUserMessage(`实时反馈失败：${result.error || '未知错误'}`, {
-        openSettings: CONFIG_ERROR_CODES.has(result.errorCode)
-      });
-    }
-  }
-
-  classifyFeedback(text) {
-    if (text === '✓' || text.includes('✓')) return 'good';
-    // 填充词相关
-    const fillerKeywords = ['嗯','啊','呃','那个','就是','然后','这个','对吧','是吧','反正','基本上','所以说'];
-    if (fillerKeywords.some(w => text.includes(`「${w}」`))) return 'filler';
-    // 犹豫词相关
-    const hedgeKeywords = ['可能','也许','大概','应该','我觉得','好像','似乎','感觉','或许'];
-    if (hedgeKeywords.some(w => text.includes(`「${w}」`))) return 'hedge';
-    // 其他精准词替换
-    if (text.includes('→')) return 'vague';
-    return 'ai';
-  }
-
   addFeedbackItem(text, type = 'ai') {
     // 去重：如果前3条已经有相同内容，跳过
     const existing = Array.from(this.feedbackContent.children).slice(-3);
@@ -1373,10 +1309,10 @@ class ExpressionTrainer {
     const generation=this.navigationGeneration;
     let state;try {state=await window.api.getAiDisclosureState();} catch {return;}
     if (!this.analysisContextCurrent(record,generation) || !state?.profile?.autoDiagnosisEnabled || !state.required) return;
-    await this.trackAnalysis(()=>this.awaitTrainingAnalysis(record,true,undefined,{trigger:'automatic'}));
+    await this.trackAnalysis(()=>this.awaitTrainingAnalysis(record,true,{trigger:'automatic'}));
   }
 
-  async awaitTrainingAnalysis(record,retry = false,framework,{trigger='manual',prompt=true} = {}) {
+  async awaitTrainingAnalysis(record,retry = false,{trigger='manual',prompt=true} = {}) {
     if (record.reportPending) return false;
     if (prompt && !await this.ensureAiDisclosure(record)) return false;
     if (record.reportPending) return false;
@@ -1387,7 +1323,7 @@ class ExpressionTrainer {
     if (this.viewingTrainingRecordId===record.id && this.currentScreen==='report') {this.btnReport.disabled=true;this.renderCurrentReport(record);}
     try {
       const result=await window.api.analyzeTrainingSession({requestId:globalThis.crypto.randomUUID(),sessionId:record.id,retry,
-        trigger,...(framework ? {framework} : {})});
+        trigger});
       if (!result?.ok) throw new Error(result?.error?.message || '分析暂不可用，可重试；已保存训练保持不变。');
       return await this.refreshTrainingRecord(record);
     } catch (error) {
@@ -1404,7 +1340,7 @@ class ExpressionTrainer {
     if (record.deleted || this.deletedSessionIds?.has(record.id) || !saved?.ok || !saved.value) return false;
     const retained={audioUrl:record.audioUrl};
     if (record.pendingResults?.length || ['saving','failed'].includes(record.saveState)) {
-      for (const key of ['saveState','saveError','stats','metricsAvailable','segments','report','reportStatus','playbackAnalysis','playbackStatus']) {
+      for (const key of ['saveState','saveError','stats','metricsAvailable','segments','report','reportStatus']) {
         retained[key]=record[key];
       }
     }
@@ -1426,7 +1362,7 @@ class ExpressionTrainer {
       // Main starts analysis when finalization succeeds. Join that job (or its
       // saved snapshot), then refresh only the original record and current view.
       if (typeof window.api.analyzeTrainingSession === 'function') {
-        const refreshed=await this.awaitTrainingAnalysis(record,false,undefined,{trigger:'automatic',prompt:false});
+        const refreshed=await this.awaitTrainingAnalysis(record,false,{trigger:'automatic',prompt:false});
         if (this.currentScreen==='report' && this.viewingTrainingRecordId===record.id) {this.pendingAutoDisclosureRecord=record;void this.offerAutomaticDisclosure();}
         return refreshed;
       }
@@ -1454,8 +1390,7 @@ class ExpressionTrainer {
         },
         onOpen:(id,reportId,round) => this.openHistoryRecord(id,{reportId,returnTo:this.reportSource==='practice' && this.practiceReturn ? this.practiceReturn : {id:record.id,
           reportId:record.structuredReport.snapshot.id,source:this.reportSource,viewState:ReportViewState.capture(document,record,round)}}),
-        onLayout:part=>this.restorePracticeLayout(record,part),
-        onReanalyze:framework => this.trackAnalysis(() => this.awaitTrainingAnalysis(record,true,framework))});
+        onLayout:part=>this.restorePracticeLayout(record,part)});
       this.reportAiStatus.textContent=record.dataQuality?.includes('asr-error') ? '转写未完成，已保存录音及可用证据；可改选模型进行新训练。' : '';
       this.btnReport.querySelector?.('.btn-label') && (this.btnReport.querySelector('.btn-label').textContent='重试诊断');
     } else {
@@ -1491,40 +1426,11 @@ class ExpressionTrainer {
   generateReport() { return this.closing ? Promise.resolve(false) : this.trackAnalysis(() => this.generateReportForRecord()); }
 
   async generateReportForRecord() {
-    const record = this.trainingRecords?.selected();
-    if (record?.factsSaved && typeof window.api.analyzeTrainingSession==='function') return this.awaitTrainingAnalysis(record,true);
-    if (!record || !record.fullText.trim()) {
-      this.showUserMessage('暂无可分析的逐字稿'); return false;
-    }
-    if (record.metricsAvailable === false) { this.showUserMessage('这条记录缺少已保存的本地统计，无法生成原有 AI 报告；逐字稿和音频仍可查看。'); return false; }
-    if (record.reportPending) return false;
-    if (!await this.ensureAiDisclosure(record)) return false;
-    if (record.reportPending) return false;
-    record.reportPending = true;
-    this.btnReport.disabled = true;
-    this.reportAiStatus && (this.reportAiStatus.textContent = '正在生成 AI 报告…');
-    try {
-      let response;
-      try { response = await window.api.getFinalReport({fullText:record.fullText,stats:record.stats}); }
-      catch { response = {success:false,error:'报告请求失败，请重试'}; }
-      if (record.deleted) return false;
-      if (response.success) record.report = response.report;
-      record.reportStatus = response.success ? 'completed' : 'failed';
-      if (this.persistence) await this.persistence.append(record, {
-        kind:'report',status:record.reportStatus,value:response.success ? response.report : {error:response.error || '分析失败'},
-        createdAt:response.createdAt || new Date().toISOString(),provenance:response.provenance || {},
-        definitionVersion:'report-v1',analyzerVersion:'ai-feedback-v1'
-      });
-      if (this.viewingTrainingRecordId === record.id && this.currentScreen === 'report') {
-        this.renderReport(record.report || '尚未生成 AI 报告。');
-        this.reportAiStatus && (this.reportAiStatus.textContent = response.success ? '' : '生成失败，可重试；已有内容仍可查看。');
-        if (!response.success) this.showUserMessage(response.error || '报告生成失败，请重试', {openSettings:CONFIG_ERROR_CODES.has(response.errorCode)});
-      }
-      return response.success;
-    } finally {
-      record.reportPending = false;
-      if (this.viewingTrainingRecordId === record.id) this.btnReport.disabled = false;
-    }
+    const record=this.trainingRecords?.selected();
+    if (!record || !record.fullText.trim()) {this.showUserMessage('暂无可分析的逐字稿');return false;}
+    if (!record.factsSaved) {this.showUserMessage('训练尚未保存，请先重试保存后再分析。');return false;}
+    if (typeof window.api.analyzeTrainingSession!=='function') {this.showUserMessage('分析服务不可用，请重新启动应用后重试。');return false;}
+    return this.awaitTrainingAnalysis(record,true);
   }
 
   renderReport(report) {
@@ -1578,16 +1484,11 @@ class ExpressionTrainer {
 
   async handleLlmProviderSettingsChanged() {
     const dismissedConfigurationMessage = this.userMessageRequiresSettings;
-    if (dismissedConfigurationMessage) this.hideUserMessage();
-    const summary = await this.refreshLlmProfileOptions({supersede: true});
-    if (!summary) return null;
-    const record = this.trainingRecords?.selected();
-    if (record?.id === this.viewingTrainingRecordId) {
-      this.renderPlaybackAnalysis(record, this.playbackSegmentId);
-    } else if (dismissedConfigurationMessage) {
-      this.feedbackStatus.textContent = '训练中使用本地规则；结束后按设置自动生成 AI 诊断';
+    if (dismissedConfigurationMessage) {
+      this.hideUserMessage();
+      this.feedbackStatus.textContent='训练中使用本地规则；结束后按设置自动生成 AI 诊断';
     }
-    return summary;
+    return null;
   }
 
   openModal(modal, initialFocus) {
@@ -1717,11 +1618,7 @@ class ExpressionTrainer {
       if (label) label.textContent = text; else this.reportBack.textContent = `← ${text}`;
     }
     if (!record.structuredReport) this.reportAiStatus && (this.reportAiStatus.textContent = record.reportStatus === 'failed' ? '上次 AI 报告生成失败，可重试；已有结果保留。' : '');
-    const structuredAnalysis = record.factsSaved && typeof window.api.analyzeTrainingSession === 'function';
-    this.btnReport.disabled = Boolean(record.reportPending) || !record.fullText.trim() ||
-      (!structuredAnalysis && record.metricsAvailable === false);
-    this.btnReanalyze.disabled = Boolean(record.playbackPending);
-    this.reportPlayback?.updateFeedback(record);
+    this.btnReport.disabled = Boolean(record.reportPending) || !record.fullText.trim() || !record.factsSaved;
   }
 
   renderRecordStatus(record) {
@@ -1729,7 +1626,7 @@ class ExpressionTrainer {
     FrozenReport.renderIdentity(document,record);
     const states = {saving:'正在保存…',saved:'这次训练已保存',failed:record.factsSaved ? '训练已保存，部分分析结果保存失败，请重试。' : '训练保存失败，请重试；关闭应用将丢失未保存内容。',incomplete:'这条记录未完成或已损坏，现有可读内容仍可查看。'};
     const audio = record.audioState === 'missing' ? '音频缺失，无法播放。' : record.audioState === 'corrupt' ? '音频损坏，无法播放。' : '';
-    const warnings=[audio,record.resultIntegrity === 'corrupt' ? '部分分析结果损坏。' : '',record.metricsAvailable === false ? '本地统计未保存，无法生成原有 AI 报告。' : ''].filter(Boolean);
+    const warnings=[audio,record.resultIntegrity === 'corrupt' ? '部分分析结果损坏。' : '',record.metricsAvailable === false ? '本地统计未保存，部分历史统计不可用。' : ''].filter(Boolean);
     const quiet=record.saveState === 'saved' && !warnings.length;
     this.recordSaveStatus.textContent=quiet ? '' : [states[record.saveState] || '记录状态未知',...warnings].join(' · ');
     this.recordSaveStatus.hidden=quiet;
@@ -1809,7 +1706,7 @@ class ExpressionTrainer {
           fresh.structuredReport=pinned;
         }
         // Keep in-flight results attached to the same object, independently of this view.
-        const retain=record && (record.reportPending || record.playbackPending || ['failed','saving'].includes(record.saveState) || record.pendingResults?.length);
+        const retain=record && (record.reportPending || ['failed','saving'].includes(record.saveState) || record.pendingResults?.length);
         const next=retain?record:fresh;
         if (fresh.audioState === 'available' && !next.audioUrl) {
           const audio = await window.api.readTrainingAudio({requestId:globalThis.crypto.randomUUID(),sessionId:id});
@@ -1881,7 +1778,7 @@ class ExpressionTrainer {
 
   releaseSavedRecordCache() {
     for (const record of this.getTrainingRecordStore().list()) {
-      if (record.saveState === 'saved' && !record.reportPending && !record.playbackPending) {
+      if (record.saveState === 'saved' && !record.reportPending) {
         this.getTrainingRecordStore().remove(record.id);
       }
     }
@@ -2010,7 +1907,6 @@ class ExpressionTrainer {
     this.fullText = record.fullText;
     this.sentences = record.segments.map(segment => segment.text);
     this.stats = { ...record.stats };
-    this.lastFeedbackText = '';
     this.subtitleContainer.replaceChildren();
     if (!record.segments.length && record.fullText) {
       const text = document.createElement('div'); text.className = 'subtitle-line'; text.textContent = record.fullText; this.subtitleContainer.appendChild(text);
@@ -2028,14 +1924,11 @@ class ExpressionTrainer {
     this.timer.textContent = `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(totalSeconds % 60).padStart(2, '0')}`;
     this.btnReport.classList.toggle('hidden', !record.fullText.trim());
     this.refreshTrainingRecordSelect();
-    void this.loadLlmProfileOptions(this.playbackProfileSummary);
     this.playbackSegmentId = null;
     const initialSegment = findSegmentAtTime(record.segments, 0);
     if (initialSegment) {
       this.playbackSegmentId = initialSegment.id;
       this.renderPlaybackSegment(initialSegment.id);
-    } else {
-      this.renderPlaybackAnalysis(record, null);
     }
     return record;
   }
@@ -2073,21 +1966,6 @@ class ExpressionTrainer {
       if (isCurrent) currentLine = line;
     }
     currentLine?.scrollIntoView({block: 'nearest'});
-    this.renderPlaybackAnalysis(record, segmentId);
-  }
-
-  renderPlaybackAnalysis(record, segmentId) {
-    if(this.reportPlayback&&this.currentScreen==='report'&&this.viewingTrainingRecordId===record.id){this.reportPlayback.updateFeedback(record);return;}
-    const analysis = record.playbackAnalysis;
-    if (!analysis) {
-      this.feedbackStatus.textContent = '尚未生成回放分析';
-      this.feedbackContent.textContent = '';
-      return;
-    }
-    const model = analysis.profile?.model || '未知模型';
-    this.feedbackStatus.textContent = `回放分析 · ${model}`;
-    const item = analysis.items?.find(candidate => candidate.segmentId === segmentId);
-    this.feedbackContent.textContent = item?.advice || '该片段暂无特别建议';
   }
 
   selectPlaybackSegment(segmentId) {
@@ -2100,131 +1978,6 @@ class ExpressionTrainer {
       if(this.audioPlayer.readyState>=1)seek();else this.audioPlayer.addEventListener('loadedmetadata',seek,{once:true});
     }
     return true;
-  }
-
-  async loadLlmProfileOptions(summary, {isCurrent = () => true} = {}) {
-    try {
-      const nextSummary = summary?.profiles
-        ? summary
-        : await window.api.getLlmProfileSummaries();
-      if (!isCurrent()) return null;
-      if (!nextSummary || !Array.isArray(nextSummary.profiles)) return null;
-      this.playbackProfileSummary = nextSummary;
-      if (this.playbackModel) {
-        const options = nextSummary.profiles.map(profile => {
-          const option = document.createElement('option');
-          option.value = profile.id;
-          option.textContent = profile.model;
-          return option;
-        });
-        this.playbackModel.replaceChildren(...options);
-        this.playbackModel.value = nextSummary.activeProfileId || '';
-      }
-      return nextSummary;
-    } catch (error) {
-      if (isCurrent() && this.viewingTrainingRecordId) {
-        this.feedbackStatus.textContent = error?.message || '无法加载分析模型';
-      }
-      return null;
-    }
-  }
-
-  refreshLlmProfileOptions({supersede = false} = {}) {
-    if (!supersede && this.playbackProfileRefreshPromise) {
-      return this.playbackProfileRefreshPromise;
-    }
-    const refreshGeneration = (this.playbackProfileRefreshGeneration ?? 0) + 1;
-    this.playbackProfileRefreshGeneration = refreshGeneration;
-    const refreshPromise = this.loadLlmProfileOptions(undefined, {
-      isCurrent: () => refreshGeneration === this.playbackProfileRefreshGeneration
-    });
-    this.playbackProfileRefreshPromise = refreshPromise;
-    void refreshPromise.finally(() => {
-      if (this.playbackProfileRefreshPromise === refreshPromise) {
-        this.playbackProfileRefreshPromise = null;
-      }
-    });
-    return refreshPromise;
-  }
-
-  async selectPlaybackProfile(profileId) {
-    if (!profileId) return false;
-    const previousActiveProfileId = this.playbackProfileSummary?.activeProfileId || '';
-    const restoreSelection = async () => {
-      const refreshed = await this.refreshLlmProfileOptions({supersede: true});
-      if (!refreshed && this.playbackModel) this.playbackModel.value = previousActiveProfileId;
-    };
-    try {
-      const response = await window.api.selectLlmProfile(profileId);
-      if (!response?.success) {
-        await restoreSelection();
-        this.feedbackStatus.textContent = response?.error || '无法切换分析模型';
-        this.reportPlayback?.showNotice('无法切换分析模型，已恢复原配置；已有反馈保留。');
-        return false;
-      }
-      this.playbackProfileRefreshGeneration = (this.playbackProfileRefreshGeneration ?? 0) + 1;
-      this.playbackProfileRefreshPromise = null;
-      await this.loadLlmProfileOptions(response.summary);
-      this.reportPlayback?.showNotice('');
-      const record = this.trainingRecords?.selected();
-      if (record?.id === this.viewingTrainingRecordId) {
-        this.renderPlaybackAnalysis(record, this.playbackSegmentId);
-      }
-      return true;
-    } catch (error) {
-      await restoreSelection();
-      this.feedbackStatus.textContent = error?.message || '无法切换分析模型';
-      this.reportPlayback?.showNotice('无法切换分析模型，已恢复原配置；已有反馈保留。');
-      return false;
-    }
-  }
-
-  analyzeSelectedRecording() { return this.closing ? Promise.resolve(false) : this.trackAnalysis(() => this.analyzeRecordingForRecord()); }
-
-  async analyzeRecordingForRecord() {
-    const record = this.trainingRecords?.selected();
-    if (!record || record.playbackPending) return false;
-    if (!ReportPlayback.hasAnalyzableSegments(record.segments)) {
-      this.feedbackStatus.textContent = '没有可分析的有效片段时间，仍可查看逐字稿。'; return false;
-    }
-    record.playbackPending = true;
-    this.btnReanalyze.disabled = true;
-    this.reportPlayback?.updateFeedback(record);
-    try {
-      let refresh = this.playbackProfileRefreshPromise || this.refreshLlmProfileOptions();
-      while (refresh) {
-        await refresh;
-        const latest = this.playbackProfileRefreshPromise;
-        if (!latest || latest === refresh) break;
-        refresh = latest;
-      }
-      if (record.deleted) return false;
-      const profileId = this.playbackProfileSummary?.activeProfileId;
-      if (!profileId) { this.showUserMessage('请先配置分析模型',{openSettings:true}); return false; }
-      if (!await this.ensureAiDisclosure(record,profileId)) return false;
-      record.playbackRequestModel=this.playbackProfileSummary.profiles.find(profile=>profile.id===profileId)?.model || null;
-      if(this.currentScreen==='report'&&this.viewingTrainingRecordId===record.id)this.reportPlayback?.updateFeedback(record);
-      this.feedbackStatus.textContent = '正在分析回放…';
-      let response;
-      try { response = await window.api.analyzePlayback({profileId,segments:record.segments.map(({id,text,startMs,endMs}) => ({id,text,startMs,endMs}))}); }
-      catch { response = {success:false,error:'回放分析失败，请重试'}; }
-      if (record.deleted) return false;
-      if (response.success) record.playbackAnalysis = response.analysis;
-      record.playbackStatus = response.success ? 'completed' : 'failed';
-      if (this.persistence) await this.persistence.append(record, {
-        kind:'playback',status:record.playbackStatus,value:response.success ? response.analysis : {error:response.error || '分析失败'},
-        createdAt:response.createdAt || new Date().toISOString(),provenance:response.provenance || {},
-        definitionVersion:'playback-v1',analyzerVersion:'ai-feedback-v1'
-      });
-      if (this.viewingTrainingRecordId === record.id && this.currentScreen === 'report') {
-        this.renderPlaybackAnalysis(record,this.playbackSegmentId);
-        if (!response.success) this.feedbackStatus.textContent = '回放分析失败，可重试；已有分析保留。';
-      }
-      return response.success;
-    } finally {
-      record.playbackPending=false;record.playbackRequestModel=null;
-      if(this.viewingTrainingRecordId===record.id){this.btnReanalyze.disabled=false;if(this.currentScreen==='report')this.reportPlayback?.updateFeedback(record);}
-    }
   }
 
   handleGlobalKeydown(event) {
@@ -2251,7 +2004,6 @@ class ExpressionTrainer {
   disposeTrainingRecords() {
     if (this.countdown) void this.cancelCountdown();
     this.advanceLLMGeneration();
-    this.playbackAnalysisGeneration += 1;
     try {
       const cancellation = window.api.cancelLLMRequests();
       cancellation?.catch?.(() => {});

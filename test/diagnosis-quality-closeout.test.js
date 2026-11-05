@@ -58,7 +58,7 @@ test('the provider boundary emits original raw and normalization receipt after o
 
 test('production cards omit per-card practice while the full source retains it and merge counterexamples remain in the rules',()=>{
   const {getStructuredDiagnosisPrompt,DIAGNOSIS_PROMPT_VERSION}=require('../lib/structured-diagnosis');
-  assert.equal(DIAGNOSIS_PROMPT_VERSION,'structured-diagnosis-v10');
+  assert.equal(DIAGNOSIS_PROMPT_VERSION,'structured-diagnosis-v11');
   const {system}=getStructuredDiagnosisPrompt(buildCases()[5].context);
   const cards=system.slice(system.indexOf('【2 本次通用检查卡】'),system.indexOf('【4 本次证据与质量限制】'));
   assert.doesNotMatch(cards,/可选练习：/);

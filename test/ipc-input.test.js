@@ -5,9 +5,7 @@ const assert = require('node:assert/strict');
 
 const {
   MAX_TEXT_LENGTH,
-  requireBoundedText,
-  validateFinalReportPayload,
-  validatePlaybackAnalysisPayload
+  requireBoundedText
 } = require('../lib/ipc-input');
 
 test('bounded IPC text accepts product text and rejects invalid or oversized values', () => {
@@ -23,106 +21,5 @@ test('bounded IPC text accepts product text and rejects invalid or oversized val
   assert.throws(
     () => requireBoundedText('x'.repeat(MAX_TEXT_LENGTH + 1), {label: 'text'}),
     error => error.code === 'invalid-ipc-input' && error.message === `text exceeds ${MAX_TEXT_LENGTH} characters`
-  );
-});
-
-test('final report payload has exact text and finite non-negative statistics', () => {
-  const payload = {
-    fullText: '一段训练内容',
-    stats: {fillers: 1, hedges: 2, vagueWords: 3, totalWords: 20, duration: 15, excludedCharacters: 7, hedgeCharacters: 6}
-  };
-
-  assert.deepEqual(validateFinalReportPayload(payload), payload);
-
-  assert.throws(
-    () => validateFinalReportPayload({...payload, extra: true}),
-    error => error.code === 'invalid-ipc-input' && error.message === 'report payload has unexpected fields'
-  );
-  assert.throws(
-    () => validateFinalReportPayload({...payload, stats: {...payload.stats, duration: -1}}),
-    error => error.code === 'invalid-ipc-input' && error.message === 'stats.duration must be a non-negative finite number'
-  );
-  for (const field of ['excludedCharacters', 'hedgeCharacters']) {
-    assert.throws(
-      () => validateFinalReportPayload({...payload, stats: {...payload.stats, [field]: NaN}}),
-      error => error.code === 'invalid-ipc-input' && error.message === `stats.${field} must be a non-negative finite number`
-    );
-  }
-});
-
-test('playback payload accepts ordered segments with bounded profile and transcript text', () => {
-  const payload = {
-    profileId: 'profile-1',
-    segments: [
-      {id: 's1', text: '第一段', startMs: 0, endMs: 1000},
-      {id: 's2', text: '第二段', startMs: 1000, endMs: 2200}
-    ]
-  };
-
-  assert.deepEqual(validatePlaybackAnalysisPayload(payload), payload);
-});
-
-test('playback payload rejects overlaps, duplicate IDs, and excessive text', () => {
-  assert.throws(() => validatePlaybackAnalysisPayload({
-    profileId: 'p1',
-    segments: [
-      {id: 'a', text: '一', startMs: 0, endMs: 1000},
-      {id: 'a', text: '二', startMs: 900, endMs: 1200}
-    ]
-  }), error => error.code === 'invalid-ipc-input');
-
-  assert.throws(() => validatePlaybackAnalysisPayload({
-    profileId: 'p1',
-    segments: [{id: 'a', text: 'x'.repeat(30_001), startMs: 0, endMs: 1000}]
-  }), error => error.code === 'invalid-ipc-input');
-});
-
-test('playback payload rejects unexpected fields and invalid millisecond ranges', () => {
-  for (const payload of [
-    {profileId: 'p1', segments: [], extra: true},
-    {profileId: 'p1', segments: [{id: 'a', text: '一', startMs: -1, endMs: 1}]},
-    {profileId: 'p1', segments: [{id: 'a', text: '一', startMs: 2, endMs: 1}]},
-    {profileId: 'p1', segments: [{id: 'a', text: '一', startMs: 0, endMs: 0}]},
-    {profileId: 'p1', segments: [{id: 'a', text: '一', startMs: Number.NaN, endMs: 1}]},
-    {profileId: 'p1', segments: [{id: 'a', text: '一', startMs: 0, endMs: Infinity}]},
-    {profileId: 'p1', segments: [{id: 'a', text: '一', startMs: 0, endMs: 1, extra: true}]}
-  ]) {
-    assert.throws(
-      () => validatePlaybackAnalysisPayload(payload),
-      error => error.code === 'invalid-ipc-input'
-    );
-  }
-});
-
-test('playback payload enforces exact profile, segment, and transcript boundaries', () => {
-  const maxIdPayload = {
-    profileId: 'p'.repeat(128),
-    segments: [{id: 's'.repeat(64), text: 'x'.repeat(30_000), startMs: 0, endMs: 1}]
-  };
-  assert.deepEqual(validatePlaybackAnalysisPayload(maxIdPayload), maxIdPayload);
-
-  for (const payload of [
-    {...maxIdPayload, profileId: 'p'.repeat(129)},
-    {...maxIdPayload, segments: [{...maxIdPayload.segments[0], id: 's'.repeat(65)}]},
-    {...maxIdPayload, segments: [{...maxIdPayload.segments[0], text: 'x'.repeat(30_001)}]}
-  ]) {
-    assert.throws(
-      () => validatePlaybackAnalysisPayload(payload),
-      error => error.code === 'invalid-ipc-input'
-    );
-  }
-});
-
-test('playback payload permits 600 segments and rejects a 601st', () => {
-  const segments = Array.from({length: 600}, (_, index) => ({
-    id: `segment-${index}`,
-    text: 'x',
-    startMs: index * 2,
-    endMs: index * 2 + 1
-  }));
-  assert.deepEqual(validatePlaybackAnalysisPayload({profileId: 'p1', segments}), {profileId: 'p1', segments});
-  assert.throws(
-    () => validatePlaybackAnalysisPayload({profileId: 'p1', segments: [...segments, {id: 'segment-600', text: 'x', startMs: 1200, endMs: 1201}]}),
-    error => error.code === 'invalid-ipc-input'
   );
 });

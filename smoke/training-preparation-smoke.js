@@ -32,7 +32,7 @@ async function run({mainWindow,evaluate,wait,capture,choose,setCustom}) {
     mainWindow.webContents.sendInputEvent({type:'mouseMove',x:4,y:4});
     await new Promise(resolve => setTimeout(resolve,330));
     assert.equal(await evaluate(`document.getElementById('training-picker').matches(':popover-open')`),true,'help remains open after pointer leaves');
-    await evaluate(`document.querySelector('[data-setup-back]').click();document.querySelector('[data-setup-select="prep"]').click()`);
+    await evaluate(`document.getElementById('training-picker-close').click();document.querySelector('[data-setup-select="prep"]').click()`);
     await choose('topic','meeting-free-day');
     await setCustom('scenario','向负责人汇报 <img src=x onerror="window.__topicInjected=true">');
     const selected = await snapshot();

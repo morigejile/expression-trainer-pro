@@ -90,7 +90,7 @@ test('real Electron covers core flows and offline 16/44.1/48 kHz buffer graph ad
       reportOpenedAfterStop: true,
       saved: true,
       historyReportRestored: true,
-      modelLabels: ['fake-model'],
+      modelLabels: [],
       manualReportRequests: 0,
       automaticDiagnosisRequests: 1,
       audioType: 'audio/wav'

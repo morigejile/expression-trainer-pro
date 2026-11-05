@@ -139,7 +139,9 @@ test('Frozen Comparison adapts real filler metrics and keeps optional examples a
   renderComparison(container,projection,{onReport:()=>{},onPlay:()=>{}});
   assert.match(container.textContent,/填充词命中次数/);assert.match(container.textContent,/填充词命中频率/);assert.match(container.textContent,/次\/录音分钟/);assert.doesNotMatch(container.textContent,/每百字|继续练习/);
   const detail=container.querySelector('[data-detail-key="finding-baseline-wording-0"]');detail.open=true;detail.populateEvidence();
-  assert.ok(container.textContent.includes('这是建议写法，不能冒充原话'));assert.equal(detail.querySelectorAll('blockquote').some(node=>node.textContent.includes('建议写法')),false);
+  assert.equal(container.textContent.includes('这是建议写法，不能冒充原话'),false);assert.equal(detail.querySelectorAll('blockquote').some(node=>node.textContent.includes('建议写法')),false);
+  const limits=container.querySelector('[data-detail-key="compare-limits"]');limits.open=true;limits.populateEvidence();
+  assert.doesNotMatch(limits.textContent,/雷达/);
 });
 test('Frozen metric limitations distinguish saved denominators, totals and actual ASR source differences',()=>{
   const projection=compareSessions([comparisonSession('a'),comparisonSession('b')]),document=new Document(),container=document.createElement('main');

@@ -6,6 +6,10 @@ const {spawn} = require('node:child_process');
 
 async function run({app, mainWindow, BrowserWindow, phase}) {
   assert.ok(['write', 'read', 'future'].includes(phase));
+  for(const channel of ['get-final-report','get-realtime-feedback','analyze-playback']) {
+    assert.equal(require('electron').ipcMain._invokeHandlers.has(channel), false,`${channel} is retired`);
+  }
+  assert.equal(await mainWindow.webContents.executeJavaScript('typeof window.api.getFinalReport'), 'undefined');
   const missing = await mainWindow.webContents.executeJavaScript(`[
     'createTrainingSession', 'finalizeTrainingSession', 'listTrainingSessions',
     'getTrainingSession', 'deleteTrainingSession', 'readTrainingAudio'

@@ -30,7 +30,7 @@ test('new diagnosis provenance records the problem library without changing old 
   const saved=await store.get(id);
   const run=saved.results.find(x=>x.kind==='diagnosis');
   assert.equal(run.provenance.problemLibraryVersion,'expression-problem-library-v0.4');
-  assert.equal(run.provenance.promptVersion,'structured-diagnosis-v10');
+  assert.equal(run.provenance.promptVersion,'structured-diagnosis-v11');
   assert.deepEqual(run.value.findings,[]);
   const before=structuredClone(saved.results);
   assert.equal((await analyzer.start(id)).id,first.id);
@@ -68,41 +68,28 @@ test('completed facts receive immutable local evidence and metric/report snapsho
   await analyzer.close();
 });
 
-test('explicit framework reanalysis reuses saved evidence and appends results without changing original training facts', async t => {
-  const {createSessionAnalysis} = require('../lib/session-analysis');
-  const {store,id} = await fixture(t);
-  let calls = 0;
-  const frameworks = [];
-  const analyzer = createSessionAnalysis({store,runSpeechEvidence:async () => {calls++;return {schemaVersion:1,status:'unavailable',segments:[]};},
-    getDiagnosisProfile:() => ({profile:{id:'test',provider:'local',model:'fixture'}}),
-    diagnose:async ({framework}) => {frameworks.push(framework);return {schemaVersion:1,summary:'分析结果',findings:[]};}});
-  await analyzer.start(id);
-  const original = await store.get(id);
-  await analyzer.start(id,{framework:'prep'});
-  const after = await store.get(id);
-  assert.equal(after.results.length,6);
-  assert.deepEqual(after.results.slice(0,4),original.results);
-  assert.equal(after.trainingMode,'free');
-  assert.equal(after.framework,null);
-  assert.deepEqual(after.transcript,original.transcript);
-  assert.deepEqual(frameworks,[null,'prep']);
-  assert.equal(calls,1);
-  assert.equal(after.results.at(-2).value.analysisTarget.framework,'prep');
-  assert.equal(after.results.at(-2).value.metricRunId,original.results[1].id);
-  await assert.rejects(analyzer.start(id,{framework:'unknown'}),{code:'INVALID_SESSION'});
-  await analyzer.close();
+test('analysis rejects an external framework override without invoking speech or AI',async t=>{
+  const {createSessionAnalysis}=require('../lib/session-analysis');const {store,id}=await fixture(t);
+  const analyzer=createSessionAnalysis({store,runSpeechEvidence:()=>assert.fail('no VAD')});
+  await assert.rejects(analyzer.start(id,{framework:'prep'}),{code:'INVALID_SESSION'});
+  assert.equal((await store.get(id)).results.length,0);await analyzer.close();
 });
 
-test('retry after a failed framework reanalysis preserves the requested framework and saved local evidence', async t => {
-  const {createSessionAnalysis} = require('../lib/session-analysis');
-  const {store,id} = await fixture(t);const targets=[];let vad=0;
-  const analyzer = createSessionAnalysis({store,runSpeechEvidence:async () => {vad++;return {schemaVersion:1,status:'unavailable',segments:[]};},
-    getDiagnosisProfile:() => ({profile:{id:'p'}}),diagnose:async ({framework}) => {
-      targets.push(framework);if(targets.length===2) throw Object.assign(new Error('temporary'),{code:'network'});
+test('retry of a saved historical framework attempt preserves its target and evidence',async t=>{
+  const {createSessionAnalysis}=require('../lib/session-analysis');const {store,id}=await fixture(t);let vad=0;
+  const targets=[];const analyzer=createSessionAnalysis({store,
+    runSpeechEvidence:async()=>{vad++;return {schemaVersion:1,status:'unavailable',segments:[]};},
+    getDiagnosisProfile:()=>({profile:{id:'p'}}),diagnose:async({framework})=>{
+      targets.push(framework);if(targets.length===1)throw Object.assign(Error('network'),{code:'network'});
       return {schemaVersion:1,summary:'可用报告',findings:[]};
     }});
-  await analyzer.start(id);await analyzer.start(id,{framework:'star'});await analyzer.start(id,{retry:true});
-  assert.deepEqual(targets,[null,'star','star']);assert.equal(vad,1);
+  await analyzer.start(id);const saved=await store.get(id);
+  const diagnosis=structuredClone(saved.results[2]);diagnosis.id='legacy-diagnosis';diagnosis.value.analysisTarget={framework:'star',definitionVersion:'star-v1'};
+  await store.appendResult(id,diagnosis);
+  const report=structuredClone(saved.results[3]);report.id='legacy-report';report.value.analysisRunId=diagnosis.id;
+  await store.appendResult(id,report);
+  await analyzer.start(id,{retry:true});
+  assert.deepEqual(targets,[null,'star']);assert.equal(vad,1);
   assert.equal((await store.get(id)).results.at(-2).value.analysisTarget.framework,'star');await analyzer.close();
 });
 

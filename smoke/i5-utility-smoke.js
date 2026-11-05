@@ -19,7 +19,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   const settingsPath = path.join(root,'llm-provider-settings.json');
   const preferencesPath = path.join(root,'custom-prompt.json');
   const diagnosticPath = path.join(root,'i5-diagnostics.json');
-  const reportDirectory = 'C:/Users/mr/.codex/visualizations/2026/10/12/i5';
+  const reportDirectory = path.join(root,'i5-evidence');
   const observations = [];
   const check = label => observations.push(label);
   const {ipcMain,dialog,shell,screen} = require('electron');
@@ -417,17 +417,18 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
       await preserve('Training Processing','help','report');
       assert.ok(await evaluate(`Boolean(${trainer}.recordingStopOperation)`));
     } finally {releaseFinalize();ipcMain._invokeHandlers.set('training-session:finalize',originals.get('training-session:finalize'));}
-    await readyReport();const aId=await evaluate(`${trainer}.trainingRecords.selected().id`);
+    await readyReport();let aId=await evaluate(`${trainer}.trainingRecords.selected().id`);
     const beforeAnalysis=calls.llmDiagnosis;
-    await evaluate(`void ${trainer}.awaitTrainingAnalysis(${trainer}.trainingRecords.selected(),true,'prep')`);
+    await evaluate(`void ${trainer}.awaitTrainingAnalysis(${trainer}.trainingRecords.selected(),true)`);
     await wait('real manual analysis settled',`!${trainer}.trainingRecords.selected().reportPending && document.querySelector('.finding-details')`);
     assert.equal(calls.llmDiagnosis,beforeAnalysis+1);
     await open();await edit(deepseek.id);await field('model','i2-pending');await click('[data-save-ai]');
     await wait('delayed AI profile saved',`!${utility}.state.dirty`);await close();
     const {fakeLlm}=require('./electron-smoke-runner');
-    // A complete saved snapshot is cached on an ordinary retry. An explicit
-    // supported framework requests a new real analysis without mutating facts.
-    await evaluate(`void ${trainer}.awaitTrainingAnalysis(${trainer}.trainingRecords.selected(),true,'prep')`);
+    // A complete saved snapshot stays cached. Start a fresh recording to test
+    // delayed manual diagnosis without the retired framework override.
+    aId=await recordOnce(null,{framework:'prep'});
+    await evaluate(`void ${trainer}.awaitTrainingAnalysis(${trainer}.trainingRecords.selected(),true)`);
     await wait('actual analysis in flight',`${trainer}.trainingRecords.selected().reportPending`);
     for(let n=0;n<100 && typeof fakeLlm.releaseDiagnosis!=='function';n++)await new Promise(resolve=>setTimeout(resolve,20));
     assert.equal(typeof fakeLlm.releaseDiagnosis,'function');

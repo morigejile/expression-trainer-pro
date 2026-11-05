@@ -31,6 +31,31 @@ function assessed(data=response(),overrides={}) {
     evidenceRefs:['segment-1'],...overrides}};
 }
 
+test('current diagnosis has one summary and findings may omit explanations for common and selected-framework advice',async()=>{
+  const source=context();source.analysisTarget={framework:'prep',definitionVersion:'prep-v1'};
+  const data=assessed(undefined,{frameworkAssessable:true});
+  delete data.findings[0].interpretation;
+  data.frameworkFindings=[{...data.findings[0],id:'framework-1'}];
+  const result=await require('../lib/ai-feedback').sendStructuredDiagnosis(source,profile,{
+    fetchImpl:async()=>apiResponse(JSON.stringify(data))
+  });
+  assert.equal(Object.hasOwn(result.findings[0],'interpretation'),false);
+  assert.equal(Object.hasOwn(result.frameworkAnalysis,'summary'),false);
+  assert.equal(result.frameworkAnalysis.findings.length,1);
+});
+
+test('current provider rejects retired reference fields and second summary without making a second request',async()=>{
+  for(const change of [d=>{d.frameworkSummary=null;},d=>{d.findings[0].example=null;},
+    d=>{d.findings[0].exampleEvidenceRefs=[];},d=>{d.findings[0].interpretation='';},
+    d=>{d.findings[0].interpretation=null;},d=>{d.findings[0].evidenceRefs=['unknown'];}]){
+    const data=assessed();data.frameworkFindings=[];change(data);let calls=0;
+    await assert.rejects(require('../lib/ai-feedback').sendStructuredDiagnosis(context(),profile,{
+      fetchImpl:async()=>{calls++;return apiResponse(JSON.stringify({...data,frameworkFindings:[]}));}
+    }),{code:'invalid-response'});
+    assert.equal(calls,1);
+  }
+});
+
 test('material-insufficient diagnosis is a successful explicit result without fabricated problems or framework analysis', () => {
   for (const framework of [null,'prep','star','pyramid']) {
     const source=context();
@@ -261,9 +286,9 @@ test('prompt examples teach parallel Finding arrays and remain consumable by the
       if (practice) source.practiceComparison={status:'unavailable'};
       const {system}=getStructuredDiagnosisPrompt(source);
       const template=JSON.parse(system.match(/\n(\{\n[\s\S]+?\n\})\n/)[1]);
-      assert.deepEqual(Object.keys(template).sort(),['schemaVersion','assessment','summary','findings','frameworkSummary',
+      assert.deepEqual(Object.keys(template).sort(),['schemaVersion','assessment','summary','findings',
         'frameworkFindings',...(practice?['practiceFeedback']:[])].sort());
-      assert.equal(template.frameworkSummary===null,!framework);
+      assert.equal(Object.hasOwn(template,'frameworkSummary'),false);
       // Replace only the declared placeholder citations with supplied source IDs.
       // All other example fields must satisfy the same parser used for real output.
       for (const finding of [...template.findings,...template.frameworkFindings]) finding.evidenceRefs=['segment-1'];
@@ -281,12 +306,12 @@ test('DeepSeek diagnosis requests JSON output for Free and each reanalysis targe
     const source = context();
     if (framework) source.analysisTarget = {framework,definitionVersion:`${framework}-v1`};
     const data = assessed({...response(),frameworkAnalysis:null},{frameworkAssessable:Boolean(framework)});
-    if (framework) data.frameworkAnalysis = {framework,definitionVersion:`${framework}-v1`,summary:'专项反馈',findings:[]};
+    if (framework) data.frameworkAnalysis = {framework,definitionVersion:`${framework}-v1`,findings:[]};
     let request;
     const fetchImpl = async (_url,options) => {
       request = JSON.parse(options.body);
       const {frameworkAnalysis,...common}=data;
-      return apiResponse(JSON.stringify({...common,frameworkSummary:frameworkAnalysis?.summary ?? null,frameworkFindings:frameworkAnalysis?.findings ?? []}));
+      return apiResponse(JSON.stringify({...common,frameworkFindings:frameworkAnalysis?.findings ?? []}));
     };
     assert.deepEqual(await sendStructuredDiagnosis(source,{...profile,provider:'deepseek'},{fetchImpl}),data);
     assert.deepEqual(request.response_format,{type:'json_object'});
@@ -296,15 +321,13 @@ test('DeepSeek diagnosis requests JSON output for Free and each reanalysis targe
   }
 });
 
-test('JSON output is limited to the known DeepSeek structured endpoint and does not change text feedback', async () => {
-  const {sendStructuredDiagnosis,sendFeedback} = require('../lib/ai-feedback');
+test('JSON output is limited to the known DeepSeek structured endpoint', async () => {
+  const {sendStructuredDiagnosis} = require('../lib/ai-feedback');
   const requests = [];
   for (const provider of ['openai','custom','ollama']) {
     await sendStructuredDiagnosis(context(),{...profile,provider,baseUrl:'https://example.test/v1'},
-      {fetchImpl:async (_url,options) => {requests.push(JSON.parse(options.body));return apiResponse(JSON.stringify(assessed()));}});
+      {fetchImpl:async (_url,options) => {requests.push(JSON.parse(options.body));return apiResponse(JSON.stringify({...assessed(),frameworkFindings:[]}));}});
   }
-  assert.equal(await sendFeedback('测试表达',{...profile,provider:'deepseek'},null,
-    {fetchImpl:async (_url,options) => {requests.push(JSON.parse(options.body));return apiResponse('补充例子。');}}),'补充例子。');
   assert.ok(requests.every(request => !Object.hasOwn(request,'response_format')));
 });
 
@@ -404,9 +427,9 @@ test('structured request separates untrusted quoted source data from system inst
   const result = await sendStructuredDiagnosis(source,profile,{fetchImpl:async(_url,options)=>{
     request=JSON.parse(options.body);
     assert.equal(options.headers.Authorization,'Bearer test-secret-key');
-    return apiResponse(JSON.stringify(assessed()));
+    return apiResponse(JSON.stringify({...assessed(),frameworkFindings:[]}));
   }});
-  assert.deepEqual(result,assessed());
+  assert.deepEqual(result,{...assessed(),frameworkAnalysis:null});
   assert.equal(request.temperature,0.2);
   assert.equal(request.messages[0].role,'system');
   assert.equal(request.messages[0].content.includes('IGNORE THE SCHEMA'),false);
@@ -422,7 +445,7 @@ test('structured request snapshots the allowed references before awaiting extern
   const data=response();data.findings[0].evidenceRefs=['invented'];
   await assert.rejects(sendStructuredDiagnosis(source,profile,{fetchImpl:async()=>{
     source.allowedEvidenceRefs.push('invented');
-    return apiResponse(JSON.stringify(data));
+    return apiResponse(JSON.stringify({...data,frameworkFindings:[]}));
   }}),error=>error.code === 'invalid-response');
 });
 
@@ -432,7 +455,7 @@ test('provider response validation pins the selected framework and both practice
   source.analysisTarget = {framework:'star',definitionVersion:'star-v1'};
   source.practiceComparison = {status:'available',goal:{observation:'结果不清楚'},scope:'full',
     previous:{transcript:{segments:[{id:'previous-1',text:'之前的表达'}]}}};
-  const data = assessed({...response(),frameworkAnalysis:{framework:'star',definitionVersion:'star-v1',summary:'结果仍需补充',findings:[]},
+  const data = assessed({...response(),frameworkAnalysis:{framework:'star',definitionVersion:'star-v1',findings:[]},
     practiceFeedback:{status:'unchanged',summary:'继续练习说明结果',comparability:{status:'comparable',reason:'两侧有对应目标的原文。'},
       previousEvidenceRefs:['previous-1'],currentEvidenceRefs:['segment-1']}},{frameworkAssessable:true});
   const result = await sendStructuredDiagnosis(source,profile,{fetchImpl:async (_url,options) => {
@@ -441,8 +464,7 @@ test('provider response validation pins the selected framework and both practice
     assert.equal(sent.practiceComparison.previous.transcript.segments[0].text,'之前的表达');
     source.analysisTarget.framework='prep';source.practiceComparison.previous.transcript.segments=[];
     const {frameworkAnalysis,...common}=data;
-    return apiResponse(JSON.stringify({...common,frameworkSummary:frameworkAnalysis.summary,
-      frameworkFindings:frameworkAnalysis.findings}));
+    return apiResponse(JSON.stringify({...common,frameworkFindings:frameworkAnalysis.findings}));
   }});
   assert.deepEqual(result,{...data});
 });

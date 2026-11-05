@@ -40,7 +40,7 @@ test('normal renderer saves, restarts, plays and deletes with network blocked an
   runPhase(userData, 'offline-read');
 });
 
-test('M4 renderer selects frameworks and bank topics, reanalyses, and restores a practice chain with a deleted middle round', {timeout:120000}, t => {
+test('M4 renderer selects frameworks and bank topics and restores a practice chain with a deleted middle round', {timeout:120000}, t => {
   const userData = isolatedData(t);
   runPhase(userData,'m4');
   runPhase(userData,'m4-read');

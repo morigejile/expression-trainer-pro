@@ -98,10 +98,12 @@ test('normalization receipt is optional, bounded and survives actual storage reo
   }
 });
 
-test('E06 without the retired field passes HTTP and reopened SQLite without normalization',async t=>{
+test('E06 findings in the current format pass HTTP and reopened SQLite without retired fields',async t=>{
   const f=fixture(t);let store=await f.open();
   const input=require('../scripts/evaluate-problem-library').buildCases()[5].context;
   const raw=require('../benchmark/prompt-evaluation/problem-library-v03/refined/actual-results.json').cases.find(x=>x.id==='E06').outputs.new.raw;
+  const data=JSON.parse(raw);delete data.frameworkSummary;for(const finding of [...data.findings,...data.frameworkFindings]){delete finding.example;delete finding.exampleEvidenceRefs;}
+  const currentRaw=JSON.stringify(data);
   const {id}=store.create({...start(),trainingMode:'structured',framework:'star',frameworkDefinitionVersion:'star-v1'});
   const complete=completion();complete.transcript={text:input.transcript.segments.map(x=>x.text).join(''),segments:input.transcript.segments};
   await store.finalize(id,complete);const before=await store.get(id);let requests=0;
@@ -112,7 +114,7 @@ test('E06 without the retired field passes HTTP and reopened SQLite without norm
     runSpeechEvidence:async()=>({schemaVersion:1,status:'unavailable',segments:[],quality:{vad:{status:'unavailable',reasons:['model-unavailable']}}}),
     getDiagnosisProfile:()=>({profile}),
     diagnose:({profile,signal,...source})=>require('../lib/ai-feedback').sendStructuredDiagnosis(buildAnalysisContext(source),profile,
-      {signal,fetchImpl:async()=>{requests++;return {ok:true,status:200,json:async()=>({choices:[{message:{content:raw}}]})};}})});
+      {signal,fetchImpl:async()=>{requests++;return {ok:true,status:200,json:async()=>({choices:[{message:{content:currentRaw}}]})};}})});
   await analyzer.start(id);await analyzer.close();store.close();store=await f.open();
   const record=await store.get(id),diagnosis=record.results.find(x=>x.kind==='diagnosis');
   assert.equal(requests,1,'synthetic HTTP only; no repair call or external model');
@@ -238,4 +240,13 @@ test('history summaries are bounded and show session mode and saved artifact sta
   assert.equal(rows[0].artifactState, 'available');
   assert.equal('results' in rows[0], false);
   assert.equal('transcript' in rows[0], false);
+});
+
+test('legacy Markdown reports remain readable after reopening SQLite without rewriting source facts',async t=>{
+  const f=fixture(t);let store=await f.open();const id=await saved(store),before=await store.get(id);
+  const markdown='## 历史报告\n\n**保留原文**';
+  await store.appendResult(id,result({value:markdown}));store.close();store=await f.open();
+  const after=await store.get(id),record=require('../src/training-persistence').sessionToRecord(after);
+  assert.equal(after.results[0].value,markdown);assert.equal(record.report,markdown);assert.equal(record.factsSaved,true);
+  assert.deepEqual({...after,results:[]},{...before,results:[]});
 });

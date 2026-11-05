@@ -11,7 +11,7 @@ html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-the
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .session-foot{border-top-color: var(--line);}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo #prepare-ring{border-color: rgba(168, 187, 203, 0.25); background: rgba(228, 237, 243, 0.24); box-shadow: rgba(97, 121, 142, 0.05) 0px 8px 24px, rgba(255, 255, 255, 0.75) 0px 1px 1px inset;}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo #prepare-context-slot #training-settings-anchor{color: var(--muted); background: var(--glass); border-radius: 50%; box-shadow: 0 3px 14px var(--shadow);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.context-capsule, .training-capsule){color: var(--accent); border-color: var(--line); background: var(--glass);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.training-capsule){color: var(--accent); border-color: var(--line); background: var(--glass);}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.training-picker-hint, .picker-example-caption, .picker-example-note, .picker-help, .screen-status, .report-footer, #history-count, .history-row-main small, .record-status){color: var(--muted);}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.picker-option, .picker-choice){color: var(--ink);}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .picker-option:has([aria-pressed="true"]){background: var(--evidence); color: var(--accent);}
@@ -31,7 +31,7 @@ html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-the
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.session-report, .history-study){background: var(--reading); color: var(--ink); --muted: var(--theme-muted);}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.outline-button, .btn-report-back, #btn-report-back, .finding-open, .finding-practice, .practice-start, .report-disclosure > summary){color: var(--accent); border-color: var(--line);}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo #btn-report-back:hover{background: var(--hover);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.finding-detail, .finding-recommendation, .finding-details, .evidence-caption, .source-note, .summary-subtitle, .record-save-state){color: var(--muted);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.finding-detail, .finding-recommendation, .finding-details, .source-note, .summary-subtitle, .record-save-state){color: var(--muted);}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.finding-category, .evidence-block span, .metrics span, .metrics small){color: var(--muted);}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#record-identity, .record-save-state){color: var(--muted);}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .evidence-block{background: var(--evidence); border-left-color: var(--accent); color: var(--ink);}
@@ -39,8 +39,6 @@ html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-the
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .evidence-button{color: var(--accent); border-color: var(--line);}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .history-row-actions{color: var(--muted);}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .history-row-actions:hover{color: var(--danger); background: var(--record-soft);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .history-choice input{color: var(--accent); border-color: var(--muted); accent-color: var(--accent); background: transparent;}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .history-choice input:checked{border-color: var(--accent); background: var(--evidence);}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .history-compare-choice input{border-color: var(--muted); background: transparent;}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .history-compare-choice input:checked{border-color: var(--accent); background: var(--evidence);}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .history-compare-choice input:checked::after{border-color: var(--accent);}
@@ -67,8 +65,8 @@ html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-the
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility #ai-toggle.ai-switch span{background: rgb(252, 253, 255);}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility .active-status i{background: var(--success);}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility :is(.danger, .delete-confirm button.danger){color: var(--danger) !important;}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility :is(.delete-confirm, .consent-panel, .unsaved){background: rgb(243, 233, 219); border-color: var(--warning); color: var(--warning);}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility :is(.delete-confirm p, .consent-panel p){color: var(--warning);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility :is(.delete-confirm, .unsaved){background: rgb(243, 233, 219); border-color: var(--warning); color: var(--warning);}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility :is(.delete-confirm p){color: var(--warning);}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility[data-feedback="error"] #edit-status{color: var(--danger);}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility[data-feedback="warning"] #edit-status{color: var(--warning);}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) #utility[data-feedback="success"] #edit-status{color: var(--success);}
@@ -138,7 +136,7 @@ html:root[data-theme="ink-night"] body.beo #prepare-ring::before{border-color: r
 html:root[data-theme="ink-night"] body.beo #btn-start{background: radial-gradient(at 45% 20%, rgb(66, 70, 67), rgb(53, 57, 55) 58%, rgb(39, 44, 42)); color: rgb(224, 211, 185); box-shadow: rgba(201, 193, 171, 0.19) 0px 1px 2px inset, rgba(0, 0, 0, 0.333) 0px -3px 5px inset, rgba(181, 168, 132, 0.44) 0px 0px 0px 1px;}
 html:root[data-theme="ink-night"] body.beo #btn-start:hover{box-shadow: rgba(188, 165, 129, 0.11) 0px 0px 24px inset, rgba(181, 168, 132, 0.44) 0px 0px 0px 1px;}
 html:root[data-theme="ink-night"] body.beo #prepare-context-slot #training-settings-anchor{background: transparent; color: rgb(167, 166, 153); box-shadow: none; border-radius: 0px;}
-html:root[data-theme="ink-night"] body.beo :is(.context-capsule, .training-capsule, #training-capsules){background: var(--popover); color: var(--muted); border-color: var(--line); box-shadow: none;}
+html:root[data-theme="ink-night"] body.beo :is(.training-capsule, #training-capsules){background: var(--popover); color: var(--muted); border-color: var(--line); box-shadow: none;}
 html:root[data-theme="ink-night"] body.beo #training-capsules button{background: transparent; color: var(--muted);}
 html:root[data-theme="ink-night"] .topbar.app-header .utility-menu-items, html:root[data-theme="ink-night"] body.beo #training-picker, html:root[data-theme="ink-night"] #utility[data-surface="settings"] .config-more > div{background: rgb(48, 53, 50); color: var(--ink); border-color: var(--line); border-radius: 3px; box-shadow: rgba(0, 0, 0, 0.333) 0px 8px 24px; backdrop-filter: none;}
 html:root[data-theme="ink-night"] body.beo #training-picker::backdrop{background: rgba(0, 0, 0, 0.314); backdrop-filter: blur(3px);}
@@ -156,7 +154,7 @@ html:root[data-theme="ink-night"] body.beo button:disabled{background: transpare
 html:root[data-theme="ink-night"] body.beo .history-compare-choice input{background: transparent !important; border-color: rgb(142, 146, 133) !important;}
 html:root[data-theme="ink-night"] body.beo .history-compare-choice input:checked{background: var(--evidence) !important; border-color: var(--accent) !important;}
 html:root[data-theme="ink-night"] body.beo .history-compare-choice input:checked::after{border-color: var(--accent);}
-html:root[data-theme="ink-night"] body.beo :is(small, .hint, .source-note, .record-identity, .record-save-state, .finding-category, .finding-index, .evidence-caption, .training-picker-hint, .picker-example-caption, .picker-example-note, .report-footer, .comparison-note, .comparison-limitations, .practice-source-status){color: var(--muted) !important;}
+html:root[data-theme="ink-night"] body.beo :is(small, .hint, .source-note, .record-identity, .record-save-state, .finding-category, .finding-index, .training-picker-hint, .picker-example-caption, .picker-example-note, .report-footer, .practice-source-status){color: var(--muted) !important;}
 html:root[data-theme="ink-night"] body.beo .evidence-block{color: var(--ink); background: var(--evidence); border-color: var(--accent);}
 html:root[data-theme="ink-night"] body.beo :is(.evidence-block blockquote, .evidence-quote, .finding-interpretation, .finding-recommendation){color: var(--ink);}
 html:root[data-theme="ink-night"] body.beo .modal{background: rgba(0, 0, 0, 0.533); backdrop-filter: blur(3px);}
@@ -174,9 +172,9 @@ html:root[data-theme="ink-night"] #utility :is(p, label, small, .hint, .identity
 html:root[data-theme="ink-night"] #utility #ai-toggle.ai-switch::before{background: rgb(96, 103, 94);}
 html:root[data-theme="ink-night"] #utility #ai-toggle.ai-switch[aria-checked="true"]::before{background: rgb(188, 165, 129);}
 html:root[data-theme="ink-night"] #utility #ai-toggle.ai-switch span{background: rgb(241, 232, 215);}
-html:root[data-theme="ink-night"] #utility :is(.delete-confirm, .consent-panel, #unsaved){background: rgb(64, 58, 47); color: var(--warning); border-color: rgb(166, 140, 92);}
-html:root[data-theme="ink-night"] #utility :is(.delete-confirm p, .consent-panel p, #unsaved span){color: var(--warning);}
-html:root[data-theme="ink-night"] #utility[data-feedback="error"] #edit-status, html:root[data-theme="ink-night"] body.beo :is([role="alert"], #ai-disclosure-error, .state-error, .delete-failed){color: var(--danger) !important;}
+html:root[data-theme="ink-night"] #utility :is(.delete-confirm, #unsaved){background: rgb(64, 58, 47); color: var(--warning); border-color: rgb(166, 140, 92);}
+html:root[data-theme="ink-night"] #utility :is(.delete-confirm p, #unsaved span){color: var(--warning);}
+html:root[data-theme="ink-night"] #utility[data-feedback="error"] #edit-status, html:root[data-theme="ink-night"] body.beo :is([role="alert"], #ai-disclosure-error){color: var(--danger) !important;}
 html:root[data-theme="ink-night"] #utility[data-feedback="warning"] #edit-status{color: var(--warning);}
 html:root[data-theme="ink-night"] #utility[data-feedback="success"] #edit-status{color: var(--success);}
 html:root[data-theme="ink-night"] body.beo audio{color-scheme: dark;}
@@ -193,14 +191,14 @@ html:root[data-theme="ink-night"] .topbar.app-header #btn-history{color: rgb(183
 /* Shared full-workspace states and semantic surfaces. */
 html:root[data-theme="coral-glow"] body.beo, html:root[data-theme="coral-glow"] #utility{--past: #906a73; --disabled-ink: #927777; --disabled-bg: #ead9d7; --danger: #a2434d; --danger-fill: #8d3e47; --warning: #88552f; --success: #546d47; --record: #aa4b60;}
 html:root[data-theme="coral-glow"] body.beo :is(.comparison-view, .target-report){color: var(--ink); background: var(--reading); --muted: var(--theme-muted);}
-html:root[data-theme="coral-glow"] body.beo :is(.round-result, .comparison-card, .comparison-section, .comparison-metrics, .practice-history, .practice-evidence, .evidence-block){border-color: var(--line); color: var(--ink);}
-html:root[data-theme="coral-glow"] body.beo :is(.finding-index, .record-identity, .practice-source-status, .comparison-note, .comparison-limitations){color: var(--muted);}
+html:root[data-theme="coral-glow"] body.beo :is(.round-result, .practice-history, .practice-evidence, .evidence-block){border-color: var(--line); color: var(--ink);}
+html:root[data-theme="coral-glow"] body.beo :is(.finding-index, .record-identity, .practice-source-status){color: var(--muted);}
 html:root[data-theme="coral-glow"] body.beo :is(.practice-action, .practice-scope, .text-action, .evidence-button, .comparison-card button){color: var(--accent); border-color: var(--line);}
 html:root[data-theme="coral-glow"] body.beo .modal-content{background: var(--reading); color: var(--ink); border-color: var(--line); box-shadow: 0 16px 70px var(--shadow);}
 html:root[data-theme="coral-glow"] body.beo #ai-disclosure-modal .modal-body p:not(#ai-disclosure-error){color: var(--muted);}
 html:root[data-theme="coral-glow"] body.beo #ai-disclosure-modal #btn-ai-disclosure-confirm{background: rgb(151, 98, 95); color: rgb(255, 248, 242); border-color: rgb(151, 98, 95);}
 html:root[data-theme="ink-night"] body.beo #ai-disclosure-modal #btn-ai-disclosure-confirm{background: rgb(93, 81, 64); color: rgb(250, 240, 220); border-color: rgb(169, 147, 112);}
-html:root[data-theme="coral-glow"] #utility :is(.delete-confirm, .consent-panel, #unsaved){background: rgb(248, 225, 210); color: var(--warning); border-color: rgb(199, 154, 126);}
+html:root[data-theme="coral-glow"] #utility :is(.delete-confirm, #unsaved){background: rgb(248, 225, 210); color: var(--warning); border-color: rgb(199, 154, 126);}
 html:root[data-theme="coral-glow"] body.beo .modal .danger-action{background: rgb(141, 62, 71); border-color: rgb(141, 62, 71); color: rgb(255, 248, 242);}
 html:root[data-theme="coral-glow"] body.beo :is([role="alert"], #ai-disclosure-error){color: rgb(156, 53, 72);}
 html:root[data-theme="coral-glow"] body.beo :is(input, select, textarea, option){background: var(--field); color: var(--ink); border-color: var(--line); color-scheme: light;}
@@ -236,7 +234,7 @@ html:root[data-theme="coral-glow"] body.beo .topbar.app-header .utility-menu > s
 html:root[data-theme="coral-glow"] body.beo #prepare-context-slot #training-settings-anchor{background: rgba(255, 232, 224, 0.23); box-shadow: rgba(255, 246, 237, 0.24) 0px 0px 0px 1px inset, rgba(159, 89, 91, 0.024) 0px 1px 4px;}
 html:root[data-theme="coral-glow"] body.beo #prepare-context-slot #training-settings-anchor:hover{background: rgba(255, 234, 226, 0.39); box-shadow: rgba(255, 246, 237, 0.4) 0px 0px 0px 1px inset, rgba(159, 89, 91, 0.05) 0px 2px 6px;}
 html:root[data-theme="coral-glow"] body.beo #prepare-context-slot #training-settings-anchor:active{background: rgba(255, 230, 221, 0.48);}
-html:root[data-theme="coral-glow"] body.beo :is(#history-screen, #frozen-report, #comparison-screen, #utility), html:root[data-theme="coral-glow"] body.beo :is(#ai-disclosure-modal, #recording-policy-modal, #history-delete-modal, #help-modal) > .modal-content{background: var(--coral-reading-base);}
+html:root[data-theme="coral-glow"] body.beo :is(#history-screen, #frozen-report, #comparison-screen, #utility), html:root[data-theme="coral-glow"] body.beo :is(#ai-disclosure-modal, #recording-policy-modal, #history-delete-modal) > .modal-content{background: var(--coral-reading-base);}
 html:root[data-theme="coral-glow"] body.beo #utility{border-color: rgba(255, 248, 242, 0.48); box-shadow: rgba(127, 72, 83, 0.13) 0px 18px 56px; backdrop-filter: blur(18px);}
 html:root[data-theme="coral-glow"] body.beo #utility .sidebar{background: rgba(255, 250, 246, 0.12); backdrop-filter: none;}
 html:root[data-theme="coral-glow"] body.beo #utility .surface-header{background: rgba(255, 251, 248, 0.08);}
@@ -296,8 +294,8 @@ html[data-theme="frosted-mist"] :is(body.beo #btn-start, .topbar.app-header .uti
 /* Existing formal surfaces outside the fourteen accepted preview states.
    Stable reading panels and semantic roles extend the same blue-purple palette. */
 html:root[data-theme="frosted-mist"] body.beo :is(.comparison-view,.target-report){background:var(--reading);color:var(--ink);--muted:var(--theme-muted)}
-html:root[data-theme="frosted-mist"] body.beo :is(.round-result,.comparison-card,.comparison-section,.comparison-metrics,.practice-history,.practice-evidence){border-color:var(--line);color:var(--ink)}
-html:root[data-theme="frosted-mist"] body.beo :is(.finding-index,.record-identity,.practice-source-status,.comparison-note,.comparison-limitations){color:var(--muted)}
+html:root[data-theme="frosted-mist"] body.beo :is(.round-result, .practice-history, .practice-evidence){border-color:var(--line);color:var(--ink)}
+html:root[data-theme="frosted-mist"] body.beo :is(.finding-index, .record-identity, .practice-source-status){color:var(--muted)}
 html:root[data-theme="frosted-mist"] body.beo :is(.practice-action,.practice-scope,.text-action,.evidence-button,.comparison-card button){color:var(--accent);border-color:var(--line)}
 html:root[data-theme="frosted-mist"] body.beo :is(.practice-action,.practice-start){background:var(--evidence)}
 html:root[data-theme="frosted-mist"] body.beo :is(.practice-action,.practice-start):hover:not(:disabled){background:var(--hover)}
@@ -309,10 +307,10 @@ html:root[data-theme="frosted-mist"] body.beo #ai-disclosure-modal .modal-conten
 html:root[data-theme="frosted-mist"] body.beo #ai-disclosure-modal .modal-body p:not(#ai-disclosure-error){color:var(--muted)}
 html:root[data-theme="frosted-mist"] body.beo #ai-disclosure-modal button{border-color:var(--line)}
 html:root[data-theme="frosted-mist"] body.beo #ai-disclosure-modal #btn-ai-disclosure-confirm{background:var(--accent);color:var(--field);border-color:var(--accent)}
-html:root[data-theme="frosted-mist"] #utility :is(.delete-confirm,.consent-panel,#unsaved){background:#f3e9db;color:var(--warning);border-color:var(--warning)}
-html:root[data-theme="frosted-mist"] #utility :is(.delete-confirm p,.consent-panel p,#unsaved span){color:var(--warning)}
+html:root[data-theme="frosted-mist"] #utility :is(.delete-confirm, #unsaved){background:#f3e9db;color:var(--warning);border-color:var(--warning)}
+html:root[data-theme="frosted-mist"] #utility :is(.delete-confirm p, #unsaved span){color:var(--warning)}
 html:root[data-theme="frosted-mist"] body.beo .modal .danger-action{background:var(--danger);border-color:var(--danger);color:var(--field)}
-html:root[data-theme="frosted-mist"] body.beo :is([role="alert"],#ai-disclosure-error,.delete-failed,.state-error){color:var(--danger)}
+html:root[data-theme="frosted-mist"] body.beo :is([role="alert"], #ai-disclosure-error){color:var(--danger)}
 html:root[data-theme="frosted-mist"] body.beo option{background:var(--field);color:var(--ink);color-scheme:light}
 html:root[data-theme="frosted-mist"] body.beo audio{color-scheme:light}
 html:root[data-theme="frosted-mist"] body.beo audio::-webkit-media-controls-panel{background:var(--evidence)}

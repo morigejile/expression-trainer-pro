@@ -3,7 +3,7 @@
   const area=document=>document.getElementById('frozen-report');
   const scrollArea=document=>document.getElementById('report-scroll');
   const detailKey=node=>node.getAttribute('data-finding-id')?`finding:${node.getAttribute('data-finding-id')}`
-    : node.id || ['practice-history','practice-evidence','more-findings','metric-details','framework-analysis','framework-reanalysis'].find(name=>node.classList.contains(name));
+    : node.id || ['practice-history','practice-evidence','more-findings','metric-details'].find(name=>node.classList.contains(name));
   function capture(document,record,round) {
     const root=area(document),region=scrollArea(document),view=document.defaultView;
     const focusedRound=document.activeElement?.closest?.('[data-practice-round]')?.getAttribute('data-practice-round');

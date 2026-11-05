@@ -1,14 +1,5 @@
 (function(root,factory){const api=factory();if(typeof module==='object'&&module.exports)module.exports=api;else root.ReportPlayback=api;})(typeof globalThis!=='undefined'?globalThis:this,()=>{
   'use strict';
-  function hasAnalyzableSegments(segments){
-    if(!Array.isArray(segments)||!segments.length)return false;
-    const ids=new Set();let end=0;
-    return segments.every(segment=>{
-      if(typeof segment.id!=='string'||!segment.id.trim()||ids.has(segment.id)||typeof segment.text!=='string'||!segment.text.trim()
-        ||!Number.isInteger(segment.startMs)||!Number.isInteger(segment.endMs)||segment.startMs<end||segment.endMs<=segment.startMs)return false;
-      ids.add(segment.id);end=segment.endMs;return true;
-    });
-  }
   function clock(seconds){
     if(!Number.isFinite(seconds)||seconds<0)return '—';
     const total=Math.floor(seconds),pad=value=>String(value).padStart(2,'0');
@@ -18,8 +9,7 @@
     const get=id=>document.getElementById(id),player=get('playback-player');if(!player)return null;
     const toggle=get('playback-toggle'),seek=get('playback-seek'),current=get('playback-current-time'),duration=get('playback-duration'),
       volume=get('playback-volume'),mute=get('playback-mute'),speed=get('playback-speed'),audioStatus=get('playback-audio-status'),
-      status=get('playback-feedback-status'),source=get('playback-result-source'),note=get('playback-analysis-note'),notice=get('playback-notice'),
-      transcript=get('playback-segments'),feedback=get('playback-inline-feedback'),generate=get('btn-reanalyze');
+      transcript=get('playback-segments');
     let record=null,recordKey=null,segments=null,selectedId=null,currentId=null,playError='',lastVolume=1,scrubbing=false;
     const rows=new Map(),available=()=>Boolean(record?.audioUrl&&!['missing','corrupt'].includes(record.audioState));
     audio.controls=false;audio.hidden=true;
@@ -54,41 +44,28 @@
     volume.addEventListener('input',()=>{audio.volume=Math.max(0,Math.min(1,Number(volume.value)||0));if(audio.volume>0){audio.muted=false;lastVolume=audio.volume;}});
     speed.addEventListener('change',()=>{const rate=Number(speed.value);if(rate>=.25&&rate<=2)audio.playbackRate=rate;});
     for(const event of ['loadedmetadata','durationchange','timeupdate','seeked','play','pause','ended','volumechange','ratechange','emptied'])audio.addEventListener(event,syncMedia);
-    audio.addEventListener('error',()=>{syncMedia();updateFeedback();});
+    audio.addEventListener('error',()=>{syncMedia();});
     audio.addEventListener('waiting',()=>{playError='录音加载中…';syncMedia();});
     audio.addEventListener('canplay',()=>{playError='';syncMedia();});
-    function updateFeedback(next=record){
-      if(!next||next.id!==record?.id)return;record=next;
-      const canAnalyze=hasAnalyzableSegments(record.segments),analysis=record.playbackAnalysis;
-      generate.disabled=Boolean(record.playbackPending)||!canAnalyze;generate.textContent=record.playbackPending?'生成中…':analysis?'重新生成':'生成反馈';
-      status.textContent=record.playbackPending?'生成中…':record.playbackStatus==='failed'?`生成失败，可重试${analysis?'；已有反馈保留':''}`:analysis?'已生成':'尚未生成';
-      const model=analysis?.profile?.model||'来源未知';source.textContent=[record.playbackPending&&record.playbackRequestModel?`本次生成：${record.playbackRequestModel}`:'',analysis?`已有反馈来源：${model}`:''].filter(Boolean).join(' · ');
-      note.textContent=!canAnalyze?`当前记录缺少可分析的转写片段${available()&&!audio.error?'，录音仍可回放':''}。`:
-        `基于转写片段提供建议，不分析音频。${record.segments.some(item=>item.timingSource==='estimated')?'片段播放位置为估计值。':'使用保存的片段时间，不表示词级定位。'}`;
-      const row=rows.get(selectedId),item=analysis?.items?.find(entry=>entry.segmentId===selectedId);
-      feedback.hidden=!row||!analysis;
-      if(row&&analysis){feedback.replaceChildren(node('span','playback-advice-label','这段反馈'),node('p',null,item?.advice||'该片段暂无特别建议'));row.root.append(feedback);}
-      updateRows();
-    }
-    function selectSegment(id){if(!rows.has(id))return false;selectedId=id;updateFeedback();return true;}
-    function setCurrentSegment(id){currentId=id;if(rows.has(id))selectedId=id;updateFeedback();}
+    function selectSegment(id){if(!rows.has(id))return false;selectedId=id;updateRows();return true;}
+    function setCurrentSegment(id){currentId=id;if(rows.has(id))selectedId=id;updateRows();}
     function setRecord(next){
       const key=`${next?.id||''}:${next?.audioUrl||''}`,changed=key!==recordKey;
-      if(changed){playError='';scrubbing=false;recordKey=key;currentId=null;selectedId=null;notice.textContent='';}
+      if(changed){playError='';scrubbing=false;recordKey=key;currentId=null;selectedId=null;}
       const rebuild=changed||segments!==next?.segments;record=next;
       if(rebuild){
-        segments=next?.segments;rows.clear();transcript.replaceChildren();feedback.remove();
+        segments=next?.segments;rows.clear();transcript.replaceChildren();
         for(const segment of segments||[]){
           const root=node('div','playback-segment'),button=node('button','playback-segment-button'),time=node('span','playback-segment-time',clock(Number.isFinite(segment.startMs)?segment.startMs/1000:NaN)),text=node('span','playback-segment-text'),position=node('span','playback-position');
-          root.dataset.segmentId=segment.id;button.type='button';button.setAttribute('aria-label',`查看${Number.isFinite(segment.startMs)?clock(segment.startMs/1000)+'开始的':''}片段与反馈`);renderText(text,segment.text||'');button.append(time,text,position);root.append(button);transcript.append(root);rows.set(segment.id,{root,button,position});
+          root.dataset.segmentId=segment.id;button.type='button';button.setAttribute('aria-label',`查看${Number.isFinite(segment.startMs)?clock(segment.startMs/1000)+'开始的':''}片段`);renderText(text,segment.text||'');button.append(time,text,position);root.append(button);transcript.append(root);rows.set(segment.id,{root,button,position});
           button.addEventListener('click',()=>{selectSegment(segment.id);onSelect?.(segment.id);});
         }
         if(!rows.size&&next?.fullText)transcript.append(node('p','playback-plain-transcript',next.fullText));
         selectedId=rows.has(selectedId)?selectedId:(rows.keys().next().value||null);
       }
-      syncMedia();updateFeedback();
+      syncMedia();updateRows();
     }
-    return {setRecord,updateFeedback,setCurrentSegment,selectSegment,syncMedia,showNotice:message=>{notice.textContent=message||'';}};
+    return {setRecord,setCurrentSegment,selectSegment,syncMedia};
   }
-  return {createReportPlayback,hasAnalyzableSegments,clock};
+  return {createReportPlayback,clock};
 });
