@@ -263,6 +263,19 @@ test('three primary findings and all additional findings remain accessible throu
   }
 });
 
+test('frozen report initially shows only the first finding and keeps the remainder in a closed More disclosure', () => {
+  for(const count of [0,1,2,4]){
+    const target=container();api().renderStructuredReport(target,api().selectStructuredReport(runs('1',{findings:count})),{frozen:true});
+    const root=byClass(target,'structured-report')[0],more=byClass(root,'more-findings');
+    assert.equal(root.children.filter(node=>node.className.split(' ').includes('finding')).length,Math.min(count,1));
+    assert.equal(more.length,count>1?1:0);
+    if(count>1){
+      assert.equal(more[0].open,false);assert.equal(more[0].children[0].textContent,'更多');
+      assert.deepEqual(byClass(more[0],'finding-observation').map(node=>node.textContent),Array.from({length:count-1},(_,i)=>`观察 ${i+1}`));
+    }
+  }
+});
+
 test('evidence buttons preserve real references, disclose transcript quotes and model intervals, and open the metric table', () => {
   const target = container();const clicked = [];
   api().renderStructuredReport(target,api().selectStructuredReport(runs()),{

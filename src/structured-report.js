@@ -151,12 +151,12 @@
     if (successful && !insufficient) {
       const framework = analysisRun.value.frameworkAnalysis;
       const findings = frozen ? [...analysisRun.value.findings,...(framework?.findings || [])] : analysisRun.value.findings;
-      const priorityCount=frozen?2:3;
+      const priorityCount=frozen?1:3;
       root.appendChild(element('h2',null,'优先改善'));
       for (const finding of findings.slice(0,priorityCount)) root.appendChild(findingCard(finding));
       if (findings.length > priorityCount) {
         const more = element('details',frozen?'more-findings report-disclosure':'more-findings');
-        more.appendChild(element('summary',null,`${frozen?'其他问题':'更多发现'}（${findings.length - priorityCount}）`));
+        more.appendChild(element('summary',null,frozen?'更多':`更多发现（${findings.length - priorityCount}）`));
         for (const finding of findings.slice(priorityCount)) more.appendChild(findingCard(finding));
         root.appendChild(more);
       } else if (!findings.length) {
