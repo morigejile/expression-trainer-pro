@@ -82,7 +82,7 @@ test('deleting the previous recording during diagnosis cannot persist a new impr
 test('practice validates the selected saved finding and rejects forged chain facts or deleted sources before creation', async t => {
   const app = fixture(t).open(); const a = await complete(app);
   for (const practiceRequest of [{...request(a),findingId:'invented'},{...request(a),reportId:'stale'},
-    {...request(a),continueChain:true},{...request(a),scope:'unknown'}]) {
+    {...request(a),continueChain:true},...['sentence','segment','unknown'].map(scope=>({...request(a),scope}))]) {
     const result = await app.execute('create',{requestId:'bad',input:{...input(),practiceRequest}});
     assert.equal(result.ok,false);
   }

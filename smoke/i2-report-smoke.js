@@ -116,7 +116,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   // Latest successful result contains examples again for restart evidence.
   await setProfile('i2-example');await analyze('prep');
   // Finding launch configures real Preparing and cannot automatically start recording.
-  await evaluate(`document.querySelector('.finding-open').click();document.querySelector('.practice-start').click()`);
+  await evaluate(`document.querySelector('.finding .practice-start').click()`);
   await wait('Finding to Preparing',`document.body.dataset.screen==='training' && ${trainer}.trainingSetup.snapshot().practiceRequest`);
   assert.equal(await evaluate(`${trainer}.isRecording`),false);assert.equal(await evaluate(`${trainer}.trainingSetup.snapshot().framework`),'prep');
   await openHistory(id);await analyze('prep');fs.writeFileSync(fixture,JSON.stringify(records));

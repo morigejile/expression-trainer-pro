@@ -35,6 +35,19 @@ async function chain() {
   return {a,b,store,records,aReport,bReport};
 }
 
+test('new practice rejects local scopes while continuation of historical local practice uses full scope',async()=>{
+  const {a,b,store,aReport,bReport}=await chain();
+  for(const scope of ['sentence','segment']){
+    await assert.rejects(createPractice(store,{sessionId:a.id,reportId:aReport,findingId:finding.id,continueChain:false,scope}),{code:'INVALID_SESSION'});
+  }
+  b.practice.scope='sentence';const saved=structuredClone(b.practice);
+  const next=await createPractice(store,{sessionId:b.id,reportId:bReport,findingId:null,continueChain:true,scope:'full'});
+  assert.equal(next.scope,'full');assert.equal(next.chainId,b.practice.chainId);assert.equal(next.round,3);
+  assert.deepEqual(b.practice,saved);
+  const {normalizePractice}=require('../lib/training-session-data');
+  for(const scope of ['sentence','segment'])assert.equal(normalizePractice({...saved,scope}).scope,scope);
+});
+
 test('history current round keeps the caller fixed snapshot after a newer analysis is saved', async () => {
   const {b,store,bReport}=await chain();addReport(b,'b2',{feedback:feedback('后来分析的另一结论')});
   const rows=await practiceHistory(store,b.id,bReport);

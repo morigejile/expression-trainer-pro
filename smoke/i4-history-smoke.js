@@ -206,7 +206,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     await saveProfile('i2-example');
     const aId=await recordOnce(null,{framework:'prep',bank:true}); owned.add(aId); await waitSavedReport(aId); await ready();
     const a=await session(aId); const aReport=selectStructuredReport(a.results); assert.ok(aReport);
-    await evaluate(`document.querySelector('.finding-details').open=true;document.querySelector('.finding-details .practice-start').click()`);
+    await evaluate(`document.querySelector('.finding .practice-start').click()`);
     await wait('Finding prepares the real targeted practice',`document.body.dataset.screen==='training' && ${trainer}.trainingSetup.snapshot().practiceRequest`);
     const practiceId=await recordOnce(a.trainingPrompt,{practice:true}); owned.add(practiceId); await waitSavedReport(practiceId); await ready();
     const practice=await session(practiceId); assert.equal(practice.practice.round,2);

@@ -326,7 +326,7 @@ AI 解释已测事实，不重算时长、频次、比例或给出雷达/总分�
 - A Structured session automatically requests Framework Analysis for its selected framework in addition to Common Analysis.
 - A user may explicitly request a framework re-analysis of an existing session. That appends a new `FrameworkAnalysis` over the same transcript revision and evidence; it does not change how the session was trained.
 - AI Coaching consumes facts and validated Common/Framework results to explain priorities and suggest improvements. It is not an independent source of deterministic facts or scores.
-- 每次继续练习/重练均创建新的 `TrainingSession`，包括句子/片段/完整表达范围的 Free 重练；自动保存新事实与新结果，不复用源 Session identity，不覆盖原表达、原分析或此前 attempts。
+- 每次继续练习/重练均创建新的 `TrainingSession`，新练习固定为完整表达（`practice.scope = full`）；自动保存新事实与新结果，不复用源 Session identity，不覆盖原表达、原分析或此前 attempts。历史 `sentence / segment` 快照继续按原值读取和比较，不迁移、不改写；从这些记录发起的新轮仍为 `full`，保留前后范围不同的比较限制。
 - Finding-aware 重练的新 Session 必须持久化来源 Session 与来源 Finding 的关系。Finding 引用应能定位其所属来源 Session 和分析结果/版本，不能仅靠显示名称或当前页面状态识别。
 - 来源关系记录训练意图与前后关联，独立于 `trainingMode`、framework 和训练题目，不产生独立 Session 类型；继承的准备值在新 Session 开始时形成它自己的事实快照，不引用一个可变的源上下文替代快照。继承与用户调整流程由 [Training Flow §9](../product/training-flow.md#9-带上下文再次进入-training-workspace) 定义。History 不展示上/下游报告不取消这些关系或持久化义务。
 - Practice Chain 的产品语义由 [Training Flow §10.2](../product/training-flow.md#102-多轮练习历程) 定义。M4 用每轮不可变的 `practice` 关系快照恢复目标、轮次和前轮，不新增通用链实体。快照含 `chainId`、`round`、`scope`、`goal`（来源观察/建议/类别）、`origin`（来源 Session/Report/Analysis/Finding ID 与定义版本）、`previousSessionId` / `previousReportId`，以及按轮次排列的 `history`（Session/Report ID、轮次）。第一轮为基准；历史只存定位元数据，不复制来源录音或逐字稿。Main 从真实已保存的来源 Finding 构造快照，不接受 Renderer 自报轮次或链事实。

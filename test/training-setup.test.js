@@ -140,6 +140,8 @@ test('finding practice remains separate from independent optional topic and scen
   assert.equal(f.controller.snapshot().trainingPrompt,null);
   assert.deepEqual(f.controller.snapshot().practiceRequest,practiceRequest);
   assert.match(f.element('training-practice-focus').textContent,/先说明结论/);
+  assert.match(f.element('training-practice-focus').textContent,/重新讲完整表达/);
+  assert.doesNotMatch(f.element('training-practice-focus').textContent,/练习范围/);
   f.controller.clearPractice();
   assert.equal(f.controller.snapshot().practiceRequest,undefined);
   assert.equal(f.element('training-practice-focus').hidden,true);

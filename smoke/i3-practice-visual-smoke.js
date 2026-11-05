@@ -47,16 +47,12 @@ async function run({mainWindow, BrowserWindow, evaluate, capture}) {
         ['.practice-current-target','.round-result>p'],
         ['.practice-evidence>summary','#round-evidence>summary'],
         ['.practice-history>summary','#practice-chain>summary'],
-        ['.round-action .practice-scope','.round-action select'],
         ['.round-action .practice-start','.round-action .practice-action']
       ]) {
         const actual = await evaluate(style(actualSelector));
         const expected = await reference.webContents.executeJavaScript(style(referenceSelector));
         for (const key of ['font','size','weight','line','spacing','color']) {
           assert.equal(actual[key],expected[key],`${width}: ${actualSelector} ${key}`);
-        }
-        if (actualSelector.includes('practice-scope')) for (const key of ['width','height']) {
-          assert.ok(Math.abs(actual[key]-expected[key])<1,`${width}: scope control ${key}`);
         }
         if (actualSelector.includes('practice-start')) {
           assert.ok(Math.abs(actual.height-expected.height)<1,`${width}: continue control height`);

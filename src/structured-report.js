@@ -122,26 +122,30 @@
         const block=frozen?element('div','evidence-block'):evidence;
         if (frozen) {
           const seconds=Number.isFinite(transcript?.startMs)?Math.floor(transcript.startMs/1000):null;
-          block.appendChild(element('span',null,transcript ? `你的原话${seconds===null?'':` · ${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`}` : metric?'本地指标证据':'语音活动证据'));
+          const header=element('div','evidence-header');
+          header.append(element('span',null,transcript ? `你的原话${seconds===null?'':` · ${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`}` : metric?'本地指标证据':'语音活动证据'),button);
+          block.appendChild(header);
         }
         if (transcript) block.appendChild(element('blockquote','evidence-quote',transcript.text));
         if (speech) {
           block.appendChild(element('p','speech-interval',
             `VAD 模型估计区间：samples ${speech.startSample}–${speech.endSample}（终点不含在区间内），不表示词语起止。`));
         }
-        block.appendChild(button);if (frozen) evidence.appendChild(block);
+        if (frozen) evidence.appendChild(block);else block.appendChild(button);
       }
       content.appendChild(evidence);
       const guidance=frozen?element('div','finding-detail finding-guidance'):content;
       guidance.append(element('h4',null,frozen?'为什么值得练':'解释'),element('p','finding-interpretation',finding.interpretation));
       if (typeof finding.example==='string' && finding.example.trim()) content.append(element('h4',null,'一种表达参考'),element('p','example',finding.example));
       guidance.append(element('h4',null,frozen?'下一轮怎么练':'建议'),element('p','finding-recommendation',finding.recommendation));
+      const controls=element('div','practice-controls');
+      const action=practiceView?.practiceAction(element,controls,finding,onPractice);
+      if (action) {
+        if (frozen) action.button.className+=' practice-action';
+        (frozen?guidance:card).appendChild(controls);
+      }
       if (frozen) card.appendChild(guidance);
       card.appendChild(details);
-      const controls=frozen?element('div','practice-controls'):content;
-      practiceView?.practiceAction(element,controls,finding,onPractice,
-        ['organization','argument'].includes(finding.category) ? 'full' : finding.evidenceRefs.length === 1 ? 'sentence' : 'segment');
-      if (frozen && typeof onPractice==='function') {controls.querySelector('button').textContent='练习这一点';controls.querySelector('button').className+=' practice-action';content.appendChild(controls);}
       return card;
     }
     if (successful && !insufficient) {

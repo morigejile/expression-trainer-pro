@@ -297,7 +297,7 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
     const startPractice = async continuing => {
       await evaluate(continuing
         ? `document.querySelector('.practice-goal .practice-start').click()`
-        : `(()=>{const card=document.querySelector('.finding-details');card.open=true;card.querySelector('.practice-start').click();})()`);
+        : `document.querySelector('.finding .practice-start').click()`);
       await wait('practice preparation',`document.body.dataset.screen==='training' && !document.getElementById('training-practice-focus').hidden`);
       assert.equal(await evaluate('window.__trainingProductTrainer.trainingSetup.snapshot().practiceRequest.continueChain'),continuing);
       assert.equal(await evaluate(`(() => {const rect=document.getElementById('training-practice-focus').getBoundingClientRect();return rect.top>=document.querySelector('.main-area').getBoundingClientRect().top&&rect.bottom<=innerHeight;})()`),true,'entering practice shows the goal before scrolling to Start');

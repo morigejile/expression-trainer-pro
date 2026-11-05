@@ -39,6 +39,7 @@ class Node {
   setAttribute(name,value) {this.attributes[name] = String(value);}
   addEventListener(name,handler) {this.listeners[name] = handler;}
   click() {this.listeners.click?.();}
+  querySelector(selector) {return descendants(this,node=>node.tagName===selector.toUpperCase())[0] || null;}
 }
 class Document {
   createElement(name) {return new Node(this,name);}
@@ -115,19 +116,40 @@ test('framework report keeps common advice while saved legacy recommendations ha
   assert.doesNotMatch(target.textContent,/适合练习观点支撑|准备下一次表达/);
 });
 
-test('finding practice actions expose adjustable scope and the current goal keeps a distinct continuation action', () => {
+test('finding and current-goal practice actions always request a full expression without a scope selector', () => {
   const source = runs(); const target = container(); const clicks = [];
   const record = {id:'session-1',practice:{round:3,scope:'full',goal:{category:'organization',observation:'先说明结论',recommendation:'用一句话开场'}}};
   api().renderStructuredReport(target,api().selectStructuredReport(source),{record,onPractice:(...args) => clicks.push(args)});
   assert.match(target.textContent,/第 3 轮/);
   assert.match(target.textContent,/相比上一轮/);
-  const scopes = byClass(target,'practice-scope'); assert.equal(scopes.length,2);
-  scopes[1].value = 'sentence';
+  assert.equal(byClass(target,'practice-scope').length,0);
   const buttons = byClass(target,'practice-start'); assert.equal(buttons.length,2);
   buttons[1].click();
-  assert.equal(clicks[0][0].id,'finding-1-0'); assert.equal(clicks[0][1],'sentence');
+  assert.equal(clicks[0][0].id,'finding-1-0'); assert.equal(clicks[0][1],'full');
   buttons[0].click();
-  assert.equal(clicks[1][2],true);
+  assert.equal(clicks[1][1],'full');assert.equal(clicks[1][2],true);
+  assert.ok(buttons.every(button=>button.textContent==='重新练习'));
+});
+
+test('frozen finding practice stays outside collapsed evidence and evidence actions share the metadata header', () => {
+  const target=container(),clicked=[],practiced=[];
+  api().renderStructuredReport(target,api().selectStructuredReport(runs()),{frozen:true,
+    segments:[{id:'segment-1',text:'这是原文。',startMs:31000}],
+    onEvidence:ref=>clicked.push(ref),onPractice:(...args)=>practiced.push(args)});
+  const card=byClass(target,'finding')[0],details=byClass(card,'finding-details')[0];
+  assert.equal(details.open,false);
+  assert.equal(byClass(details,'practice-start').length,0);
+  const guidance=byClass(card,'finding-guidance')[0],practice=byClass(guidance,'practice-start')[0];
+  assert.ok(practice);assert.ok(card.children.indexOf(guidance)<card.children.indexOf(details));
+  practice.click();assert.equal(practiced[0][1],'full');
+  const blocks=byClass(card,'evidence-block');assert.equal(blocks.length,3);
+  for(const block of blocks){
+    const header=byClass(block,'evidence-header')[0];assert.ok(header);
+    const action=byClass(header,'evidence-button')[0];assert.ok(action);action.click();
+  }
+  assert.deepEqual(clicked,['segment-1','metric:text-character-count','speech-0']);
+  assert.match(blocks[0].textContent,/00:31/);assert.match(blocks[0].textContent,/这是原文。/);
+  assert.equal(byClass(target,'metric-details')[0].open,true);
 });
 
 test('damaged optional framework or practice results cannot replace an earlier readable report', () => {

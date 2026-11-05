@@ -18,18 +18,12 @@
     : reason.includes('audio-unavailable')?'部分录音不可用，保留原文复盘。'
     : reason.includes('asr-incomplete')?'转写覆盖不完整，相关比较存在限制。'
     : reason.includes('vad')?'语音活动证据为模型估计或暂不可用，相关比较存在限制。':'部分证据存在质量限制，请在该轮报告中复核。');
-  function practiceAction(element,container,goal,onPractice,scope = 'full',continuing = false) {
+  function practiceAction(element,container,goal,onPractice,continuing = false) {
     if (typeof onPractice !== 'function') return;
-    const label = element('label','practice-scope-label','练习范围 ');
-    const select = element('select','practice-scope');
-    for (const [value,text] of Object.entries({sentence:'句子',segment:'片段',full:'完整表达'})) {
-      const option = element('option',null,text);option.value = value;select.appendChild(option);
-    }
-    select.value = scope;label.appendChild(select);container.appendChild(label);
-    const button = element('button','practice-start',continuing ? '继续练习这个目标' : '针对这个问题继续练习');
-    button.type = 'button';button.addEventListener('click',() => onPractice(goal,select.value,continuing));
+    const button = element('button','practice-start','重新练习');
+    button.type = 'button';button.addEventListener('click',() => onPractice(goal,'full',continuing));
     container.appendChild(button);
-    return {select,button};
+    return {button};
   }
   function renderPractice(element,root,{record,projection,api,onPractice,onOpen,onEvidence,onLayout,frozen=false}) {
     if (!record?.practice) return () => {};
@@ -82,7 +76,7 @@
     const goal = element('article',`practice-goal${frozen?' round-action':''}`);
     goal.appendChild(element('p','finding-recommendation',practice.goal.recommendation));
     const controls=element('div',frozen?'practice-controls':null);
-    const action=practiceAction(element,controls,practice.goal,onPractice,practice.scope,true);
+    const action=practiceAction(element,controls,practice.goal,onPractice,true);
     if(action && !projection?.snapshot?.id){action.button.disabled=true;controls.appendChild(element('p','source-note','本轮固定报告尚不可用，暂不能以当前轮继续。'));}
     if (action && frozen) action.button.className+=' practice-action';
     goal.appendChild(controls);section.appendChild(goal);

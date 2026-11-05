@@ -436,7 +436,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     await wait('stable analysis profile restored',`!${utility}.state.dirty`);await close();
     await evaluate(`document.querySelector('.finding-details').open=true;window.scrollTo(0,350)`);
     await preserve('Normal Report','settings','preferences');
-    await evaluate(`document.querySelector('.finding-details .practice-start').click()`);
+    await evaluate(`document.querySelector('.finding .practice-start').click()`);
     await wait('targeted Preparing restored',`document.body.dataset.screen==='training' && Boolean(${trainer}.trainingSetup.snapshot().practiceRequest)`);
     await preserve('Targeted Practice Preparing','help','report');
     const practicePrompt=await evaluate(`${trainer}.trainingSetup.snapshot().trainingPrompt`);

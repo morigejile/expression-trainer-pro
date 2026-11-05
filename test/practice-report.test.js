@@ -24,8 +24,8 @@ function fixture({missing=false,failed=false,invalidRef=false,withoutReport=fals
   if (feedbackOverride) Object.assign(projection.analysisRun.value.practiceFeedback,feedbackOverride);
   const calls=[],opens=[];const api={getTrainingSession:async command=>{calls.push(command);return {ok:true,value:missing?null:previous};},getPracticeHistory:async command=>{calls.push(command);return {ok:true,value:historyRows || [{round:1,sessionId:'origin',reportId:'origin-r',deleted:false,summary:'基准表达',evidence:[]},{round:2,sessionId:'previous',reportId:'r',deleted:true,summary:null},{round:3,sessionId:'current',reportId:'current-r',deleted:false,summary:'当前反馈',evidence:[]}]};}};
   Object.assign(api,apiOverrides);
-  const root=element('div'),dispose=renderPractice(element,root,{record,projection,api,frozen:true,onPractice:()=>{},onOpen:(...args)=>opens.push(args)});
-  return {root,record,previous,projection,calls,opens,api,dispose};
+  const practices=[],root=element('div'),dispose=renderPractice(element,root,{record,projection,api,frozen:true,onPractice:(...args)=>practices.push(args),onOpen:(...args)=>opens.push(args)});
+  return {root,record,previous,projection,calls,opens,practices,api,dispose};
 }
 
 test('unavailable comparability is not displayed as unchanged even when both reference sets exist',async()=>{
@@ -37,10 +37,13 @@ test('unavailable comparability is not displayed as unchanged even when both ref
   assert.match(find(f.root,'practice-source-status')[0].textContent,/当前材料不对应所选目标/);
   f.dispose();
 });
-test('frozen targeted report orders evidence and history before scope/continuation and pins history',async()=>{
+test('historical local report retains its scope, continues as full expression and pins history',async()=>{
   const f=fixture();await tick();const section=find(f.root,'practice-result')[0];
   assert.ok(section.children.indexOf(find(section,'practice-evidence')[0])<section.children.indexOf(find(section,'practice-goal')[0]));
   assert.ok(section.children.indexOf(find(section,'practice-history')[0])<section.children.indexOf(find(section,'practice-goal')[0]));
+  assert.equal(find(section,'practice-scope').length,0);
+  const practice=find(section,'practice-start')[0];assert.equal(practice.textContent,'重新练习');practice.click();
+  assert.deepEqual(f.practices,[[f.record.practice.goal,'full',true]]);assert.equal(f.record.practice.scope,'sentence');
   const history=find(section,'practice-history')[0];history.open=true;await history.toggle();
   assert.equal(f.calls.at(-1).reportId,'current-r');assert.match(section.textContent,/基准/);assert.match(section.textContent,/来源报告已删除/);
   f.dispose();

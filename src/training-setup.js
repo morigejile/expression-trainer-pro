@@ -75,7 +75,7 @@
       }
       anchor.disabled = locked;
       focus.hidden = !practiceRequest;
-      focus.textContent = practiceRequest ? `练习范围：${{sentence:'句子',segment:'片段',full:'完整表达'}[practiceRequest.scope]} · ${practiceLabel}${practiceRecommendation?`\n${practiceRecommendation}`:''}\n使用 AI 分析时，会使用本轮与上一轮转写比较这个目标，原始录音留在本机。` : '';
+      focus.textContent = practiceRequest ? `${practiceLabel}${practiceRecommendation?`\n${practiceRecommendation}`:''}\n围绕这个目标，重新讲完整表达。\n使用 AI 分析时，会使用本轮与上一轮转写比较这个目标，原始录音留在本机。` : '';
     }
     function setPart(kind,value) {
       const parts = getPromptParts(draft.trainingPrompt);

@@ -37,20 +37,18 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     assert.equal(await evaluate(`document.querySelectorAll('#frozen-practice-result>.practice-result.round-result').length`),1);
     assert.match(await evaluate(`document.querySelector('.round-label').textContent`),new RegExp(`第 ${round} 轮`));
     assert.equal(await evaluate(`document.querySelectorAll('.round-action .practice-start').length`),1);
-    assert.equal(await evaluate(`document.querySelector('.round-action .practice-start').textContent`),'继续练习这个目标');
+    assert.equal(await evaluate(`document.querySelector('.round-action .practice-start').textContent`),'重新练习');
     assert.equal(await evaluate(`(()=>{const s=document.querySelector('.practice-result'),e=s.querySelector('.practice-evidence'),h=s.querySelector('.practice-history'),a=s.querySelector('.round-action');return Boolean((e.compareDocumentPosition(h)&Node.DOCUMENT_POSITION_FOLLOWING)&&(h.compareDocumentPosition(a)&Node.DOCUMENT_POSITION_FOLLOWING));})()`),true,
       'same-goal action follows evidence and history inside the top result area');
     const findings=[...report(saved).analysisRun.value.findings,...(report(saved).analysisRun.value.frameworkAnalysis?.findings || [])];
-    assert.equal(await evaluate(`document.querySelectorAll('#report-body .finding-open').length`),findings.length,
+    assert.equal(await evaluate(`document.querySelectorAll('#report-body .finding-evidence-toggle').length`),findings.length,
       'current Findings retain Frozen disclosure and explicit new-goal actions');
     return saved;
   };
-  const startPractice = async ({continuing=false,index=0,scope='full'}={}) => {
+  const startPractice = async ({continuing=false,index=0}={}) => {
     const before = await session(await current()); const beforeCalls = aiCalls();
     await evaluate(`(() => {
-      const area=${continuing ? "document.querySelector('.round-action')" : `document.querySelectorAll('.finding-details')[${index}]`};
-      if(area.tagName==='DETAILS') area.open=true;
-      area.querySelector('.practice-scope').value=${JSON.stringify(scope)};
+      const area=${continuing ? "document.querySelector('.round-action')" : `document.querySelectorAll('.finding')[${index}]`};
       area.querySelector('.practice-start').click();
     })()`);
     await wait('Finding practice opens real Preparing',
@@ -59,7 +57,8 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     assert.equal(setup.practiceRequest.continueChain,continuing);
     assert.equal(setup.practiceRequest.sessionId,before.id);
     assert.equal(setup.practiceRequest.reportId,report(before).snapshot.id);
-    assert.equal(setup.practiceRequest.scope,scope);
+    assert.equal(setup.practiceRequest.scope,'full');
+    assert.equal(await evaluate(`document.querySelectorAll('.practice-scope').length`),0);
     assert.equal(await evaluate(`${trainer}.isRecording`),false,'entering practice never auto-records');
     assert.equal(await evaluate(`${trainer}.asrStartAttempt`),null);
     assert.deepEqual(setup.trainingPrompt,before.trainingPrompt);
@@ -67,7 +66,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     const focus = await evaluate(`document.getElementById('training-practice-focus').textContent`);
     assert.ok(focus.includes(continuing ? before.practice.goal.observation
       : [...report(before).analysisRun.value.findings,...(report(before).analysisRun.value.frameworkAnalysis?.findings || [])][index].observation));
-    assert.ok(focus.includes('范围')); await disclosure(); assert.deepEqual(aiCalls(),beforeCalls);
+    assert.ok(focus.includes('重新讲完整表达')); await disclosure(); assert.deepEqual(aiCalls(),beforeCalls);
     return setup;
   };
   const assertFeedback = async saved => {
@@ -85,7 +84,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   };
   const restoreHistoryView = async (saved,baseline,pinnedReportId) => {
     const beforeCalls = aiCalls();
-    await evaluate(`document.querySelector('.practice-history').open=true;document.querySelector('.practice-evidence').open=true;document.getElementById('report-materials').open=true;document.getElementById('report-information').open=true;document.querySelector('.finding-details').open=true;document.querySelector('.round-action .practice-scope').value='sentence'`);
+    await evaluate(`document.querySelector('.practice-history').open=true;document.querySelector('.practice-evidence').open=true;document.getElementById('report-materials').open=true;document.getElementById('report-information').open=true;document.querySelector('.finding-details').open=true`);
     await wait('practice history loaded',`document.querySelectorAll('.practice-round').length===${saved.practice.round}`);
     const state = await evaluate(`(() => {
       document.getElementById('report-scroll').scrollTop=250;
@@ -102,11 +101,11 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     for (const selector of ['.practice-history','.practice-evidence','#report-materials','#report-information','.finding-details']) {
       assert.equal(await evaluate(`document.querySelector(${JSON.stringify(selector)}).open`),true,`return restores ${selector}`);
     }
-    assert.equal(await evaluate(`document.querySelector('.round-action .practice-scope').value`),'sentence');
+    assert.equal(await evaluate(`document.querySelectorAll('.practice-scope').length`),0);
     assert.equal(await evaluate(`document.getElementById('report-scroll').scrollTop`),state.scroll);
     assert.equal(await evaluate(`document.activeElement===document.querySelector('.practice-round button')`),true,'return restores the history opener focus');
     await evaluate(`${trainer}.refreshTrainingRecord(${trainer}.trainingRecords.selected())`);
-    await wait('late passive refresh preserves the restored practice view',`document.querySelector('.practice-history').open && document.querySelector('.practice-evidence').open && document.querySelector('.round-action .practice-scope').value==='sentence' && document.querySelectorAll('.practice-round').length===${saved.practice.round} && !${trainer}.reportRestoration`);
+    await wait('late passive refresh preserves the restored practice view',`document.querySelector('.practice-history').open && document.querySelector('.practice-evidence').open && document.querySelectorAll('.practice-round').length===${saved.practice.round} && !${trainer}.reportRestoration`);
     assert.equal(await evaluate(`${trainer}.trainingRecords.selected().structuredReport.snapshot.id`),state.id);
     assert.equal(await evaluate(`document.getElementById('report-scroll').scrollTop`),state.scroll);
     assert.equal(await evaluate(`document.activeElement===document.querySelector('.practice-round button')`),true,'passive refresh keeps the restored history focus');
@@ -149,14 +148,14 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   const aId = await recordOnce(null,{framework:'prep',bank:true}); await ready();
   const a = await session(aId); const aReport = report(a).snapshot.id;
   assert.equal(a.practice,null); assert.equal(a.framework,'prep');
-  await startPractice({scope:'full'}); await capture('i3-practice-preparing');
+  await startPractice(); await capture('i3-practice-preparing');
   const bId = await recordOnce(a.trainingPrompt,{practice:true}); const b = await assertPracticeReport(bId,2);
   assert.equal(b.practice.previousSessionId,aId); assert.equal(b.practice.previousReportId,aReport); await assertFeedback(b);
-  await startPractice({continuing:true,scope:'segment'});
+  await startPractice({continuing:true});
   await setCustom('scenario','虚构练习：向另一位同事解释具体协作安排'); await choose('framework','star');
   const cPrompt = await evaluate(`${trainer}.trainingSetup.snapshot().trainingPrompt`);
   const cId = await recordOnce(cPrompt,{practice:true}); const c = await assertPracticeReport(cId,3); await assertFeedback(c);
-  assert.equal(c.framework,'star'); assert.equal(c.practice.scope,'segment');
+  assert.equal(c.framework,'star'); assert.equal(c.practice.scope,'full');
   assert.equal(c.practice.chainId,b.practice.chainId); assert.deepEqual(c.practice.goal,b.practice.goal);
   assert.equal(c.practice.previousSessionId,bId); assert.equal(c.practice.previousReportId,report(b).snapshot.id);
   assert.deepEqual(immutable(await session(aId)),immutable(a)); assert.deepEqual(immutable(await session(bId)),immutable(b));
@@ -165,10 +164,10 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   await evaluate(`${trainer}.awaitTrainingAnalysis(${trainer}.trainingRecords.selected(),true,'star')`); await ready();
   const laterA = await session(aId); assert.notEqual(report(laterA).snapshot.id,aReport); assert.deepEqual(immutable(laterA),immutable(a));
   await openHistory(cId); await ready(); await restoreHistoryView(c,aId,aReport);
-  const utilityContext=await evaluate(`({record:${trainer}.viewingTrainingRecordId,snapshot:${trainer}.trainingRecords.selected().structuredReport.snapshot.id,scroll:document.getElementById('report-scroll').scrollTop,scope:document.querySelector('.round-action .practice-scope').value})`);
+  const utilityContext=await evaluate(`({record:${trainer}.viewingTrainingRecordId,snapshot:${trainer}.trainingRecords.selected().structuredReport.snapshot.id,scroll:document.getElementById('report-scroll').scrollTop})`);
   await evaluate(`document.getElementById('btn-help').click();document.getElementById('close-surface').click()`);
   await saveProfile('i2-example');
-  assert.deepEqual(await evaluate(`({record:${trainer}.viewingTrainingRecordId,snapshot:${trainer}.trainingRecords.selected().structuredReport.snapshot.id,scroll:document.getElementById('report-scroll').scrollTop,scope:document.querySelector('.round-action .practice-scope').value})`),utilityContext,'Help and Settings preserve the fixed report and view context');
+  assert.deepEqual(await evaluate(`({record:${trainer}.viewingTrainingRecordId,snapshot:${trainer}.trainingRecords.selected().structuredReport.snapshot.id,scroll:document.getElementById('report-scroll').scrollTop})`),utilityContext,'Help and Settings preserve the fixed report and view context');
   const chain = await history(cId,report(c).snapshot.id); assert.deepEqual(chain.map(row=>row.round),[1,2,3]);
   assert.equal(chain[0].reportId,aReport); assert.equal(chain[0].feedbackStatus,null,'baseline has no fabricated previous-round feedback');
   assert.equal(chain[2].feedbackStatus,'unchanged'); assert.ok(chain[2].evidence?.length>0,'history has saved key evidence');
@@ -180,7 +179,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   assert.equal(missing[1].deleted,true); assert.ok(!missing[1].evidence || !missing[1].evidence.length);
   assert.equal(missing[2].availability,'unavailable');
   await capture('i3-deleted-middle-current-unavailable');
-  await startPractice({continuing:true,scope:'segment'});
+  await startPractice({continuing:true});
   const dId = await recordOnce(c.trainingPrompt,{practice:true}); const d = await assertPracticeReport(dId,4); await assertFeedback(d);
   assert.equal(d.practice.previousSessionId,cId); assert.equal(d.practice.previousReportId,report(c).snapshot.id);
   assert.equal(d.practice.chainId,c.practice.chainId); const dRows = await history(dId);
@@ -193,10 +192,11 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   await evaluate(`document.getElementById('btn-report-back').click()`);
   await wait('returns to D fixed report after reading healthy C',`${trainer}.viewingTrainingRecordId===${JSON.stringify(dId)} && ${trainer}.trainingRecords.selected().structuredReport.snapshot.id===${JSON.stringify(report(d).snapshot.id)} && document.querySelectorAll('.practice-round').length===4`);
   assert.deepEqual(aiCalls(),callsBeforeGapRead,'reading a healthy round with a comparison gap never analyzes');
-  await startPractice({index:1,scope:'sentence'});
+  await startPractice({index:1});
   const eId = await recordOnce(d.trainingPrompt,{practice:true}); const e = await assertPracticeReport(eId,2); await assertFeedback(e);
   assert.notEqual(e.practice.chainId,d.practice.chainId); assert.equal(e.practice.origin.sessionId,dId);
-  assert.equal(e.practice.origin.findingId,'finding-2'); assert.deepEqual(e.practice.history,[{sessionId:dId,reportId:report(d).snapshot.id,round:1}]);
+  const selectedFinding=[...report(d).analysisRun.value.findings,...(report(d).analysisRun.value.frameworkAnalysis?.findings || [])][1];
+  assert.equal(e.practice.origin.findingId,selectedFinding.id); assert.deepEqual(e.practice.history,[{sessionId:dId,reportId:report(d).snapshot.id,round:1}]);
   assert.deepEqual(immutable(await session(dId)),immutable(d));
   const listed = (await invoke('listTrainingSessions',{requestId:'i3-no-duplicate-basis'})).value;
   assert.equal(listed.filter(row=>row.id===dId).length,1,'one Session can end one chain and start another');
@@ -207,7 +207,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     // Identity edits revoke auto enabling at the real save boundary. A second
     // explicit opt-in of that unchanged configuration is the intended action.
     if (enabled && !(await invoke('getAiDisclosureState',{})).profile.autoDiagnosisEnabled) await saveProfile(model,enabled);
-    await openHistory(dId); await ready(); await startPractice({scope:'full'});
+    await openHistory(dId); await ready(); await startPractice();
     const id = await recordOnce(d.trainingPrompt,{practice:true}); await ready(); const saved = await session(id);
     assert.equal(saved.status,'completed'); assert.equal(saved.artifact.state,'available'); assert.ok(saved.transcript.text);
     assert.equal(report(saved).analysisRun.value.reason,reason); assert.equal(report(saved).analysisRun.value.practiceFeedback.status,'unavailable');
@@ -220,7 +220,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   const empty = await invoke('createTrainingSession',{requestId:'i3-empty-create',input:{
     createdAt:new Date().toISOString(),source:'microphone',trainingPrompt:d.trainingPrompt,
     trainingMode:d.trainingMode,framework:d.framework,frameworkDefinitionVersion:d.frameworkDefinitionVersion,
-    practiceRequest:{sessionId:dId,reportId:report(d).snapshot.id,findingId:'finding-1',scope:'sentence',continueChain:false}}});
+    practiceRequest:{sessionId:dId,reportId:report(d).snapshot.id,findingId:'finding-1',scope:'full',continueChain:false}}});
   assert.equal(empty.ok,true);
   const finalized = await evaluate(`(async()=>{const audio=await window.api.readTrainingAudio({requestId:'i3-empty-audio',sessionId:${JSON.stringify(dId)}});return window.api.finalizeTrainingSession({requestId:'i3-empty-finalize',sessionId:${JSON.stringify(empty.sessionId)},input:{completedAt:new Date().toISOString(),durationMs:10,audio:audio.value,transcript:{text:'',segments:[]}}});})()`);
   assert.equal(finalized.ok,true);
