@@ -50,10 +50,6 @@ const TrainingRecords = typeof module !== 'undefined' && module.exports
   ? require('./training-records')
   : window.TrainingRecords;
 const { createTrainingRecordStore, findSegmentAtTime, formatRecordLabel } = TrainingRecords;
-const SupportLinks = typeof module !== 'undefined' && module.exports
-  ? require('../shared/support-links')
-  : window.SupportLinks;
-const { FEEDBACK_DOCUMENT_URL } = SupportLinks;
 const TextStatistics = typeof module !== 'undefined' && module.exports
   ? require('../shared/text-statistics')
   : window.TextStatistics;
@@ -133,8 +129,7 @@ class ExpressionTrainer {
     this.initElements();
     this.reportPlayback=ReportPlayback.createReportPlayback({document,audio:this.audioPlayer,
       renderText:renderHighlightedText,onSelect:id=>this.selectPlaybackSegment(id)});
-    this.flowView = typeof document.createComment === 'function' && window.FrozenFlowView
-      ? window.FrozenFlowView.createFlowView(document) : null;
+    this.flowView = window.FrozenFlowView.createFlowView(document);
     this.utilityMenu = window.UtilityMenu?.createUtilityMenu({document});
     this.trainingSetup = TrainingSetup.createTrainingSetup({api:window.api,document});
     this.comparison = SessionComparison.createComparisonController({trainer:this,api:window.api,document});
@@ -144,13 +139,12 @@ class ExpressionTrainer {
       onFailed:(id,actual)=>{if(actual?.deletionPending){const item={...this.historyItems.get(id),deletionPending:true,summary:''};this.historyItems.set(id,item);this.historyList.querySelector(`[data-record-id="${id}"]`)?.parentNode?.replaceWith?.(TrainingHistory.renderRow(document,item,{comparison:this.comparison,onOpen:value=>this.openHistoryRecord(value),onDelete:value=>void this.deleteHistoryRecord(value)}));}},
       onRefresh:async()=>{await this.historyLoadPromise;if(this.currentScreen==='history')await this.loadHistory();},
       onStateChange:ids=>{this.comparison.syncSelection();for(const button of this.historyList.querySelectorAll('.history-row-actions'))button.disabled=Boolean(this.historyDeletion?.busy);for(const button of this.historyList.querySelectorAll('.history-row-main')){const item=this.historyItems.get(button.dataset.recordId);button.disabled=ids.includes(button.dataset.recordId)||Boolean(item?.deletionPending)||['recording','finalizing'].includes(item?.status);}}});
-    this.utility=window.FrozenUtility && document.getElementById('utility')?.showModal
-      ? window.FrozenUtility.createUtility({document,api:window.api,trainer:this}) : null;
-    if(this.utility)this.helpModal=this.utility.dialog;
+    this.utility=window.FrozenUtility.createUtility({document,api:window.api,trainer:this});
+    this.helpModal=this.utility.dialog;
     this.bindEvents();
     this.aiDisclosure=AiDisclosure.createDisclosure({document,api:window.api,
       open:(modal,focus)=>this.openModal(modal,focus),close:modal=>this.closeModal(modal),
-      onPrivacy:()=>{this.openHelpModal('privacy');if(!this.utility)document.getElementById('help-data-privacy')?.scrollIntoView({block:'start'});}});
+      onPrivacy:()=>this.openHelpModal('privacy')});
     if (!this.showFirstRunHelp()) void this.showFirstRunRecordingPolicy();
     void this.prepareSpeechModel();
     void this.preflightMicrophone();
@@ -182,11 +176,7 @@ class ExpressionTrainer {
     this.userMessageClose = document.getElementById('user-message-close');
     this.trainingStatus = document.getElementById('training-status');
     this.feedbackStatus = document.getElementById('feedback-status');
-    this.helpModal = document.getElementById('help-modal');
-    this.btnCloseHelp = document.getElementById('btn-close-help');
-    this.btnHelpDiagnostics = document.getElementById('btn-help-diagnostics');
-    this.btnOpenFeedbackDocument = document.getElementById('btn-open-feedback-document');
-    this.feedbackLinkError = document.getElementById('feedback-link-error');
+    this.btnCloseHelp = document.getElementById('close-surface');
     this.recordingPolicyModal = document.getElementById('recording-policy-modal');
     this.btnCloseRecordingPolicy = document.getElementById('btn-close-recording-policy');
     this.btnRecordingPolicyConfirm = document.getElementById('btn-recording-policy-confirm');
@@ -228,24 +218,20 @@ class ExpressionTrainer {
       await this.preflightMicrophone();
       if (this.asrPreparationState !== 'ready') await this.prepareSpeechModel();
     });
-    document.getElementById('btn-open-asr-settings')?.addEventListener('click', () => this.utility?void this.utility.open('settings','speech'):window.api.openSettings());
+    document.getElementById('btn-open-asr-settings')?.addEventListener('click', () => void this.utility.open('settings','speech'));
     this.btnPause.addEventListener('click', () => this.pauseRecording());
     this.btnResume.addEventListener('click', () => this.resumeRecording());
     this.btnStop.addEventListener('click', () => this.stopRecording());
     this.btnReport.addEventListener('click', () => this.generateReport());
     this.btnSettings.addEventListener('click', () => {
       document.querySelector('.utility-menu')?.removeAttribute('open');
-      if(this.utility)void this.utility.open('settings','ai');
-      else{if (this.activeModal) this.closeModal(this.activeModal);window.api.openSettings();}
+      void this.utility.open('settings','ai');
     });
     this.userMessageAction.addEventListener('click', () => window.api.openSettings());
     this.userMessageClose.addEventListener('click', () => this.hideUserMessage());
     window.api.onLlmProviderSettingsChanged?.(() => this.handleLlmProviderSettingsChanged());
     window.api.onAsrModelStateChanged?.(state => this.handleAsrModelStateChanged(state));
     this.btnHelp.addEventListener('click', () => this.openHelpModal());
-    this.btnCloseHelp.addEventListener('click', () => this.closeModal(this.helpModal));
-    this.btnHelpDiagnostics.addEventListener('click', () => this.exportDiagnostics(this.btnHelpDiagnostics));
-    this.btnOpenFeedbackDocument.addEventListener('click', () => this.openFeedbackDocument());
     this.btnRecordingPolicyConfirm.addEventListener('click', () => this.resolveRecordingPolicyDecision(true));
     this.btnRecordingPolicyCancel.addEventListener('click', () => this.resolveRecordingPolicyDecision(false));
     this.btnCloseRecordingPolicy.addEventListener('click', () => this.resolveRecordingPolicyDecision(false));
@@ -262,18 +248,6 @@ class ExpressionTrainer {
     document.addEventListener('keydown', event => this.handleGlobalKeydown(event));
   }
 
-  async exportDiagnostics(triggerButton = this.btnHelpDiagnostics) {
-    const original = triggerButton.textContent;
-    try {
-      const result = await window.api.exportDiagnostics(this.lastAudioCaptureRates);
-      if (!result?.success) return;
-      triggerButton.textContent = '✓ 已导出';
-      setTimeout(() => { triggerButton.textContent = original; }, 2000);
-    } catch (error) {
-      alert(`导出诊断失败: ${error.message}`);
-    }
-  }
-
   showFirstRunHelp() {
     try {
       if (window.localStorage.getItem('expression-trainer.help-seen') === '1') return false;
@@ -285,22 +259,8 @@ class ExpressionTrainer {
 
   openHelpModal(page='start') {
     document.querySelector?.('.utility-menu')?.removeAttribute('open');
-    this.feedbackLinkError.textContent = '';
-    if(this.utility)void this.utility.open('help',page);
-    else this.openModal(this.helpModal, this.btnCloseHelp);
+    void this.utility.open('help',page);
     this.modalOpener = document.querySelector?.('.utility-menu summary') || this.modalOpener;
-  }
-
-  async openFeedbackDocument() {
-    this.feedbackLinkError.textContent = '';
-    try {
-      const result = await window.api.openSupportLink(FEEDBACK_DOCUMENT_URL);
-      if (!result?.success) {
-        this.feedbackLinkError.textContent = result?.error || '无法打开问题和建议文档';
-      }
-    } catch (error) {
-      this.feedbackLinkError.textContent = error.message;
-    }
   }
 
   // ===== 录制控制 =====
@@ -316,7 +276,7 @@ class ExpressionTrainer {
       this.asrPreparationState = 'failed';
     }
     this.btnStart.disabled = false;
-    this.btnStartLabel.textContent = this.asrPreparationState === 'failed' ? '重试加载' : this.flowView ? 'start' : '开始表达';
+    this.btnStartLabel.textContent = this.asrPreparationState === 'failed' ? '重试加载' : 'start';
     this.btnStart.setAttribute('aria-label',this.asrPreparationState === 'failed' ? '重试加载' : '开始表达');
     if (!this.fullText.trim() && !this.isRecording && !this.asrStartAttempt) {
       this.finishTrainingPreparation();
@@ -975,7 +935,7 @@ class ExpressionTrainer {
       } else {
         this.setScreen(this.currentScreen,'preparing',{refresh:true});
         if (this.currentScreen === 'history') {
-          const area=document.getElementById(this.flowView?'history-scroll':'history-screen');
+          const area=document.getElementById('history-scroll');
           const scroll=area?.scrollTop || 0, focusId=document.activeElement?.dataset?.recordId;
           await this.loadHistory();
           if (this.currentScreen === 'history') {
@@ -1484,7 +1444,7 @@ class ExpressionTrainer {
     this.renderedReportSnapshotId=snapshotId;this.renderedReportNavigation=this.navigationGeneration;
     this.reportCleanup?.();this.reportCleanup = null;
     if (record.structuredReport) {
-      this.reportCleanup = StructuredReport.renderStructuredReport(this.reportBody,record.structuredReport,{segments:record.segments,record,api:window.api,frozen:Boolean(this.flowView),
+      this.reportCleanup = StructuredReport.renderStructuredReport(this.reportBody,record.structuredReport,{segments:record.segments,record,api:window.api,
         onEvidence:ref => this.focusReportEvidence(record,ref),
         onPractice:(finding,scope,continueChain = false) => {
           const practiceRequest = {sessionId:record.id,reportId:record.structuredReport.snapshot.id,
@@ -1500,14 +1460,14 @@ class ExpressionTrainer {
       this.btnReport.querySelector?.('.btn-label') && (this.btnReport.querySelector('.btn-label').textContent='重试诊断');
     } else {
       this.renderReport(record.report || (record.saveState==='failed' && !record.factsSaved?'训练尚未保存，请重试保存。':'训练已保存；暂无结构化诊断，可主动分析这一次。'));
-      if(record.practice && this.flowView){
+      if(record.practice){
         const root=document.createElement('section');root.className='structured-report';this.reportBody.appendChild(root);
-        this.reportCleanup=window.PracticeReport.renderPractice((tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node;},root,{record,projection:null,api:window.api,frozen:true,onPractice:()=>{}});
+        this.reportCleanup=window.PracticeReport.renderPractice((tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node;},root,{record,projection:null,api:window.api,onPractice:()=>{}});
       }
     }
     if (record.reportPending) this.reportAiStatus.textContent='正在分析这一次…';
     else if (record.analysisError) this.reportAiStatus.textContent=record.analysisError;
-    if (this.flowView) FrozenReport.present(document,record);
+    if (this.currentScreen==='report') FrozenReport.present(document,record);
     for (const node of this.reportBody.querySelectorAll?.('details[data-finding-id]') || []) if (expanded.includes(node.getAttribute('data-finding-id'))) node.open=true;
     if(preserved)this.restorePracticeReportView(record,preserved);
   }
@@ -1766,9 +1726,7 @@ class ExpressionTrainer {
 
   renderRecordStatus(record) {
     if (this.viewingTrainingRecordId !== record.id || !this.recordSaveStatus) return;
-    if (typeof document !== 'undefined' && document.body?.dataset?.frozenUi === 'report' && globalThis.FrozenReport?.renderIdentity) {
-      globalThis.FrozenReport.renderIdentity(document,record);
-    } else this.recordIdentity.textContent = `${new Date(record.createdAt).toLocaleString()} · ${Math.round(record.durationMs / 1000)} 秒 · ${TrainingContext.formatTrainingContext(record)}`;
+    FrozenReport.renderIdentity(document,record);
     const states = {saving:'正在保存…',saved:'这次训练已保存',failed:record.factsSaved ? '训练已保存，部分分析结果保存失败，请重试。' : '训练保存失败，请重试；关闭应用将丢失未保存内容。',incomplete:'这条记录未完成或已损坏，现有可读内容仍可查看。'};
     const audio = record.audioState === 'missing' ? '音频缺失，无法播放。' : record.audioState === 'corrupt' ? '音频损坏，无法播放。' : '';
     const warnings=[audio,record.resultIntegrity === 'corrupt' ? '部分分析结果损坏。' : '',record.metricsAvailable === false ? '本地统计未保存，无法生成原有 AI 报告。' : ''].filter(Boolean);
@@ -1787,7 +1745,7 @@ class ExpressionTrainer {
     this.releaseSavedRecordCache();
     this.setScreen('history');
     if (restore && this.historyList?.children.length) {
-      const area = document.getElementById(this.flowView?'history-scroll':'history-screen');
+      const area = document.getElementById('history-scroll');
       if(area)area.scrollTop = this.historyScroll || 0;
       if (this.historyReturnFocus) document.getElementById(this.historyReturnFocus)?.focus({preventScroll:true});
       else this.historyList.querySelector(`[data-record-id="${this.historyOpenedId}"]`)?.focus({preventScroll:true});
@@ -1835,7 +1793,7 @@ class ExpressionTrainer {
     const previousSelected=this.trainingRecords?.selected()?.id;
     const currentRead=()=>this.navigationGeneration===navigation && this.reportOpenGeneration===readGeneration && !this.deletedSessionIds?.has(id);
     if (this.currentScreen==='history') {
-      this.historyScroll = document.getElementById(this.flowView?'history-scroll':'history-screen')?.scrollTop || 0;
+      this.historyScroll = document.getElementById('history-scroll')?.scrollTop || 0;
       this.historyOpenedId = id;this.historyReturnFocus = null;
     }
     try {

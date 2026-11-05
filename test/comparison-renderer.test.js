@@ -66,8 +66,7 @@ function fixture(apiOverrides={}) {
 }
 
 test('frozen Comparison captures regional History and restores its own scroll and disclosures after drilldown',async t=>{
-  const previous=globalThis.FrozenComparison;globalThis.FrozenComparison=require('../src/frozen-comparison');t.after(()=>{globalThis.FrozenComparison=previous;});
-  const f=fixture();f.trainer.flowView={};const documentScroll=[];f.document.defaultView={scrollY:900,scrollTo:(...args)=>documentScroll.push(args)};
+  const f=fixture();const documentScroll=[];f.document.defaultView={scrollY:900,scrollTo:(...args)=>documentScroll.push(args)};
   f.document.getElementById('history-scroll').scrollTop=530;await f.controller.open();assert.equal(f.trainer.historyScroll,530);
   const content=f.document.getElementById('comparison-content'),detail=content.querySelector('details[data-detail-key]');detail.open=true;detail.populateEvidence();const key=detail.dataset.detailKey;
   f.document.getElementById('comparison-scroll').scrollTop=317;await f.controller.openReport('baseline');f.document.getElementById('comparison-scroll').scrollTop=0;await f.controller.restore();
@@ -113,9 +112,9 @@ test('comparison renders hostile content literally and expands side-qualified ev
   const projection=compareSessions([a,b]);const document=new Document();const container=document.createElement('main');
   let played;
   renderComparison(container,projection,{onPlay:(role,ref)=>{played={role,ref};}});
-  const category=container.querySelector('[data-detail-key="category-wording"]');category.open=true;category.listeners.get('toggle')();
+  const category=container.querySelector('[data-detail-key="finding-baseline-wording-0"]');category.open=true;category.listeners.get('toggle')();
   assert.ok(container.textContent.includes(hostile));assert.equal(container.querySelectorAll('img').length,0);
-  assert.match(container.textContent,/暂未建立跨录音问题对应/);
+  assert.match(container.textContent,/尚未自动建立问题对应关系/);
   const play=category.querySelectorAll('button').find(el=>el.textContent==='播放此处');play.listeners.get('click')();
   assert.deepEqual(played,{role:'baseline',ref:'segment-1'});
 });
@@ -137,18 +136,31 @@ test('a newer evidence playback wins over late audio for the same comparison',as
 test('Frozen Comparison adapts real filler metrics and keeps optional examples apart from evidence',()=>{
   const a=comparisonSession('a'),b=comparisonSession('b');a.results[2].value.findings[0].example='这是建议写法，不能冒充原话';
   const projection=compareSessions([a,b]),document=new Document(),container=document.createElement('main');
-  require('../src/frozen-comparison').renderComparison(container,projection,{onReport:()=>{},onPlay:()=>{}});
+  renderComparison(container,projection,{onReport:()=>{},onPlay:()=>{}});
   assert.match(container.textContent,/填充词命中次数/);assert.match(container.textContent,/填充词命中频率/);assert.match(container.textContent,/次\/录音分钟/);assert.doesNotMatch(container.textContent,/每百字|继续练习/);
   const detail=container.querySelector('[data-detail-key="finding-baseline-wording-0"]');detail.open=true;detail.populateEvidence();
   assert.ok(container.textContent.includes('这是建议写法，不能冒充原话'));assert.equal(detail.querySelectorAll('blockquote').some(node=>node.textContent.includes('建议写法')),false);
 });
 test('Frozen metric limitations distinguish saved denominators, totals and actual ASR source differences',()=>{
   const projection=compareSessions([comparisonSession('a'),comparisonSession('b')]),document=new Document(),container=document.createElement('main');
-  require('../src/frozen-comparison').renderComparison(container,projection,{onReport(){},onPlay(){}});
+  renderComparison(container,projection,{onReport(){},onPlay(){}});
   for(const id of ['audio-duration-ms','filler-rate-per-recorded-minute']){const detail=container.querySelector(`[data-detail-key="metric-${id}"]`);detail.open=true;detail.populateEvidence();assert.doesNotMatch(detail.textContent,/识别来源不同或未知/);}
   assert.match(container.querySelector('[data-detail-key="metric-audio-duration-ms"]').textContent,/总量.*评分/);
   assert.match(container.querySelector('[data-detail-key="metric-filler-rate-per-recorded-minute"]').textContent,/保存.*分母/);
   projection.metrics.find(metric=>metric.id==='text-character-count').limitations.push('asr-observation-only');
-  require('../src/frozen-comparison').renderComparison(container,projection,{onReport(){},onPlay(){}});
+  renderComparison(container,projection,{onReport(){},onPlay(){}});
   const changed=container.querySelector('[data-detail-key="metric-text-character-count"]');changed.open=true;changed.populateEvidence();assert.match(changed.textContent,/识别来源不同或未知/);
+});
+
+test('unavailable comparison metrics disclose their reasons and both sides without a rendering error',()=>{
+  const projection=compareSessions([comparisonSession('a'),comparisonSession('b')]);
+  const metric=projection.metrics.find(item=>item.id==='text-character-count');
+  metric.status='unavailable';metric.delta=null;metric.reasons=['transcript-unavailable'];
+  metric.baseline.available=false;metric.baseline.reason='transcript-unavailable';
+  const document=new Document(),container=document.createElement('main');
+  renderComparison(container,projection,{});
+  const detail=container.querySelector('[data-detail-key="metric-text-character-count"]');detail.open=true;
+  assert.doesNotThrow(()=>detail.populateEvidence());
+  assert.match(detail.textContent,/暂时无法可靠比较/);
+  assert.ok(detail.textContent.includes(require('../src/comparison').reasonText('transcript-unavailable')));
 });

@@ -488,7 +488,7 @@ M4 仍需复核原重分析失败场景、整理重练过程 UI 并验收真实 
 
 主窗口默认请求尺寸为1200×800，最小尺寸继续为960×640。Windows使用隐藏标题栏与原生窗口按钮叠加，Header留出原生按钮区域并支持拖动；其他窗口保持既有行为。准备与录音页在现有DOM上采用纵向Flex布局，中间区域伸缩，底部交互区保持在窗口底部；正常准备状态文字隐藏，失败提示及准备阻断仍由原状态驱动。
 
-主 Renderer 的 App Shell、准备、倒计时、录音/暂停、处理和普通 Report 使用冻结 Demo `ab714d6` 的视觉资产与布局。[Flow View](../../src/frozen-flow-view.js) 只适配现有 DOM 与样式启用，[Report 投影](../../src/frozen-report.js) 只展示同一真实记录的事实和保存结果；字体许可保留在 [frozen-ui](../../src/frozen-ui/README.md)。页面独立启用冻结样式；I1 当时尚未迁移的 Practice、History、Comparison、Settings 和 Help 后续接入见 §18～§20，不能将其早期状态读作当前缺失。
+主 Renderer 的 App Shell、准备、倒计时、录音/暂停、处理和普通 Report 使用冻结 Demo `ab714d6` 的视觉资产与布局。[Flow View](../../src/frozen-flow-view.js) 只适配现有 DOM 与样式启用，[Report 投影](../../src/frozen-report.js) 只展示同一真实记录的事实和保存结果；字体许可保留在 [frozen-ui](../../src/frozen-ui/README.md)。当前 Renderer 只保留这套界面：普通报告与针对性练习不再接受新旧布局开关，对比控制器与当前渲染器统一在 `src/comparison.js`；旧对比渲染器、`src/styles.css`、旧帮助弹窗及回退入口已移除。主窗口固定加载当前训练样式，报告样式按 Screen 启用。Flow View 仍负责共享控件在训练／报告区域间的生命周期与位置，不再切换旧界面。I1 当时尚未迁移的 Practice、History、Comparison、Settings 和 Help 后续接入见 §18～§20，不能将其早期状态读作当前缺失。
 
 `ExpressionTrainer` 在实际 ASR/capture 准备后执行倒计时；采集保持禁用，到零后才创建 Session 并接收音频。声音活动读取实际 PCM，处理页等待原收尾/分析任务，离开后由原操作保存结果。录音、ASR、VAD、SQLite、WAV 和保存重试仍复用既有实现；I1 未新增存储 schema、AI 告知机制或转写重试 API，后续 AI 接线见 §17。普通报告无 AI 时只显示真实事实、可用本地指标与未执行状态；缺失指标不补零。产品规则仍由 [Training Flow](../product/training-flow.md) 维护。
 
@@ -499,6 +499,8 @@ M4 仍需复核原重分析失败场景、整理重练过程 UI 并验收真实 
 上述 I1 native 验证使用隔离 userData 与校验过哈希的模型副本。当时 Codex MSIX 环境中的 Roaming 路径重定向让默认模型缓存被路径检查拒绝（`Model file escapes install root`），普通启动路径尚未覆盖。I6 已修复这处路径视图误判，并使用原生产缓存验证正常 Main 分支；本轮证据及剩余限制见 §21。
 
 部分 streaming 失败仍按既有机制中断并丢弃当前缓冲；已有 utterance/取消收尾可保留录音。界面不承诺不存在的转写恢复。音频保留与可追溯转写重试契约（迁移 MB3）留待单独决策，不将本切片视为该恢复能力完成。
+
+2026-11-05 界面收敛：默认报告与练习渲染、历史／对比区域滚动、训练与 Utility 入口只使用当前界面；共享控件的 DOM 搬移仍是当前布局职责。236 项定向 Node 检查、I1 训练、I3 重练及 I5 设置帮助 Electron 用例通过，DPR 1／1.5 的 64 个组合视口检查通过；普通报告 6 类输入的 DOM 与还原点当前布局分支一致。独立复核发现并修复不可比指标展开的函数引用遗漏，增加对应回归。I2／I4 的多尺寸检查已按当前确认界面收敛为显式字重／字号、无横向溢出、证据／重练控件位置、双列对比、长文本与删除弹窗检查，不再要求与早期 Demo 的旧按钮结构和排版完全相同；完整 I2／I4 功能及重启用例通过。旧报告生成及历史读取、数据协议和 AI 提示未在此轮变更。
 
 ## 17. I2 普通报告与真实 AI 接入
 
@@ -563,7 +565,7 @@ History 和 Comparison 接入同一 Frozen App Shell，沿用冻结列表、空�
 
 主 Renderer 的长工作区使用 `history-scroll`、`report-scroll`、`comparison-scroll` 容器；Report View State 与既有导航控制器按容器位置保存和恢复上下文，继续校验异步材料/历程的记录、报告与导航身份。实时计时节点固定在 `transport-time`，不再还原到 Header；导航由居中 Flex 容器排列，取消按不同页面标题测量平移。固定区和滚动区的产品边界由 [Training Flow §12.1 / §13.6](../product/training-flow.md#121-跨-screen-的-ux-约束) 维护。
 
-[Frozen Comparison](../../src/frozen-comparison.js) 展示既有只读 [Comparison Core](../../lib/session-comparison.js) 投影。进入时固定双方角色、Report 与结果引用，新增分析不替换输入；单侧完整报告下钻和返回恢复快照、展开、位置与焦点。无结构化报告的旧记录仍可固定读取健康事实，通用和框架 Finding 均保留 recommendation、可选 example 和真实引用。删除输入会使原对比失效，不自动换记录或从缓存恢复证据；音频异步读取后继续检查固定输入和当前展开容器。
+[Comparison Renderer](../../src/comparison.js) 展示既有只读 [Comparison Core](../../lib/session-comparison.js) 投影。进入时固定双方角色、Report 与结果引用，新增分析不替换输入；单侧完整报告下钻和返回恢复快照、展开、位置与焦点。无结构化报告的旧记录仍可固定读取健康事实，通用和框架 Finding 均保留 recommendation、可选 example 和真实引用。删除输入会使原对比失效，不自动换记录或从缓存恢复证据；音频异步读取后继续检查固定输入和当前展开容器。
 
 MB4 复用固定快照的填充词命中次数和每录音分钟频率，不新增单词/每百字统计，不以当前词表重算历史。录音时长来自已保存音频，指标定义与兼容规则仍由 [Data Model §5.3 / §10.1](data-model.md#101-m3-compatibility) 维护。保存值、原单位、词表、版本、ASR/VAD 来源、分母和覆盖逐项核对；缺失不补零，不能可靠比较时保留两侧保存值及原因、差值为空。总量、保存分母、实际识别来源差异与 VAD 未校准分别解释，只陈述观察，不生成好坏结论、雷达或跨录音 Finding 对应。
 

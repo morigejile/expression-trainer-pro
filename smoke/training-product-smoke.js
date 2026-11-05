@@ -256,7 +256,7 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
       assert.match(await evaluate(`document.getElementById('report-analysis-info').textContent`),new RegExp(labels[framework]));
       assert.match(await evaluate(`document.getElementById('report-summary-copy').textContent`),/本次未生成 AI 分析/);
       assert.equal(await evaluate(`document.querySelectorAll('#frozen-report .finding').length`),0);
-      assert.equal(await evaluate(`document.getElementById('legacy-styles').disabled`),true);
+      assert.equal(await evaluate(`document.getElementById('legacy-styles') === null`),true);
       const statuses=await evaluate(`document.querySelectorAll('#report-analysis-info .report-status').length`);
       await evaluate(`window.__trainingProductTrainer.flowView.show('report','preparing',window.__trainingProductTrainer.trainingRecords.selected())`);
       assert.equal(await evaluate(`document.querySelectorAll('#report-analysis-info .report-status').length`),statuses,'state refresh retains the actual unavailable/failure status');

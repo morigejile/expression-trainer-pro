@@ -124,7 +124,7 @@ async function run({mainWindow,BrowserWindow,evaluate,wait,capture}) {
           await reference.webContents.executeJavaScript(textStyle('.transcript-lines p:last-child')),
           'expanded report transcript retains frozen typography and final paragraph spacing');
       }
-      assert.equal(await evaluate(`document.getElementById('legacy-styles').disabled`),true);
+      assert.equal(await evaluate(`document.getElementById('legacy-styles') === null`),true);
     }
     const reportId=await evaluate(`window.__trainingProductTrainer.trainingRecords.selected().id`);
     mainWindow.setContentSize(1280,900);

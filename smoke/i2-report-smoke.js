@@ -25,7 +25,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
       await openHistory(id);const value=await session(id);
       assert.equal(value.framework,framework);assert.equal(value.artifact.state,'available');
       assert.equal(await evaluate(modal),false,'opening saved history never asks or starts AI');
-      await evaluate(`document.querySelectorAll('.finding-open').forEach(button=>button.click())`);
+      await evaluate(`document.querySelectorAll('.finding-evidence-toggle').forEach(button=>button.click())`);
       const latest=value.results.filter(run=>run.kind==='diagnosis' && run.status==='completed').at(-1).value;
       const count=[...latest.findings,...(latest.frameworkAnalysis?.findings || [])].filter(f=>typeof f.example==='string').length;
       assert.equal(await evaluate(`document.querySelectorAll('.example').length`),count);
@@ -69,7 +69,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   const original=await session(id),records=[{id,framework:null}];
   await click('btn-report');await wait('covered repeat finishes',`!${trainer}.trainingRecords.selected().reportPending`);
   assert.equal(await evaluate(modal),false);assert.equal(calls.llmDiagnosis,1,'complete history keeps existing reanalysis policy');
-  await evaluate(`document.getElementById('report-information').open=true;document.getElementById('report-materials').open=true;document.querySelector('.finding-open').click()`);
+  await evaluate(`document.getElementById('report-information').open=true;document.getElementById('report-materials').open=true;document.querySelector('.finding-evidence-toggle').click()`);
   assert.equal(await evaluate(`document.querySelector('.finding-details').open`),true);
   const savedExample=reportValue=>reportValue.results.filter(run=>run.kind==='diagnosis' && run.status==='completed').at(-1).value.findings[0].example;
   assert.equal(await evaluate(`document.querySelector('.example').textContent`),savedExample(await session(id)));

@@ -150,8 +150,8 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   const restoreComparison = async projection => {
     await evaluate(`document.querySelector('[data-detail-key="original-baseline"]').open=true;document.querySelector('[data-detail-key="finding-baseline-wording-0"]').open=true;document.querySelector('[data-detail-key="metric-filler-rate-per-recorded-minute"]').open=true`);
     await wait('Comparison details populated',`document.querySelector('[data-detail-key="original-baseline"] blockquote')`);
-    const scroll = await evaluate(`(()=>{window.scrollTo(0,550);return window.scrollY})()`);
-    assert.ok(scroll>0,'Comparison uses document scrolling');
+    const scroll = await evaluate(`(()=>{document.getElementById('comparison-scroll').scrollTop=550;return document.getElementById('comparison-scroll').scrollTop})()`);
+    assert.ok(scroll>0,'Comparison uses its regional scrolling');
     for (const role of ['baseline','target']) {
       await evaluate(`document.querySelector('[data-comparison-report="${role}"]').focus({preventScroll:true});document.querySelector('[data-comparison-report="${role}"]').click()`);
       await wait('opens pinned side Report',`document.body.dataset.screen==='report' && ${trainer}.reportSource==='comparison' && ${trainer}.viewingTrainingRecordId===${JSON.stringify(projection[role].session.id)}`);
@@ -161,7 +161,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
       assert.deepEqual(await evaluate(`${trainer}.comparison.context.projection.baseline.snapshot`),projection.baseline.snapshot);
       assert.deepEqual(await evaluate(`${trainer}.comparison.context.projection.target.snapshot`),projection.target.snapshot);
       for (const key of ['original-baseline','finding-baseline-wording-0','metric-filler-rate-per-recorded-minute']) assert.equal(await evaluate(`document.querySelector('[data-detail-key="${key}"]').open`),true);
-      assert.equal(await evaluate('window.scrollY'),scroll,'Report return restores window scroll');
+      assert.equal(await evaluate(`document.getElementById('comparison-scroll').scrollTop`),scroll,'Report return restores regional scroll');
       assert.equal(await evaluate('document.activeElement.dataset.comparisonReport'),role,'Report return restores opener focus');
     }
     check('Both Report drill-downs restore fixed pins, document scroll, disclosures and focus');
@@ -273,7 +273,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
         if(saved.practice){assert.match(text,/第\s*2\s*轮/);assert.ok(text.includes(saved.practice.goal.observation));}
         assert.doesNotMatch(text,/上游报告|下游报告/);
       }
-      assert.equal(await evaluate(`[...document.querySelectorAll('.history-row-actions')].every(e=>e.textContent==='删除')`),true);
+      assert.equal(await evaluate(`[...document.querySelectorAll('.history-row-actions')].every(e=>e.getAttribute('aria-label')?.startsWith('删除记录 '))`),true);
       for(let count=0;count<=4;count++) {
         await select(all.slice(0,count));
         assert.equal(await evaluate(`document.getElementById('btn-history-compare').disabled`),count!==2);
@@ -282,11 +282,11 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
         assert.equal(await evaluate(`document.querySelector('[data-compare-id="${seedIds.at(-1)}"]').disabled`),false,'two selections never disable a third valid Session');
       }
       const selection=[aId,practiceId,seedIds.at(-1)];await select(selection);
-      const historyScroll=await evaluate(`(()=>{window.scrollTo(0,750);return window.scrollY})()`);assert.ok(historyScroll>0);
+      const historyScroll=await evaluate(`(()=>{document.getElementById('history-scroll').scrollTop=750;return document.getElementById('history-scroll').scrollTop})()`);assert.ok(historyScroll>0);
       await evaluate(`document.querySelector('[data-record-id="${aiOffId}"]').focus({preventScroll:true});document.querySelector('[data-record-id="${aiOffId}"]').click()`);await ready();
       await evaluate(`document.getElementById('btn-report-back').click()`);
       await wait('Report restores History',`document.body.dataset.frozenUi==='history'`);
-      assert.equal(await evaluate('window.scrollY'),historyScroll);
+      assert.equal(await evaluate(`document.getElementById('history-scroll').scrollTop`),historyScroll);
       assert.deepEqual((await evaluate(`[...${trainer}.comparison.selection]`)).sort(),selection.sort());
       assert.equal(await evaluate(`document.querySelectorAll('.history-row-main[data-record-id]').length`),all.length);
       assert.equal(await evaluate('document.activeElement.dataset.recordId'),aiOffId);
@@ -372,7 +372,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
       await loadAll();
       assert.equal(await evaluate(`document.querySelector('[data-record-id="${success}"]')`),null,'a successfully deleted row cannot return from the preserved History DOM');
       assert.match(await evaluate(`document.querySelector('[data-record-id="${failed}"]').textContent`),/删除未完成/);
-      assert.equal(await evaluate(`document.querySelector('[data-record-id="${failed}"]').closest('.history-entry').querySelector('.history-row-actions').textContent`),'重试删除');
+      assert.equal(await evaluate(`document.querySelector('[data-record-id="${failed}"]').closest('.history-entry').querySelector('.history-row-actions').getAttribute('aria-label').startsWith('重试删除记录 ')`),true);
       assert.equal(await evaluate(`document.querySelector('[data-compare-id="${failed}"]').checked`),true);
       assert.deepEqual((await evaluate(`[...${trainer}.comparison.selection]`)).sort(),[failed,newChoice].sort(),'History return retains the failed item and new selection while removing the successful item');
       assert.deepEqual(aiCalls(),readCalls,'reading and returning during async deletion never requests AI');

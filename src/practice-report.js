@@ -25,23 +25,23 @@
     container.appendChild(button);
     return {button};
   }
-  function renderPractice(element,root,{record,projection,api,onPractice,onOpen,onEvidence,onLayout,frozen=false}) {
+  function renderPractice(element,root,{record,projection,api,onPractice,onOpen,onEvidence,onLayout}) {
     if (!record?.practice) return () => {};
     const practice = record.practice;
     const analysis=projection?.analysisRun,feedback=analysis?.value.practiceFeedback;
     const localTitle=record.saveState==='failed' && !record.factsSaved?'本轮训练尚未保存。':record.saveState==='incomplete'?'本轮训练尚未完成。':'本轮练习已保存。';
-    const section = element('section',`practice-result${frozen?' round-result':''}`);root.appendChild(section);
-    section.appendChild(element(frozen?'div':'h2',frozen?'round-label':null,`针对性练习 · 第 ${practice.round} 轮 · 相比上一轮`));
-    const feedbackSummary = element(frozen?'h2':'p','practice-feedback-summary',localTitle);
+    const section = element('section','practice-result round-result');root.appendChild(section);
+    section.appendChild(element('div','round-label',`针对性练习 · 第 ${practice.round} 轮 · 相比上一轮`));
+    const feedbackSummary = element('h2','practice-feedback-summary',localTitle);
     section.appendChild(feedbackSummary);
     const status = element('p','practice-change source-note',`相比上一轮：${states.unavailable}`);
     section.appendChild(element('p','practice-current-target',`练习目标：${practice.goal.observation}`));section.appendChild(status);
     let active = true;
     const urls = [], players = [];
     const request = sessionId => ({requestId:globalThis.crypto.randomUUID(),sessionId});
-    const history = element('details',`practice-history${frozen?' report-disclosure':''}`);
+    const history = element('details','practice-history report-disclosure');
     history.appendChild(element('summary',null,'查看练习历程'));
-    const historyBody = element('div',frozen?'chain':null);history.appendChild(historyBody);
+    const historyBody = element('div','chain');history.appendChild(historyBody);
     let historyLoading = false;
     history.addEventListener('toggle',async () => {
       if (!active || !history.open || historyLoading || !api?.getPracticeHistory) return;
@@ -53,7 +53,7 @@
         if (!response?.ok) throw new Error('Unavailable');
         historyBody.replaceChildren();
         for (const row of response.value) {
-          const line = element('div',`practice-round${frozen?' chain-item':''}`);
+          const line = element('div','practice-round chain-item');
           line.setAttribute('data-practice-round',row.round);
           line.appendChild(element('small',null,`${String(row.round).padStart(2,'0')} · ${row.round===1?'基准表达':row.sessionId===record.id?'当前轮':'针对性练习'}`));
           line.appendChild(element('p',null,row.deleted?'来源报告已删除':row.summary || '暂无可靠的练习变化结论'));
@@ -62,7 +62,7 @@
             for (const limitation of new Set((row.limitations || []).map(limitationText))) line.appendChild(element('p','source-note',limitation));
           }
           if (!row.deleted && row.reportId && !row.availabilityReasons?.includes('report-unavailable') && row.sessionId !== record.id && typeof onOpen === 'function') {
-            const open = element('button',frozen?'text-action':null,`查看第 ${row.round} 轮报告 →`);open.type = 'button';
+            const open = element('button','text-action',`查看第 ${row.round} 轮报告 →`);open.type = 'button';
             open.addEventListener('click',() => onOpen(row.sessionId,row.reportId,row.round));line.appendChild(open);
           }
           historyBody.appendChild(line);
@@ -70,15 +70,15 @@
       } catch { if (active) historyBody.replaceChildren(element('p',null,'历程暂时无法读取，重新展开可重试。')); }
       finally { historyLoading = false;if(active)onLayout?.('history'); }
     });
-    const evidence = element('details',`practice-evidence${frozen?' report-disclosure':''}`);evidence.appendChild(element('summary',null,'查看对比证据'));
+    const evidence = element('details','practice-evidence report-disclosure');evidence.appendChild(element('summary',null,'查看对比证据'));
     const evidenceBody = element('div');evidence.appendChild(evidenceBody);section.appendChild(evidence);
     section.appendChild(history);
-    const goal = element('article',`practice-goal${frozen?' round-action':''}`);
+    const goal = element('article','practice-goal round-action');
     goal.appendChild(element('p','finding-recommendation',practice.goal.recommendation));
-    const controls=element('div',frozen?'practice-controls':null);
+    const controls=element('div','practice-controls');
     const action=practiceAction(element,controls,practice.goal,onPractice,true);
     if(action && !projection?.snapshot?.id){action.button.disabled=true;controls.appendChild(element('p','source-note','本轮固定报告尚不可用，暂不能以当前轮继续。'));}
-    if (action && frozen) action.button.className+=' practice-action';
+    if (action) action.button.className+=' practice-action';
     goal.appendChild(controls);section.appendChild(goal);
     let source = null, sourceLoaded = false, sourceRead = null, sourceReport=null;
     const sourceStatus = element('p','practice-source-status');section.appendChild(sourceStatus);
@@ -131,7 +131,7 @@
       if (!active || !evidence.open || generation!==evidenceGeneration) return;
       evidenceBody.replaceChildren();
       if (!source) {evidenceBody.appendChild(element('p',null,sourceLoaded ? '来源报告已删除。' : '上一轮证据暂不可用，请重新展开重试。'));onLayout?.('evidence');return;}
-      const pair=element('div',frozen?'round-evidence':null);evidenceBody.appendChild(pair);
+      const pair=element('div','round-evidence');evidenceBody.appendChild(pair);
       for (const [label,segments,refs] of [['上一轮',source.transcript?.segments || [],feedback?.previousEvidenceRefs || []],
         ['本轮',record.segments || [],feedback?.currentEvidenceRefs || []]]) {
         const column=element('div');pair.appendChild(column);column.appendChild(element('h3',null,`${label} · 第 ${label==='上一轮'?practice.round-1:practice.round} 轮`));

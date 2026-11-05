@@ -24,7 +24,7 @@ function fixture({missing=false,failed=false,invalidRef=false,withoutReport=fals
   if (feedbackOverride) Object.assign(projection.analysisRun.value.practiceFeedback,feedbackOverride);
   const calls=[],opens=[];const api={getTrainingSession:async command=>{calls.push(command);return {ok:true,value:missing?null:previous};},getPracticeHistory:async command=>{calls.push(command);return {ok:true,value:historyRows || [{round:1,sessionId:'origin',reportId:'origin-r',deleted:false,summary:'基准表达',evidence:[]},{round:2,sessionId:'previous',reportId:'r',deleted:true,summary:null},{round:3,sessionId:'current',reportId:'current-r',deleted:false,summary:'当前反馈',evidence:[]}]};}};
   Object.assign(api,apiOverrides);
-  const practices=[],root=element('div'),dispose=renderPractice(element,root,{record,projection,api,frozen:true,onPractice:(...args)=>practices.push(args),onOpen:(...args)=>opens.push(args)});
+  const practices=[],root=element('div'),dispose=renderPractice(element,root,{record,projection,api,onPractice:(...args)=>practices.push(args),onOpen:(...args)=>opens.push(args)});
   return {root,record,previous,projection,calls,opens,practices,api,dispose};
 }
 

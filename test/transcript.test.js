@@ -46,7 +46,7 @@ function createElement(tagName = 'div') {
       };
     },
     classList: createClassList(),
-    style: {},
+    style: {setProperty(name,value) {this[name]=value;}},
     textContent: '',
     value: '',
     dataset: {},
@@ -637,7 +637,7 @@ for (const leaveReport of [false,true]) {
     assert.equal(record.audioUrl,'blob:playback');
     assert.equal(trainer.currentScreen,leaveReport ? 'history' : 'report');
     if (leaveReport) assert.equal(elementText(trainer.reportBody),previousBody);
-    else assert.match(elementText(trainer.reportBody),/保存恢复后的结构化诊断/);
+    else assert.match(elementText(document.getElementById('report-summary-copy')),/保存恢复后的结构化诊断/);
   });
 }
 
@@ -744,6 +744,20 @@ function startupTrainer(t, prepare, {
     require('node:fs').readFileSync(require.resolve('../preload'), 'utf8'),
     {require: () => ({ipcRenderer: ipc, contextBridge: {exposeInMainWorld: (name, api) => { window[name] = api; }}})}
   );
+  // Startup lifecycle tests stub the current UI adapters; their actual DOM and
+  // native-dialog behavior are exercised by Utility and Electron tests.
+  window.FrozenFlowView = {createFlowView: () => ({show() {}, preparation() {}})};
+  window.FrozenUtility = {createUtility: ({trainer}) => {
+    const dialog = document.getElementById('utility');
+    dialog.classList.add('hidden');
+    const utility = {dialog, closing:false,
+      open() {dialog.open=true;trainer.openModal(dialog,document.getElementById('close-surface'));},
+      requestClose() {this.closing=true;dialog.open=false;trainer.closeModal(dialog);this.closing=false;},
+      async prepareWindowClose() {this.requestClose();return true;}
+    };
+    document.getElementById('close-surface').addEventListener('click',()=>utility.requestClose());
+    return utility;
+  }};
   if (closeHandshake) window.api = {...window.api, ...closeHandshake};
   t.after(() => { delete global.document; delete global.window; });
   return new ExpressionTrainer({audioCaptureFactory: () => {
@@ -923,7 +937,7 @@ test('startup automatically prepares speech before enabling recording or reporti
   await flushMicrotasks();
   assert.equal(trainer.trainingStatus.textContent, '语音模型已就绪；开始时检查麦克风权限');
   assert.equal(trainer.btnStart.disabled, false);
-  assert.equal(trainer.btnStartLabel.textContent, '开始表达');
+  assert.equal(trainer.btnStartLabel.textContent, 'start');
   assert.equal(trainer.isRecording, false);
 });
 
@@ -945,7 +959,7 @@ for (const rejection of [false, true]) {
     await trainer.btnStart.dispatchEvent({type: 'click'});
     assert.equal(preparations, 2);
     assert.equal(trainer.trainingStatus.textContent, '语音模型已就绪；开始时检查麦克风权限');
-    assert.equal(trainer.btnStartLabel.textContent, '开始表达');
+    assert.equal(trainer.btnStartLabel.textContent, 'start');
     assert.equal(trainer.isRecording, false);
   });
 }

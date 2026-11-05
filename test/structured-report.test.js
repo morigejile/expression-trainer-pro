@@ -58,7 +58,7 @@ test('an insufficient saved report keeps local measurements without problem, fra
   const projection=api().selectStructuredReport(source);
   assert.ok(projection);
   const target=container();
-  api().renderStructuredReport(target,projection,{frozen:true,onReanalyze:()=>assert.fail('must not offer another framework'),
+  api().renderStructuredReport(target,projection,{onReanalyze:()=>assert.fail('must not offer another framework'),
     onPractice:()=>assert.fail('must not invent practice')});
   assert.match(target.textContent,/材料不足/);
   assert.match(target.textContent,/只有试音/);
@@ -133,7 +133,7 @@ test('finding and current-goal practice actions always request a full expression
 
 test('frozen finding practice stays outside collapsed evidence and evidence actions share the metadata header', () => {
   const target=container(),clicked=[],practiced=[];
-  api().renderStructuredReport(target,api().selectStructuredReport(runs()),{frozen:true,
+  api().renderStructuredReport(target,api().selectStructuredReport(runs()),{
     segments:[{id:'segment-1',text:'这是原文。',startMs:31000}],
     onEvidence:ref=>clicked.push(ref),onPractice:(...args)=>practiced.push(args)});
   const card=byClass(target,'finding')[0],details=byClass(card,'finding-details')[0];
@@ -248,15 +248,15 @@ test('hostile summary, findings and transcript quotes remain literal text and ne
   assert.equal(descendants(target,node=>node.tagName === 'BLOCKQUOTE')[0].textContent,hostile);
 });
 
-test('three primary findings and all additional findings remain accessible through native details', () => {
+test('the current report keeps all additional findings accessible through native details', () => {
   const target = container();
   api().renderStructuredReport(target,api().selectStructuredReport(runs('1',{findings:6})));
   assert.equal(byClass(target,'finding').length,6);
   const more = byClass(target,'more-findings')[0];
   assert.equal(more.tagName,'DETAILS');
   assert.equal(more.children[0].tagName,'SUMMARY');
-  assert.match(more.children[0].textContent,/更多发现.*3/);
-  assert.equal(byClass(more,'finding').length,3);
+  assert.match(more.children[0].textContent,/^更多$/);
+  assert.equal(byClass(more,'finding').length,5);
   assert.equal(byClass(target,'finding-details').length,6);
   for (const text of ['组织与衔接','论点与论据','节奏与停顿','措辞与口头禅','观察 5','解释 5','建议 5']) {
     assert.match(target.textContent,new RegExp(text));
@@ -265,7 +265,7 @@ test('three primary findings and all additional findings remain accessible throu
 
 test('frozen report initially shows only the first finding and keeps the remainder in a closed More disclosure', () => {
   for(const count of [0,1,2,4]){
-    const target=container();api().renderStructuredReport(target,api().selectStructuredReport(runs('1',{findings:count})),{frozen:true});
+    const target=container();api().renderStructuredReport(target,api().selectStructuredReport(runs('1',{findings:count})),{});
     const root=byClass(target,'structured-report')[0],more=byClass(root,'more-findings');
     assert.equal(root.children.filter(node=>node.className.split(' ').includes('finding')).length,Math.min(count,1));
     assert.equal(more.length,count>1?1:0);

@@ -29,104 +29,90 @@
   const valueText=(value,unit)=>Number.isFinite(value)?`${number(value)} ${UNITS[unit] || unit}`:'不可用';
   const reasonText=reason=>REASONS[reason] || '证据或分析暂不可用';
 
-  function renderComparison(container,projection,{onReport=()=>{},onPlay=()=>{}}={}) {
-    const document=container.ownerDocument;
-    const element=(tag,className,text)=>{const el=document.createElement(tag);if(className)el.className=className;if(text!==undefined)el.textContent=text;return el;};
-    const button=(text,action)=>{const el=element('button','btn-support btn-support-secondary',text);el.type='button';el.addEventListener('click',action);return el;};
-    function details(parent,key,label,build) {
-      const el=element('details','comparison-details');el.dataset.detailKey=key;
-      el.appendChild(element('summary',null,label));let built=false;
-      el.populateEvidence=()=>{if(el.open && !built){built=true;build(el);}};
-      el.addEventListener('toggle',el.populateEvidence);
-      parent.appendChild(el);return el;
+  const context=node?require('../shared/training-context'):globalThis.TrainingContext;
+  const labels={'audio-duration-ms':'录音时长','text-character-count':'转写字符数','filler-count':'填充词命中次数','filler-rate-per-recorded-minute':'填充词命中频率'};
+  const limitations={'vad-uncalibrated':'VAD 检测尚未完整校准；区间差异不表示节奏评分。','asr-observation-only':'识别来源不同或未知，文字差异可能来自识别结果。','totals-not-quality':'总量差异受录音长度与表达范围影响，不表示能力评分。','saved-denominator':'按各自保存的分母比较；不混用字符数、墙钟时长或其他分母。'};
+  function renderComparison(container,projection,{onReport=()=>{},onPlay=()=>{},onCollapse=()=>{}}){
+    const document=container.ownerDocument,sides=[projection.baseline,projection.target];
+    const el=(tag,className,text)=>{const node=document.createElement(tag);if(className)node.className=className;if(text!==undefined)node.textContent=text;return node;};
+    const button=(text,click)=>{const node=el('button','text-action',text);node.type='button';node.addEventListener('click',click);return node;};
+    const value=(number,unit)=>unit==='ms' && Number.isFinite(number)?valueText(number/1000,'秒'):valueText(number,unit);
+    function disclosure(parent,key,title,build){
+      const node=el('details','report-disclosure comparison-details');node.dataset.detailKey=key;node.appendChild(el('summary',null,title));let built=false;
+      node.populateEvidence=()=>{if(node.open && !built){built=true;const body=el('div');node.appendChild(body);build(body);}};
+      node.addEventListener('toggle',()=>{if(node.open)node.populateEvidence();else onCollapse();});parent.appendChild(node);return node;
     }
-    function evidence(parent,side,refs,visited=new Set()) {
-      for(const ref of [...new Set(refs)]) {
-        if(visited.has(ref))continue;
-        const branch=new Set(visited);branch.add(ref);
-        const item=side.evidence[ref];const row=element('div','comparison-evidence');parent.appendChild(row);
-        if(!item?.available){row.appendChild(element('p','comparison-note','该证据已缺失或不可用。'));continue;}
-        if(item.kind==='metric') {
-          row.appendChild(element('p',null,`${item.label}：${valueText(item.value,item.unit)}`));
-          evidence(row,side,item.evidenceRefs,branch);continue;
-        }
-        if(item.kind==='transcript')row.appendChild(element('blockquote',null,item.text));
-        const hasTime=Number.isFinite(item.startMs) && Number.isFinite(item.endMs);
-        if(hasTime)row.appendChild(element('p','comparison-note',`${number(item.startMs/1000)}–${number(item.endMs/1000)} 秒${item.timingSource==='estimated'?'（估计位置）':item.kind==='speech'?'（语音检测区间，未校准）':''}`));
-        else row.appendChild(element('p','comparison-note','没有可靠时间位置，可查看原文。'));
-        if(side.evidence.audio.available && hasTime) {
-          const player=element('audio','comparison-player');player.controls=true;player.preload='none';player.hidden=true;
-          const status=element('p','comparison-note');status.setAttribute('role','status');
-          row.appendChild(button('播放此处',()=>onPlay(side===projection.baseline?'baseline':'target',ref,player,status)));
-          row.appendChild(player);row.appendChild(status);
-        } else if(!side.evidence.audio.available)row.appendChild(element('p','comparison-note','音频不可用，文字仍可复盘。'));
+    function evidence(parent,side,refs,visited=new Set()){
+      for(const ref of new Set(refs || [])){
+        if(visited.has(ref))continue;const branch=new Set(visited);branch.add(ref);
+        const item=side.evidence[ref],block=el('div','evidence-block');parent.appendChild(block);
+        if(!item?.available){block.appendChild(el('p','source-note','该证据已缺失或不可用。'));continue;}
+        if(item.kind==='metric'){block.appendChild(el('p',null,`${labels[ref.slice(7)] || item.label}：${value(item.value,item.unit)}`));evidence(block,side,item.evidenceRefs,branch);continue;}
+        if(item.kind==='transcript'){block.appendChild(el('span',null,'你的原话'));block.appendChild(el('blockquote','evidence-quote',item.text));}
+        else block.appendChild(el('p','source-note',item.kind==='audio'?'已保存的录音':'VAD 模型检测区间，尚未校准。'));
+        const timed=Number.isFinite(item.startMs)&&Number.isFinite(item.endMs);
+        if(timed){const time=ms=>`${String(Math.floor(ms/60000)).padStart(2,'0')}:${String(Math.floor(ms/1000)%60).padStart(2,'0')}`;
+          const source=item.kind==='speech'?'检测区间':item.kind==='audio'?'录音范围':item.timingSource==='model-token'?'模型标记时间':'片段位置为估计值';
+          block.appendChild(el('p','source-note',`${source} · ${time(item.startMs)}—${time(item.endMs)}`));
+        }else block.appendChild(el('p','source-note','时间位置不可用，原文仍可查看。'));
+        if(side.evidence.audio.available && timed){const player=el('audio','comparison-player');player.controls=true;player.preload='none';player.hidden=true;const status=el('p','source-note');status.setAttribute('role','status');const role=side===projection.baseline?'baseline':'target';block.appendChild(button('播放此处',()=>onPlay(role,ref,player,status)));block.appendChild(player);block.appendChild(status);}
+        else if(!side.evidence.audio.available)block.appendChild(el('p','source-note','录音不可用，原文仍可查看。'));
       }
     }
     container.replaceChildren();
-    const sides=[projection.baseline,projection.target];
-    const header=element('div','comparison-pair');container.appendChild(header);
-    sides.forEach((side,index)=>{
-      const role=index===0?'baseline':'target';const card=element('section','comparison-card');header.appendChild(card);
-      card.appendChild(element('h2',null,index===0?'基线 · 较早记录':'目标 · 较晚记录'));
-      card.appendChild(element('p',null,new Date(side.session.createdAt).toLocaleString()));
-      const audioDuration=side.evidence.audio.endMs;
-      card.appendChild(element('p','comparison-note',`${side.session.trainingMode==='structured'?(side.session.framework || '结构化表达'):'自由表达'} · ${valueText(Number.isFinite(audioDuration)?audioDuration/1000:null,'秒')}`));
-      const prompt=side.session.trainingPrompt;
-      if(prompt?.text)card.appendChild(element('p',null,prompt.text));
-      const report=button('查看完整报告',()=>onReport(role));report.dataset.comparisonReport=role;card.appendChild(report);
-      details(card,`original-${role}`,'查看原文与录音',body=>{
-        body.appendChild(element('p','comparison-note',`识别来源：${side.sources.asr?.modelId || '未知'} · ${side.sources.asr?.modelVersion || '版本未知'}`));
-        const refs=(side.session.transcript?.segments || []).map(segment=>segment.id);
-        if(!refs.length)body.appendChild(element('p',null,side.session.transcript?.text || '暂无可读原文。'));
-        evidence(body,side,['audio',...refs]);
-      });
-    });
-    container.appendChild(element('p','comparison-note','差值 = 目标 − 基线。数值变化是本次表达的观察，不代表能力提升或下降。'));
-    if(projection.limitations.includes('framework-mismatch'))container.appendChild(element('p','comparison-note','两次训练框架不同，结构化指标无法直接比较；其他可用证据仍可查看。'));
-    const analysis=element('section','comparison-analysis');container.appendChild(analysis);
-    analysis.appendChild(element('h2',null,'问题与建议复盘'));
-    analysis.appendChild(element('p','comparison-note','暂未建立跨录音问题对应。以下为两侧已保存的发现，不自动判断改善、持续或新出现；缺少发现不表示问题消失。'));
-    for(const [category,label] of Object.entries(CATEGORIES)) {
+    const prompts=sides.map(side=>context.getPromptParts(side.session.trainingPrompt)),text=key=>prompts.map(parts=>parts[key]?.text || null);
+    const topic=text('topic'),scenario=text('scenario');
+    const subheading=[topic.every(value=>value===null)?'未设置主题':topic[0] && topic[0]===topic[1]?'同一主题':'不同主题',scenario.every(value=>value===null)?'未设置场景':scenario[0] && scenario[0]===scenario[1]?'同一场景':'不同场景',sides[0].session.trainingMode===sides[1].session.trainingMode && sides[0].session.framework===sides[1].session.framework?sides[0].session.trainingMode?context.formatTrainingContext({...sides[0].session,trainingPrompt:null}):'训练方式未保存':'不同训练方式'];
+    document.getElementById('comparison-context').textContent=subheading.join(' · ');
+    const header=el('section','compare-header'),identities=el('div','compare-identities'),fixed=document.getElementById('comparison-identities');header.appendChild(identities);
+    let originals;
+    if(fixed){fixed.replaceChildren(header);const section=el('section','comparison-originals');originals=el('div','comparison-pair');section.appendChild(originals);container.appendChild(section);}
+    else container.appendChild(header);
+    for(const [index,side] of sides.entries()){
+      const role=index?'target':'baseline',identity=el('div');identities.appendChild(identity);
+      const parts=context.getPromptParts(side.session.trainingPrompt),mode=side.session.trainingMode==='free'?'自由表达':side.session.trainingMode==='structured'?context.formatTrainingContext({...side.session,trainingPrompt:null}):'训练方式未保存';
+      identity.appendChild(el('small',null,index?'目标记录 · 较晚一次':'基线记录 · 较早一次'));
+      identity.appendChild(el('h2',null,parts.topic?.text || mode));
+      identity.appendChild(el('p',null,`${new Date(side.session.createdAt).toLocaleString()} · ${value(side.evidence.audio.endMs,'ms')}`));
+      identity.appendChild(el('p',null,[mode,parts.scenario?.text,side.session.practice?`针对性练习第 ${side.session.practice.round} 轮`:null].filter(Boolean).join(' · ')));
+      if(side.session.practice)identity.appendChild(el('p',null,`练习范围：${{sentence:'句子',segment:'片段',full:'完整表达'}[side.session.practice.scope]} · 目标：${side.session.practice.goal.observation}`));
+      for(const line of identity.children)if(['H2','P'].includes(line.tagName))line.setAttribute('title',line.textContent);
+      const open=button('查看这次报告 →',()=>onReport(role));open.dataset.comparisonReport=role;identity.appendChild(open);
+      const materials=originals?el('div'):identity;if(originals)originals.appendChild(materials);
+      disclosure(materials,`original-${role}`,'查看原文与录音',body=>{body.appendChild(el('p','source-note',`识别来源：${side.sources.asr?.modelId || '来源未保存'} · ${side.sources.asr?.modelVersion || '版本未保存'}`));const refs=(side.session.transcript?.segments || []).map(segment=>segment.id);if(!refs.length)body.appendChild(el('p',null,side.session.transcript?.text || '暂无可读原文。'));evidence(body,side,['audio',...refs]);});
+    }
+    const observations=projection.metrics.filter(metric=>['audio-duration-ms','filler-count'].includes(metric.id)&&metric.delta!==null);
+    if(observations.length){const section=el('section','report-section');section.appendChild(el('h2',null,'可以观察到的变化'));const insight=el('p','compare-insight');
+      for(const metric of observations){const line=el(metric.id==='filler-count'?'em':'span',null,`${labels[metric.id]}从 ${value(metric.baseline.value,metric.unit)} 变为 ${value(metric.target.value,metric.unit)}。`);insight.appendChild(line);insight.appendChild(el('br'));}section.appendChild(insight);section.appendChild(el('p','compare-note','这些是记录中的差异；时长更短或用词更少，不直接等于表达更好。'));container.appendChild(section);}
+    const analysis=el('section','report-section comparison-analysis');container.appendChild(analysis);const sectionHead=el('header','section-head');sectionHead.appendChild(el('h2',null,'分析与证据'));sectionHead.appendChild(el('small',null,'按类别查看两侧结果'));analysis.appendChild(sectionHead);
+    analysis.appendChild(el('p','source-note','两侧展示各自保存的分析，尚未自动建立问题对应关系。另一侧未返回 Finding 不表示问题改善或消失。'));
+    for(const [category,label] of Object.entries(CATEGORIES)){
       if(!sides.some(side=>side.findings.some(finding=>finding.category===category)))continue;
-      details(analysis,`category-${category}`,label,body=>{
-        const columns=element('div','comparison-pair');body.appendChild(columns);
-        sides.forEach((side,index)=>{
-          const column=element('section','comparison-card');columns.appendChild(column);column.appendChild(element('h3',null,index===0?'基线':'目标'));
-          const findings=side.findings.filter(finding=>finding.category===category);
-          if(!findings.length)column.appendChild(element('p',null,'该侧未返回此类发现，不代表没有问题。'));
-          for(const finding of findings) {
-            const findingEl=element('article','comparison-finding');column.appendChild(findingEl);
-            findingEl.appendChild(element('p','finding-observation',finding.observation));
-            findingEl.appendChild(element('p',null,finding.interpretation));
-            findingEl.appendChild(element('p',null,finding.recommendation));
-            evidence(findingEl,side,finding.evidenceRefs);
-          }
-        });
+      const group=el('article','comparison-group');group.dataset.category=category;group.appendChild(el('h3',null,label));const pair=el('div','comparison-pair');group.appendChild(pair);analysis.appendChild(group);
+      for(const [index,side] of sides.entries()){
+        const column=el('div');pair.appendChild(column);column.appendChild(el('small',null,index?'目标':'基线'));const findings=side.findings.filter(finding=>finding.category===category);
+        if(!findings.length)column.appendChild(el('p','source-note','此类别未保存分析项，无法判断问题是否存在或改善。'));
+        findings.forEach((finding,i)=>{const card=el('article','comparison-finding');column.appendChild(card);card.appendChild(el('h4','finding-observation',finding.observation));card.appendChild(el('p',null,finding.interpretation));card.appendChild(el('small',null,'下一轮怎么练'));card.appendChild(el('p',null,finding.recommendation));if(typeof finding.example==='string' && finding.example.trim()){card.appendChild(el('small',null,'一种表达参考'));card.appendChild(el('p','example',finding.example));}disclosure(card,`finding-${index?'target':'baseline'}-${category}-${i}`,'查看证据',body=>evidence(body,side,finding.evidenceRefs));});
+      }
+    }
+    for(const [i,side] of sides.entries())if(side.diagnosisStatus!=='completed')analysis.appendChild(el('p','source-note',`${i?'目标':'基线'}分析暂不可用；保存的原文、录音与健康指标仍可查看。`));
+    if(sides.every(side=>!side.findings.length))analysis.appendChild(el('p','source-note','两侧暂无可复盘的 Finding，不据此判断问题已解决。'));
+    const metrics=el('section','report-section comparison-measurements');metrics.appendChild(el('h2',null,'指标对比'));container.appendChild(metrics);const table=el('table','metric-table');metrics.appendChild(table);
+    const thead=el('thead'),head=el('tr');for(const title of ['指标','基线','目标','变化']){const th=el('th',null,title);th.setAttribute('scope','col');head.appendChild(th);}thead.appendChild(head);table.appendChild(thead);const body=el('tbody');table.appendChild(body);
+    for(const metric of projection.metrics){
+      const row=el('tr','comparison-metric');row.dataset.metricId=metric.id;body.appendChild(row);
+      const sideValue=side=>`${value(side?.value,side?.rawUnit || metric.unit)}${side?.available===false && Number.isFinite(side.value)?'（保存值，当前不可用）':''}`;
+      row.appendChild(el('td',null,labels[metric.id] || metric.label));row.appendChild(el('td',null,sideValue(metric.baseline)));row.appendChild(el('td',null,sideValue(metric.target)));row.appendChild(el('td','comparison-delta',metric.delta===null?'—':`${metric.delta>0?'+':''}${value(metric.delta,metric.deltaUnit)}`));
+      const noteRow=el('tr','metric-note-row'),cell=el('td');cell.colSpan=4;noteRow.appendChild(cell);body.appendChild(noteRow);
+      disclosure(cell,`metric-${metric.id}`,metric.status==='unavailable'?'暂时无法可靠比较 · 查看原因与证据':'查看口径与证据',detail=>{
+        detail.appendChild(el('p','source-note',metric.status==='unavailable'?`暂时无法可靠比较：${metric.reasons.map(reasonText).join('；')}`:metric.status==='normalized'?'已按保存的频率或占比口径比较，保留各自分母。':'可比；数值差异仅是观察，不表示能力评分。'));
+        if(metric.id==='filler-count' || metric.id==='filler-rate-per-recorded-minute')detail.appendChild(el('p','source-note','统计当次保存词表的填充词命中次数；频率为命中次数／已保存录音分钟数，分母包含静音。'));
+        for(const limitation of metric.limitations)detail.appendChild(el('p','source-note',limitations[limitation] || '比较需结合保存证据的限制。'));
+        const pair=el('div','comparison-pair');detail.appendChild(pair);for(const [index,side] of sides.entries()){const column=el('div','comparison-evidence-side');pair.appendChild(column);column.appendChild(el('small',null,index?'目标证据':'基线证据'));const sideMetric=index?metric.target:metric.baseline;if(!sideMetric?.available)column.appendChild(el('p','source-note',reasonText(sideMetric?.reason)));else evidence(column,side,sideMetric.evidenceRefs);}
       });
     }
-    sides.forEach((side,index)=>{if(side.diagnosisStatus!=='completed')analysis.appendChild(element('p','comparison-note',`${index===0?'基线':'目标'}：诊断不可用，已保存的文字、音频和指标仍可查看。`));});
-    if(sides.every(side=>side.diagnosisStatus==='completed' && !side.findings.length))analysis.appendChild(element('p',null,'两侧报告均未形成有充分证据的改善建议，不据此判断问题已解决。'));
-    const measurements=element('section','comparison-measurements');container.appendChild(measurements);measurements.appendChild(element('h2',null,'指标变化'));
-    for(const metric of projection.metrics) {
-      const row=element('article','comparison-metric');measurements.appendChild(row);row.dataset.metricId=metric.id;
-      row.appendChild(element('h3',null,metric.label));
-      const values=element('div','comparison-values');row.appendChild(values);
-      values.appendChild(element('p',null,`基线：${valueText(metric.baseline?.value,metric.baseline?.rawUnit || metric.unit)}`));
-      values.appendChild(element('p',null,`目标：${valueText(metric.target?.value,metric.target?.rawUnit || metric.unit)}`));
-      values.appendChild(element('p','comparison-delta',metric.delta===null?'差值：—':`差值：${metric.delta>0?'+':''}${valueText(metric.delta,metric.deltaUnit)}`));
-      row.appendChild(element('p','comparison-note',metric.status==='unavailable'?`暂时无法可靠比较：${metric.reasons.map(reasonText).join('；')}`:
-        metric.status==='normalized'?'需归一化 · 已按保存的速率/占比口径比较，保留各自分母。':'可比 · 总量差异受表达长度与任务影响。'));
-      if(metric.limitations.includes('vad-uncalibrated'))row.appendChild(element('p','comparison-note','语音检测尚未完整校准；区间差异不等于停顿过长或不流利。'));
-      if(metric.limitations.includes('asr-observation-only'))row.appendChild(element('p','comparison-note','识别来源不同或未知，文字差异可能来自识别结果。'));
-      details(row,`metric-${metric.id}`,'查看两侧证据',body=>{
-        sides.forEach((side,index)=>{const section=element('section','comparison-evidence-side');body.appendChild(section);section.appendChild(element('h4',null,index===0?'基线证据':'目标证据'));
-          const value=index===0?metric.baseline:metric.target;
-          if(!value?.available)section.appendChild(element('p','comparison-note',reasonText(value?.reason)));
-          else evidence(section,side,value.evidenceRefs);
-        });
-      });
-    }
-    container.appendChild(element('p','comparison-note','雷达未校准，暂不提供雷达数值对比。'));
+    table.appendChild(el('caption',null,'转写字符数不含标点；填充词命中频率单位为次／录音分钟，分母包含静音。变化为目标减基线，数值不表示能力评分。'));
+    disclosure(metrics,'compare-limits','比较范围与限制',detail=>{detail.appendChild(el('p',null,'本页固定两条所选记录与进入时的报告版本；训练方式、主题或练习范围不同时，需要结合上下文阅读。'));detail.appendChild(el('p',null,'对比只读取两次保存的结果，不重新运行识别或分析。某项缺失不影响其他资料查看，也不能据此认定问题已解决。'));detail.appendChild(el('p',null,'VAD 表示模型检测事实及局限；雷达未校准，暂不提供数值对比。'));});
   }
 
   function createComparisonController({trainer,api,document}) {
@@ -165,18 +151,18 @@
     }
     function capture() {
       if(!context)return;
-      context.scroll=(trainer.flowView?get('comparison-scroll'):area).scrollTop;
+      context.scroll=get('comparison-scroll').scrollTop;
       context.expanded=new Set([...content.querySelectorAll('details[data-detail-key]')].filter(el=>el.open).map(el=>el.dataset.detailKey));
     }
     function draw() {
       if(!context?.projection)return;
       const p=context.projection;
-      stopAudio();(trainer.flowView?globalThis.FrozenComparison.renderComparison:renderComparison)(content,p,{onReport:openReport,onPlay:play,onCollapse:()=>{action++;stopAudio();}});
+      stopAudio();renderComparison(content,p,{onReport:openReport,onPlay:play,onCollapse:()=>{action++;stopAudio();}});
       area.dataset.availability=p.availability;
       status.textContent=p.availability==='ready'?'已读取两次训练的保存结果':p.availability==='partial'?'部分项目暂不可比；可用内容仍可复盘。':'核心证据不足，暂时无法完成有意义的对比。';
       retry.hidden=p.availability!=='unavailable';
       for(const el of content.querySelectorAll('details[data-detail-key]'))if(context.expanded?.has(el.dataset.detailKey)){el.open=true;el.populateEvidence();}
-      (trainer.flowView?get('comparison-scroll'):area).scrollTop=context.scroll || 0;
+      get('comparison-scroll').scrollTop=context.scroll || 0;
     }
     async function read(expected=context) {
       if(!expected)return null;
@@ -194,7 +180,7 @@
     async function open() {
       syncSelection();if(compareButton.disabled || selection.size!==2 || trainer.isRecording || trainer.asrStartAttempt || trainer.recordingStopOperation)return;
       releaseAudio();request++;action++;
-      trainer.historyScroll=get(trainer.flowView?'history-scroll':'history-screen').scrollTop;trainer.historyReturnFocus='btn-history-compare';
+      trainer.historyScroll=get('history-scroll').scrollTop;trainer.historyReturnFocus='btn-history-compare';
       trainer.audioPlayer?.pause();trainer.releaseSavedRecordCache();
       context={ids:[...selection],projection:null,expanded:new Set(),scroll:0};
       trainer.setScreen('comparison');content.replaceChildren();get('comparison-identities')?.replaceChildren();status.textContent='正在读取两次训练…';retry.hidden=true;
@@ -204,7 +190,7 @@
       if(!context)return trainer.showHistory({restore:true});
       action++;
       trainer.audioPlayer?.pause();trainer.setScreen('comparison');status.textContent='正在检查原对比…';
-      if(await read()){draw();(trainer.flowView?get('comparison-identities'):content).querySelector(`[data-comparison-report="${context.reportSide || 'baseline'}"]`)?.focus({preventScroll:true});}
+      if(await read()){draw();get('comparison-identities').querySelector(`[data-comparison-report="${context.reportSide || 'baseline'}"]`)?.focus({preventScroll:true});}
     }
     async function openReport(role) {
       if(!context || loading)return;capture();stopAudio();

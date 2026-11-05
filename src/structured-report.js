@@ -31,7 +31,7 @@
     'occurrences/recorded-minute':'次/录音分钟'};
   const reasonText = reason => REASONS[reason] || '当前证据或分析不可用';
 
-  function renderStructuredReport(container,projection,{onEvidence,onReanalyze,onPractice,onOpen,onLayout,record,api,frozen:useFrozen=false,segments = []} = {}) {
+  function renderStructuredReport(container,projection,{onEvidence,onReanalyze,onPractice,onOpen,onLayout,record,api,segments = []} = {}) {
     container.replaceChildren();
     if (!projection) return;
     const document = container.ownerDocument;
@@ -43,10 +43,9 @@
     }
     const {evidenceRun,metricRun,analysisRun,latestAttempt} = projection;
     const root = element('section','structured-report');
-    const frozen=useFrozen || document.body?.dataset?.frozenUi==='report';
     root.setAttribute('aria-label','本次表达报告');
     const practiceView = typeof module === 'object' && module.exports ? require('./practice-report') : globalThis.PracticeReport;
-    const dispose = record?.practice ? practiceView.renderPractice(element,root,{record,projection,api,onPractice,onOpen,onEvidence,frozen,onLayout}) : () => {};
+    const dispose = record?.practice ? practiceView.renderPractice(element,root,{record,projection,api,onPractice,onOpen,onEvidence,onLayout}) : () => {};
     const successful = analysisRun.status === 'completed';
     const assessment=successful ? analysisRun.value.assessment : null;
     const insufficient=assessment?.status==='insufficient';
@@ -94,18 +93,15 @@
       const card = element('article','finding');
       const details = element('details','finding-details');
       details.setAttribute('data-finding-id',finding.id);
-      const summary=element('summary',frozen?'finding-evidence-toggle':null,frozen?'查看证据':'解释、建议与证据');
+      const summary=element('summary','finding-evidence-toggle','查看证据');
       details.appendChild(summary);
-      let content=details;
-      if (frozen) {
-        card.className+=' frozen-finding';
-        const row=element('div','finding-row');row.appendChild(element('span','finding-index',String(++findingIndex).padStart(2,'0')));
-        row.appendChild(element('p','finding-category',CATEGORIES[finding.category]));
-        const title=element('div');title.appendChild(element('h3','finding-observation',finding.observation));
-        details.id=`finding-detail-${finding.id}`;
-        details.addEventListener('toggle',()=>{summary.textContent=details.open?'收起证据':'查看证据';});
-        row.append(title);card.appendChild(row);content=element('div','finding-detail');details.appendChild(content);
-      } else card.append(element('p','finding-category',CATEGORIES[finding.category]),element('h3','finding-observation',finding.observation));
+      card.className+=' frozen-finding';
+      const row=element('div','finding-row');row.appendChild(element('span','finding-index',String(++findingIndex).padStart(2,'0')));
+      row.appendChild(element('p','finding-category',CATEGORIES[finding.category]));
+      const title=element('div');title.appendChild(element('h3','finding-observation',finding.observation));
+      details.id=`finding-detail-${finding.id}`;
+      details.addEventListener('toggle',()=>{summary.textContent=details.open?'收起证据':'查看证据';});
+      row.append(title);card.appendChild(row);const content=element('div','finding-detail');details.appendChild(content);
       const evidence = element('div','finding-evidence');
       for (const ref of finding.evidenceRefs) {
         const metric = ref.startsWith('metric:') ? metricById.get(ref.slice(7)) : null;
@@ -119,44 +115,42 @@
           if (metric) metricDetails.open = true;
           if (typeof onEvidence === 'function') onEvidence(ref);
         });
-        const block=frozen?element('div','evidence-block'):evidence;
-        if (frozen) {
-          const seconds=Number.isFinite(transcript?.startMs)?Math.floor(transcript.startMs/1000):null;
-          const header=element('div','evidence-header');
-          header.append(element('span',null,transcript ? `你的原话${seconds===null?'':` · ${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`}` : metric?'本地指标证据':'语音活动证据'),button);
-          block.appendChild(header);
-        }
+        const block=element('div','evidence-block');
+        const seconds=Number.isFinite(transcript?.startMs)?Math.floor(transcript.startMs/1000):null;
+        const header=element('div','evidence-header');
+        header.append(element('span',null,transcript ? `你的原话${seconds===null?'':` · ${String(Math.floor(seconds/60)).padStart(2,'0')}:${String(seconds%60).padStart(2,'0')}`}` : metric?'本地指标证据':'语音活动证据'),button);
+        block.appendChild(header);
         if (transcript) block.appendChild(element('blockquote','evidence-quote',transcript.text));
         if (speech) {
           block.appendChild(element('p','speech-interval',
             `VAD 模型估计区间：samples ${speech.startSample}–${speech.endSample}（终点不含在区间内），不表示词语起止。`));
         }
-        if (frozen) evidence.appendChild(block);else block.appendChild(button);
+        evidence.appendChild(block);
       }
       content.appendChild(evidence);
-      const guidance=frozen?element('div','finding-detail finding-guidance'):content;
-      guidance.append(element('h4',null,frozen?'为什么值得练':'解释'),element('p','finding-interpretation',finding.interpretation));
+      const guidance=element('div','finding-detail finding-guidance');
+      guidance.append(element('h4',null,'为什么值得练'),element('p','finding-interpretation',finding.interpretation));
       if (typeof finding.example==='string' && finding.example.trim()) content.append(element('h4',null,'一种表达参考'),element('p','example',finding.example));
-      guidance.append(element('h4',null,frozen?'下一轮怎么练':'建议'),element('p','finding-recommendation',finding.recommendation));
+      guidance.append(element('h4',null,'下一轮怎么练'),element('p','finding-recommendation',finding.recommendation));
       const controls=element('div','practice-controls');
       const action=practiceView?.practiceAction(element,controls,finding,onPractice);
       if (action) {
-        if (frozen) action.button.className+=' practice-action';
-        (frozen?guidance:card).appendChild(controls);
+        action.button.className+=' practice-action';
+        guidance.appendChild(controls);
       }
-      if (frozen) card.appendChild(guidance);
+      card.appendChild(guidance);
       card.appendChild(details);
       return card;
     }
     if (successful && !insufficient) {
       const framework = analysisRun.value.frameworkAnalysis;
-      const findings = frozen ? [...analysisRun.value.findings,...(framework?.findings || [])] : analysisRun.value.findings;
-      const priorityCount=frozen?1:3;
+      const findings = [...analysisRun.value.findings,...(framework?.findings || [])];
+      const priorityCount=1;
       root.appendChild(element('h2',null,'优先改善'));
       for (const finding of findings.slice(0,priorityCount)) root.appendChild(findingCard(finding));
       if (findings.length > priorityCount) {
-        const more = element('details',frozen?'more-findings report-disclosure':'more-findings');
-        more.appendChild(element('summary',null,frozen?'更多':`更多发现（${findings.length - priorityCount}）`));
+        const more = element('details','more-findings report-disclosure');
+        more.appendChild(element('summary',null,'更多'));
         for (const finding of findings.slice(priorityCount)) more.appendChild(findingCard(finding));
         root.appendChild(more);
       } else if (!findings.length) {
@@ -164,11 +158,10 @@
       }
       const labels = {prep:'PREP',star:'STAR',pyramid:'金字塔'};
       if (framework) {
-        const target=frozen?element('details','framework-analysis'):root;
-        target.appendChild(element(frozen?'summary':'h2',null,`${labels[framework.framework]} 专项分析`));
+        const target=element('details','framework-analysis');
+        target.appendChild(element('summary',null,`${labels[framework.framework]} 专项分析`));
         target.appendChild(element('p','framework-summary',framework.summary));
-        if (frozen) root.appendChild(target);
-        else for (const finding of framework.findings) root.appendChild(findingCard(finding));
+        root.appendChild(target);
       }
     }
     root.appendChild(metricDetails);

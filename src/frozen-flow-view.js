@@ -28,15 +28,13 @@
     byId('sound-bars').replaceChildren();
     for (let i=0;i<23;i++) byId('sound-bars').append(document.createElement('i'));
     function show(screen,state = 'preparing',record) {
-      const frozen = ['training','report','history','comparison'].includes(screen);
-      byId('legacy-styles').disabled = frozen;
-      byId('frozen-styles').disabled = !frozen;
-      byId('frozen-report-styles').disabled = !frozen || screen === 'training';
-      document.body.classList.toggle('beo',frozen);
-      document.body.classList.toggle('concept',frozen);
-      document.body.dataset.frozenUi = frozen ? screen : '';
+      if (!['training','report','history','comparison'].includes(screen)) throw new Error(`Unknown screen: ${screen}`);
+      byId('frozen-report-styles').disabled = screen === 'training';
+      document.body.classList.add('beo');
+      document.body.classList.add('concept');
+      document.body.dataset.frozenUi = screen;
       byId('frozen-report').classList.toggle('target-report',screen==='report' && Boolean(record?.practice));
-      const key = `${frozen}:${screen}:${state}`;
+      const key = `${screen}:${state}`;
       if (key !== layoutKey) {
         for (const [node,marker] of homes) marker.after(node);
         if (screen === 'training') {
@@ -52,7 +50,7 @@
           for (const id of ['btn-pause','btn-resume','btn-stop']) move(id,'transport-actions');
           move('training-status',state === 'processing' ? 'processing-status-detail' : 'preparation-notes');
           move('btn-leave-processing','processing-actions');move('btn-cancel-processing','processing-actions');
-        } else if (frozen) {
+        } else {
           move('playback-controls','report-audio');
           move('report-header','frozen-report-heading');move('report-ai-section','frozen-findings');
           move('btn-report-back','report-header');move('record-save-state','report-persistence-state');
@@ -64,9 +62,9 @@
       byId('btn-history').setAttribute('aria-current',screen === 'history' ? 'page' : 'false');
       byId('frozen-recording').classList.toggle('is-paused',state === 'paused');
       byId('recording-state-label').textContent=state === 'paused' ? '已暂停' : '录音中';
-      byId('report-header').querySelector('h1').textContent=frozen && screen === 'report' ? '这一次表达。' : '训练报告';
-      if (record && frozen && screen === 'report') root.FrozenReport.present(document,record);
-      if (frozen && screen === 'report' && record?.id !== reportId) {
+      byId('report-header').querySelector('h1').textContent=screen === 'report' ? '这一次表达。' : '训练报告';
+      if (record && screen === 'report') root.FrozenReport.present(document,record);
+      if (screen === 'report' && record?.id !== reportId) {
         byId('report-materials').open=false;byId('report-information').open=false;reportId=record?.id;
       }
     }

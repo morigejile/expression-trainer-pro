@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>宇宙无敌表达训练系统</title>
-  <link id="legacy-styles" rel="stylesheet" href="styles.css" disabled>
   <link id="frozen-styles" rel="stylesheet" href="frozen-ui/training.css">
   <link id="frozen-report-styles" rel="stylesheet" href="frozen-ui/report.css" disabled>
   <link rel="stylesheet" href="frozen-flow.css">
@@ -13,8 +12,6 @@
   <link rel="stylesheet" href="themes.css">
 </head>
 <body class="concept beo" data-screen="training" data-training-state="preparing" data-frozen-ui="training">
-  <!-- 洋红闪烁边框 -->
-  <div class="glow-border"></div>
 
   <svg class="icon-sprite" aria-hidden="true">
     <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M4 19V9m6 10V5m6 14v-7m4 7H2"/></symbol>
@@ -301,61 +298,6 @@
     </div>
   </div>
 
-  <!-- 帮助与反馈弹窗 -->
-  <div id="help-modal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="help-modal-title">
-    <div class="modal-content help-modal-content">
-      <div class="modal-header">
-        <h2 id="help-modal-title">帮助与反馈</h2>
-        <button id="btn-close-help" class="btn-close" aria-label="关闭帮助">×</button>
-      </div>
-      <div class="modal-body help-body">
-        <section class="help-section">
-          <h2>快速开始</h2>
-          <ol>
-            <li>等待准备完成，点击“开始表达”，允许应用使用麦克风。</li>
-            <li>讲话时查看字幕、本地统计和规则提示；可暂停、继续或结束。整段识别模型在结束后显示转写。</li>
-            <li>结束后自动保存并进入训练报告，可回放录音、查看逐字稿与统计。</li>
-            <li>可在报告内“分析这一次”，也可在设置中为所选服务启用“结束后自动诊断”；首次使用须先完成 AI 数据告知。诊断失败可重试，“分析回放”仍需主动点击。</li>
-            <li>从“训练历史”重开记录，或明确删除不再保留的记录。</li>
-          </ol>
-          <h3>字幕颜色</h3>
-          <div class="help-color-grid">
-            <span><b class="help-red">红色</b>：填充词</span>
-            <span><b class="help-orange">橙色</b>：犹豫词</span>
-            <span><b class="help-yellow">黄色</b>：笼统词</span>
-            <span><b class="help-green">绿色</b>：有力表达</span>
-          </div>
-          <p class="help-note">“设置”可配置 AI 服务与分析偏好；分析指令不属于本次训练题目。本应用当前处于内部开发测试阶段。</p>
-        </section>
-
-        <section class="help-section">
-          <h2 id="help-data-privacy">数据与隐私</h2>
-          <ul class="recording-policy-list">
-            <li>录音、逐字稿和已有分析结果自动保存在本机，重启应用后仍可从训练历史查看，直到你明确删除记录；</li>
-            <li>流式模型每次最长 20 分钟，整段识别模型最长 5 分钟；记录不会因为数量增加而自动淘汰；</li>
-            <li>原始录音留在本机，用于回放和字幕同步，不发送给远程 AI；</li>
-            <li>本地统计可离线使用；语音活动模型首次需要联网安装。AI 使用本地或远程模型，只有实际服务地址为回环地址时视为本地，不根据服务名称判断。</li>
-            <li>分析所需的数据包含本次逐字稿及片段引用、语音区间和音频时长、停顿及质量状态、确定性指标、分析指令、原训练方式与框架、可选主题和场景；针对性练习包含所选目标、范围和必要的上一轮转写与训练上下文。原始音频、密钥和无关历史不进入分析内容；远程服务按接口使用配置凭据认证。</li>
-            <li>首次告知在报告内弹出，覆盖本地与远程分析。自动分析已开启时先保存训练并进入报告，确认后才分析；关闭自动分析时只在主动分析时告知。取消或关闭不分析，也不记为已告知。</li>
-            <li>确认状态保存在本机，重启仍有效。覆盖范围未实质扩大时，再次分析、更换服务、模型或地址不重复告知；历史告知仅覆盖本地时首次远程分析须补齐，数据范围实质扩大时重新告知。</li>
-            <li>告知与自动分析授权独立：确认不打开自动分析。改变服务、模型或地址会关闭该配置的自动分析；可重新开启，已覆盖范围无需再次告知。关闭自动分析仍可主动分析这一次。打开历史只读取已保存结果。</li>
-          </ul>
-        </section>
-
-        <section class="help-section">
-          <h2 id="feedback-section-title">问题和建议</h2>
-          <p>问题与建议统一记录在腾讯在线文档中，便于内部测试阶段集中跟踪和处理。</p>
-          <p class="help-privacy-notice">如需提供错误线索，可先导出脱敏诊断 JSON，再将文件信息补充到在线文档。诊断信息不包含逐字稿、音频、密钥、绝对路径或完整错误堆栈。</p>
-          <p id="feedback-link-error" class="help-form-message" role="alert"></p>
-          <div class="help-actions">
-            <button id="btn-help-diagnostics" class="btn-support btn-support-secondary">导出诊断信息</button>
-            <button id="btn-open-feedback-document" class="btn-support">打开问题和建议文档</button>
-          </div>
-        </section>
-      </div>
-    </div>
-  </div>
-
   <script src="../shared/expression-rules.js"></script>
   <script src="../shared/text-statistics.js"></script>
   <script src="../shared/support-links.js"></script>
@@ -381,7 +323,6 @@
   </div>
   <script src="history.js"></script>
   <script src="comparison.js"></script>
-  <script src="frozen-comparison.js"></script>
   <script src="microphone-readiness.js"></script>
   <script src="../lib/appearance-config.js"></script>
   <script src="appearance.js"></script>
