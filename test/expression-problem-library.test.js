@@ -24,7 +24,7 @@ test('all 48 reviewed card IDs and required fields are compiled from the single 
   const source=fs.readFileSync(path.join(__dirname,'../docs/product/expression-problem-library.md'),'utf8');
   const compiled=compileProblemLibrary(source);
   assert.deepEqual(require('../lib/expression-problem-library.generated.json'),compiled,'regenerate after changing authoring content');
-  assert.equal(lib.PROBLEM_LIBRARY_VERSION,'expression-problem-library-v0.4');
+  assert.equal(lib.PROBLEM_LIBRARY_VERSION,'expression-problem-library-v0.5');
   assert.equal(lib.cards.length,48);
   assert.equal(new Set(lib.cards.map(x=>x.id)).size,48);
   for(const card of lib.cards){
@@ -75,7 +75,7 @@ test('production prompt assembles rules, dynamic cards, evidence limits, optiona
   assert.doesNotMatch(prompt.system,/\[PREP-\d|\[PYR-\d|### E01|想做看说|代码事实核对/);
   assert.match(prompt.system,/数值明显极端/);
   assert.match(prompt.system,/同一片段/);
-  assert.match(prompt.system,/expression-problem-library-v0\.4/);
+  assert.match(prompt.system,/expression-problem-library-v0\.5/);
   assert.doesNotMatch(prompt.system,/【5 针对性练习规则】/);
   assert.deepEqual(JSON.parse(prompt.user),source);
   const local=getStructuredDiagnosisPrompt(context('star','segment'));

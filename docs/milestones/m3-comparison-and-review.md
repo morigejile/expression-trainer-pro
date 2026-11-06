@@ -39,7 +39,7 @@ M2 已于 2026-09-19 关闭，复用其保存事实和 V1 结果契约。设备�
 
 | ID | 需求 / Owner | 核验重点 | 验证层 |
 |---|---|---|---|
-| AC-M3-01 | R-R01；Flow §13.2 | 0/1/2 选择、最多两条、显式对比、取消恢复；单条打开仍可用；跨 Framework 不拒绝整对 | Passed：Electron 产品流；跨 Framework 由 Core fixture 验证 |
+| AC-M3-01 | R-R01；Flow §13.2 | 0/1/2/3 条及以上选择；仅恰好两条可显式对比，三条及以上仍可批量删除；取消恢复、单条打开仍可用；跨 Framework 不拒绝整对 | 两条对比首版 Passed：Electron 产品流；多选／批量删除的后续接入证据见 [Current §19](../architecture/current.md#19-i4-history--comparison-接入)；跨 Framework 由 Core fixture 验证 |
 | AC-M3-02 | R-R01；Data Model §10 | 两侧角色、Session/revision/Report/Run 固定；较新失败结果不替换既有可用报告；打开比较零分析调用、零事实修改 | Passed：comparison-application / session-comparison / structured-report |
 | AC-M3-03 | R-R01/R-R02；Data Model §10.1 | 同口径、版本变化、词表变化/未知、ASR 差异、VAD 配置变化、单位/分母不同、零分母、缺失值；只输出获支持的差值 | Passed：session-comparison |
 | AC-M3-04 | R-R02；Flow §13.3 | 两侧 Finding/Evidence 归属正确；局部 ID 冲突不串证据；缺少 Finding/AI 不代表问题消失；首版不生成跨录音语义结论，按已关闭 D-13 / R-R02 验收 | Passed：session-comparison / comparison-renderer |

@@ -1,8 +1,9 @@
 (function(root, factory) {
-  const api = factory();
+  const api = factory(typeof module === 'object' && module.exports ? require('./help-guide') : root.HelpGuide,
+    typeof module === 'object' && module.exports ? require('./deepseek-guide') : root.DeepSeekGuide);
   if (typeof module === 'object' && module.exports) module.exports = api;
   else root.UtilityContent = api;
-})(typeof globalThis !== 'undefined' ? globalThis : this, function() {
+})(typeof globalThis !== 'undefined' ? globalThis : this, function(guideRenderer,deepseekGuide) {
   'use strict';
 
   const questions = [
@@ -67,6 +68,20 @@
   }
 
   function start(document, parent, options) {
+    if(options.firstRun){
+      const welcome=element(document,'section','first-use-welcome');
+      welcome.appendChild(element(document,'h2',null,'欢迎使用好好表达'));
+      welcome.appendChild(element(document,'p',null,'先准备语音识别，再按需配置 AI，完成第一次表达。可以暂时跳过，随时从帮助继续；查看引导不会开启录音或自动分析。'));
+      welcome.appendChild(button(document,'暂时跳过','dismiss','',options.onDismiss,'secondary-control'));
+      parent.appendChild(welcome);
+    }
+    const actions=element(document,'div','action-row quick-start-actions');
+    for(const[title,key,page,callback]of [
+      ['准备语音识别','setting','speech',options.onSettings],
+      ['配置 AI','setting','ai',options.onSettings],
+      ['DeepSeek 配置指南','help','deepseek',options.onHelp]
+    ])actions.appendChild(button(document,title,key,page,typeof callback==='function'?()=>callback(page):null,'secondary-control'));
+    parent.appendChild(actions);
     const steps = element(document, 'ol', 'steps');
     for (const [title, description] of [
       ['开始一次表达', '点击首页的 start。框架、主题和场景都可跳过；首次录音按提示确认说明并授权麦克风，倒计时后开始。录音中可以暂停、继续或结束。'],
@@ -135,9 +150,13 @@
 
   function help(document, parent, page, options = {}) {
     parent.replaceChildren();
-    const selected = ['start', 'report', 'privacy', 'feedback'].includes(page) ? page : 'start';
+    const selected = ['start', 'deepseek', 'report', 'privacy', 'feedback'].includes(page) ? page : 'start';
     const results = element(document, 'div'); results.id = 'help-results';
-    ({start, report, privacy, feedback})[selected](document, results, options);
+    if(selected==='deepseek'){
+      const actions=element(document,'div','action-row');
+      actions.appendChild(button(document,'打开 AI 配置','setting','ai',typeof options.onSettings==='function'?()=>options.onSettings('ai'):null,'secondary-control'));
+      results.appendChild(actions);guideRenderer.render(document,results,deepseekGuide,options);
+    }else ({start, report, privacy, feedback})[selected](document, results, options);
     parent.appendChild(results);
   }
 

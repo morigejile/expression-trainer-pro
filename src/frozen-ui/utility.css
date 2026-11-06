@@ -180,6 +180,21 @@
 #utility #content.content-scroll::-webkit-scrollbar-thumb:hover{background:#918572}
 #utility #content.content-scroll::-webkit-scrollbar-button{display:none;width:0;height:0}
 
+#utility .first-use-welcome{padding:0 0 20px;margin-bottom:20px;border-bottom:1px solid var(--line)}
+#utility .first-use-welcome h2{font-size:17px;font-weight:400;margin:0 0 10px}
+#utility .first-use-welcome p{line-height:1.8;color:var(--muted);margin:0 0 12px}
+#utility .quick-start-actions{display:flex;flex-wrap:wrap;gap:10px;margin:20px 0 24px}
+#utility .help-manual{overflow-wrap:anywhere;line-height:1.85;font-size:13px}
+#utility .help-manual h2{font-size:16px;font-weight:400;margin:28px 0 12px}
+#utility .help-manual li{margin:8px 0}
+#utility .help-manual code{font-size:12px;white-space:normal}
+#utility .guide-link{display:inline;padding:0;border:0;border-radius:0;background:none;color:var(--accent);font:inherit;text-decoration:underline;text-underline-offset:3px;cursor:pointer;text-align:left;overflow-wrap:anywhere}
+#utility .guide-link:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+#utility .guide-table{overflow-x:auto;margin:14px 0}
+#utility .guide-table table{border-collapse:collapse;width:100%;min-width:420px;font-size:12px}
+#utility .guide-table th,#utility .guide-table td{text-align:left;vertical-align:top;border-bottom:1px solid var(--line);padding:10px 12px;line-height:1.8}
+#utility .guide-table th{font-weight:500}
+
 @media(max-width:650px){
   #utility[data-surface="settings"] .activation-line{display:grid;grid-template-columns:minmax(0,1fr) 42px;gap:0 16px}
   #utility[data-surface="settings"] .activation-line>div{display:contents}

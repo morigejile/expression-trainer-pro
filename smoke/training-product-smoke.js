@@ -4,6 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 async function run({app, mainWindow, BrowserWindow, phase}) {
+  if(phase==='onboarding'||phase==='onboarding-read')return require('./first-use-smoke').run({app,mainWindow,BrowserWindow,phase});
   assert.ok(['write', 'read', 'offline', 'offline-read', 'degraded','m4','m4-read','i1','i1-read','i2','i2-read','i2-auto','i2-auto-read','i2-live-read','i3','i3-read','i4','i4-read','i5','i5-read','audio-background','countdown'].includes(phase));
   const offline = phase.startsWith('offline') || phase === 'countdown';
   if (offline) {

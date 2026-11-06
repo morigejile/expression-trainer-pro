@@ -67,6 +67,17 @@ test('Utility commands accept only the current Main document and reject same-URL
   assert.deepEqual(fs.readdirSync(f.root), []);
 });
 
+test('official manual links open only after a trusted explicit request; lookalikes and altered links are rejected',async t=>{
+ const f=fixture(t),{DEEPSEEK_GUIDE_URLS}=require('../shared/support-links');
+ assert.ok(Array.isArray(DEEPSEEK_GUIDE_URLS));
+ assert.deepEqual(f.effects.links,[]);
+ for(const url of DEEPSEEK_GUIDE_URLS){
+  assert.equal((await f.call('open-support-link',url)).success,true);
+  assert.equal((await f.call('open-support-link',url+'?tracking=unexpected')).success,false);
+ }
+ assert.deepEqual(f.effects.links,DEEPSEEK_GUIDE_URLS);
+});
+
 test('settings open in the main Utility and narrow preload notifications unsubscribe', async t => {
   const f = fixture(t);
   assert.deepEqual(await f.call('open-settings'), {success: true});

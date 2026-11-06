@@ -91,7 +91,7 @@ Owns use cases and transaction boundaries:
 - expose transcript/segment evidence to the UI;
 - trigger and store later metric or AI runs;
 - enforce the R-A04/R-A11 diagnosis scheduling and profile-enablement boundary;
-- distinguish re-analysis of existing evidence from re-training that creates a new session;
+- distinguish diagnosis retries on saved evidence, preserving the analysis target, from re-training that creates a new session;
 - compose one report view from Common Analysis, optional Framework Analysis, evidence, and AI Coaching;
 - own bounded report-generation waiting/timeout and per-part result availability required by [Training Flow §6–§7.4](../product/training-flow.md#6-自动持久化与分析状态); navigation does not own task lifetime or persistence;
 - enforce stale-result and late-event rules;
@@ -167,7 +167,7 @@ M2 separates four result classes:
 | Fact | capture/user input | audio, transcript, timestamps, task |
 | Speech evidence | versioned local model | neural VAD intervals |
 | Deterministic metric | versioned pure code | pace, pause duration, filler frequency |
-| AI interpretation | versioned provider call | organisation diagnosis, suggested rewrite |
+| AI interpretation | versioned provider call | organisation diagnosis, practice recommendations |
 
 事实与派生结果的信任规则见 [Data Model §3](data-model.md#3-fact-and-derived-data-rules)、[§5](data-model.md#5-later-derived-entities) 与 [§6](data-model.md#6-analysis-and-retraining-invariants)；确定性度量及雷达维度的验收分别见 [R-A01 / R-A05](../product/requirements.md#6-m2表达证据ai-分析与雷达图)。
 
@@ -183,7 +183,7 @@ TrainingSession facts
         ├── Common Analysis                    every analyzable session
         │     └── general organisation/structure is valid for Free
         │
-        ├── Framework Analysis                 when Structured, or on explicit re-analysis
+        ├── Framework Analysis                 selected framework; fixed-target retry
         │     └── PREP | STAR | Pyramid | later framework
         │
         └── AI Coaching                        default; explains evidence and suggests next action
@@ -196,13 +196,13 @@ Finding is the diagnosis single source of truth for the shared Report. Radar is 
 
 M2 的雷达交付边界按 R-A05 验收未校准状态；完整投影与校准按 Backlog B-20 重开，不成为 M2 Core 或 Report 的完成依赖。
 
-分析资格与重练来源关系统一由 [Data Model §6](data-model.md#6-analysis-and-retraining-invariants) 定义；用户流程见 [Training Flow §9–§11](../product/training-flow.md#9-带上下文再次进入-training-workspace)。Core 为重新分析与新训练提供不同命令，并复用同一 Session/report 边界，不复制交互规则。
+分析资格与重练来源关系统一由 [Data Model §6](data-model.md#6-analysis-and-retraining-invariants) 定义；用户流程见 [Training Flow §9–§11](../product/training-flow.md#9-带上下文再次进入-training-workspace)。Core 区分保持原分析目标的诊断失败重试与创建新 Session 的训练命令，并复用同一 Session/report 边界。历史不同框架的分析目标只按兼容规则恢复，不为既有录音提供新的换框架分析入口。
 
 报告生成按 Flow §6 使用完成等待与 timeout，不建设 progressive report rendering 管线。Core 汇总完成/局部失败/不可用结果，任务在 Renderer 导航离开后仍可管理并保存；超时结束本次等待/attempt，取消支持取消的底层任务，不可取消的迟到结果仍按 request/session/attempt 身份隔离，不复活旧等待或覆盖新一次重试。具体预算与恢复实现随 M2 细化，不新增独立调度服务。
 
 报告保持统一 composition。完整分析保留有效 findings，训练呈现层选择优先问题；首次报告与完整报告使用同一分析来源，不形成独立结论副本。展示顺序、数量和导航由 [Training Flow](../product/training-flow.md) 定义；架构只负责 Common Analysis、可选 Framework Analysis、Evidence 和 AI Coaching 的组合与证据引用。
 
-M3 的 comparison 属于 Application Core 的共同用例边界，为历史完整差异视图提供证据与版本兼容判断；M4 的针对性练习反馈复用该能力，在 Report 中投影聚焦目标的结果。两种展示不各自计算一套 comparison，也不因此新增通用比较框架或 M1 服务。数据不变量及 Practice Chain 的实体未决项分别由 [Data Model §10/§12](data-model.md) 维护。
+M3 的 comparison 属于 Application Core 的共同用例边界，为历史完整差异视图提供证据与版本兼容判断；M4 的针对性练习反馈复用该能力，在 Report 中投影聚焦目标的结果。两种展示不各自计算一套 comparison，也不因此新增通用比较框架或 M1 服务。比较不变量及已确认的重练来源表示分别由 [Data Model §10](data-model.md#10-comparison-invariants) 和 [§6](data-model.md#6-analysis-and-retraining-invariants) 定义；不将已关闭的 D-12/D-13 重新列为架构待决。
 
 ## 8. Privacy and network boundary
 
@@ -249,7 +249,7 @@ The target remains valid while these statements hold:
 4. A desktop runtime can be replaced without rewriting product requirements or derived-result schemas.
 5. No score or suggestion loses its evidence and version provenance.
 6. M1 adds only components needed for durable training records.
-7. Re-analysis can add a framework view without changing the session's recorded training mode or evidence.
+7. A diagnosis retry appends results while preserving the saved analysis target, recorded training mode and evidence.
 8. Adding a framework does not create a new session lifecycle, Common Analysis pipeline, or report architecture.
 9. AI diagnosis is attempted by default for completed analyzable sessions only through a valid profile; remote validity requires disclosed, explicit user enablement, while provider failure remains a recoverable derived-result state.
 10. Neural VAD can fail or be rerun without changing primary transcript facts. Selecting SenseVoiceSmall makes it the new Session's primary ASR; failure is explicit, and model selection or recovery never overwrites previously completed Session facts.

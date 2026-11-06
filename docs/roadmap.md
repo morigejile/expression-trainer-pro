@@ -85,7 +85,7 @@ M0 的 Complete 记录上述历史完成事件；[当时的审查](archive/revie
 | PKG-05 | P1 | Planned | 代码签名、checksums 和 release notes | 公开发布前具备凭据并验证来源与完整性 |
 | PKG-06 | P1 | Planned | 扩展支持矩阵 | 每个提升支持等级的平台均有对应 package/smoke 证据 |
 | OPS-01 | P1 | Deferred | 最小 CI/内测取包自动化 | 跨机取包成为反复痛点时增加可移除的手工 Windows workflow |
-| OPS-03 | P1 | Ongoing | 受控运行时与依赖升级 | 只因具体安全或兼容风险升级，并重跑能发现实质回归的验证 |
+| OPS-03 | P1 | Ongoing | 受控运行时与依赖升级 | Node/npm 按 [Development 的 Active LTS 政策](development.md#环境与安装) 跟进；其他运行时与依赖由具体安全或兼容风险触发，验证范围沿用 Development，不另维护升级政策 |
 | OPS-04 | P1 | Planned | 模型生命周期 | 定义 current/deprecated/removed、兼容期和回退 |
 | OPS-06 | P2 | Deferred | 自动更新评估 | 至少两个稳定手工发布后用 ADR 决定是否采用 |
 

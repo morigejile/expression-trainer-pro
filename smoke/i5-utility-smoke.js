@@ -60,7 +60,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     assert.equal(await evaluate(`document.querySelectorAll('dialog[open]').length`),1,'at most one native Utility is open');
     assert.equal(await evaluate(`document.getElementById('utility').matches(':modal')`),true,`Utility participates in the native dialog top layer; before=${JSON.stringify(beforeDialog)}`);
     assert.equal(BrowserWindow.getAllWindows().filter(window=>!window.isDestroyed() && !window.webContents.getURL().includes('/design-preview-merged/index.html')).length,1,'Utility uses the existing business window');
-    assert.equal(await evaluate(`document.querySelectorAll('#local-nav button').length`),4);
+    assert.equal(await evaluate(`document.querySelectorAll('#local-nav button').length`),surface==='help'?5:4);
     assert.doesNotMatch(await evaluate(`document.getElementById('local-nav').textContent`),/主题|布局|关于/);
   };
   const close = async () => {

@@ -43,7 +43,7 @@ This backlog keeps plausible future work visible without making it a dependency 
 ### M2 收尾非阻塞限制
 
 - 更细的服务错误文案：当前 503 等非认证/限流 HTTP 错误保存为通用 `analysis-failed`，本地事实保留且可显式重试。只有真实服务验收表明无法据此恢复时再细化，不为文案扩大当前 scope。
-- Finding 优先展示当前采用有效响应顺序的首三项，全部发现可展开；独立排序或反馈偏好优化留待真实使用证据，不在收尾增加评分或排序算法。
+- Finding 跨组排序与默认展示沿用 [Training Flow §7.1–§7.2](training-flow.md#71-完整分析与训练重点分层)，当前接入与验证限制见 [Current §17](../architecture/current.md#17-i2-普通报告与真实-ai-接入)。后续反馈偏好优化仍须由真实使用证据触发，不新增评分或权重算法。
 - 逐字音频对齐、逐帧 VAD 概率与专用可视化标注界面不进入当前验收工具。现有 Source 区间、原始 WAV、版本/质量及精确结果引用已支持 M2 的区间与汇总核验；只有已确认 Finding 需要词级定位，或实际边界错误无法用现有证据诊断时，再明确最小数据与工具范围后重开，不能因验收需要向正式 Report 加入全量调试数据。
 - Windows 文件符号链接权限跳过项与较低配置/其他设备覆盖不足保留为验证限制；复验入口与平台提升条件沿用 [Current §13](../architecture/current.md#13-m2-analysis-pipeline) 和 [支持矩阵](../support-matrix.md)，不把内部 M2 收尾变成公开平台资格认证。
 
@@ -51,19 +51,19 @@ This backlog keeps plausible future work visible without making it a dependency 
 
 ## Deferred product choices required by planned milestones
 
-These are not architecture projects. Decisions close before the named delivery slice; explicitly deferred items become prerequisites only when that capability is reopened.
+本表统一维护产品决策的当前状态、归属和证据入口，同时保留已关闭项供追溯；已关闭不等于所有模型、设备或发布验收均已通过。未决项在对应交付切片前收口，明确延期的能力只有按重开条件进入范围后才成为前置条件。
 
 | ID | Decision | Needed by | Required evidence/output |
 |---|---|---|---|
 | D-01 | 容量清理提醒：规则已确认，实施待排期 | After M1；未指定里程碑 | 唯一行为定义见 [Requirements §9.1](requirements.md#91-已确认的后续容量提醒策略实施待排期)。只待细化统计范围/计量单位、检测时机、清理后档位与提醒状态持久化；不以硬配额或自动删除替代可忽略提醒。 |
 | D-02 | Transcript correction scope | After M1 | User workflow and revision/provenance semantics |
-| D-03 | Timing-capable model support policy | M2 | Per-model capability matrix and graceful-degradation examples |
-| D-04 | Finding categories and Radar dimensions/scales | M2 类别与未校准边界已收口；完整校准归 B-20 | 初始 Finding 类别按 Training Flow §7.1；M2 不要求完成雷达定义、映射、量程或校准 |
+| D-03 | Timing-capable model support policy | M2 政策与默认路径验收已关闭 | 定义见 [Speech Contract §6](../architecture/speech-contract.md#6-time-and-timestamp-rules) / R-A06；适配器矩阵和质量/持久化降级已接入，默认真实路径见 M2 H-02。四款 ASR 仍无词级时间戳，不外推扩展设备。 |
+| D-04 | Finding categories and Radar dimensions/scales | M2 类别与未校准边界已关闭；完整校准归 B-20 | 初始类别与结构化校验边界见 [Training Flow §7.1](training-flow.md#71-完整分析与训练重点分层)；M2 不要求完整雷达定义、映射、量程或校准，类别不能直接作为图轴。 |
 | D-05 | Finding-scoped AI context boundary | B-17 重开时；M3 候选 | 明确来源 Finding / Evidence / Report / Session 的最小上下文、用户可见范围、删除与 token budget；不作为当前 Comparison 交付依赖 |
 | D-06 | Framework definitions and scoring | M4 首版决策已关闭 | 版本化定义、示例与证据边界见 [Training Flow §3.3](training-flow.md#33-训练前-guidance)；首版定性反馈，不提供未校准框架分数。实际验证边界见 M4 / Current。 |
-| D-07 | Neural VAD model, thresholds, and resource budget | M2 有限验收已关闭；扩大验证归 B-24 | 现有单一 Silero 的工程证据与有限人工复核满足本阶段；不将其写成统计准确率、完整阈值或资格线资源预算认证。 |
-| D-08 | SenseVoiceSmall 可选主 ASR 的集成与资源验证 | 集成证据保留；下载/实机验收延期至 B-23 | 沿用 ADR-0009 的 utterance/5 分钟有界缓冲基线；下载修复、真实等待/资源、取消恢复和离线使用按 B-23 一并验收，公开分发许可独立跟进。 |
-| D-09 | Default AI onboarding and initial profile availability | M2 | Fresh-install flow defining how local and remote profiles are distinguished, when a profile becomes active, and how the accepted R-A11 disclosure/enablement boundary is presented |
+| D-07 | Neural VAD model, thresholds, and resource budget | M2 有限验收已关闭；扩大验证归 B-24 | 单一 Silero 的工程证据见 [Current §13](../architecture/current.md#13-m2-analysis-pipeline)，有限人工复核见 M2 H-01；保留未校准标记，不将其写成统计准确率、完整阈值或资格线资源预算认证。 |
+| D-08 | SenseVoiceSmall 可选主 ASR 的集成与资源验证 | 集成证据保留；下载/实机验收延期至 B-23 | R-A10 与 [Speech Contract §4.1](../architecture/speech-contract.md#41-start) 定义产品角色和输入契约，沿用 ADR-0009 的 utterance/5 分钟缓冲基线。Provider、自动化、有限资源及历史包内执行证据不代替实机验收；下载修复、真实等待/资源、取消恢复和离线使用按 B-23 一并验收，公开分发许可独立跟进。 |
+| D-09 | Default AI onboarding and initial profile availability | M2 profile 规则与真实 AI E2E 已关闭 | R-A11 / [Training Flow §6.1](training-flow.md#61-m2-自动诊断的配置与启用) 定义首次无预置 profile、显式启用/撤销、身份变更撤销与告知门禁；自动化覆盖异常和离线恢复，真实成功链路见 M2 H-03。未执行的真实故障组合不冒充人工通过。 |
 | D-10 | M2 本地实时规则与结束后 AI 的分工 | M2；决策已关闭 | 按 Training Flow §4 实施并验证；后续可选实时 AI 的上下文、触发、延迟/成本与独立启用归 B-19，不重开当前阶段选择。 |
 | D-11 | 报告复制／导出／分享、备份 | After M1；后续待办，未指定里程碑 | 先明确报告/详情入口、格式与数据范围、分享方式、备份及恢复边界；不预设云分享或账号。M1 首页移除复制/保存不等于永久禁止这些能力，也不将诊断 JSON 导出误并为训练内容导出。 |
 | D-12 | Practice Chain 的实体与关系表达 | M4 首版决策已关闭 | 产品语义见 [Training Flow §10.2](training-flow.md#102-多轮练习历程)，最小来源关系快照见 [Data Model §6](../architecture/data-model.md#6-analysis-and-retraining-invariants)。轮次恢复和来源删除占位的自动化/人工证据见 [Current §15](../architecture/current.md#15-m4-training-context)，不预建通用链框架。 |
@@ -71,16 +71,7 @@ These are not architecture projects. Decisions close before the named delivery s
 
 ### M2 decision state
 
-“Decision closed” only means the product/architecture rule is no longer an open choice. It never means the model integration, benchmark, resource evidence, or acceptance criterion has been implemented or passed.
-
-| ID | 本轮状态 | Canonical owner | 仍需交付/证据 |
-|---|---|---|---|
-| D-03 | **Closed for M2 — policy and default-path acceptance** | [Speech Contract §6](../architecture/speech-contract.md#6-time-and-timestamp-rules)、R-A06 | 适配器矩阵与质量/持久化降级已实施；默认真实路径验收见 M2 H-02，扩展设备不外推。四款 ASR 仍无词级时间戳。 |
-| D-04 | **Closed for M2 — categories and uncalibrated boundary; full calibration deferred** | [Training Flow §7.1](training-flow.md#71-完整分析与训练重点分层)、[Target §7](../architecture/target.md#7-analysis-architecture)、R-A05 | 四类初始 Finding 已确认并有结构化校验；M2 保持未校准、无数值评分或多边形，不把类别直接当图轴。完整维度映射、量程与校准归 B-20，不是 M2 closeout 依赖。 |
-| D-07 | **Closed for M2 — limited manual review accepted** | [Data Model §5.1–§5.3](../architecture/data-model.md#51-speech-evidence-v1)、R-A09 | 单一 Silero 工程及制品证据见 Current §13，有限 VAD/Evidence 人工验收见 M2 H-01；保留未校准来源标记，扩大统计/资源验证按 B-24 重开。 |
-| D-08 | **Deferred — download defect and real-device/resource acceptance (B-23)** | R-A10、[Speech Contract §4.1](../architecture/speech-contract.md#41-start) | Provider、自动化、有限资源和历史包内执行证据保留；用户本轮模型下载异常，未通过真实设备验收。按 B-23 合并修复/验收，不阻塞 M2，不新增自动切换或音频重放。 |
-| D-09 | **Closed for M2 — profile rules and real AI E2E accepted** | R-A11、[Training Flow §6.1](training-flow.md#61-m2-自动诊断的配置与启用) | 首次无预置 profile、显式启用/撤销、身份变更撤销、异常与离线恢复已有自动化证据；真实外部 AI 成功链路见 M2 H-03，未执行的真实故障组合不冒充人工通过。 |
-| D-10 | **Closed — M2 local rules during training, AI after recording** | [Training Flow §4](training-flow.md#4-训练页与实时交互)、R-A04 | 验证训练中没有自动实时 AI、结束后按已启用配置调度结构化诊断，并维持 ASR 主文本隔离；未来独立启用的可选实时 AI 按 B-19 重开。 |
+M2 决策的状态、Owner 与剩余验证统一见[上方决策表](#deferred-product-choices-required-by-planned-milestones)，不另维护一份状态表。决策关闭只表示该规则不再未决；真实 AI 语义质量、扩展设备与公开交付仍按各自 Owner 和里程碑验收。
 
 ## Screen Structure 与 Interaction TBD 的唯一入口
 

@@ -77,6 +77,39 @@ test('quick-start shows all steps and FAQs without search', () => {
   assert.doesNotMatch(fixture.parent.textContent, /搜索结果|没有找到/);
 });
 
+test('first-use quick start can be skipped and its setup actions never run before a click', () => {
+  const fixture=view(),calls=[];
+  help(fixture,'start',{firstRun:true,onDismiss:()=>calls.push('skip'),onSettings:page=>calls.push(page),onHelp:page=>calls.push(page)});
+  assert.match(fixture.parent.textContent,/欢迎使用好好表达/);
+  assert.deepEqual(calls,[]);
+  click(fixture.parent.querySelector('[data-setting="speech"]'));
+  click(fixture.parent.querySelector('[data-setting="ai"]'));
+  click(fixture.parent.querySelector('[data-help="deepseek"]'));
+  click(fixture.parent.querySelector('[data-dismiss]'));
+  assert.deepEqual(calls,['speech','ai','deepseek','skip']);
+  help(fixture,'start',{firstRun:false});
+  assert.equal(fixture.parent.querySelector('[data-dismiss]'),null);
+  assert.doesNotMatch(fixture.parent.textContent,/欢迎使用好好表达/);
+});
+
+test('DeepSeek manual is complete offline and opens only explicit official links',()=>{
+  const fixture=view(),calls=[];
+  help(fixture,'deepseek',{onExternal:url=>calls.push(url),onSettings:page=>calls.push(page)});
+  assert.match(fixture.parent.textContent,/API 密钥.*deepseek-flash/s);
+  assert.match(fixture.parent.textContent,/测试连接不保存配置/);
+  assert.match(fixture.parent.textContent,/启动AI分析.*首次.*告知/s);
+  assert.match(fixture.parent.textContent,/401.*402.*429/s);
+  assert.equal(fixture.parent.querySelectorAll('table').length,2);
+  assert.equal(fixture.parent.querySelectorAll('iframe').length,0);
+  assert.equal(fixture.parent.querySelectorAll('script').length,0);
+  assert.deepEqual(calls,[]);
+  click(fixture.parent.querySelector('[data-external="https://platform.deepseek.com/"]'));
+  assert.deepEqual(calls,['https://platform.deepseek.com/']);
+  help(fixture,'start',{onHelp:page=>calls.push(page)});
+  click(fixture.parent.querySelector('[data-help="deepseek"]'));
+  assert.equal(calls.at(-1),'deepseek');
+});
+
 test('quick-start describes optional AI and renders two full answers without disclosure controls', () => {
   const fixture=view(),settings=[];
   help(fixture,'start',{onSettings:page=>settings.push(page)});

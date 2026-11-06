@@ -77,6 +77,10 @@ test('I5 Frozen Settings and Help use guarded real IPC, preserve workspace state
   const userData=isolatedData(t);runPhase(userData,'i5');runPhase(userData,'i5-read');
 });
 
+test('first-use welcome skips once and the offline DeepSeek guide remains available after restart',{timeout:120000},t=>{
+  const userData=isolatedData(t);runPhase(userData,'onboarding');runPhase(userData,'onboarding-read');
+});
+
 test('AudioWorklet recording survives hidden windows without debugger or polling and restores idle scheduling',{timeout:120000},t=>{
   runPhase(isolatedData(t),'audio-background');
 });

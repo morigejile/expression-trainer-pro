@@ -19,6 +19,20 @@ const deferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;})
 test('a late model operation keeps its real state without replacing a new preferences editor',async()=>{const f=fixture(),done=deferred();f.api.switchAsrModel=()=>done.promise;await f.ui.open('settings','speech');const task=f.ui.modelAction('model','switch');await f.ui.show('settings','preferences');f.ui.state.updatePreference('goals','新草稿');const before=f.document.getElementById('content').querySelector('[data-pref]');before.focus();done.resolve({ok:false});await task;assert.equal(f.document.getElementById('content').querySelector('[data-pref]'),before);assert.equal(f.document.activeElement,before);assert.equal(f.ui.state.prefs.goals,'新草稿');assert.doesNotMatch(f.document.getElementById('content').textContent,/模型操作/);});
 test('a late diagnostic export cannot append success to another Help page',async()=>{const f=fixture(),done=deferred();f.api.exportDiagnostics=()=>done.promise;await f.ui.open('help','feedback');const task=f.ui.exportDiagnostics();await f.ui.open('help','privacy');done.resolve({success:true});await task;assert.doesNotMatch(f.document.getElementById('content').textContent,/已导出/);});
 
+test('AI setup links to the manual, protects a draft and restores the manual as an ordinary Help page',async()=>{
+ const f=fixture();f.api.getLlmProviderSettings=async()=>({schemaVersion:3,activeProfileId:null,profiles:[]});
+ await f.ui.open('settings','ai');
+ const link=f.document.getElementById('content').all().find(el=>el.attrs['data-help']==='deepseek');
+ assert.ok(link);assert.match(link.textContent,/配置指南/);
+ f.ui.state.edit(null);f.ui.state.update('name','未保存的配置');
+ link.listeners.click();assert.equal(f.ui.surface,'settings');assert.equal(f.ui.state.draft.name,'未保存的配置');
+ assert.equal(f.document.getElementById('unsaved').hidden,false);
+ f.document.getElementById('discard').listeners.click();await new Promise(done=>setImmediate(done));
+ assert.equal(f.ui.surface,'help');assert.equal(f.ui.page,'deepseek');
+ assert.equal(f.document.getElementById('surface-title').textContent,'DeepSeek 配置指南');
+ assert.ok(f.document.getElementById('local-nav').all().some(el=>el.attrs['data-page']==='deepseek'));
+});
+
 test('Appearance keeps native radios and focus during saving, failure and retry; other drafts are protected',async()=>{
  const {createAppearanceController}=require('../src/appearance'),pending=deferred(),saved={schemaVersion:1,theme:'graphite',layout:'coach-rail'};let fail=true;
  const appearance=createAppearanceController({root:{dataset:{}},api:{getAppearance:async()=>saved,saveAppearance:async value=>{await pending.promise;return fail?{success:false,error:'外观保存失败，请重试。'}:{success:true,appearance:value};}}});
