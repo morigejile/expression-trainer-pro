@@ -19,7 +19,8 @@ test('legacy report retains findings and evidence but never displays retired sum
   const before=JSON.stringify(source),target=container();
   api().renderStructuredReport(target,api().selectStructuredReport(source),{onReanalyze:()=>assert.fail('retired')});
   assert.match(target.textContent,/观察 0/);
-  assert.doesNotMatch(target.textContent,/旧表达参考|一种表达参考|旧专项摘要|换个框架|雷达|为什么值得练/);
+  assert.doesNotMatch(target.textContent,/旧表达参考|一种表达参考|旧专项摘要|换个框架|雷达/);
+  assert.match(target.textContent,/为什么值得练解释 0/);
   assert.equal(JSON.stringify(source),before);
 });
 
@@ -207,6 +208,20 @@ test('more disclosure changes its footer label while preserving native expanded 
   assert.equal(more.children[0].textContent,'更多');
   more.open=true;more.listeners.toggle();assert.equal(more.children[0].textContent,'收起');
   more.open=false;more.listeners.toggle();assert.equal(more.children[0].textContent,'更多');
+});
+
+test('optional explanations use a compact labeled row without inventing missing content',()=>{
+  for(const hasExplanation of [true,false]){
+    const source=runs();if(!hasExplanation)delete source[2].value.findings[0].interpretation;
+    const target=container();api().renderStructuredReport(target,api().selectStructuredReport(source),{onPractice:()=>{}});
+    const why=byClass(target,'finding-why-guidance');assert.equal(why.length,hasExplanation?1:0);
+    if(hasExplanation){
+      assert.equal(descendants(why[0],node=>node.tagName==='H4')[0].textContent,'为什么值得练');
+      assert.equal(byClass(why[0],'finding-interpretation')[0].textContent,'解释 0');
+    }else assert.doesNotMatch(target.textContent,/为什么值得练/);
+    assert.equal(byClass(target,'finding-practice-guidance').length,1);
+    assert.equal(byClass(target,'finding-category')[0].textContent,'问题语义类型：组织与衔接');
+  }
 });
 
 test('damaged optional framework or practice results cannot replace an earlier readable report', () => {

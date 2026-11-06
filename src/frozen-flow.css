@@ -137,25 +137,25 @@ body[data-frozen-ui="report"] .session-report .frozen-finding .finding-observati
 body[data-frozen-ui="report"] .frozen-finding .finding-details{margin:0}
 body[data-frozen-ui="report"] .frozen-finding .finding-detail{padding-bottom:22px}
 body[data-frozen-ui="report"] .frozen-finding .finding-guidance{padding-bottom:10px}
-body[data-frozen-ui="report"] #frozen-findings .finding-practice-guidance{display:grid;grid-template-columns:84px minmax(0,1fr);gap:0 14px;align-items:baseline}
-body[data-frozen-ui="report"] #frozen-findings .finding-interpretation+.finding-practice-guidance{margin-top:14px}
-body[data-frozen-ui="report"] #frozen-findings .finding-practice-guidance>h4{margin:0;font-size:11px;font-weight:500;color:var(--muted);line-height:1.8}
-body[data-frozen-ui="report"] #frozen-findings .finding-practice-guidance>p{margin:0;font-size:13px;font-weight:400;color:var(--ink);line-height:1.8;overflow-wrap:anywhere}
+body[data-frozen-ui="report"] #frozen-findings :is(.finding-why-guidance,.finding-practice-guidance){display:grid;grid-template-columns:84px minmax(0,1fr);gap:0 14px;align-items:baseline}
+body[data-frozen-ui="report"] #frozen-findings .finding-why-guidance+.finding-practice-guidance{margin-top:12px}
+body[data-frozen-ui="report"] #frozen-findings :is(.finding-why-guidance,.finding-practice-guidance)>h4{margin:0;font-size:11px;font-weight:500;color:var(--muted);line-height:1.8}
+body[data-frozen-ui="report"] #frozen-findings :is(.finding-why-guidance,.finding-practice-guidance)>p{margin:0;font-size:13px;font-weight:400;color:var(--ink);line-height:1.8;overflow-wrap:anywhere}
 body[data-frozen-ui="report"] .frozen-finding .finding-details>summary{margin-left:42px;width:fit-content;justify-content:flex-start;gap:8px;color:var(--accent)}
 @media(max-width:460px){body[data-frozen-ui="report"] .frozen-finding .finding-details>summary{margin-left:32px}}
 body[data-frozen-ui="report"] .frozen-finding .finding-open svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.3}
 body[data-frozen-ui="report"] .frozen-finding .finding-open[aria-expanded="true"] svg{transform:rotate(180deg)}
 body[data-frozen-ui="report"] .session-report .frozen-finding .practice-controls{margin-top:18px;align-items:flex-start}
-body[data-frozen-ui="report"] #frozen-findings .finding-actions{display:grid;grid-template-columns:100px minmax(0,1fr);gap:0 12px;align-items:start}
+body[data-frozen-ui="report"] #frozen-findings .finding-actions{display:grid;grid-template-columns:76px minmax(0,1fr);gap:0 12px;align-items:start}
 body[data-frozen-ui="report"] #frozen-findings .finding-actions .finding-details{display:contents}
 body[data-frozen-ui="report"] #frozen-findings .finding-actions .finding-details::details-content{grid-column:1 / -1}
 body[data-frozen-ui="report"] #frozen-findings .finding-actions .finding-details>.finding-detail{padding:12px 0 0}
 body[data-frozen-ui="report"] #frozen-findings .finding-actions .finding-details>summary{grid-column:2;grid-row:1;justify-self:start;margin:0;list-style:none}
-body[data-frozen-ui="report"] #frozen-findings .finding-actions :is(.practice-start,.finding-evidence-toggle){box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;width:100px;min-height:40px;height:40px;padding:8px 14px;border:1px solid color-mix(in srgb,var(--accent) 18%,transparent);border-radius:4px;background:none;color:var(--muted);font-size:13px;font-weight:400;line-height:1.5;letter-spacing:normal;white-space:nowrap}
+body[data-frozen-ui="report"] #frozen-findings .finding-actions :is(.practice-start,.finding-evidence-toggle){box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;width:76px;min-height:36px;height:36px;padding:6px 8px;border:0;border-radius:2px;background:none;color:var(--muted);font-size:13px;font-weight:400;line-height:1.5;letter-spacing:normal;white-space:nowrap;text-decoration:none}
 body[data-frozen-ui="report"] #frozen-findings .finding-actions:not(:has(.practice-start)) .finding-details>summary{grid-column:1}
-body[data-frozen-ui="report"] #frozen-findings .finding-actions :is(.practice-start,.finding-evidence-toggle):hover{background:color-mix(in srgb,var(--accent) 4%,transparent);border-color:color-mix(in srgb,var(--accent) 38%,transparent);color:var(--ink)}
-body[data-frozen-ui="report"] #frozen-findings .finding-actions .finding-details[open]>summary{border-color:color-mix(in srgb,var(--accent) 30%,transparent)}
-@media(max-width:520px){body[data-frozen-ui="report"] #frozen-findings .finding-practice-guidance{display:block}body[data-frozen-ui="report"] #frozen-findings .finding-practice-guidance>h4{margin-bottom:4px}}
+body[data-frozen-ui="report"] #frozen-findings .finding-actions :is(.practice-start,.finding-evidence-toggle):hover{color:var(--ink);text-decoration:underline;text-underline-offset:4px}
+body[data-frozen-ui="report"] #frozen-findings .finding-actions .finding-details[open]>summary{color:var(--ink);text-decoration:underline;text-underline-offset:4px}
+@media(max-width:520px){body[data-frozen-ui="report"] #frozen-findings :is(.finding-why-guidance,.finding-practice-guidance){display:block}body[data-frozen-ui="report"] #frozen-findings :is(.finding-why-guidance,.finding-practice-guidance)>h4{margin-bottom:4px}}
 @media(max-width:460px){body[data-frozen-ui="report"] #frozen-findings .more-findings>summary{margin-left:32px}}
 @media(pointer:coarse){body[data-frozen-ui="report"] #frozen-findings .finding-actions :is(.practice-start,.finding-evidence-toggle){height:44px;min-height:44px}}
 body[data-frozen-ui="report"] .session-report .frozen-finding .evidence-block{padding:10px 16px 12px}

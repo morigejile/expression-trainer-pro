@@ -129,7 +129,11 @@
       }
       content.appendChild(evidence);
       const guidance=element('div','finding-detail finding-guidance');
-      if (typeof finding.interpretation==='string' && finding.interpretation.trim()) guidance.appendChild(element('p','finding-interpretation',finding.interpretation));
+      if (typeof finding.interpretation==='string' && finding.interpretation.trim()) {
+        const explanation=element('div','finding-why-guidance');
+        explanation.append(element('h4',null,'为什么值得练'),element('p','finding-interpretation',finding.interpretation));
+        guidance.appendChild(explanation);
+      }
       const recommendation=element('div','finding-practice-guidance');
       recommendation.append(element('h4',null,'下一轮怎么练'),element('p','finding-recommendation',finding.recommendation));
       guidance.appendChild(recommendation);
