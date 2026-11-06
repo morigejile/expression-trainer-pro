@@ -97,7 +97,7 @@
       details.appendChild(summary);
       card.className+=' frozen-finding';
       const row=element('div','finding-row');row.appendChild(element('span','finding-index',String(++findingIndex).padStart(2,'0')));
-      row.appendChild(element('p','finding-category',CATEGORIES[finding.category]));
+      row.appendChild(element('p','finding-category',`问题语义类型：${CATEGORIES[finding.category]}`));
       const title=element('div');title.appendChild(element('h3','finding-observation',finding.observation));
       details.id=`finding-detail-${finding.id}`;
       details.addEventListener('toggle',()=>{summary.textContent=details.open?'收起证据':'查看证据';});
@@ -130,15 +130,17 @@
       content.appendChild(evidence);
       const guidance=element('div','finding-detail finding-guidance');
       if (typeof finding.interpretation==='string' && finding.interpretation.trim()) guidance.appendChild(element('p','finding-interpretation',finding.interpretation));
-      guidance.append(element('h4',null,'下一轮怎么练'),element('p','finding-recommendation',finding.recommendation));
-      const controls=element('div','practice-controls');
+      const recommendation=element('div','finding-practice-guidance');
+      recommendation.append(element('h4',null,'下一轮怎么练'),element('p','finding-recommendation',finding.recommendation));
+      guidance.appendChild(recommendation);
+      const controls=element('div','practice-controls finding-actions');
       const action=practiceView?.practiceAction(element,controls,finding,onPractice);
       if (action) {
         action.button.className+=' practice-action';
-        guidance.appendChild(controls);
       }
+      controls.appendChild(details);
+      guidance.appendChild(controls);
       card.appendChild(guidance);
-      card.appendChild(details);
       return card;
     }
     if (successful && !insufficient) {
@@ -149,7 +151,8 @@
       for (const finding of findings.slice(0,priorityCount)) root.appendChild(findingCard(finding));
       if (findings.length > priorityCount) {
         const more = element('details','more-findings report-disclosure');
-        more.appendChild(element('summary',null,'更多'));
+        const toggle=element('summary',null,'更多');more.appendChild(toggle);
+        more.addEventListener('toggle',()=>{toggle.textContent=more.open?'收起':'更多';});
         for (const finding of findings.slice(priorityCount)) more.appendChild(findingCard(finding));
         root.appendChild(more);
       } else if (!findings.length) {

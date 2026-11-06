@@ -159,7 +159,9 @@ test('frozen finding practice stays outside collapsed evidence and evidence acti
   assert.equal(details.open,false);
   assert.equal(byClass(details,'practice-start').length,0);
   const guidance=byClass(card,'finding-guidance')[0],practice=byClass(guidance,'practice-start')[0];
-  assert.ok(practice);assert.ok(card.children.indexOf(guidance)<card.children.indexOf(details));
+  assert.ok(practice);assert.ok(byClass(guidance,'finding-details').includes(details));
+  assert.equal(byClass(guidance,'finding-actions').length,1);
+  assert.equal(byClass(card,'finding-category')[0].textContent,'问题语义类型：组织与衔接');
   practice.click();assert.equal(practiced[0][1],'full');
   const blocks=byClass(card,'evidence-block');assert.equal(blocks.length,3);
   for(const block of blocks){
@@ -169,6 +171,14 @@ test('frozen finding practice stays outside collapsed evidence and evidence acti
   assert.deepEqual(clicked,['segment-1','metric:text-character-count','speech-0']);
   assert.match(blocks[0].textContent,/00:31/);assert.match(blocks[0].textContent,/这是原文。/);
   assert.equal(byClass(target,'metric-details')[0].open,true);
+});
+
+test('more disclosure changes its footer label while preserving native expanded state',()=>{
+  const target=container();api().renderStructuredReport(target,api().selectStructuredReport(runs('1',{findings:3})));
+  const more=byClass(target,'more-findings')[0];assert.equal(more.tagName,'DETAILS');
+  assert.equal(more.children[0].textContent,'更多');
+  more.open=true;more.listeners.toggle();assert.equal(more.children[0].textContent,'收起');
+  more.open=false;more.listeners.toggle();assert.equal(more.children[0].textContent,'更多');
 });
 
 test('damaged optional framework or practice results cannot replace an earlier readable report', () => {
