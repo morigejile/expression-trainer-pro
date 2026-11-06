@@ -21,6 +21,32 @@ async function fixture(t) {
   return {store,id:session.id};
 }
 
+test('diagnosis waits for asynchronous credential readiness before selecting a profile',async t=>{
+  const {createSessionAnalysis}=require('../lib/session-analysis');
+  const {store,id}=await fixture(t);
+  let release,selecting;
+  const ready=new Promise(resolve=>{release=resolve;});
+  const selected=new Promise(resolve=>{selecting=resolve;});
+  let calls=0;
+  const analyzer=createSessionAnalysis({store,getDiagnosisProfile:async()=>{
+    selecting();await ready;return {profile:{id:'synthetic',provider:'local',model:'fake'}};
+  },diagnose:async()=>{calls++;return {schemaVersion:1,summary:'验证异步门禁',findings:[]};}});
+  const pending=analyzer.start(id);await selected;assert.equal(calls,0);
+  release();await pending;assert.equal(calls,1);await analyzer.close();
+});
+
+test('cancelling while waiting for credentials preserves local results without waiting for initialization',async t=>{
+  const {createSessionAnalysis}=require('../lib/session-analysis');const {store,id}=await fixture(t);
+  let release,entered,timer;const ready=new Promise(resolve=>{release=resolve;});
+  const waiting=new Promise(resolve=>{entered=resolve;});
+  const analyzer=createSessionAnalysis({store,getDiagnosisProfile:async()=>{entered();await ready;return {profile:{id:'test'}};},diagnose:()=>assert.fail('cancelled work cannot call AI')});
+  const pending=analyzer.start(id);await waiting;analyzer.cancel(id);
+  try {
+    const report=await Promise.race([pending,new Promise((_,reject)=>{timer=setTimeout(()=>reject(Error('credential wait ignored cancellation')),250);})]);
+    assert.equal(report.value.availability,'partial');assert.equal((await store.get(id)).results.find(r=>r.kind==='diagnosis').value.reason,'cancelled');
+  } finally {clearTimeout(timer);release();await pending;await analyzer.close();}
+});
+
 test('new diagnosis provenance records the problem library without changing old snapshots or Finding fields',async t=>{
   const {createSessionAnalysis}=require('../lib/session-analysis');
   const {store,id}=await fixture(t);

@@ -81,6 +81,8 @@ v7 → v8 历史对照工具 `scripts/evaluate-diagnosis-quality.js` 读取冻�
 
 配置 store、legacy 迁移、future schema 与凭据的实际边界统一见 [Current §5.7](architecture/current.md#57-设置与数据)；模型安装/选择见 [Current §3.2](architecture/current.md#32-model-manager-与生产模型)。更改这些实现时按本文件的触发规则运行对应 focused tests。
 
+两个维护中的 `evaluate-*` 工具仍用普通 Node 命令启动；读取加密配置时通过隐藏的 Electron Main helper 和专用进程 IPC 解密，不把密钥写到输出或临时文件，也不迁移/修改指定的 userData。Windows helper 仅在隔离目录复制系统加密封装，结束后清理；读取失败不发起该次请求。配置边界验证覆盖 `llm-provider-store`、`llm-settings-boundary`、`trusted-utility-ipc`、`utility-state`、`llm-provider-cli-reader` 与 Windows `credential-storage-electron` tests，界面及重启走 I5；不需要真实密钥或在线模型调用。
+
 ## ASR 模型
 
 模型权重不进入 Git。唯一 schema-v2 产品 Catalog 是 `models/registry.json`，包含 Paraformer、Zipformer Small、Zipformer Large 三款 streaming 模型和可选 SenseVoice utterance 模型；受信任 Factory 只创建代码支持的 Provider。启动按严格 `--asr-model=<modelId>`、持久选择、Catalog 默认值解析，设置页可下载、取消、重试、重新安装或在空闲时切换模型；安装使用独立短生命周期 utility，不影响当前识别 controller。当前用户已验收并继续采用 Zipformer Small CTC 中文 INT8，Catalog 技术默认仍为 Zipformer Large；SenseVoice 下载和真实验收延期见 Backlog B-23。archive/runtime 的固定大小、hash 与再分发状态见 registry 和 ADR-0004/0009。

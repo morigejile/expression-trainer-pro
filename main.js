@@ -232,6 +232,11 @@ const aiAnalysisGate=createAiAnalysisGate({
   loadSettings:()=>loadLlmProviderSettings(app.getPath('userData')),
   loadDisclosure:()=>loadAiDisclosure(app.getPath('userData'))
 });
+let credentialInitialization = Promise.resolve();
+async function loadReadyLlmSettings() {
+  await credentialInitialization;
+  return loadLlmProviderSettings(app.getPath('userData'));
+}
 let applicationShutdownStarted = false;
 let applicationShutdownComplete = false;
 let trainingSessions;
@@ -392,6 +397,9 @@ function broadcastLlmProviderSettingsChanged() {
 // App lifecycle
 app.whenReady().then(async () => {
   if (isSquirrelStartup) return;
+  // Keep the window responsive while Chromium persists its first OS key envelope.
+  // Keyless configurations remain usable if the OS key store is unavailable.
+  credentialInitialization = require('./lib/credential-storage').initializeCredentialStorage(app.getPath('userData')).catch(() => {});
   if (isTrainingPersistenceSmokeTest) {
     try {
       await require('./smoke/training-persistence-smoke').run({
@@ -440,7 +448,7 @@ app.whenReady().then(async () => {
         userDataPath:app.getPath('userData'),modelRoot:path.join(modelRoot,'speech-evidence'),appVersion:app.getVersion(),
         spawn:entry => utilityProcess.fork(entry,[],{serviceName:'expression-trainer-speech-evidence',stdio:'pipe'})
       }).run,
-      getDiagnosisProfile:options => aiAnalysisGate.resolve(options),
+      getDiagnosisProfile:async options => {await credentialInitialization;return aiAnalysisGate.resolve(options);},
       getAnalysisInputs:(session,options) => buildSessionAnalysisInputs(session,loadCustomPrompt(),options),
       diagnose:({profile,signal,trigger,...input}) => {
         const context=buildAnalysisContext(input);
@@ -466,7 +474,7 @@ app.whenReady().then(async () => {
   });
   registerAiDisclosureIpc({ipcMain,getMainWebContents:()=>mainWindow?.webContents,
     mainUrl:pathToFileURL(path.join(__dirname,'src','index.html')).href,
-    getState:options=>aiAnalysisGate.getState(options),
+    getState:async options=>{await credentialInitialization;return aiAnalysisGate.getState(options);},
     acknowledge:options=>acknowledgeAiDisclosure(app.getPath('userData'),options)});
   if (process.platform === 'darwin') {
     Menu.setApplicationMenu(Menu.buildFromTemplate([
@@ -679,7 +687,7 @@ registerTrustedUtilityIpc({
   mainUrl: pathToFileURL(path.join(__dirname, 'src', 'index.html')).href,
   openUtility: target => mainWindow.webContents.send('utility-open', target),
   getAppInfo: () => ({name: app.getName(), version: app.getVersion()}),
-  loadSettings: () => loadLlmProviderSettings(app.getPath('userData')),
+  loadSettings: loadReadyLlmSettings,
   saveSettings: settings => saveLlmProviderSettings(app.getPath('userData'), settings),
   publishSettings: broadcastLlmProviderSettingsChanged,
   loadPrompt: loadCustomPrompt,

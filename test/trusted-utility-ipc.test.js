@@ -9,10 +9,11 @@ const {loadLlmProviderSettings, saveLlmProviderSettings} = require('../lib/llm-p
 const {createCustomPromptStore} = require('../lib/custom-prompt-store');
 const {createRequestCoordinator} = require('../lib/ai-feedback');
 const {FEEDBACK_DOCUMENT_URL} = require('../shared/support-links');
+const {testSecretStorage} = require('./helpers/secret-storage');
 const mainUrl = 'file:///D:/app/src/index.html';
 
 function profile(id = 'editor') {
-  return {id, name: id, provider: 'custom', apiKey: 'test-key', model: 'test-model', ollamaUrl: '',
+  return {id, name: id, provider: 'custom', hasApiKey: false, credential:{action:'replace',value:'test-key'}, model: 'test-model', ollamaUrl: '',
     baseUrl: 'https://fixture.invalid/v1', customModel: 'test-model', autoDiagnosisEnabled: false};
 }
 function settings(profiles = [profile()]) {
@@ -27,10 +28,11 @@ function fixture(t, overrides = {}) {
   const handlers = new Map();
   const effects = {opens: [], broadcasts: 0, connections: [], links: [], exports: []};
   const promptStore = createCustomPromptStore();
+  const storeOptions={secretStorage:testSecretStorage()};
   registerTrustedUtilityIpc({ipcMain: {handle: (name, handler) => handlers.set(name, handler)},
     getMainWebContents: () => contents, mainUrl,
     openUtility: value => effects.opens.push(value), getAppInfo: () => ({name: '表达训练', version: '1.0.1'}),
-    loadSettings: () => loadLlmProviderSettings(root), saveSettings: value => saveLlmProviderSettings(root, value),
+    loadSettings: () => loadLlmProviderSettings(root,storeOptions), saveSettings: value => saveLlmProviderSettings(root,value,storeOptions),
     publishSettings: () => effects.broadcasts++, loadPrompt: () => promptStore.load(root),
     savePrompt: value => promptStore.save(root, value), requests: createRequestCoordinator(),
     testConnection: async (value, options) => {effects.connections.push({value, options}); return {success: true};},
@@ -107,9 +109,9 @@ test('Utility saves use existing durable profile and prompt stores, preserving i
 test('typed bounded invalid Utility parameters are rejected before writes, testing, links, or diagnostics', async t => {
   const f = fixture(t);
   const badSettings = [null, [], {}, {...settings(), privatePath: 'secret'}, {...settings(), schemaVersion: 4},
-    settings([{...profile(), apiKey: 5}]), settings([{...profile(), id: 'x'.repeat(129)}]),
+    settings([{...profile(), apiKey: 5}]), settings([{...profile(), credential:{action:'replace',value:5}}]), settings([{...profile(), id: 'x'.repeat(129)}]),
     settings([{...profile(), provider: 'unknown'}]), settings([{...profile(), autoDiagnosisEnabled: 'true'}]),
-    settings([{...profile(), apiKey: 'x'.repeat(16385)}]), settings([profile(), profile()]),
+    settings([{...profile(), credential:{action:'replace',value:'x'.repeat(16385)}}]), settings([profile(), profile()]),
     {...settings(), activeProfileId: 'missing'}];
   for (const channel of ['save-llm-provider-settings', 'test-llm-connection']) {
     for (const value of badSettings) assert.equal((await f.call(channel, value)).errorCode, 'invalid-ipc-input', channel);
@@ -139,11 +141,12 @@ test('connection testing uses the exact selected editor draft without persisting
   await f.call('save-llm-provider-settings', settings([profile('saved')]));
   const file = path.join(f.root, 'llm-provider-settings.json');
   const before = fs.readFileSync(file, 'utf8');
-  const draft = {...profile('draft'), apiKey: 'draft-key', model: 'draft-model', customModel: 'draft-model',
+  const draft = {...profile('draft'), credential:{action:'replace',value:'draft-key'}, model: 'draft-model', customModel: 'draft-model',
     baseUrl: 'http://localhost:9999/v1'};
   assert.deepEqual(await f.call('test-llm-connection', {schemaVersion: 3, activeProfileId: 'draft', profiles: [profile('other'), draft]}),
     {success: true});
-  assert.deepEqual(f.effects.connections[0].value, draft);
+  const {hasApiKey,credential,...expected}=draft;
+  assert.deepEqual(f.effects.connections[0].value, {...expected,apiKey:'draft-key'});
   assert.equal(f.effects.connections[0].options.signal instanceof AbortSignal, true);
   assert.equal(fs.readFileSync(file, 'utf8'), before);
   assert.equal(f.effects.broadcasts, 1);

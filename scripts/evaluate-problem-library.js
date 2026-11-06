@@ -64,14 +64,12 @@ async function runComparison({userData,output,baselineRef='d985160',live=false})
   fs.writeFileSync(path.join(output,'prompt-preview.md'),renderPreview(cases[5]));
   if(!live) return {status:'preview-only',cases:cases.length};
   if(!path.isAbsolute(userData||'')) throw new Error('An explicit absolute user-data directory is required');
-  const {parseLlmProviderSettingsJson,getEffectiveLlmModel}=require('../lib/llm-provider-config');
+  const {getEffectiveLlmModel}=require('../lib/llm-provider-config');
+  const {readLlmProviderSettingsForCli}=require('./llm-provider-cli-reader');
   const {loadAiDisclosure}=require('../lib/ai-disclosure-store');
   const {createAiAnalysisGate}=require('../lib/ai-analysis-gate');
-  // Read/parse directly: loadLlmProviderSettings may persist a migration.
-  const gate=createAiAnalysisGate({loadSettings:()=>{
-    const parsed=parseLlmProviderSettingsJson(fs.readFileSync(path.join(userData,'llm-provider-settings.json'),'utf8'));
-    if(parsed.error) throw new Error('configuration-unavailable');return parsed.settings;
-  },loadDisclosure:()=>loadAiDisclosure(userData)});
+  let settings=await readLlmProviderSettingsForCli(userData);
+  const gate=createAiAnalysisGate({loadSettings:()=>settings,loadDisclosure:()=>loadAiDisclosure(userData)});
   const {profile,reason}=gate.resolve({trigger:'manual'});
   if(!profile) return {status:'unavailable',reason};
   const clients={old:baseline.client,new:require('../lib/ai-feedback')};
@@ -87,6 +85,7 @@ async function runComparison({userData,output,baselineRef='d985160',live=false})
       let raw=null,usage=null,servedModel=null,requestBody=null;
       const started=Date.now();
       try{
+        settings=await readLlmProviderSettingsForCli(userData);
         gate.requireUnchanged(profile,{trigger:'manual'});
         const parsed=await clients[variant].sendStructuredDiagnosis(structuredClone(item.context),profile,{
           timeoutMs:60000,

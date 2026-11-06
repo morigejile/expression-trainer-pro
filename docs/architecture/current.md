@@ -63,7 +63,7 @@ M1 增量：[训练存储与产品集成](current.md#10-m1-training-storage-foun
 | ASR 模型 | Paraformer、Zipformer Small、Zipformer Large、SenseVoice Small | schema-v2 Catalog 固定 archive/runtime；模型安装到 `appData/expression-trainer-pro-models`，权重不纳入 Git；默认仍为 Zipformer Large，SenseVoice 为可选整段识别；公开分发仍受许可约束 |
 | 本地分析 | `lib/lexicon.js` + `data/emotion-lexicon.json` + `shared/expression-rules.js` | 146 个情绪词；16 个填充词、14 个犹豫词、20 组笼统词映射由 Renderer/Main 共用；未启用数据不放入活跃 `data/` 目录 |
 | LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接测试与结构化诊断有独立超时，支持 AbortSignal、按 Renderer 取消和严格结构化响应验证；诊断请求不含音频 |
-| 设置 | `userData/appearance.json`、`userData/asr-selection.json`、`userData/llm-provider-settings.json`、`userData/recording-policy.json`、legacy `userData/settings.json`、`userData/custom-prompt.json` | Appearance、ASR 选择、多 LLM profile 与录音策略确认各自持久化且互不覆盖；录音策略文件只保存确认布尔值，训练内容另存 SQLite/受管 WAV；小文件原子发布；API Key 明文 |
+| 设置 | `userData/appearance.json`、`userData/asr-selection.json`、`userData/llm-provider-settings.json`、`userData/recording-policy.json`、legacy `userData/settings.json`、`userData/custom-prompt.json` | Appearance、ASR 选择、多 LLM profile 与录音策略确认各自持久化且互不覆盖；录音策略文件只保存确认布尔值，训练内容另存 SQLite/受管 WAV；小文件原子发布；API Key 系统加密存储（§5.7） |
 | 构建/测试 | Node test + Electron smoke + Electron Forge 7.5/Squirrel | `package`/`make` 固定 Windows x64；packaged smoke 覆盖 Fake 产品流、utility-only Sherpa native load、完整 DLL unpack 和外部模型目录；尚无 CI |
 
 开发工具精确版本见[开发与验证](../development.md)；已验证平台、制品和硬件边界见[支持矩阵](../support-matrix.md)。
@@ -154,13 +154,13 @@ Main 负责 Electron 控制面、词库分析、小型 userData JSON 原子文�
 通过 `contextBridge` 暴露显式的 Appearance、设置、Prompt、ASR、分析、LLM、录音策略和文件能力；BrowserWindow 使用 `contextIsolation:true`、`nodeIntegration:false`。
 
 - ASR 只暴露 start/feed/stop/cancel，并保留 session、sequence 和有限 Float32 样本校验。
-- LLM 只暴露脱敏 profile 摘要、分析和取消；主窗口不能读取 Key 或完整 endpoint。
+- LLM 设置只返回可编辑的配置元数据（含服务地址）与 `hasApiKey`，不返回已保存 Key 或密文；新输入的 Key 仅随明确替换或连接测试提交 Main，分析与认证仍由 Main 执行。
 - 录音策略只读写确认布尔值，音频、时间轴和分析结果不经过设置 IPC。
 
 ### 5.3 Main / `main.js`
 
 - 管理窗口、应用生命周期、IPC handlers、词库、对话框和小型 userData JSON；设置使用同目录临时文件、fsync 和 rename 原子写。
-- 通过配置模块规范化和单向迁移旧 schema；损坏文件保留原文，future schema 可读已知字段但拒绝降级保存。
+- 通过配置模块规范化和单向迁移旧 schema；损坏文件保留原文，LLM future disk schema 拒绝读取与降级保存。
 - ASR 命令通过 Router/Controller 返回安全 envelope；Main 不加载 Sherpa，utility 退出后在下一次 start 重建。
 - 本地分析、有超时的 LLM fetch 和回放输入校验均在 Main 执行；同类新 LLM 请求取消旧请求。
 - Fake ASR/LLM 只在显式 smoke 参数和隔离 `userData` 下组合，普通启动不进入该路径。
@@ -189,7 +189,11 @@ Main 只持有 `AsrProcessController`；实际 session wrapper、managed provide
 
 ### 5.7 设置与数据
 
-`llm-provider-settings.json` 使用 schema-v3 `activeProfileId + profiles[]`，自动启用字段见 §13；旧 schema/file 单向迁移，canonical 文件优先，不删除或双向同步 legacy 文件。损坏 JSON 保留原文，future schema 拒绝降级保存。API Key 当前仍明文保存。
+`llm-provider-settings.json` 使用 disk schema-v4 `activeProfileId + profiles[]`，Key 通过 Electron `safeStorage` 使用系统密钥服务加密为 `encryptedApiKey`，不保存明文。Main 私有运行时仍使用 schema-v3，Renderer 只接收元数据与 `hasApiKey`；自动启用字段见 §13。系统加密不可用（含 Linux `basic_text` 后端）、解密失败或未来磁盘版本均明确失败，不能降级写明文或把坏密文当作空 Key。
+
+旧 schema-v1/v2/v3 与 `settings.json` 单向迁移：canonical 文件优先，先加密并原子写入 canonical，再原子剥离 legacy 中已知 LLM `apiKey` 字段，保留无关设置与原文件；清理失败明确报错并在下次读取重试，不创建明文备份。损坏 JSON 保留原文。Windows 首次创建系统加密封装时，Main 后台等待其写入 `Local State` 后才允许加密迁移；等待不阻塞窗口创建，相关设置/AI 操作等待初始化结束，失败仍保留原配置。配置文件连同系统密钥服务绑定当前本机账户，单独复制 JSON 不能作为可移植的密钥备份。
+
+设置写入使用明确的 `keep / replace / clear` 指令。保留和复制密钥只按 Main 当前保存的配置 ID 解析；服务提供方或实际服务地址变化不能携带旧 Key，必须重新输入或明确移除。复制和移除密钥关闭自动分析；其他身份变更的撤销规则仍见 §13。连接测试只使用当前草稿、不保存或激活配置；成功保存或放弃草稿后清除 Renderer 中的新输入。本轮系统加密、迁移后强制退出和跨进程重启读取已在隔离 Windows userData 实测；macOS/Linux 系统密钥服务尚未实测。
 
 `recording-policy.json` 使用 `{schemaVersion:2,acknowledged:true}`。旧版确认不代表已同意新的持久化告知，须重新确认；未知未来版本和损坏文件不被覆写。训练事实、WAV、本地统计及手动报告/回放结果保存在 §10 的训练存储中；Home 已移除粘贴、复制、保存和清空入口。
 
@@ -274,7 +278,6 @@ Settings/Prompt Renderer 通过 Preload 调用 Main 中的 userData JSON store�
 | TD-04 | 320 样本块仍经两次 structured clone | 10-block 队列可观测且失败关闭 | 真实推理 profile 证明复制成为瓶颈时再换通道 |
 | TD-07 | `ExpressionTrainer` 仍编排多个训练阶段 | session、stop single-flight、迟到结果和 overrun 已分别受控 | 新状态使现有局部状态无法可靠组合时再抽取状态机 |
 | TD-08 | 无 CI，Experimental 平台无制品证据 | Windows x64 Node/Electron/安装/升级 smoke 已建立 | OPS-01 或实际新增支持平台时增加最小验证 |
-| TD-09 | API Key 仍明文保存在 userData | 原子写、future-schema 防降级与日志脱敏已覆盖 | 公开发布且 keychain 收益超过 native/跨平台成本时复审 |
 | TD-10 | 页面尚未启用 CSP/sandbox | I5 Utility 的 LLM profile / custom-prompt 命令已有精确字段、类型、数量和长度边界；ASR、文本分析和结构化诊断继续使用各自输入边界，Renderer 无 Node integration | 对应具体风险或公开发布安全收口时逐项处理 |
 | TD-12 | LLM 瞬时失败仍需用户重试 | 超时、取消、迟到抑制、响应验证和错误脱敏已覆盖 | 产品确认重试语义后再实现，不在 fetch 层盲目重试 |
 | TD-17 | Forge/Squirrel 的仅开发传递依赖仍有安全告警 | 生产依赖审计为 0，当前组合已有完整打包证据 | 出现具体安全/兼容风险时受控升级并重跑 make/native smoke |
@@ -296,7 +299,7 @@ Settings/Prompt Renderer 通过 Preload 调用 Main 中的 userData JSON store�
 
 - Audio 逐块 invoke、TypedArray 规范化与跨进程 structured-clone 复制；
 - 完整训练状态仍由一个 Renderer 编排类组合，只有状态继续增长时才做局部抽取；
-- 页面 CSP/sandbox 与明文密钥留到对应具体风险或公开发布收口；I5 的 Utility 配置与偏好输入已定向收紧；
+- 页面 CSP/sandbox 仍留到对应具体风险或公开发布收口；I5 的 Utility 输入及已保存密钥边界已按 §5.7 收紧；
 - 接近资格线性能、多采样率/其他麦克风组合和 Experimental 平台仍缺证据；默认真实麦克风链路见 M2 验收；
 - 首次安装与 1.0.0→1.0.1 升级已可复现，后续只维护能发现实质回归的验证。
 
@@ -473,13 +476,13 @@ M3 首版按用户选择交付可靠指标变化与两侧证据复盘。实现�
 
 - 从 Finding 选择练习目标的功能流程已闭环；对应过程仍有多处 UI/交互待优化，未逐项提供具体问题，不视为体验验收完成。该目标仍属于 Practice Focus，不改变主题/场景的独立语义。
 - 前后证据与练习历程显示正常；重启后轮次正确。使用专门测试记录删除中间轮后，有删除占位，后续轮次不变，仍能继续练习。本组恢复与删除降级路径已有用户人工通过证据。
-- 改用不同表达框架重新分析不稳定、失败率高。报告当时尚未记录具体错误类型、模型/Provider 或复现条件；后续排查与修复证据见下段，原失败场景的桌面复核仍待完成。
+- 改用不同表达框架重新分析不稳定、失败率高。报告当时尚未记录具体错误类型、模型/Provider 或复现条件；后续排查与修复证据见下段，当时尚未完成原失败场景的桌面复核。该入口现已移除，当前验收范围见本节末。
 
 2026-09-20 重分析稳定性排查：只读已保存结果，最近一组 v3 的 5 次 DeepSeek / `deepseek-chat` 请求中 4 次为 `invalid-response`、1 次成功；历史未保存原始返回，不能还原每次失败的具体原因。独立虚构短文本复现了嵌套专项 Finding 返回漏闭合括号、字段层级错误，以及练习反馈把转写原文用作证据 ID；单独增加 JSON Output 或调整嵌套示例不足以稳定解决。上述 v4 平铺传输及明确两侧 `segment.id` 的修复保留原有存储格式、严格校验和历史结果，不修补损坏 JSON，也不自动重发请求。
 
 修复验证：Node 24.20.0 下执行分析上下文、AI 请求、结构化诊断、Session analysis、真实本地 HTTP/SQLite、Report 和 Practice Chain 定向测试，106 项通过、0 失败、0 跳过。HTTP 回归覆盖 Free → PREP → STAR → 金字塔、失败后保留旧报告、重试保持 STAR、原事实/本地证据不改写及重启恢复；提示词示例与解析器的契约测试防止误恢复嵌套返回。真实 DeepSeek 的同一虚构短文本在三框架下均通过最终结构/证据校验；当时另检查 Free 推荐（v10 已下线）、可用前轮比较与来源删除降级。可用前轮比较在初次复测仍因原文代替 ID 失败，明确 ID 提示后同一样本通过；这些是有限样本的协议验证，不是稳定失败率统计或 AI 结论质量验收。未向外部重发用户历史转写、未改写用户记录、未重新打包。
 
-M4 仍需复核原重分析失败场景、整理重练过程 UI 并验收真实 AI 反馈质量；任务顺序及阶段阻塞判断由 [M4 剩余任务](../milestones/m4-structured-training.md#remaining-work-and-blockers) 维护。
+上述跨框架重分析排查属于历史证据，入口移除不代表当时的模型问题已获质量验收，也不要求恢复该入口继续复核。当前 M4 按现行报告、诊断失败重试和完整表达重练路径验收 UI、真实 AI 反馈质量及最终制品；任务顺序和未完成项由 [M4 剩余任务](../milestones/m4-structured-training.md#remaining-work-and-blockers) 维护。
 
 ## 16. Frozen Demo I0 / I1 Renderer 接入
 
@@ -511,7 +514,7 @@ Main 新增独立 `ai-disclosure.json` 的原子持久化和统一请求门禁�
 
 主报告使用 `structured-diagnosis-v12`／问题库 v0.4，沿用单次诊断请求。[问题库](../product/expression-problem-library.md)是内容维护源，生成脚本与一致性检查见 [Development](../development.md#问题库与主诊断提示)。运行时按共同规则、通用卡、所选框架卡、证据限制、条件练习规则和输出契约组装；文档保留完整练习方向，生产卡只发送适用、检查、排除、证据及相邻边界，不逐卡发送练习处方。33＋15 个编号保留；声音禁评／仅观察卡、缺时长的时长要求卡和局部练习的完整框架卡按现有能力／范围过滤，不按关键词或本地候选缺失排除语义检查，不截断原文。
 
-Main 要求材料评价范围及练习可比性，解析时执行范围／状态与严格引用约束；Report 明示材料不足／有限分析，保留本地事实与旧快照。产品行为由 [Training Flow §7.1 / §10](../product/training-flow.md#71-完整分析与训练重点分层) 定义，版本来源、E06 窄补 null、严格拒绝边界及可选 raw／回执来源由 [Data Model §5.4](data-model.md#54-structured-diagnosis-v1) 定义；Main 沿现有 provenance 保存成功补全回执，不改写历史结果。
+Main 要求材料评价范围及练习可比性，解析时执行范围／状态与严格引用约束；Report 明示材料不足／有限分析，保留本地事实与旧快照。产品行为由 [Training Flow §7.1 / §10](../product/training-flow.md#71-完整分析与训练重点分层) 定义；当前响应契约、版本来源及历史补全回执的读取兼容由 [Data Model §5.4](data-model.md#54-structured-diagnosis-v1) 定义。旧回执仅用于读取既有快照，当前生产不进行字段补全或生成新回执。
 
 v10 在 v9 篇幅规则基础上移除自动框架推荐：新提示与响应不再包含推荐字段，删除补 null 归一化、回执生成及其 Main／AI／分析编排回调，Report 不再显示推荐标题、理由或准备按钮。训练前框架选择、所选框架专项发现及 Finding 练习保留，报告内换框架分析随 v11 移除；旧推荐与回执仅保留读取兼容，不改写快照。v9 篇幅调整仅修改生成提示与文案示例，沿用现有字段、问题库、解析及展示路径；可读性规则见 [Training Flow §7.1](../product/training-flow.md#71-完整分析与训练重点分层)。同输入生成对照与验证边界见[篇幅对照](../../benchmark/prompt-evaluation/report-concision-v9/summary.md)，不把字数下降、结构通过或本轮风格确认当作报告语义质量验收。
 
@@ -582,7 +585,7 @@ I4 阶段的验证使用隔离 userData、确定性采集与 Fake ASR/LLM，实�
 
 [Utility Content](../../src/utility-content.js) 读取实际 Catalog / 模型管理 DTO，分开显示持久选择与生效模型，按真实 action 接入安装、取消、重试、重新安装和切换。只有可信下载阶段与完整分母显示百分比，未知总量和校验阶段显示等待；没有初始化麦克风或移植模拟安装。帮助按子页直接显示正文及 FAQ；未呈现的搜索逻辑及其专用条目已移除；帮助与隐私说明同步当前保存、删除、AI 告知和恢复事实，不承诺 MB3 重新转写。诊断只在问题与反馈导出，调用既有脱敏快照和保存能力；反馈仍由用户主动打开白名单文档，不自动提交。
 
-[Trusted Utility IPC](../../lib/trusted-utility-ipc.js) 将必要完整配置、偏好、连接测试、模型、版本、诊断与反馈入口限定为当前主窗口、主 frame、精确主文档 URL。字段、类型、数量和长度有界，非法窗口/子 frame/文档和参数拒绝，失败不透传密钥、私有地址或原始错误。模型广播同时到主窗口，下载、校验、缓存、ASR 与存储机制未重写。Utility 关闭及替换时保护未保存修改，原生 Dialog 承担可见控件的 Tab 遍历；Escape 仍走草稿保护。真正的应用退出先等待明确草稿决定，再沿用既有训练排空与超时保护，决定等待不被误判为渲染器挂起。读取与操作完成按界面代际隔离，不让旧设置读取、模型、诊断导出或反馈响应覆盖新子页。
+[Trusted Utility IPC](../../lib/trusted-utility-ipc.js) 将配置元数据与凭据操作、偏好、连接测试、模型、版本、诊断与反馈入口限定为当前主窗口、主 frame、精确主文档 URL。字段、类型、数量和长度有界，非法窗口/子 frame/文档和参数拒绝，失败不透传密钥、私有地址或原始错误。模型广播同时到主窗口，下载、校验、缓存、ASR 与存储机制未重写。Utility 关闭及替换时保护未保存修改，原生 Dialog 承担可见控件的 Tab 遍历；Escape 仍走草稿保护。真正的应用退出先等待明确草稿决定，再沿用既有训练排空与超时保护，决定等待不被误判为渲染器挂起。读取与操作完成按界面代际隔离，不让旧设置读取、模型、诊断导出或反馈响应覆盖新子页。
 
 2026-10-12：使用项目基线 Node 24.20.0 / npm 11.19.0，Electron 43.4.1（内嵌 Node 24.18.1）。580 项定向模块测试、13 个受影响 JavaScript 文件语法检查与差异空白检查通过；分组执行的 10 个 Electron 用例均有本轮通过记录，包括核心、既有普通/离线/M4、I1–I4 回归及 I5 双阶段保存/重启。I5 最终键盘复测以真实输入事件确认 Shift+Tab 到可见菜单、正向 14 个可见目标循环和关闭焦点恢复。证据覆盖真实 profile / 偏好文件保存及重启、实际文件写入失败/重试、模型管理及缓存/安装协议、原生 Utility、Help 搜索/跳转、诊断 JSON 写入与脱敏、真实同 URL sandbox iframe 的权限拒绝，以及 Training、普通/针对性 Report、History 多选和固定 Comparison 的上下文恢复。录音、Processing 和分析期间开关 Surface 不重启任务或改写已冻结上下文；退出继续编辑不停止录音。关闭计时使用生产函数与模拟时钟验证长于 10 秒的明确决定等待及决定后恢复；不把直接 Renderer 退出准备验证当作实际 Main 等待时长验收。
 

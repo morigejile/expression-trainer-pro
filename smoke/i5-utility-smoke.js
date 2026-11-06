@@ -68,6 +68,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     await wait('Utility closed',`!document.getElementById('utility').open`);
   };
   const savedSettings = () => invoke('getLlmProviderSettings');
+  const storedKey = id => require('../lib/llm-provider-store').loadLlmProviderSettings(root).profiles.find(p=>p.id===id)?.apiKey;
   const savedPreferences = () => invoke('getCustomPrompt');
   const session = async id => {
     const response = await invoke('getTrainingSession',{requestId:randomUUID(),sessionId:id});
@@ -151,7 +152,10 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
       assert.equal(await evaluate(`document.querySelectorAll('#utility .config-row').length`),fixture.settings.profiles.length);
       assert.equal(await evaluate(`document.getElementById('ai-toggle').getAttribute('aria-checked')`),'false');
       await edit(fixture.activeId);
-      assert.equal(await evaluate(`document.querySelector('[data-field="apiKey"]').value`),fixture.key);
+      assert.equal(await evaluate(`document.querySelector('[data-field="apiKey"]').value`),'');
+      assert.equal((await savedSettings()).profiles.find(p=>p.id===fixture.activeId).hasApiKey,true);
+      assert.doesNotMatch(JSON.stringify(await savedSettings()),/"apiKey":|encryptedApiKey|i5-owned-secret-key/);
+      assert.equal(storedKey(fixture.activeId),fixture.key,'Main can decrypt the stored key after restart');
       assert.equal(await evaluate(`document.querySelector('[data-field="apiKey"]').type`),'password');
       await close();await open('settings','preferences');
       for(const [ui,key] of Object.entries({goals:'goals',rules:'customRules',style:'styleRef',words:'customWords'}))
@@ -161,7 +165,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
       assert.deepEqual(aiCalls(),before,'restart reading Settings, Help and saved Reports never calls AI');
       assert.equal(count('test-llm-connection'),0,'restart never tests credentials automatically');
       assert.equal(count('install-asr-model'),0,'restart never starts a model download');
-      check('Restart restores all profile fields, masked key, current configuration, disabled auto analysis and custom preference fields from real local stores');
+      check('Restart restores configuration metadata and hasApiKey without returning stored keys; current configuration, disabled auto analysis and preferences survive');
       return;
     }
 
@@ -189,11 +193,32 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     await wait('copy saved',`!${utility}.state.dirty`);
     const copied=(await savedSettings()).profiles.find(value=>value.name==='I5 可删除副本');
     assert.ok(copied);assert.notEqual(copied.id,custom.id);assert.equal(copied.autoDiagnosisEnabled,false);
+    assert.equal(copied.hasApiKey,true);assert.equal(storedKey(copied.id),storedKey(custom.id));
     await click(`[data-delete="${copied.id}"]`);await wait('inline delete confirmation',`Boolean(document.querySelector('[data-confirm-delete]'))`);
     await click('[data-cancel-delete]');assert.ok((await savedSettings()).profiles.some(value=>value.id===copied.id));
     await click(`[data-delete="${copied.id}"]`);await click('[data-confirm-delete]');
     await wait('exact copied configuration deleted',`(async()=>{const s=await window.api.getLlmProviderSettings();return !s.profiles.some(p=>p.id===${JSON.stringify(copied.id)})})()`);
     assert.equal((await savedSettings()).profiles.length,4);assert.equal((await savedSettings()).activeProfileId,deepseek.id);
+    await edit(custom.id);
+    assert.equal(await evaluate(`document.querySelector('[data-field="apiKey"]').value`),'');
+    const beforeTest=calls.llmConnection;
+    await click('[data-test]');await wait('saved key tested in Main',`document.getElementById('edit-status').textContent.includes('成功')`);
+    assert.equal(calls.llmConnection,beforeTest+1);
+    await field('apiKey','i5-typed-for-old-address');
+    await field('url','https://changed-i5.invalid/v1');await click('[data-test]');
+    assert.equal(await evaluate(`document.querySelector('[data-field="apiKey"]').value`),'','address edits clear a replacement typed for the old service');
+    assert.equal(calls.llmConnection,beforeTest+1,'changing endpoint cannot silently send the stored key');
+    await field('url',custom.baseUrl);await field('apiKey','i5-replacement-owned-key');await click('[data-save-ai]');
+    await wait('replacement saved and draft erased',`!${utility}.state.busy && !${utility}.state.draft`);
+    assert.equal(storedKey(custom.id),'i5-replacement-owned-key');
+    await edit(custom.id);await click('[data-clear-credential]');await click('[data-save-ai]');
+    await wait('explicit credential removal saved',`!${utility}.state.busy && !${utility}.state.draft`);
+    assert.equal(storedKey(custom.id),'');assert.equal((await savedSettings()).profiles.find(p=>p.id===custom.id).hasApiKey,false);
+    await edit(custom.id);await field('apiKey','i5-custom-owned-key');await click('[data-save-ai]');
+    await wait('test credential restored',`!${utility}.state.busy && !${utility}.state.draft`);
+    const disk=fs.readFileSync(settingsPath,'utf8');assert.equal(JSON.parse(disk).schemaVersion,4);
+    for(const secret of [key,'i5-openai-owned-key','i5-custom-owned-key','i5-replacement-owned-key'])assert.equal(disk.includes(secret),false,'disk configuration contains no synthetic plaintext key');
+    assert.doesNotMatch(JSON.stringify(await savedSettings()),/"apiKey":|encryptedApiKey|i5-owned-secret-key/);
     check('Empty state plus DeepSeek/OpenAI/Ollama/custom create, test, save, use, copy, cancel-delete and confirmed exact-ID deletion use actual stores; connectivity tests never save drafts; Add/Edit/Copy scroll the name field into visible content and focus it');
 
     await close();await evaluate(`document.getElementById('btn-home').focus()`);await open();
@@ -249,7 +274,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     await open();
 
     await edit(deepseek.id);const clean=await savedSettings();
-    await field('name','I5 未保存草稿');await click('#close-surface');
+    await field('name','I5 未保存草稿');await field('apiKey','i5-discarded-owned-key');await click('#close-surface');
     await wait('close guarded by inline unsaved state',`!document.getElementById('unsaved').hidden && document.getElementById('utility').open`);
     await click('#stay');assert.equal(await evaluate(`${utility}.state.dirty`),true);
     assert.equal(await evaluate(`document.querySelector('[data-field="name"]').value`),'I5 未保存草稿');
@@ -257,6 +282,8 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     mainWindow.webContents.sendInputEvent({type:'keyUp',keyCode:'Escape'});
     await wait('native Escape guarded',`!document.getElementById('unsaved').hidden && document.getElementById('utility').open`);
     await click('#discard');await wait('discard closes Utility',`!document.getElementById('utility').open`);
+    assert.equal(await evaluate(`${utility}.state.draft`),null);
+    assert.equal(await evaluate(`document.querySelector('[data-field="apiKey"]')?.value || ''`),'','closing clears typed credentials from the DOM');
     assert.deepEqual(await savedSettings(),clean,'discard preserves the last real saved configuration');
     await open();await edit(deepseek.id);await field('model','i5-unsaved');
     await evaluate(`${utility}.open('help','privacy')`);
@@ -456,7 +483,10 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
       check('Frozen and actual Utility typography/frame/sidebar/editor/unsaved/preferences/speech/Help are compared at 1200, 960, 1280 and 1440 CSS pixels; long preference and expanded FAQ content stays within the dialog');
     }
     const settings=await savedSettings();assert.equal(settings.activeProfileId,deepseek.id);
-    assert.deepEqual(JSON.parse(fs.readFileSync(settingsPath,'utf8')),settings);
+    const stored=JSON.parse(fs.readFileSync(settingsPath,'utf8'));
+    assert.equal(stored.schemaVersion,4);
+    assert.ok(stored.profiles.every(p=>!Object.hasOwn(p,'apiKey') && !Object.hasOwn(p,'hasApiKey')));
+    assert.deepEqual(require('../lib/llm-settings-boundary').publicLlmSettings(require('../lib/llm-provider-store').loadLlmProviderSettings(root)),settings);
     fs.writeFileSync(fixturePath,JSON.stringify({settings,preferences,activeId:deepseek.id,key,sessions:[await session(aId),await session(bId)]},null,2));
     assert.equal(calls.llmReport,0);assert.equal(calls.llmPlayback,0);
     assert.equal(count('install-asr-model'),0,'I5 never downloads model assets');

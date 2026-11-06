@@ -14,7 +14,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   const setProfile=async (model,{provider='deepseek',endpoint='',enabled=false}={})=>{
     await evaluate('window.api.openSettings()');
     await wait('settings Utility ready',`document.getElementById('utility').open && !${trainer}.utility.loading`);
-    const value={schemaVersion:3,activeProfileId:'product-smoke',profiles:[{id:'product-smoke',name:'I2 fixture',provider,model,customModel:'',apiKey:'smoke-only-key',baseUrl:endpoint,ollamaUrl:endpoint,autoDiagnosisEnabled:enabled}]};
+    const value={schemaVersion:3,activeProfileId:'product-smoke',profiles:[{id:'product-smoke',name:'I2 fixture',provider,model,customModel:'',hasApiKey:false,credential:{action:'replace',value:'smoke-only-key'},baseUrl:endpoint,ollamaUrl:endpoint,autoDiagnosisEnabled:enabled}]};
     assert.equal((await invoke('saveLlmProviderSettings',value)).success,true);await evaluate(`${trainer}.utility.requestClose()`);
   };
   if (phase.endsWith('read')) {

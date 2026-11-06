@@ -105,13 +105,12 @@ async function runQualityExperiment({output,userData,jobs,live=false}){
     controls:{temperature:0.2,max_tokens:8192,timeoutMs:60000,retries:0,material:'synthetic text only',parser:current.DIAGNOSIS_PROMPT_VERSION},outputs:[]};
   const save=()=>fs.writeFileSync(path.join(output,'results.json'),JSON.stringify(result,null,2)+'\n');
   if(!live){for(const job of resolved)result.outputs.push({id:job.id,variant:job.variant,request:job.prompt,promptHash:job.promptHash,inputHash:job.inputHash});save();return result;}
-  const {parseLlmProviderSettingsJson,getEffectiveLlmModel}=require('../lib/llm-provider-config');
+  const {getEffectiveLlmModel}=require('../lib/llm-provider-config');
+  const {readLlmProviderSettingsForCli}=require('./llm-provider-cli-reader');
   const {loadAiDisclosure}=require('../lib/ai-disclosure-store');
   const {createAiAnalysisGate}=require('../lib/ai-analysis-gate');
-  const gate=createAiAnalysisGate({loadSettings:()=>{
-    const parsed=parseLlmProviderSettingsJson(fs.readFileSync(path.join(userData,'llm-provider-settings.json'),'utf8'));
-    if(parsed.error)throw new Error('configuration-unavailable');return parsed.settings;
-  },loadDisclosure:()=>loadAiDisclosure(userData)});
+  let settings=await readLlmProviderSettingsForCli(userData);
+  const gate=createAiAnalysisGate({loadSettings:()=>settings,loadDisclosure:()=>loadAiDisclosure(userData)});
   const selection=gate.resolve({trigger:'manual'});
   if(!selection.profile){result.unavailable=selection.reason;save();return result;}
   const profile=selection.profile;result.provider=profile.provider;result.requestModel=getEffectiveLlmModel(profile);
@@ -123,6 +122,7 @@ async function runQualityExperiment({output,userData,jobs,live=false}){
       promptVersion:job.variant==='baseline'?'structured-diagnosis-v7':job.variant==='final'?current.DIAGNOSIS_PROMPT_VERSION:`structured-diagnosis-v8-exp-${job.variant}`,
       request:{system:job.prompt.system,user:job.prompt.user,model:result.requestModel,temperature:0.2,max_tokens:8192}};
     try{
+      settings=await readLlmProviderSettingsForCli(userData);
       gate.requireUnchanged(profile,{trigger:'manual'});
       const final=job.variant==='final';
       const client=compile('lib/ai-feedback.js',final?clientSource:historical.clientSource,{'./structured-diagnosis':{...(final?current:historical.diagnosis),getStructuredDiagnosisPrompt:()=>job.prompt}});

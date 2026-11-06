@@ -206,7 +206,7 @@ M3 的 comparison 属于 Application Core 的共同用例边界，为历史完�
 
 ## 8. Privacy and network boundary
 
-Application Core 在调用 LLM 前执行 [R-P07、R-A11、NFR-03](../product/requirements.md) 的知情与数据最小化要求；Renderer 不直接持有凭据或发起绕过该边界的请求。未来 Finding-scoped 对话按 R-R03 声明上下文，当前仍 deferred。数据快照排除规则见 [Data Model §4.5](data-model.md#45-sourcesnapshot)。本地目标架构不需要 hosted gateway 或 sync 服务。
+Application Core 在调用 LLM 前执行 [R-P07、R-A11、NFR-03](../product/requirements.md) 的知情与数据最小化要求；已保存凭据由 Main 管理，Renderer 仅短暂接收用户新输入，不读回已保存密钥，也不发起绕过该边界的请求。未来 Finding-scoped 对话按 R-R03 声明上下文，当前仍 deferred。数据快照排除规则见 [Data Model §4.5](data-model.md#45-sourcesnapshot)。本地目标架构不需要 hosted gateway 或 sync 服务。
 
 ## 9. Failure and degradation
 

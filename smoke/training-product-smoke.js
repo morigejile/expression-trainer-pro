@@ -96,7 +96,7 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
   const saveProfile = async (model,autoDiagnosisEnabled = true) => {
     await evaluate('window.api.openSettings()');
     await wait('settings Utility opened',`document.getElementById('utility').open && !window.__trainingProductTrainer.utility.loading`);
-    const config = {schemaVersion:3,activeProfileId:'product-smoke',profiles:[{id:'product-smoke',name:'Product smoke',provider:'deepseek',apiKey:'smoke-only-key',model,ollamaUrl:'',baseUrl:'',customModel:'',autoDiagnosisEnabled}]};
+    const config = {schemaVersion:3,activeProfileId:'product-smoke',profiles:[{id:'product-smoke',name:'Product smoke',provider:'deepseek',hasApiKey:false,credential:{action:'replace',value:'smoke-only-key'},model,ollamaUrl:'',baseUrl:'',customModel:'',autoDiagnosisEnabled}]};
     const saved = await invoke('saveLlmProviderSettings',config);
     assert.equal(saved.success, true);
     await wait('provider selection reached renderer', `(async()=>{const settings=await window.api.getLlmProviderSettings();return settings.profiles.some(p=>p.id===settings.activeProfileId&&p.model===${JSON.stringify(model)});})()`);
