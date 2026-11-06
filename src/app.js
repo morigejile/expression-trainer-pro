@@ -53,7 +53,7 @@ const { createTrainingRecordStore, findSegmentAtTime } = TrainingRecords;
 const TextStatistics = typeof module !== 'undefined' && module.exports
   ? require('../shared/text-statistics')
   : window.TextStatistics;
-const { analysisCharacterCounts, densityPercent, hasDuration } = TextStatistics;
+const { analysisCharacterCounts, hasDuration } = TextStatistics;
 const ASR_LOADING_MESSAGE = '语音模型加载中，预计数秒至数分钟（首次安装可能更久）；本次启动只需加载一次。';
 
 const Persistence = typeof module !== 'undefined' && module.exports ? require('./training-persistence') : window.TrainingPersistence;
@@ -173,10 +173,6 @@ class ExpressionTrainer {
     this.historyStatus = document.getElementById('history-status');
     this.historyMore = document.getElementById('btn-history-more');
     this.reportBack = document.getElementById('btn-report-back');
-    this.statFillers = document.getElementById('stat-fillers');
-    this.statHedges = document.getElementById('stat-hedges');
-    this.statVague = document.getElementById('stat-vague');
-    this.statDensity = document.getElementById('stat-density');
   }
 
   bindEvents() {
@@ -1221,18 +1217,8 @@ class ExpressionTrainer {
       const {excludedCharacters, hedgeCharacters} = analysisCharacterCounts(analysis);
       stats.excludedCharacters += excludedCharacters;
       stats.hedgeCharacters += hedgeCharacters;
-      if (this.recordingStopOperation?.left) return analysis;
-      this.updateStatsDisplay();
     }
     return analysis;
-  }
-
-  updateStatsDisplay() {
-    this.statFillers.textContent = this.stats.fillers;
-    this.statHedges.textContent = this.stats.hedges;
-    this.statVague.textContent = this.stats.vagueWords;
-    const density = densityPercent(this.stats.totalWords, this.stats.excludedCharacters);
-    this.statDensity.textContent = density === null ? '--' : `${density}%`;
   }
 
   // ===== 报告 =====
@@ -1413,7 +1399,6 @@ class ExpressionTrainer {
 
   resetStats() {
     this.stats = { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 0, duration: 0, excludedCharacters: 0, hedgeCharacters: 0 };
-    this.updateStatsDisplay();
   }
 
   advanceLLMGeneration() {
@@ -1876,8 +1861,6 @@ class ExpressionTrainer {
       renderHighlightedText(line, segment.text);
       this.subtitleContainer.appendChild(line);
     }
-    this.updateStatsDisplay();
-    if (record.metricsAvailable === false) for (const stat of [this.statFillers,this.statHedges,this.statVague,this.statDensity]) stat.textContent = '不可用';
     const totalSeconds = Math.max(0, Math.floor(record.durationMs / 1000));
     this.timer.textContent = `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(totalSeconds % 60).padStart(2, '0')}`;
     this.btnReport.classList.toggle('hidden', !record.fullText.trim());

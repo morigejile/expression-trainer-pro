@@ -458,7 +458,11 @@ test('structured request separates untrusted quoted source data from system inst
   assert.equal(request.temperature,0.2);
   assert.equal(request.messages[0].role,'system');
   assert.equal(request.messages[0].content.includes('IGNORE THE SCHEMA'),false);
-  assert.deepEqual(JSON.parse(request.messages[1].content),source);
+  const wire=JSON.parse(request.messages[1].content);
+  assert.equal(wire.analysisInstructions.goals,source.analysisInstructions.goals);
+  assert.deepEqual(wire.transcript.segments.map(x=>[x.id,x.text]),source.transcript.segments.map(x=>[x.id,x.text]));
+  assert.equal(Object.hasOwn(wire,'evidenceMap'),false);
+  assert.deepEqual(wire.allowedEvidenceRefs,source.allowedEvidenceRefs);
   assert.equal(request.messages[1].content.includes('test-secret-key'),false);
   assert.match(request.messages[0].content,/PREP/);
   assert.match(request.messages[0].content,/词.*时间|逐字/);
@@ -472,6 +476,18 @@ test('structured request snapshots the allowed references before awaiting extern
     source.allowedEvidenceRefs.push('invented');
     return apiResponse(JSON.stringify({...data,frameworkFindings:[],findingOrder:['finding-1']}));
   }}),error=>error.code === 'invalid-response');
+});
+
+test('provider refuses a local-only unavailable metric or unseen reference that was omitted from the request',async()=>{
+  const {sendStructuredDiagnosis}=require('../lib/ai-feedback');
+  for(const ref of ['metric:filler-count','unseen']){
+    const source=context();source.allowedEvidenceRefs.push(ref);
+    const data=assessed();data.findings[0].evidenceRefs=[ref];
+    await assert.rejects(sendStructuredDiagnosis(source,profile,{fetchImpl:async(_url,options)=>{
+      assert.equal(JSON.parse(JSON.parse(options.body).messages[1].content).allowedEvidenceRefs.includes(ref),false);
+      return apiResponse(JSON.stringify({...data,frameworkFindings:[],findingOrder:['finding-1']}));
+    }}),{code:'invalid-response'});
+  }
 });
 
 test('provider response validation pins the selected framework and both practice evidence sets before awaiting HTTP', async () => {

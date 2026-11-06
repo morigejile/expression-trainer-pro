@@ -55,8 +55,8 @@ test('new diagnosis provenance records the problem library without changing old 
   const first=await analyzer.start(id);
   const saved=await store.get(id);
   const run=saved.results.find(x=>x.kind==='diagnosis');
-  assert.equal(run.provenance.problemLibraryVersion,'expression-problem-library-v0.5');
-  assert.equal(run.provenance.promptVersion,'structured-diagnosis-v12');
+  assert.equal(run.provenance.problemLibraryVersion,'expression-problem-library-v0.6');
+  assert.equal(run.provenance.promptVersion,'structured-diagnosis-v14');
   assert.deepEqual(run.value.findings,[]);
   const before=structuredClone(saved.results);
   assert.equal((await analyzer.start(id)).id,first.id);

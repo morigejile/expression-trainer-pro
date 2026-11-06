@@ -197,7 +197,7 @@ Main 只持有 `AsrProcessController`；实际 session wrapper、managed provide
 
 `recording-policy.json` 使用 `{schemaVersion:2,acknowledged:true}`。旧版确认不代表已同意新的持久化告知，须重新确认；未知未来版本和损坏文件不被覆写。训练事实、WAV、本地统计及手动报告/回放结果保存在 §10 的训练存储中；Home 已移除粘贴、复制、保存和清空入口。
 
-`custom-prompt.json` 由 `lib/custom-prompt-store.js` 读写，与其余 store 同形；解析结果按 mtime+size 缓存、保存时失效，避免逐句分析反复同步读盘。
+`custom-prompt.json` 由 `lib/custom-prompt-store.js` 读写，schema 2 仅保存 `goals / styleRef`；旧 `customRules` 一次性合入 `goals`，相同内容不重复追加，旧 `customWords` 不再进入当前配置。长期关注点上限 40002 字符以容纳旧两项各 20000 字符及分隔空行，反馈风格仍为 20000。解析结果按 mtime+size 缓存、保存时失效；损坏来源不自动改写，future schema 只读已知字段并拒绝显式保存。逐句本地统计仅用默认词表，不再读取分析偏好文件；历史统计兼容见 [Data Model §5.3](data-model.md#53-common-metric-v1-定义)。
 
 Settings / Help 当前由主窗口的 Frozen Utility 承载，AI 与分析偏好不再从用户入口打开独立窗口。分析偏好通过 Utility 内导航进入，AI 配置选择通过现有设置保存接口持久化；已移除无界面调用的旧偏好快捷入口、配置摘要和独立选择 IPC。Settings 新增「外观」子页，旧主题／布局入口继续隐藏；外观切换规则见 Training Flow §12.1，Utility 接线与验证边界见 §20。
 
@@ -415,9 +415,10 @@ npm run smoke:package
 - 时间证据增加有序 quality-event、stopped 汇总及持久 `timing.qualityEvents`；queue overrun 保存可知的排队/拒绝块范围，未知范围保留 null。utterance 识别失败或用户取消收尾时保留已捕获 WAV，ASR 质量标为不可用，不能生成伪转写成功诊断。
 - SenseVoice 使用冻结的可选 Provider，无 partial，最多 4,800,000 Float32 样本。停止时推理；取消能终止正在执行 stop 的识别子进程，下一会话重建。技术默认仍为 Zipformer Large；用户本轮选用并验收的实用主路径为 Zipformer Small CTC 中文 INT8。SenseVoice 本轮下载异常、真实设备/资源验收未完成，按 Backlog B-23 延期。
 - Silero VAD 使用独立 `models/speech-evidence-registry.json`，复用 Model Manager 的固定文件大小/hash 安装与离线缓存；首次分析按需安装到 modelRoot 下的 speech-evidence 目录。独立 utility process 隔离 native 崩溃，并支持硬取消/超时；单个 Main 串行执行 VAD，最多接纳三条分析任务。整个分析预算为 120 秒，AI 请求预算为 60 秒。失败保存 unavailable，已保存事实与可用指标继续可读。
-- Common 的 15 个指标是确定性观测值，不输出表达质量分。`session-analysis-inputs.js` 复用已保存词项输入，首次 finalize 的新训练才可采用当前词表；历史缺失统计不以当前设置补算。VAD 区间明确带未校准限制；缺失/不连续证据按依赖使指标 unknown，不用零填补。AnalysisContext 只携带当前文本、允许的指标/语音区间、质量及分析指令；没有音频字节、Key、endpoint、路径或其他记录。
+- Common 的 15 个指标是确定性观测值，不输出表达质量分。`session-analysis-inputs.js` 复用已保存词项输入，首次 finalize 的新训练仅采用默认词表；历史缺失统计不以当前设置补算。VAD 区间明确带未校准限制；缺失/不连续证据按依赖使指标 unknown，不用零填补。AnalysisContext 只携带当前文本、允许的指标/语音区间、质量及分析指令；没有音频字节、Key、endpoint、路径或其他记录。
+- 远程发送前由 `diagnosis-input.js` 精简上下文，保留全部可用指标，省略不可用值、空项、重复证据关系与本地技术元数据，不附缺失说明；重要质量限制和原文保留。发送与返回校验使用同一份精简快照，本地完整结果不变；字段边界见 [Data Model §5.4](data-model.md#54-structured-diagnosis-v1)。
 - LLM 配置 schema 3 增加每个 profile 的自动诊断开关；新配置为空、旧配置迁移默认关闭。Main 在实际发起前重新解析精确 active profile，未启用、缺失或删除不会自动选择其他服务。界面披露实际本地/远程目标与发送内容；改变 Provider、模型或地址会清除该 profile 的自动启用状态。
-- 训练中保留本地规则统计，旧隐藏反馈栏、逐句词语提醒及其状态更新已清除；本地计数、表达密度和事实保存保持原路径。报告显示摘要、首项 Finding、可展开的更多发现/指标、证据定位及缺失状态。Finding 的产品语义只见 [Training Flow](../product/training-flow.md)。Processing 在事实保存后可离开到 History，完成不会强制跳回；分析取消/失败可恢复，历史读取保持原快照。
+- 训练中保留本地规则统计，旧隐藏反馈栏、统计侧栏、逐句词语提醒及其状态更新已清除；本地计数、表达密度计算和事实保存保持原路径。报告显示摘要、首项 Finding、可展开的更多发现/指标、证据定位及缺失状态；旧记录的指标展示不再依赖侧栏容器。Finding 的产品语义只见 [Training Flow](../product/training-flow.md)。Processing 在事实保存后可离开到 History，完成不会强制跳回；分析取消/失败可恢复，历史读取保持原快照。
 - 保存期间取消分析后，Renderer 只读取已保存结果，不再调用可能新建任务的分析入口。分析刷新保留尚未写入的结果、统计和失败提示；成功重试同一结果 ID 后才清除待保存状态。
 
 历史真实模型有限测量与本轮有限人工复核边界见 [M2](../milestones/m2-speech-evidence-and-ai-diagnosis.md#当前实施与有限证据)。真实 Electron 43.4.1 / 内置 Node 24.18.1 已验证 VAD 中文 WAV、损坏 ONNX 子进程退出隔离、取消及下一任务恢复；这些探测不代表准确率、资格线硬件或全部 M2 验收。
@@ -510,9 +511,9 @@ Main 新增独立 `ai-disclosure.json` 的原子持久化和统一请求门禁�
 
 结构化诊断在真实发送前核对告知和精确选中的有效配置。手动请求与自动启用分开；配置保存处撤销服务/实际模型/地址变更后的自动启用，回环地址判断实际 endpoint。自定义服务的旧双模型字段读取实际 `customModel || model`。同 Session 的自动本地整理与手动分析串行衔接，保留同类去重和取消，不让自动关闭状态吞掉主动请求。连接测试只发送固定测试文本，不发送训练内容。
 
-普通报告以保存的精确快照展示真实摘要、通用与框架 Finding、可展开的原文/语音/指标证据、建议及必要解释；通用与框架整体判断合入唯一摘要，原训练身份保持不变。新诊断使用 `structured-diagnosis-v12`，扩展契约与旧记录兼容由 [Data Model §5.4](data-model.md#54-structured-diagnosis-v1) 定义，不新增 SQLite/Session schema，不自动改写或重新分析旧结果。重试失败仍保留成功快照，空 Finding 不补样例；等待、未配置、未告知、自动关闭、失败与超时来自真实任务或结果。Finding 入口沿用现有真实 Preparing。后台收尾只刷新忙碌布局，不取消另一记录的告知、不夺回页面。
+普通报告以保存的精确快照展示真实摘要、通用与框架 Finding、可展开的原文/语音/指标证据、建议及必要解释；通用与框架整体判断合入唯一摘要，原训练身份保持不变。新诊断使用 `structured-diagnosis-v14`，扩展契约与旧记录兼容由 [Data Model §5.4](data-model.md#54-structured-diagnosis-v1) 定义，不新增 SQLite/Session schema，不自动改写或重新分析旧结果。重试失败仍保留成功快照，空 Finding 不补样例；等待、未配置、未告知、自动关闭、失败与超时来自真实任务或结果。Finding 入口沿用现有真实 Preparing。后台收尾只刷新忙碌布局，不取消另一记录的告知、不夺回页面。
 
-主报告使用 `structured-diagnosis-v12`／问题库 v0.5，沿用单次诊断请求。[问题库](../product/expression-problem-library.md)是内容维护源，生成脚本与一致性检查见 [Development](../development.md#问题库与主诊断提示)。v0.5 清理与现行跨组排序、停止生成表达参考相冲突的旧规则文案并同步生成产物；48 个问题条目、判定标准和响应契约未变，历史来源版本不回写，未因此完成新的真实 AI 质量验收。运行时按共同规则、通用卡、所选框架卡、证据限制、条件练习规则和输出契约组装；文档保留完整练习方向，生产卡只发送适用、检查、排除、证据及相邻边界，不逐卡发送练习处方。33＋15 个编号保留；声音禁评／仅观察卡、缺时长的时长要求卡和局部练习的完整框架卡按现有能力／范围过滤，不按关键词或本地候选缺失排除语义检查，不截断原文。
+主报告使用 `structured-diagnosis-v14`／问题库 v0.6，沿用单次诊断请求。[问题库](../product/expression-problem-library.md)是内容维护源，生成脚本与一致性检查见 [Development](../development.md#问题库与主诊断提示)。v0.5 已对齐跨组排序与停止生成表达参考；v13／v0.6 进一步移除运行时无关的开发、展示与历史兼容说明，明确框架教学内容不是必填清单、材料评价示例值不是默认结论。48 个问题条目、判定标准和响应契约未变，历史来源版本不回写，未因此完成新的真实 AI 质量验收。运行时按共同规则、通用卡、所选框架卡、证据限制、条件练习规则和输出契约组装；文档保留完整练习方向，生产卡只发送适用、检查、排除、证据及相邻边界，不逐卡发送练习处方。33＋15 个编号保留；声音禁评／仅观察卡、缺时长的时长要求卡和局部练习的完整框架卡按现有能力／范围过滤，不按关键词或本地候选缺失排除语义检查，不截断原文。
 
 Main 要求材料评价范围及练习可比性，解析时执行范围／状态与严格引用约束；Report 明示材料不足／有限分析，保留本地事实与旧快照。产品行为由 [Training Flow §7.1 / §10](../product/training-flow.md#71-完整分析与训练重点分层) 定义；当前响应契约、版本来源及历史补全回执的读取兼容由 [Data Model §5.4](data-model.md#54-structured-diagnosis-v1) 定义。旧回执仅用于读取既有快照，当前生产不进行字段补全或生成新回执。
 
@@ -587,7 +588,7 @@ I4 阶段的验证使用隔离 userData、确定性采集与 Fake ASR/LLM，实�
 
 主窗口的原生 `dialog#utility` 复用 [utility.css](../../src/frozen-ui/utility.css) 和原字体/许可，承载设置与帮助子页；子页职责与导航只由 [Training Flow §13.1](../product/training-flow.md#131-已确认的-ia-归属) 定义，本节不维护另一份子页清单或固定数量。既有设置、偏好及报告隐私帮助入口统一接入；旧独立设置／提示词窗口及其页面、控制器已移除，原打开接口继续路由到主窗口 Utility。旧窗口关闭 IPC、无界面调用的 Markdown 保存 IPC 和旧批量文本校验已移除；报告导出仍按 Backlog D-11 跟踪。旧主题／布局控件按确认隐藏，原配置与底层能力保留，不覆盖已迁移界面的冻结样式。
 
-[Frozen Utility](../../src/frozen-utility.js) 仅管理界面草稿，持久化仍使用既有 LLM profile、custom-prompt 和模型管理 API。AI 新建、复制、删除、当前选择、自动开关及编辑保存读取真实存储；连接测试绑定当前编辑配置，不保存或触发训练分析。身份变更后的自动撤销以 Main 保存结果为准，再读取实际状态；失败保留草稿。分析偏好将冻结标签映射至已有 `goals / styleRef / customRules / customWords`，不新增配置文件、不修改训练主题/场景/目标或旧结果。I2 的告知文件与请求门禁保持独立，查看/编辑设置和连接测试不代替告知。
+[Frozen Utility](../../src/frozen-utility.js) 仅管理界面草稿，持久化仍使用既有 LLM profile、custom-prompt 和模型管理 API。AI 新建、复制、删除、当前选择、自动开关及编辑保存读取真实存储；连接测试绑定当前编辑配置，不保存或触发训练分析。身份变更后的自动撤销以 Main 保存结果为准，再读取实际状态；失败保留草稿。分析偏好仅编辑 `goals / styleRef` 两项，无更多选项；配置迁移见 §5.7，不新增配置文件、不修改训练主题/场景/目标或旧结果。I2 的告知文件与请求门禁保持独立，查看/编辑设置和连接测试不代替告知。
 
 [Utility Content](../../src/utility-content.js) 读取实际 Catalog / 模型管理 DTO，分开显示持久选择与生效模型，按真实 action 接入安装、取消、重试、重新安装和切换。只有可信下载阶段与完整分母显示百分比，未知总量和校验阶段显示等待；没有初始化麦克风或移植模拟安装。帮助按子页直接显示正文及 FAQ；未呈现的搜索逻辑及其专用条目已移除；帮助与隐私说明同步当前保存、删除、AI 告知和恢复事实，不承诺 MB3 重新转写。诊断只在问题与反馈导出，调用既有脱敏快照和保存能力；反馈仍由用户主动打开白名单文档，不自动提交。
 

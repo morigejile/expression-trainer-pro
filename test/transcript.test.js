@@ -187,10 +187,6 @@ function createTrainer() {
   trainer.btnReport = createElement();
   trainer.timer = createElement();
   trainer.subtitleContainer = createElement();
-  trainer.statFillers = createElement();
-  trainer.statHedges = createElement();
-  trainer.statVague = createElement();
-  trainer.statDensity = createElement();
   trainer.reportBody = createElement();
   trainer.reportModal = createElement();
   trainer.userMessage = createElement();
@@ -1243,7 +1239,7 @@ test('successful recording, pause, and resume expose the current operation state
   assert.equal(trainer.trainingStatus.textContent, '正在录音');
 });
 
-test('local word statistics remain available without the retired feedback panel', async t => {
+test('local word statistics remain available without any statistics sidebar elements', async t => {
   const analysis = {totalWords:10, fillers:[{word:'嗯',position:0},{word:'嗯',position:0}],
     hedges:[{word:'可能',position:1}], vagueWords:[{word:'东西',position:2}]};
   global.window = {api:{analyzeText:async () => analysis}};
@@ -1251,10 +1247,9 @@ test('local word statistics remain available without the retired feedback panel'
   const trainer = createTrainer();
   trainer.resetStats();
   assert.equal(await trainer.analyzeCurrentSentence('嗯，可能是那个东西。'),analysis);
-  assert.equal(trainer.statFillers.textContent,2);
-  assert.equal(trainer.statHedges.textContent,1);
-  assert.equal(trainer.statVague.textContent,1);
-  assert.equal(trainer.statDensity.textContent,'70%');
+  assert.equal(trainer.stats.fillers,2);
+  assert.equal(trainer.stats.hedges,1);
+  assert.equal(trainer.stats.vagueWords,1);
   assert.equal(trainer.stats.excludedCharacters,3);
   assert.equal(trainer.stats.hedgeCharacters,2);
 });
@@ -2343,16 +2338,13 @@ test('two finals at one audio position keep the timeline non-degenerate', async 
   assert.ok(record.segments.every(segment=>Number.isInteger(segment.startMs) && Number.isInteger(segment.endMs) && segment.endMs>segment.startMs));
 });
 
-test('resetting stats returns the density readout to its placeholder', () => {
+test('resetting stats clears all saved counters without a sidebar', () => {
   const trainer = createTrainer();
   trainer.stats = { fillers: 2, hedges: 1, vagueWords: 0, totalWords: 20, duration: 0, excludedCharacters: 6, hedgeCharacters: 3 };
-  trainer.updateStatsDisplay();
-  assert.equal(trainer.statDensity.textContent, '70%');
 
   trainer.resetStats();
 
-  assert.equal(trainer.statDensity.textContent, '--');
-  assert.equal(trainer.statFillers.textContent, 0);
+  assert.deepEqual(trainer.stats,{fillers:0,hedges:0,vagueWords:0,totalWords:0,duration:0,excludedCharacters:0,hedgeCharacters:0});
 });
 
 test('a chunk reaching the configured frame limit triggers one owned normal stop', async () => {

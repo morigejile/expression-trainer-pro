@@ -200,6 +200,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       removedApis: ['analyzeTexts', 'closeWindow', 'saveFile', 'getFinalReport', 'getRealtimeFeedback', 'analyzePlayback', 'getLlmProfileSummaries', 'selectLlmProfile', 'openPromptEditor'].filter(name => name in window.api),
       removedUi: ['btn-paste','paste-modal','btn-copy-text','btn-save-text','btn-clear',
         'report-modal','training-record-select','btn-diagnostics',
+        'panel-left','report-local-statistics','stat-fillers','stat-hedges','stat-vague','stat-density',
         'panel-right','coach-title','feedback-status','feedback-content'].filter(id => document.getElementById(id)),
       missingUi: [
         'user-message', 'user-message-text', 'user-message-action', 'user-message-close',
@@ -208,11 +209,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       initialUi: {
         theme: document.documentElement.dataset.theme,
         layout: document.documentElement.dataset.layout,
-        trainingStatus: document.getElementById('training-status')?.textContent.trim(),
-        vagueClass: document.getElementById('stat-vague')?.className,
-        fillerClass: document.getElementById('stat-fillers')?.className,
-        hedgeClass: document.getElementById('stat-hedges')?.className,
-        densityHelp: document.querySelector('.stat-label[title]')?.getAttribute('title')
+        trainingStatus: document.getElementById('training-status')?.textContent.trim()
       }
     };
   })()`);
@@ -225,11 +222,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.deepEqual(apiContract.initialUi, {
     theme: 'graphite',
     layout: 'coach-rail',
-    trainingStatus: apiContract.initialUi.trainingStatus,
-    vagueClass: 'stat-value stat-yellow',
-    fillerClass: 'stat-value stat-red',
-    hedgeClass: 'stat-value stat-orange',
-    densityHelp: '字数只计文字和数字，不含标点、空白。表达密度为排除填充词和犹豫词字符后的字数占比，同一字符只扣除一次。'
+    trainingStatus: apiContract.initialUi.trainingStatus
   });
   if (process.platform !== 'darwin') {
     assert.equal(mainWindow.isMenuBarVisible(), false, 'main window must not render a second menu header');
@@ -376,10 +369,8 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
         text: button.textContent.trim()
       };
     });
-    const densityLabel = document.getElementById('stat-density-label');
     return {
       controls,
-      densityDescription: densityLabel?.getAttribute('title') || '',
       reducedMotionRule: Array.from(document.styleSheets)
         .flatMap(sheet => Array.from(sheet.cssRules))
         .some(rule => rule.conditionText?.includes('prefers-reduced-motion')),
@@ -399,7 +390,6 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     { id: 'btn-history', text: 'history' },
     { id: 'btn-settings', text: '设置' }
   ]);
-  assert.match(desktopUsability.densityDescription, /字数.*不含标点.*同一字符只扣除一次/);
   assert.equal(desktopUsability.reducedMotionRule, true);
   assert.equal(desktopUsability.brandLabel, '表达训练，返回准备');
   assert.equal(desktopUsability.brandPresent, true);
@@ -442,7 +432,6 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     document.getElementById('training-status').textContent = '布局切换状态保真';
     window.__layoutSmoke = {
       transcript: document.getElementById('subtitle-container'),
-      insights: document.querySelector('[data-region="insights"]'),
       timer: document.getElementById('timer'),
       trainingStatus: document.getElementById('training-status'),
       transcriptScroll: transcript.scrollTop,
@@ -476,9 +465,8 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
           stage: rect('#frozen-recording .session-stage'),
           transcript: rect('#subtitle-scroll'),
           coachAbsent: !document.querySelector('[data-region="coach"]'),
-          insights: rect('[data-region="insights"]'),
+          insightsAbsent: !document.querySelector('[data-region="insights"]'),
           nodesPreserved: window.__layoutSmoke.transcript === document.getElementById('subtitle-container')
-            && window.__layoutSmoke.insights === document.querySelector('[data-region="insights"]')
             && window.__layoutSmoke.timer === document.getElementById('timer')
             && window.__layoutSmoke.trainingStatus === document.getElementById('training-status'),
           scrollPreserved: transcriptScroll.scrollTop === window.__layoutSmoke.transcriptScroll,
@@ -497,7 +485,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       assert.equal(geometry.trainingStatus, '布局切换状态保真');
       assert.ok(geometry.transcript.left >= geometry.stage.left && geometry.transcript.right <= geometry.stage.right + 1,'Frozen recording transcript stays inside the stage');
       assert.equal(geometry.coachAbsent,true,'obsolete coaching rail is removed from recording');
-      assert.equal(geometry.insights.height,0,'legacy metric panel is absent from migrated recording');
+      assert.equal(geometry.insightsAbsent,true,'legacy metric panel is removed from recording');
     }
   }
   await mainWindow.webContents.executeJavaScript(`(() => {

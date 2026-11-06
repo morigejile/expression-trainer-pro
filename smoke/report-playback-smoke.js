@@ -20,7 +20,7 @@ async function run({mainWindow,evaluate,wait,click,capture}){
     trainer.refreshPlaybackControls();document.getElementById('report-materials').open=true;
   })()`);
   try{
-    await wait('synthetic WAV metadata',`document.getElementById('recording-player').duration===120`);
+    await wait('synthetic WAV metadata and seek controls ready',`document.getElementById('recording-player').duration===120 && !document.getElementById('playback-forward').disabled`);
     await click('#playback-forward');
     assert.equal(await evaluate(`document.getElementById('recording-player').currentTime`),5);
     assert.equal(await evaluate(`document.getElementById('recording-player').paused`),true);
@@ -61,19 +61,28 @@ async function run({mainWindow,evaluate,wait,click,capture}){
       for(const theme of ['graphite','coral-glow','ink-night','frosted-mist']){
         await evaluate(`document.documentElement.dataset.theme=${JSON.stringify(theme)};document.getElementById('report-scroll').scrollTop=document.getElementById('report-scroll').scrollHeight/2`);
         const layout=await evaluate(`(()=>{
-          const region=document.getElementById('report-scroll'),toolbar=document.getElementById('report-audio'),heading=document.getElementById('report-materials-heading'),seek=document.getElementById('playback-seek'),actions=document.querySelector('.playback-actions');
-          const rect=node=>{const r=node.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,height:r.height};};
-          return {viewport:innerWidth,page:document.documentElement.scrollWidth,region:rect(region),toolbar:rect(toolbar),heading:rect(heading),rail:rect(seek),actions:rect(actions),
-            fits:[...document.querySelectorAll('.playback-actions button,.playback-actions input,.playback-actions select,#playback-return,.playback-follow-label')].every(node=>{const r=node.getBoundingClientRect(),p=region.getBoundingClientRect();return r.left>=p.left&&r.right<=p.right;}),
-            surface:getComputedStyle(toolbar).backgroundColor,headerSurface:getComputedStyle(heading).backgroundColor};
+          const region=document.getElementById('report-scroll'),toolbar=document.getElementById('report-audio'),heading=document.getElementById('report-materials-heading'),seek=document.getElementById('playback-seek'),actions=document.querySelector('.playback-actions'),controls=document.querySelector('.playback-toolbar');
+          const rect=node=>{const r=node.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,height:r.height,width:r.width};};
+          return {viewport:innerWidth,page:document.documentElement.scrollWidth,region:rect(region),toolbar:rect(toolbar),heading:rect(heading),rail:rect(seek),actions:rect(actions),controls:rect(controls),timeline:rect(document.querySelector('.playback-timeline')),times:rect(document.querySelector('.playback-time')),volume:rect(document.querySelector('.playback-sound')),follow:rect(document.querySelector('.playback-follow-label')),speed:rect(document.querySelector('.playback-speed-label')),
+            fits:[...document.querySelectorAll('.playback-toolbar button,.playback-toolbar input,.playback-toolbar select,.playback-follow-label,#playback-return')].filter(node=>node.checkVisibility()).every(node=>{const r=node.getBoundingClientRect(),p=region.getBoundingClientRect();return r.left>=p.left&&r.right<=p.right;}),
+            surface:getComputedStyle(toolbar).backgroundColor,headerSurface:getComputedStyle(heading).backgroundColor,
+            currentShadow:getComputedStyle(document.querySelector('.playback-segment.is-current button')).boxShadow,
+            clip:parseFloat(document.getElementById('report-transcript').style.getPropertyValue('--playback-transcript-clip'))};
         })()`);
         assert.ok(layout.page<=layout.viewport&&layout.fits,theme+' controls fit '+width);
         assert.ok(Math.abs(layout.heading.top-layout.region.top)<2,'material title stays pinned');
         assert.ok(Math.abs(layout.toolbar.top-layout.heading.bottom)<2,'player stays below its title');
         assert.equal(layout.surface,layout.headerSurface,'sticky surfaces share the project theme');
-        assert.ok(!['transparent','rgba(0, 0, 0, 0)'].includes(layout.surface));
-        assert.ok(layout.actions.left>=layout.rail.right-1||layout.actions.top>=layout.rail.bottom-1,'controls remain on the right or wrap as a group');
-        assert.ok(Math.abs(layout.actions.right-layout.toolbar.right)<2,'control group stays right aligned');
+        assert.equal(layout.surface,'rgba(0, 0, 0, 0)','controls expose the actual report material instead of painting a different surface');
+        const center=rect=>rect.top+rect.height/2;
+        assert.ok(layout.timeline.right<layout.controls.left&&layout.timeline.width>layout.controls.right-layout.controls.left,'wide progress area stays left of the compact controls');
+        assert.ok(Math.abs(layout.controls.left-layout.timeline.right-36)<2,'accepted 36px separation');
+        assert.ok(Math.abs(layout.controls.right-layout.controls.left-248)<2,'accepted 248px control width');
+        assert.ok(Math.abs(center(layout.rail)-center(layout.volume))<2&&Math.abs(center(layout.volume)-center(layout.follow))<2,'volume and follow align with the progress bar');
+        assert.ok(Math.abs(center(layout.times)-center(layout.actions))<2&&Math.abs(center(layout.actions)-center(layout.speed))<2,'transport and speed align with the times');
+        assert.ok(layout.actions.top>=layout.volume.bottom&&layout.speed.top>=layout.follow.bottom,'playback and speed stay below volume and follow');
+        assert.equal(layout.currentShadow,'none','current transcript has no dark vertical inset');
+        assert.ok(layout.clip>0,'scrolled transcript is clipped underneath the transparent controls');
         if(width===1280)await capture('playback-'+theme);
       }
     }

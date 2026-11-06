@@ -63,7 +63,7 @@
     }
     root.append(counts,node('p','metric-count-note','词表命中次数，需结合原文判断是否影响表达。'));
     if(evidenceRun && evidenceRun.value?.status!=='completed')root.appendChild(node('p','metric-availability',`语音区间暂不可用：${reasonText(evidenceRun.value?.reason)}。词语统计仍可查看。`));
-    const more=node('details','metric-details');more.id='report-more-metrics';more.appendChild(node('summary',null,'更多指标'));
+    const more=node('section','metric-details');more.id='report-more-metrics';more.appendChild(node('h3',null,'更多指标'));
     const groups=node('div','metric-groups');
     const layouts=[
       ['词语与速率',[
@@ -76,14 +76,14 @@
         '仅供核对，不能单凭数值判断语速或停顿是否合适。']];
     for(const [title,entries,note] of layouts){
       const selected=entries.filter(([id])=>byId.has(id));if(!selected.length)continue;
-      const group=node('section','metric-group'),list=node('dl','metric-list');group.appendChild(node('h3',null,title));
+      const group=node('section','metric-group'),list=node('dl','metric-list');group.appendChild(node('h4',null,title));
       for(const [id,label] of selected)list.appendChild(row(byId.get(id),label));
       group.append(list,node('p','metric-group-note',note));groups.appendChild(group);
     }
     const extra=metrics.filter(metric=>!rendered.has(metric.id));
-    if(extra.length){const group=node('section','metric-group'),list=node('dl','metric-list');group.appendChild(node('h3',null,'其他已保存指标'));for(const metric of extra)list.appendChild(row(metric));group.appendChild(list);groups.appendChild(group);}
+    if(extra.length){const group=node('section','metric-group'),list=node('dl','metric-list');group.appendChild(node('h4',null,'其他已保存指标'));for(const metric of extra)list.appendChild(row(metric));group.appendChild(list);groups.appendChild(group);}
     more.appendChild(groups);more.hidden=!groups.children.length;root.appendChild(more);
-    const source=node('details','metric-source-details');source.id='report-metric-source';source.appendChild(node('summary',null,'分析说明'));
+    const source=node('section','metric-source-details');source.id='report-metric-source';source.appendChild(node('h3',null,'分析说明'));
     const explanations=node('dl','metric-source-list');
     const asr=record.sourceSnapshot?.asr;
     for(const [label,copy] of [
@@ -131,7 +131,6 @@
     const segmentById = new Map(segments.map(segment => [segment.id,segment]));
     const speechById = new Map((evidenceRun.value?.segments || []).map(segment => [segment.id,segment]));
     const metricContent=createReportMetrics(document,{metrics,record,evidenceRun});
-    const metricDetails=metricContent.querySelector('details');
 
     let findingIndex=0;
     function findingCard(finding) {
@@ -157,7 +156,6 @@
         button.type = 'button';
         button.setAttribute('data-evidence-ref',ref);
         button.addEventListener('click',() => {
-          if (metric && !BASIC_METRICS.includes(metric.id) && !COUNT_METRICS.some(([id])=>id===metric.id)) metricDetails.open = true;
           if (typeof onEvidence === 'function') onEvidence(ref);
         });
         const block=element('div','evidence-block');

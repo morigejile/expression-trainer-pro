@@ -43,10 +43,10 @@ test('a missing custom prompt file yields defaults without caching', t => {
   const store = createCustomPromptStore({logger: silentLogger});
 
   assert.deepEqual(store.load(userDataPath), {
-    schemaVersion: 1, goals: '', customRules: '', styleRef: '', customWords: ''
+    schemaVersion: 2, goals: '', styleRef: ''
   });
 
-  store.save(userDataPath, {goals: '更直接', customRules: '', styleRef: '', customWords: '那个'});
+  store.save(userDataPath, {schemaVersion:2, goals: '更直接', styleRef: ''});
 
   assert.equal(store.load(userDataPath).goals, '更直接');
 });
@@ -55,19 +55,20 @@ test('repeated loads reuse the parsed prompt instead of re-reading the file', t 
   const userDataPath = withUserData(t);
   const reads = [];
   const store = createCustomPromptStore({fsImpl: countingFs(reads), logger: silentLogger});
-  store.save(userDataPath, {goals: '更直接', customRules: '', styleRef: '', customWords: '那个'});
+  store.save(userDataPath, {schemaVersion:2, goals: '更直接', styleRef: ''});
 
   const first = store.load(userDataPath);
+  const readsAfterFirstLoad = reads.length;
   for (let index = 0; index < 20; index += 1) store.load(userDataPath);
 
-  assert.equal(reads.length, 1);
+  assert.equal(reads.length, readsAfterFirstLoad);
   assert.deepEqual(store.load(userDataPath), first);
 });
 
 test('each load returns an isolated copy callers cannot corrupt', t => {
   const userDataPath = withUserData(t);
   const store = createCustomPromptStore({logger: silentLogger});
-  store.save(userDataPath, {goals: '更直接', customRules: '', styleRef: '', customWords: ''});
+  store.save(userDataPath, {schemaVersion:2, goals: '更直接', styleRef: ''});
 
   const first = store.load(userDataPath);
   first.goals = '被改坏了';
@@ -78,10 +79,10 @@ test('each load returns an isolated copy callers cannot corrupt', t => {
 test('saving invalidates the cache so the next load sees the new rules', t => {
   const userDataPath = withUserData(t);
   const store = createCustomPromptStore({logger: silentLogger});
-  store.save(userDataPath, {goals: '第一版', customRules: '', styleRef: '', customWords: ''});
+  store.save(userDataPath, {schemaVersion:2, goals: '第一版', styleRef: ''});
   assert.equal(store.load(userDataPath).goals, '第一版');
 
-  store.save(userDataPath, {goals: '第二版', customRules: '', styleRef: '', customWords: ''});
+  store.save(userDataPath, {schemaVersion:2, goals: '第二版', styleRef: ''});
 
   assert.equal(store.load(userDataPath).goals, '第二版');
 });
@@ -90,7 +91,7 @@ test('an external rewrite of the file is picked up by size or mtime', t => {
   const userDataPath = withUserData(t);
   const store = createCustomPromptStore({logger: silentLogger});
   const filePath = getCustomPromptPath(userDataPath);
-  store.save(userDataPath, {goals: '第一版', customRules: '', styleRef: '', customWords: ''});
+  store.save(userDataPath, {schemaVersion:2, goals: '第一版', styleRef: ''});
   assert.equal(store.load(userDataPath).goals, '第一版');
 
   fs.writeFileSync(filePath, JSON.stringify({
@@ -123,18 +124,18 @@ test('a legacy file is normalized on disk once and then served from cache', t =>
   const reads = [];
   const store = createCustomPromptStore({fsImpl: countingFs(reads), logger: silentLogger});
   const filePath = getCustomPromptPath(userDataPath);
-  fs.writeFileSync(filePath, JSON.stringify({goals: '旧结构', legacyField: 1}), 'utf8');
+  fs.writeFileSync(filePath, JSON.stringify({goals: '旧结构', customRules:'旧指令',customWords:'行动',legacyField: 1}), 'utf8');
 
-  assert.equal(store.load(userDataPath).goals, '旧结构');
+  assert.equal(store.load(userDataPath).goals, '旧结构\n\n旧指令');
   const migrated = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  assert.equal(migrated.schemaVersion, 1);
+  assert.deepEqual(migrated,{schemaVersion:2,goals:'旧结构\n\n旧指令',styleRef:''});
   assert.equal(migrated.legacyField, undefined);
 
   const readsAfterMigration = reads.length;
   store.load(userDataPath);
   store.load(userDataPath);
 
-  assert.equal(store.load(userDataPath).goals, '旧结构');
+  assert.equal(store.load(userDataPath).goals, '旧结构\n\n旧指令');
   // 迁移后重新登记一次，之后不再读盘
   assert.equal(reads.length, readsAfterMigration + 1);
 });
@@ -149,6 +150,8 @@ test('a future schema is read but never written back', t => {
   fs.writeFileSync(filePath, raw, 'utf8');
 
   assert.equal(store.load(userDataPath).goals, '未来目标');
+  assert.throws(()=>store.save(userDataPath,{schemaVersion:2,goals:'覆盖',styleRef:''}),
+    error=>error.code==='unsupported-schema-version');
   assert.equal(fs.readFileSync(filePath, 'utf8'), raw);
 });
 
@@ -156,11 +159,11 @@ test('two stores over the same directory do not share cache state', t => {
   const userDataPath = withUserData(t);
   const writer = createCustomPromptStore({logger: silentLogger});
   const reader = createCustomPromptStore({logger: silentLogger});
-  writer.save(userDataPath, {goals: '第一版', customRules: '', styleRef: '', customWords: ''});
+  writer.save(userDataPath, {schemaVersion:2, goals: '第一版', styleRef: ''});
 
   assert.equal(reader.load(userDataPath).goals, '第一版');
 
-  writer.save(userDataPath, {goals: '第二版', customRules: '', styleRef: '', customWords: ''});
+  writer.save(userDataPath, {schemaVersion:2, goals: '第二版', styleRef: ''});
 
   assert.equal(reader.load(userDataPath).goals, '第二版');
 });

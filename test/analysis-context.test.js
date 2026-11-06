@@ -103,7 +103,7 @@ test('context strips audio, paths, credentials, history and unknown nested instr
   source.analysisInstructions.profile = {endpoint:'PRIVATE_ENDPOINT'};
   const context = build(source);
   assert.equal(JSON.stringify(context).includes('PRIVATE_'),false);
-  assert.deepEqual(context.analysisInstructions,{schemaVersion:1,goals:'说明观点',customRules:'用事实支持',styleRef:'简洁',customWords:'嗯'});
+  assert.deepEqual(context.analysisInstructions,{schemaVersion:2,goals:'说明观点\n\n用事实支持',styleRef:'简洁'});
 });
 
 test('context rejects cross-session and stale Common Analysis instead of citing unrelated metrics', () => {

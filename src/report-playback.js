@@ -26,7 +26,7 @@
       const usable=available()&&!audio.error&&(segments||[]).some(segment=>Number.isFinite(segment.startMs));
       if(followControls)followControls.hidden=!usable;
       if(followSwitch)followSwitch.checked=following;
-      if(returnButton){returnButton.hidden=following;returnButton.disabled=!usable||!rows.has(currentId);}
+      if(returnButton){returnButton.hidden=following||!usable;returnButton.disabled=!usable||!rows.has(currentId);}
     }
     function revealCurrent(force=false){
       if(!following||(!force&&audio.paused)||!available()||audio.error||!materials?.open||!scrollRegion?.clientHeight||document.body?.dataset?.frozenUi!=='report')return;
@@ -39,6 +39,15 @@
       scrollRegion.scrollTo({top:Math.max(0,scrollRegion.scrollTop+bounds.top-visibleTop),behavior:reduced?'instant':'smooth'});
     }
     function setFollowing(value){following=value;syncFollow();}
+    function clipTranscript(){
+      const surface=get('report-transcript');if(!surface)return;
+      let inset=0;
+      if(materials?.open&&document.body?.dataset?.frozenUi==='report'&&scrollRegion?.clientHeight){
+        const bounds=surface.getBoundingClientRect(),heading=get('report-materials-heading')?.getBoundingClientRect(),toolbar=get('report-audio')?.getBoundingClientRect();
+        inset=Math.max(0,Math.min(bounds.height,Math.max(heading?.bottom||0,toolbar?.bottom||0)-bounds.top));
+      }
+      surface.style.setProperty('--playback-transcript-clip',`${inset}px`);
+    }
     function pauseFollow(event){
       if(audio.paused||event.target?.closest?.('#playback-controls, #playback-follow-controls, input, select'))return;
       setFollowing(false);
@@ -52,7 +61,7 @@
       seek.style.setProperty('--playback-progress',`${total?Math.min(100,time/total*100):0}%`);seek.setAttribute('aria-valuetext',`${clock(time)}，共 ${total?clock(total):'时长加载中'}`);
       volume.value=String(audio.volume);mute.setAttribute('aria-pressed',String(audio.muted||audio.volume===0));mute.setAttribute('aria-label',audio.muted||audio.volume===0?'取消静音':'静音');speed.value=String(audio.playbackRate);
       audioStatus.textContent=!available()?(record?.audioState==='corrupt'?'录音已损坏，无法回放。':'录音缺失，无法回放。'):audio.error?'录音无法加载或已损坏，无法回放。':playError||(audio.readyState===0?'录音加载中…':'');
-      updateRows();syncFollow();
+      updateRows();syncFollow();clipTranscript();
     }
     toggle.addEventListener('click',()=>{
       if(!available()||audio.error)return;
@@ -78,6 +87,10 @@
     scrollRegion?.addEventListener('touchmove',pauseFollow,{passive:true});
     scrollRegion?.addEventListener('pointerdown',event=>{if(event.target===scrollRegion)pauseFollow(event);});
     scrollRegion?.addEventListener('keydown',event=>{if(['ArrowDown','ArrowUp','PageDown','PageUp','Home','End'].includes(event.key))pauseFollow(event);});
+    scrollRegion?.addEventListener('scroll',clipTranscript,{passive:true});
+    materials?.addEventListener('toggle',clipTranscript);
+    const ResizeObserver=document.defaultView?.ResizeObserver;
+    if(ResizeObserver){const observer=new ResizeObserver(clipTranscript);for(const element of [scrollRegion,get('report-audio'),get('report-materials-heading')])if(element)observer.observe(element);}
     for(const event of ['loadedmetadata','durationchange','timeupdate','seeked','play','pause','ended','volumechange','ratechange','emptied'])audio.addEventListener(event,syncMedia);
     audio.addEventListener('error',()=>{syncMedia();});
     audio.addEventListener('waiting',()=>{playError='录音加载中…';syncMedia();});

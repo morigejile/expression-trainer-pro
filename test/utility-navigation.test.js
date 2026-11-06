@@ -11,11 +11,22 @@ class Element{
   focus(){this.ownerDocument.activeElement=this;}showModal(){this.open=true;}close(){this.open=false;}
 }
 function fixture(appearance){const document={addEventListener(){},createElement(tag){return new Element(this,tag);},getElementById(id){return [dialog,...dialog.all()].find(el=>el.id===id);}},dialog=document.createElement('dialog');dialog.id='utility';for(const id of ['content','local-nav','utility-kind','surface-title','close-surface','unsaved','stay','discard']){const el=document.createElement('div');el.id=id;dialog.appendChild(el);}const footer=document.createElement('div');footer.className='sidebar-bottom';dialog.appendChild(footer);
-  const api={getCustomPrompt:async()=>({schemaVersion:1,goals:'原目标',styleRef:'',customRules:'',customWords:''}),getAsrModelState:async()=>({ok:true,state:{models:[]}}),getAppInfo:async()=>({version:'1.0.0'})};const trainer={openModal(modal){this.activeModal=modal;},closeModal(){this.activeModal=null;}};
+  const api={getCustomPrompt:async()=>({schemaVersion:2,goals:'原目标',styleRef:''}),getAsrModelState:async()=>({ok:true,state:{models:[]}}),getAppInfo:async()=>({version:'1.0.0'})};const trainer={openModal(modal){this.activeModal=modal;},closeModal(){this.activeModal=null;}};
   const content={renderSpeech(doc,parent){parent.textContent='真实模型';},help(doc,parent,page){parent.textContent=page;const button=doc.createElement('button');button.setAttribute('data-export','');parent.appendChild(button);}};
   return {api,document,ui:createUtility({document,api,trainer,content,appearance})};
 }
 const deferred=()=>{let resolve;const promise=new Promise(done=>{resolve=done;});return {promise,resolve};};
+test('preferences expose only goals and feedback style',async()=>{
+  const f=fixture();f.api.getCustomPrompt=async()=>({schemaVersion:2,goals:'原目标',styleRef:'简洁'});
+  await f.ui.open('settings','preferences');
+  const body=f.document.getElementById('content');
+  const fields=body.all().filter(el=>el.attrs['data-pref']!==undefined);
+  assert.deepEqual(fields.map(el=>el.attrs['data-pref']),['goals','style']);
+  assert.deepEqual(fields.map(el=>el.maxLength),[40002,20000]);
+  assert.doesNotMatch(body.textContent,/补充分析指令|自定义关注词|更多选项/);
+  f.ui.state.updatePreference('rules','旧指令');f.ui.state.updatePreference('words','旧词');
+  assert.equal(f.ui.state.dirty,false);
+});
 test('a late model operation keeps its real state without replacing a new preferences editor',async()=>{const f=fixture(),done=deferred();f.api.switchAsrModel=()=>done.promise;await f.ui.open('settings','speech');const task=f.ui.modelAction('model','switch');await f.ui.show('settings','preferences');f.ui.state.updatePreference('goals','新草稿');const before=f.document.getElementById('content').querySelector('[data-pref]');before.focus();done.resolve({ok:false});await task;assert.equal(f.document.getElementById('content').querySelector('[data-pref]'),before);assert.equal(f.document.activeElement,before);assert.equal(f.ui.state.prefs.goals,'新草稿');assert.doesNotMatch(f.document.getElementById('content').textContent,/模型操作/);});
 test('a late diagnostic export cannot append success to another Help page',async()=>{const f=fixture(),done=deferred();f.api.exportDiagnostics=()=>done.promise;await f.ui.open('help','feedback');const task=f.ui.exportDiagnostics();await f.ui.open('help','privacy');done.resolve({success:true});await task;assert.doesNotMatch(f.document.getElementById('content').textContent,/已导出/);});
 

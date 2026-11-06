@@ -1,7 +1,7 @@
 (function(root,factory){const api=factory(typeof module==='object'&&module.exports?require('../lib/llm-provider-config'):root.LlmProviderConfig);if(typeof module==='object'&&module.exports)module.exports=api;else root.FrozenUtility=api;})(typeof globalThis!=='undefined'?globalThis:this,config=>{
   'use strict';
   const clone=value=>structuredClone(value);
-  const prefFields={goals:'goals',style:'styleRef',rules:'customRules',words:'customWords'};
+  const prefFields={goals:'goals',style:'styleRef'};
   const providers={deepseek:'DeepSeek',openai:'OpenAI',ollama:'Ollama',custom:'自定义兼容服务'};
   function endpoint(profile){return config.getLlmEndpoint(profile);}
   function displayEndpoint(profile){try{const url=new URL(endpoint(profile));url.username='';url.password='';url.search='';url.hash='';return url.href;}catch{return '请填写服务地址';}}
@@ -66,7 +66,7 @@
       }else{const statusRow=add(body,'div','editor-actions');add(statusRow,'span','','').id='edit-status';}
       status();
     }
-    function renderPreferences(){add(body,'p','settings-intro','用于之后生成的分析，已有报告保持不变。');const fields=add(body,'div','preference-fields');const labels={goals:['长期关注点','例如：建议是否有具体例子支撑'],style:['反馈风格','例如：简短、直接，用原文解释'],rules:['补充分析指令','例如：指出建议中缺少的负责人和时间'],words:['自定义关注词','用顿号或逗号分隔']};const more=add(body,'details','preference-more'),summary=add(more,'summary','','更多选项');add(summary,'span','','补充指令与关注词');const extra=add(more,'div');for(const[key,[title,hint]]of Object.entries(labels)){const label=add(['goals','style'].includes(key)?fields:extra,'label','preference-field',title),textarea=add(label,'textarea');textarea.value=state.prefs[prefFields[key]];textarea.placeholder=hint;textarea.setAttribute('data-pref',key);textarea.disabled=state.busy;textarea.maxLength=20000;textarea.addEventListener('input',()=>{state.updatePreference(key,textarea.value);status();});}add(extra,'p','hint','这些偏好不修改原始转写，也不作为实时提醒开关。');const actions=add(body,'div','editor-actions');add(actions,'span','','').id='edit-status';button(actions,'恢复默认',()=>{for(const key of Object.keys(prefFields))state.updatePreference(key,'');ui.render();},{'data-reset-pref':''});const save=button(actions,'保存偏好',()=>void perform(state.savePreferences),{'data-save-pref':''},'primary');save.disabled=state.busy;status();}
+    function renderPreferences(){add(body,'p','settings-intro','用于之后生成的分析，已有报告保持不变。');const fields=add(body,'div','preference-fields');const labels={goals:['长期关注点','例如：建议是否有具体例子支撑'],style:['反馈风格','例如：简短、直接，用原文解释']};for(const[key,[title,hint]]of Object.entries(labels)){const label=add(fields,'label','preference-field',title),textarea=add(label,'textarea');textarea.value=state.prefs[prefFields[key]];textarea.placeholder=hint;textarea.setAttribute('data-pref',key);textarea.disabled=state.busy;textarea.maxLength=key==='goals'?40002:20000;textarea.addEventListener('input',()=>{state.updatePreference(key,textarea.value);status();});}const actions=add(body,'div','editor-actions');add(actions,'span','','').id='edit-status';button(actions,'恢复默认',()=>{for(const key of Object.keys(prefFields))state.updatePreference(key,'');ui.render();},{'data-reset-pref':''});const save=button(actions,'保存偏好',()=>void perform(state.savePreferences),{'data-save-pref':''},'primary');save.disabled=state.busy;status();}
     function updateAppearance(value){
       if(ui.surface!=='settings'||ui.page!=='appearance')return;
       for(const input of body.querySelectorAll('[name="theme-choice"]'))input.checked=input.value===value.appearance.theme;

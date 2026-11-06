@@ -46,7 +46,7 @@ test('Utility commands accept only the current Main document and reject same-URL
   const f = fixture(t);
   const commands = {'get-app-info': undefined, 'open-settings': undefined,
     'get-llm-provider-settings': undefined, 'save-llm-provider-settings': settings(), 'get-custom-prompt': undefined,
-    'save-custom-prompt': {schemaVersion: 1, goals: '', customRules: '', styleRef: '', customWords: ''},
+    'save-custom-prompt': {schemaVersion: 2, goals: '', styleRef: ''},
     'test-llm-connection': settings(), 'cancel-llm-requests': undefined, 'export-diagnostics': undefined,
     'open-support-link': FEEDBACK_DOCUMENT_URL};
   for (const event of [{sender: {}, senderFrame: f.frame}, {sender: f.contents, senderFrame: {url: mainUrl}},
@@ -111,10 +111,21 @@ test('Utility saves use existing durable profile and prompt stores, preserving i
   assert.equal((await f.call('save-llm-provider-settings', edited)).success, true);
   assert.equal((await f.call('get-llm-provider-settings')).profiles[0].autoDiagnosisEnabled, false);
   assert.equal(f.effects.broadcasts, 2);
-  const prompt = {schemaVersion: 1, goals: '表达清楚', customRules: '少用口癖', styleRef: '简明', customWords: '那个'};
+  const prompt = {schemaVersion: 2, goals: '表达清楚', styleRef: '简明'};
   assert.deepEqual(await f.call('save-custom-prompt', prompt), {success: true});
   assert.deepEqual(await f.call('get-custom-prompt'), prompt);
   assert.deepEqual(JSON.parse(fs.readFileSync(path.join(f.root, 'custom-prompt.json'), 'utf8')), prompt);
+});
+
+test('migrated maximum-length instructions can still be edited and saved through Utility',async t=>{
+  const f=fixture(t),file=path.join(f.root,'custom-prompt.json');
+  fs.writeFileSync(file,JSON.stringify({schemaVersion:1,goals:'甲'.repeat(20000),
+    customRules:'乙'.repeat(20000),styleRef:'简'.repeat(20000),customWords:'行动'}));
+  const prompt=await f.call('get-custom-prompt');
+  assert.equal(prompt.schemaVersion,2);assert.equal(prompt.goals.length,40002);
+  assert.deepEqual(Object.keys(prompt).sort(),['goals','schemaVersion','styleRef']);
+  assert.deepEqual(await f.call('save-custom-prompt',prompt),{success:true});
+  assert.deepEqual(JSON.parse(fs.readFileSync(file,'utf8')),prompt);
 });
 
 test('typed bounded invalid Utility parameters are rejected before writes, testing, links, or diagnostics', async t => {
@@ -127,9 +138,10 @@ test('typed bounded invalid Utility parameters are rejected before writes, testi
   for (const channel of ['save-llm-provider-settings', 'test-llm-connection']) {
     for (const value of badSettings) assert.equal((await f.call(channel, value)).errorCode, 'invalid-ipc-input', channel);
   }
-  const prompt = {schemaVersion: 1, goals: '', customRules: '', styleRef: '', customWords: ''};
-  for (const value of [null, {}, {...prompt, schemaVersion: 2}, {...prompt, goals: []}, {...prompt, unknown: ''},
-    {...prompt, goals: 'x'.repeat(20001)}]) {
+  const prompt = {schemaVersion: 2, goals: '', styleRef: ''};
+  for (const value of [null, {}, {...prompt, schemaVersion: 1}, {...prompt, goals: []}, {...prompt, unknown: ''},
+    {...prompt, goals: 'x'.repeat(40003)}, {...prompt, styleRef:'x'.repeat(20001)},
+    {...prompt, customWords:''}, {...prompt, customRules:''}]) {
     assert.equal((await f.call('save-custom-prompt', value)).errorCode, 'invalid-ipc-input');
   }
   for (const name of ['get-app-info', 'open-settings', 'get-llm-provider-settings',
@@ -172,7 +184,7 @@ test('Utility failures use safe envelopes and never expose private endpoint, key
     loadPrompt: () => {throw secretError;}, savePrompt: () => {throw secretError;},
     testConnection: async () => {throw secretError;}, exportDiagnostics: async () => {throw secretError;},
     openSupportLink: async () => {throw secretError;}});
-  const prompt = {schemaVersion: 1, goals: '', customRules: '', styleRef: '', customWords: ''};
+  const prompt = {schemaVersion: 2, goals: '', styleRef: ''};
   for (const [channel, value] of [['get-llm-provider-settings'], ['save-llm-provider-settings', settings()],
     ['get-custom-prompt'], ['save-custom-prompt', prompt],
     ['test-llm-connection', settings()], ['export-diagnostics'], ['open-support-link', FEEDBACK_DOCUMENT_URL]]) {

@@ -109,8 +109,9 @@ test('compact metrics retain saved values, all evidence anchors and optional exp
   target.appendChild(api().createReportMetrics(target.ownerDocument,{metrics,record:{stats:{fillers:99},sourceSnapshot:{asr:{modelId:'saved-model <script>'}}}}));
   assert.equal(byClass(target,'word-statistics')[0].children.length,3);
   assert.equal(byClass(target,'metric-group').length,2);
-  assert.equal(byClass(target,'metric-details')[0].open,false);
-  assert.equal(byClass(target,'metric-source-details')[0].open,false);
+  assert.equal(byClass(target,'metric-details')[0].tagName,'SECTION');
+  assert.equal(byClass(target,'metric-source-details')[0].tagName,'SECTION');
+  assert.equal(descendants(byClass(target,'report-metrics')[0],node=>node.tagName==='DETAILS'||node.tagName==='SUMMARY').length,0);
   for(const metric of metrics)assert.equal(descendants(target,node=>node.id===`metric:${metric.id}`).length,1);
   assert.match(descendants(target,node=>node.id==='metric:filler-count')[0].textContent,/6 次/);
   assert.match(descendants(target,node=>node.id==='metric:hedge-count')[0].textContent,/0 次/);
@@ -233,7 +234,7 @@ test('frozen finding practice stays outside collapsed evidence and evidence acti
   }
   assert.deepEqual(clicked,['segment-1','metric:text-character-count','speech-0']);
   assert.match(blocks[0].textContent,/00:31/);assert.match(blocks[0].textContent,/这是原文。/);
-  assert.equal(byClass(target,'metric-details')[0].open,false);
+  assert.equal(byClass(target,'metric-details')[0].tagName,'SECTION');
 });
 
 test('more disclosure changes its footer label while preserving native expanded state',()=>{
@@ -397,7 +398,7 @@ test('evidence buttons preserve references and keep directly visible metric targ
   assert.match(target.textContent,/这是原文。/);
   assert.match(target.textContent,/16000.*48000/);
   assert.match(target.textContent,/模型估计/);
-  assert.equal(byClass(target,'metric-details')[0].open,false);
+  assert.equal(byClass(target,'metric-details')[0].tagName,'SECTION');
   assert.equal(descendants(target,node=>node.id === 'metric:text-character-count').length,1);
 });
 

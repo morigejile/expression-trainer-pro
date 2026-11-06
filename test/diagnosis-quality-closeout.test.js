@@ -58,7 +58,7 @@ test('the provider boundary emits original raw and normalization receipt after o
 
 test('production cards omit per-card practice while the full source retains it and merge counterexamples remain in the rules',()=>{
   const {getStructuredDiagnosisPrompt,DIAGNOSIS_PROMPT_VERSION}=require('../lib/structured-diagnosis');
-  assert.equal(DIAGNOSIS_PROMPT_VERSION,'structured-diagnosis-v12');
+  assert.equal(DIAGNOSIS_PROMPT_VERSION,'structured-diagnosis-v14');
   const {system}=getStructuredDiagnosisPrompt(buildCases()[5].context);
   const cards=system.slice(system.indexOf('【2 本次通用检查卡】'),system.indexOf('【4 本次证据与质量限制】'));
   assert.doesNotMatch(cards,/可选练习：/);
@@ -78,7 +78,10 @@ test('controlled variants freeze v7, preserve full source and isolate task, lean
   assert.deepEqual(cases[0].context.transcript,cases.find(x=>x.id==='P01-execution').context.transcript);
   assert.notEqual(cases[0].context.trainingContext.trainingPrompt.topic.text,cases.find(x=>x.id==='P01-execution').context.trainingContext.trainingPrompt.topic.text);
   const input=cases[5],base=experimentalPrompt(input,'baseline',baseline);
-  for(const variant of ['task','lean','merge','final'])assert.equal(experimentalPrompt(input,variant,baseline).user,base.user);
+  for(const variant of ['task','lean','merge'])assert.equal(experimentalPrompt(input,variant,baseline).user,base.user);
+  const currentInput=JSON.parse(experimentalPrompt(input,'final',baseline).user);
+  assert.deepEqual(currentInput.transcript.segments.map(x=>[x.id,x.text]),input.context.transcript.segments.map(x=>[x.id,x.text]));
+  assert.equal(Object.hasOwn(currentInput,'evidenceMap'),false,'current final variant uses the current remote input projection');
   const lean=experimentalPrompt(input,'lean',baseline).system.replace('structured-diagnosis-v8-exp-lean','structured-diagnosis-v7');
   assert.equal(lean,base.system.replace(/^可选练习：[^\n]+\n?/gm,''));
   const merge=experimentalPrompt(input,'merge',baseline).system;

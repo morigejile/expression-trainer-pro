@@ -184,7 +184,7 @@ M1 stores the identities required to interpret the record later:
 | AI result | profile/provider/model identifier, LLM template/schema version, generation time, and the analysis-instruction snapshot/revision when available |
 | Training context | selected training mode, framework/definition version, and optional `TrainingPromptSnapshot`; M1 records the prompt as null |
 
-`TrainingPromptSnapshot` and analysis instructions are different concepts. The former is the topic/scenario shown before recording. Existing `custom-prompt.json` values (`goals`, `customRules`, `styleRef`, and normalized `customWords`) are **analysis instructions** consumed by local rules or LLM requests. When an existing derived result is persisted, M1 stores the normalized instruction snapshot or a stable revision/hash captured for that result when available; if the current implementation did not capture it at generation time, provenance is explicitly `unknown` rather than reconstructed from later settings.
+`TrainingPromptSnapshot` and analysis instructions are different concepts. The former is the topic/scenario shown before recording. `custom-prompt.json` schema 2 contains only `goals` (长期关注点) and `styleRef` (反馈风格), consumed as **analysis instructions** by LLM requests. Legacy `customRules` migrate into `goals`; `customWords` are retired from current preferences and new local statistics. Existing derived-result snapshots remain unchanged. When an existing derived result is persisted, M1 stores the normalized instruction snapshot or a stable revision/hash captured for that result when available; if the current implementation did not capture it at generation time, provenance is explicitly `unknown` rather than reconstructed from later settings.
 
 Secrets, complete settings snapshots, endpoints containing credentials, and API keys are excluded. Analysis-instruction snapshots contain only the user-authored fields actually supplied to the relevant analyser and remain subject to the remote-AI disclosure boundary.
 
@@ -274,7 +274,7 @@ Transcript evidence 继续使用既有稳定 segment ID；payload 内的音频�
 
 `common-metrics-v1` 是对保存事实的纯确定性测量。文字计数为 Unicode 文字与数字字符，排除空白、标点和其他符号；词表命中沿用当次本地统计及自定义词表快照，不以今日词表重新扫描历史。实现入口为 [Common Analysis](../../lib/common-analysis.js)，共享字符口径见 [text statistics](../../shared/text-statistics.js)。
 
-Common result 的 `localStatsSnapshot` 保存本次采用的词项计数输入，未知时为 null；可知的自定义词表保存在同一 result 的 `provenance.promptSnapshot.customWords`。新训练首次完成事实保存时可计算该输入；Partial 重试优先复用同一 transcript revision 的已有 Common 输入或旧 `metrics` 统计，不因之后修改词表而改变它。早期 M2 结果只有词表快照时可按该快照恢复；历史两类证据均缺失时，依赖词项的指标为 unavailable，其余测量和 AI 诊断仍可运行。AI 的训练目标/分析指令可在显式重试时更新，不改变已保存词项统计。
+Common result 的 `localStatsSnapshot` 保存本次采用的词项计数输入，未知时为 null。新训练首次完成事实保存时仅用默认词表计算；`provenance.promptSnapshot.customWords` 固定为空字符串，保留与旧默认词表结果的兼容身份，不读取当前用户配置。Partial 重试优先复用同一 transcript revision 的已有 Common 输入或旧 `metrics` 统计。早期 M2 结果只有自定义词表快照时仍按保存的词表恢复，不迁移或重写旧结果；历史两类证据均缺失时，依赖词项的指标为 unavailable，其余测量和 AI 诊断仍可运行。AI 的训练目标/分析指令可在显式重试时更新，不改变已保存词项统计。
 
 | Metric ID | 单位 / 分母 | 输入与含义 |
 |---|---|---|
@@ -301,7 +301,9 @@ VAD 是模型观察。当前 `vad-thresholds-uncalibrated` 作为降级原因随
 
 AI 输入是有界的 `AnalysisContext`：同一 Session/revision 的 transcript、可用音频时间事实、Speech Evidence、Common Metrics、分区 quality 和已捕获的分析指令；不附带原始录音、完整设置或凭据。`allowedEvidenceRefs` 由上述真实输入生成；超过输入上限或 revision 不匹配时显式不可用，不静默截断后假装证据完整。可执行边界见 [Analysis Context](../../lib/analysis-context.js)。
 
-新主诊断使用 `structured-diagnosis-v12`，响应为 `schemaVersion=1`、唯一的整体 `summary`、`assessment`、通用 `findings`、所选框架的 `frameworkFindings` 和跨组顺序 `findingOrder`，针对性练习另含 `practiceFeedback`。每个 Finding 必须包含唯一 `id`、受控 `category`、`observation`、`recommendation` 和至少一个真实 `evidenceRefs`；`interpretation` 可省略，提供时必须为 1～1200 字符的非空字符串，只补充必要影响或限定。新响应不接受 `frameworkSummary`、`example`、`exampleEvidenceRefs` 或自动推荐字段。其他未知字段、未知引用、重复 ID 或无效类型仍拒绝；没有充分证据时 Findings 可以为空。类别与排序规则见 [Training Flow §7.1](../product/training-flow.md#71-完整分析与训练重点分层)，边界实现见 [Structured Diagnosis](../../lib/structured-diagnosis.js)。
+远程请求由 [diagnosis-input](../../lib/diagnosis-input.js) 从完整上下文生成精简投影：原文和证据 ID 不变，保留全部可用指标及真实零值；不可用指标、空偏好、空背景项、普通报告的练习字段直接省略，不附缺失清单或原因说明。指标只发送 ID、名称、值与单位，省略推导引用和重复状态；语音区间用等值毫秒边界表示，省略采样信息、引擎/模型版本、哈希及阈值。重复的 `evidenceMap`、本地会话/报告身份和重复框架定义不发送；框架定义仅在系统提示保留一份。保留转写不完整、音频覆盖不完整、所提供时间为估计值及 VAD 未校准等影响判断的限制；普通的“正常/不可用”状态不逐项发送。针对性练习仍保留目标、范围和可用前轮原文；来源缺失时保留练习身份，不附缺失原因说明。统一规则禁止推测缺失数据、补零或将缺失视为没有问题。返回校验绑定精简请求的实际证据清单和前后原文，不能引用留在本地但未发送的证据。本地上下文、指标定义、持久化与历史快照不因投影改变。
+
+新主诊断使用 `structured-diagnosis-v14`，沿用 v12 响应契约：`schemaVersion=1`、唯一的整体 `summary`、`assessment`、通用 `findings`、所选框架的 `frameworkFindings` 和跨组顺序 `findingOrder`，针对性练习另含 `practiceFeedback`。每个 Finding 必须包含唯一 `id`、受控 `category`、`observation`、`recommendation` 和至少一个真实 `evidenceRefs`；`interpretation` 可省略，提供时必须为 1～1200 字符的非空字符串，只补充必要影响或限定。新响应不接受 `frameworkSummary`、`example`、`exampleEvidenceRefs` 或自动推荐字段。其他未知字段、未知引用、重复 ID 或无效类型仍拒绝；没有充分证据时 Findings 可以为空。类别与排序规则见 [Training Flow §7.1](../product/training-flow.md#71-完整分析与训练重点分层)，边界实现见 [Structured Diagnosis](../../lib/structured-diagnosis.js)。
 
 `findingOrder` 按展示顺序包含两组全部 Finding ID，每个恰好一次；没有问题时必须为 `[]`。新响应缺失顺序、重复、遗漏或引用不存在的 ID 均拒绝，走既有失败重试路径，不发起修复请求或补造顺序。解析后原样保存到不可变 `diagnosis.value.findingOrder`，不改变两组 Finding 的身份、内容或证据。报告读取和渲染共用该顺序；历史缺失字段时沿用通用后接专项的原顺序，不补写或自动重算。扩展不增加 SQLite/Session schema；结构校验不能证明重要程度判断正确。
 

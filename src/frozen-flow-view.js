@@ -55,7 +55,6 @@
           move('report-header','frozen-report-heading');move('report-ai-section','frozen-findings');
           move('btn-report-back','report-header');move('record-save-state','report-persistence-state');
           move('report-analysis-actions','report-summary-copy');
-          move('panel-left','report-local-statistics');
         }
         layoutKey=key;
       }

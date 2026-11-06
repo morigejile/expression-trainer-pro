@@ -62,6 +62,7 @@ test('diagnosis actions appear only for missing, partial or pending analysis, ne
 
 test('moved report controls survive the same projection but cannot leak to another record or projection', () => {
   const makeNode=(className='')=>({className,children:[],textContent:'',dataset:{},setAttribute(){},
+    appendChild(child){this.append(child);return child;},
     append(...nodes){for(const child of nodes){child.remove?.();this.children.push(child);child.parent=this;}},
     replaceChildren(...nodes){for(const child of this.children)child.parent=null;this.children=[];this.append(...nodes);},
     remove(){if(this.parent){this.parent.children=this.parent.children.filter(child=>child!==this);this.parent=null;}},
@@ -77,10 +78,10 @@ test('moved report controls survive the same projection but cannot leak to anoth
   present(document,a);assert.equal(info.querySelector('.report-metrics'),control,'same projection retains its actual control and listeners');
   body.replaceChildren();
   present(document,{id:'B',createdAt:'2026-10-11',segments:[]});
-  assert.equal(info.querySelector('.report-metrics'),null,'another legacy record must not show or operate on A');
-  assert.equal(info.querySelector('.metric-details'),null);
+  assert.notEqual(info.querySelector('.report-metrics'),control,'another legacy record uses its own saved metrics');
+  assert.ok(info.querySelector('.word-statistics'),'fallback metrics work without a legacy sidebar slot');
   control.append(metric);root.append(control);body.append(root);present(document,a);
   body.replaceChildren(makeNode('structured-report'));
   present(document,{...a,structuredReport:{analysisRun:{status:'unavailable',value:{reason:'evidence'}}}});
-  assert.equal(info.querySelector('.report-metrics'),null,'a new projection cannot inherit stale controls');
+  assert.notEqual(info.querySelector('.report-metrics'),control,'a new projection cannot inherit stale controls');
 });

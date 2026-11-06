@@ -117,13 +117,11 @@ async function run({mainWindow,BrowserWindow,evaluate,wait,capture,open,close,ed
 
       await referencePage('settings','preferences');await open('settings','preferences');await shell(width);
       for(const selector of ['#utility .settings-intro','#utility .preference-field','#utility [data-pref="goals"]',
-        '#utility .preference-more>summary','#utility [data-save-pref]'])await typography(width,selector);
+        '#utility [data-pref="style"]','#utility [data-save-pref]'])await typography(width,selector);
       await capture(`i5-settings-preferences-${width}`);await refCapture(`i5-frozen-settings-preferences-${width}`);
-      await evaluate(`document.querySelector('#utility .preference-more').open=true`);
-      await referenceEval(`document.querySelector('#utility .preference-more').open=true`);
       await field('goals','长期关注点，需要结合上下文、原文与建议一起阅读。'.repeat(80),'pref');
-      await field('rules','补充分析指令只应用于后续主动分析，不改变已有结果。'.repeat(80),'pref');
-      await bounds(width,'preferences-expanded-long');await capture(`i5-settings-preferences-long-${width}`);
+      await field('style','反馈风格只应用于后续主动分析，不改变已有结果。'.repeat(80),'pref');
+      await bounds(width,'preferences-long');await capture(`i5-settings-preferences-long-${width}`);
       await evaluate(`document.getElementById('content').scrollTop=document.getElementById('content').scrollHeight`);
       await capture(`i5-settings-preferences-actions-${width}`);
       await evaluate(`document.getElementById('close-surface').click();document.getElementById('discard').click()`);

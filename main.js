@@ -5,7 +5,6 @@ const os = require('os');
 const {pathToFileURL} = require('node:url');
 const {createTrainingSessionApplication} = require('./lib/training-session-application');
 const {registerTrainingSessionIpc} = require('./lib/training-session-ipc');
-const {customWordsToFillers} = require('./lib/custom-prompt-config');
 const {createCustomPromptStore} = require('./lib/custom-prompt-store');
 const {formatSafeError} = require('./lib/safe-log');
 const {createDiagnosticSnapshot} = require('./lib/diagnostics');
@@ -649,8 +648,7 @@ ipcMain.handle('cancel-asr', async (event, command) => {
 // 词库分析
 ipcMain.handle('analyze-text', (event, text) => {
   const normalizedText = requireBoundedText(text, {label: 'text'});
-  const customPrompt = loadCustomPrompt();
-  return analyzeText(normalizedText, {extraFillers: customWordsToFillers(customPrompt.customWords)});
+  return analyzeText(normalizedText);
 });
 
 async function exportDiagnostics(audioRates) {

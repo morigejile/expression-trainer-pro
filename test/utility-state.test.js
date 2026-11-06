@@ -3,7 +3,7 @@ const test=require('node:test'),assert=require('node:assert/strict');
 const {createSettingsState}=require('../src/frozen-utility');
 const profile=(id='a')=>({id,name:'配置 '+id,provider:'deepseek',model:'deepseek-chat',hasApiKey:true,baseUrl:'',ollamaUrl:'http://localhost:11434',customModel:'',autoDiagnosisEnabled:false});
 function fixture(){
-  let settings={schemaVersion:3,activeProfileId:'a',profiles:[profile()]},prefs={schemaVersion:1,goals:'原目标',styleRef:'原风格',customRules:'原指令',customWords:'原词'},fail=false;
+  let settings={schemaVersion:3,activeProfileId:'a',profiles:[profile()]},prefs={schemaVersion:2,goals:'原目标',styleRef:'原风格'},fail=false;
   const calls=[];
   const api={getLlmProviderSettings:async()=>structuredClone(settings),saveLlmProviderSettings:async value=>{
     calls.push(['save',structuredClone(value)]);if(fail)return {success:false};
@@ -47,7 +47,7 @@ test('changing destination drops a newly typed replacement and requires entering
   f.state.update('apiKey','typed-for-custom');assert.equal(await f.state.test(),true);
 });
 test('preferences retain failed drafts and discard without changing training identity',async()=>{
-  const f=fixture();await f.state.load('preferences');f.state.updatePreference('style','简短');f.state.updatePreference('rules','具体');f.state.updatePreference('words','嗯，那个');assert.equal(f.state.dirty,true);f.fail=true;assert.equal(await f.state.savePreferences(),false);assert.equal(f.state.prefs.styleRef,'简短');f.fail=false;assert.equal(await f.state.savePreferences(),true);assert.equal(f.prefs.customRules,'具体');assert.equal(f.prefs.customWords,'嗯，那个');assert.equal(f.state.dirty,false);f.state.updatePreference('goals','未保存');f.state.discard();assert.equal(f.state.prefs.goals,'原目标');assert.equal(f.calls.some(call=>Object.hasOwn(call[1],'trainingPrompt')),false);
+  const f=fixture();await f.state.load('preferences');f.state.updatePreference('style','简短');assert.equal(f.state.dirty,true);f.fail=true;assert.equal(await f.state.savePreferences(),false);assert.equal(f.state.prefs.styleRef,'简短');f.fail=false;assert.equal(await f.state.savePreferences(),true);assert.deepEqual(f.prefs,{schemaVersion:2,goals:'原目标',styleRef:'简短'});assert.equal(f.state.dirty,false);f.state.updatePreference('goals','未保存');f.state.discard();assert.equal(f.state.prefs.goals,'原目标');assert.equal(f.calls.some(call=>Object.hasOwn(call[1],'trainingPrompt')),false);
 });
 test('copy drafts request Main-side credentials without reading an existing key',async()=>{
   const f=fixture();await f.state.load('ai');f.state.edit('a',true);assert.notEqual(f.state.draft.id,'a');assert.equal(f.state.draft.copyFromId,'a');assert.equal(f.state.draft.autoDiagnosisEnabled,false);assert.equal(f.saved.profiles.length,1);assert.equal(await f.state.saveAI(),true);assert.equal(f.calls[0][1].profiles[1].copyFromId,'a');assert.equal(Object.hasOwn(f.calls[0][1].profiles[1],'apiKey'),false);assert.doesNotMatch(JSON.stringify(f.state.settings),/copyFromId|credential/);assert.equal(await f.state.select('missing'),false);assert.equal(f.saved.activeProfileId,'a');

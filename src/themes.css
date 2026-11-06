@@ -265,7 +265,7 @@ html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-the
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#playback-toggle,#btn-reanalyze,.playback-segment-button):hover{background:var(--hover)}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .playback-segment-button{color:var(--ink)}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.playback-segment-time,.playback-position,.playback-advice-label){color:var(--muted)}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .playback-segment.is-current>.playback-segment-button{background:var(--evidence);box-shadow:inset 2px 0 var(--accent)}
+html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .playback-segment.is-current>.playback-segment-button{background:var(--evidence);box-shadow:none}
 
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#playback-seek,#playback-volume){background:transparent!important}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#playback-seek,#playback-volume)::-webkit-slider-runnable-track{background:var(--line)}

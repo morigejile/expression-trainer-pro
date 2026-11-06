@@ -21,7 +21,7 @@ async function fixture(t, provider = 'custom', {speechAvailable=false,framework=
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'session-analysis-http-'));
   const received = [];
   let responseMode = 'valid';
-  const prompt = {customWords:'行动'};
+  const prompt = {schemaVersion:2,goals:'明确行动',styleRef:''};
   let requestStarted;
   const requestReceived = new Promise(resolve=>{requestStarted=resolve;});
   const server = http.createServer(async (request, response) => {
@@ -116,8 +116,10 @@ for (const provider of ['custom','ollama']) test(`${provider} protocol preserves
   const request=f.received[0];
   assert.equal(request.url,'/v1/chat/completions');
   assert.equal(request.authorization,provider==='ollama'?'Bearer ollama':'Bearer fixture-secret');
-  assert.equal(request.context.sessionId,saved.id);
-  assert.equal(request.context.quality.vad.status,'unavailable');
+  assert.equal(Object.hasOwn(request.context,'sessionId'),false);
+  assert.equal(Object.hasOwn(request.context,'speech'),false);
+  assert.equal(Object.hasOwn(request.context,'quality'),false,'absent VAD needs no missing-data explanation');
+  assert.equal(request.context.metrics.some(x=>x.value===null || x.status==='unavailable'),false);
   assert.ok(request.context.allowedEvidenceRefs.includes('segment-1'));
   assert.doesNotMatch(JSON.stringify(request.body),/fixture-secret|apiKey|audioBytes|base64|ollamaUrl|baseUrl|http:\/\/127/);
   assert.doesNotMatch(JSON.stringify(saved.results),/fixture-secret|127\.0\.0\.1/);
@@ -173,11 +175,14 @@ test('speech, metric and Finding evidence keep exact run ownership through HTTP 
   const finding=report.analysisRun.value.findings[0];
   assert.deepEqual(finding.evidenceRefs,['segment-1','metric:speech-duration-ms','speech-0']);
   const context=f.received[0].context;
-  for (const ref of finding.evidenceRefs) assert.ok(Object.hasOwn(context.evidenceMap,ref));
+  const visible=new Set([...context.transcript.segments,...context.metrics,...context.speech.segments].map(x=>x.id));
+  for (const ref of finding.evidenceRefs) assert.ok(visible.has(ref) && context.allowedEvidenceRefs.includes(ref));
+  assert.equal(Object.hasOwn(context,'evidenceMap'),false);
+  assert.deepEqual(context.speech.segments,[{id:'speech-0',startMs:100,endMs:600}]);
   assert.deepEqual(context.quality.vad,{status:'degraded',reasons:['vad-thresholds-uncalibrated']});
   assert.equal(report.analysisRun.provenance.profileId,'approved');
-  assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v12');
-  assert.equal(report.analysisRun.provenance.problemLibraryVersion,'expression-problem-library-v0.5');
+  assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v14');
+  assert.equal(report.analysisRun.provenance.problemLibraryVersion,'expression-problem-library-v0.6');
   assert.equal((await f.command('analyze',{retry:true})).value.id,report.snapshot.id,'complete report is not reanalyzed');
   await f.app.close();
   const restored=(await f.command('get',{},f.open())).value;
@@ -257,8 +262,8 @@ test('HTTP timeout and invalid evidence remain partial; explicit retry recovers 
   assert.equal(timed.results.find(result=>result.kind==='diagnosis').value.reason,'timeout');
   assert.equal(timed.artifact.state,'available');
   const originalMetrics=timed.results.find(result=>result.kind==='common-analysis');
-  assert.ok(originalMetrics.value.localStatsSnapshot.fillers>0);
-  f.prompt.customWords='现在';
+  assert.equal(originalMetrics.value.localStatsSnapshot.fillers,0,'fresh counts use the default lexicon');
+  f.prompt.goals='现在重点关注论据';
   f.mode('invalid-ref');
   assert.equal((await f.command('analyze',{retry:true})).ok,true);
   let saved=(await f.command('get')).value;

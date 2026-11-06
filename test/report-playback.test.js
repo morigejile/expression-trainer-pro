@@ -17,7 +17,7 @@ class Element {
 }
 function fixture({withoutFeedback=false}={}){
   const nodes=new Map(),document={body:{dataset:{frozenUi:'report'}},createElement:tag=>new Element(document,tag),getElementById:id=>nodes.get(id)};
-  for(const id of ['playback-player','playback-toggle','playback-backward','playback-forward','playback-follow-controls','playback-follow','playback-return','report-scroll','report-materials','report-materials-heading','report-audio','playback-seek','playback-current-time','playback-duration','playback-volume','playback-mute','playback-speed','playback-audio-status','playback-feedback-status','playback-result-source','playback-analysis-note','playback-notice','playback-segments','playback-inline-feedback','btn-reanalyze'])nodes.set(id,new Element(document));
+  for(const id of ['playback-player','playback-toggle','playback-backward','playback-forward','playback-follow-controls','playback-follow','playback-return','report-scroll','report-materials','report-materials-heading','report-audio','report-transcript','playback-seek','playback-current-time','playback-duration','playback-volume','playback-mute','playback-speed','playback-audio-status','playback-feedback-status','playback-result-source','playback-analysis-note','playback-notice','playback-segments','playback-inline-feedback','btn-reanalyze'])nodes.set(id,new Element(document));
   Object.assign(nodes.get('report-scroll'),{scrollTop:0,clientHeight:300,rect:{top:0,bottom:300,height:300}});
   nodes.get('report-materials').open=true;
   nodes.get('report-materials-heading').rect={top:0,bottom:44,height:44};
@@ -121,4 +121,24 @@ test('operating playback controls does not switch off follow, while reading with
   const f=fixture(),get=id=>f.nodes.get(id);f.audio.paused=false;
   get('report-scroll').dispatch('wheel',{target:{closest:()=>get('playback-volume')}});assert.equal(get('playback-follow').checked,true);
   get('report-scroll').dispatch('keydown',{key:'PageDown'});assert.equal(get('playback-follow').checked,false);
+});
+
+test('transparent sticky controls clip the transcript underneath them while keeping the report background visible',()=>{
+  const f=fixture(),get=id=>f.nodes.get(id),transcript=get('report-transcript');
+  transcript.rect={top:-100,bottom:300,height:400};
+  get('report-scroll').dispatch('scroll');
+  assert.equal(transcript.style['--playback-transcript-clip'],'224px');
+  get('report-materials').open=false;get('report-materials').dispatch('toggle');
+  assert.equal(transcript.style['--playback-transcript-clip'],'0px');
+  get('report-materials').open=true;transcript.rect={top:150,bottom:550,height:400};get('report-scroll').dispatch('scroll');
+  assert.equal(transcript.style['--playback-transcript-clip'],'0px');
+});
+
+test('the heading return action disappears when audio or timed transcript becomes unavailable',()=>{
+  const f=fixture(),get=id=>f.nodes.get(id);
+  f.view.setCurrentSegment('one');get('playback-follow').checked=false;get('playback-follow').dispatch('change');
+  assert.equal(get('playback-return').hidden,false);
+  f.view.setRecord({...f.record,audioState:'missing'});assert.equal(get('playback-return').hidden,true);
+  f.view.setRecord(f.record);assert.equal(get('playback-return').hidden,false);
+  f.view.setRecord({...f.record,segments:[]});assert.equal(get('playback-return').hidden,true);
 });

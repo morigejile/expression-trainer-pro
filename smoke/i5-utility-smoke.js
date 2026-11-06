@@ -158,7 +158,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
       assert.equal(storedKey(fixture.activeId),fixture.key,'Main can decrypt the stored key after restart');
       assert.equal(await evaluate(`document.querySelector('[data-field="apiKey"]').type`),'password');
       await close();await open('settings','preferences');
-      for(const [ui,key] of Object.entries({goals:'goals',rules:'customRules',style:'styleRef',words:'customWords'}))
+      for(const [ui,key] of Object.entries({goals:'goals',style:'styleRef'}))
         assert.equal(await evaluate(`document.querySelector('[data-pref="${ui}"]').value`),fixture.preferences[key]);
       await close();await openHistory(fixture.sessions[0].id);await readyReport();
       await preserve('Restart Report','help','report');
@@ -171,6 +171,14 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
 
     assert.equal((await invoke('listTrainingSessions',{requestId:randomUUID(),limit:1000})).value.length,0);
     assert.equal((await savedSettings()).profiles.length,0);
+    fs.writeFileSync(preferencesPath,JSON.stringify({schemaVersion:1,goals:'I5 旧关注点',
+      customRules:'I5 旧补充指令',styleRef:'简短',customWords:'行动'}));
+    const migrated={schemaVersion:2,goals:'I5 旧关注点\n\nI5 旧补充指令',styleRef:'简短'};
+    assert.deepEqual(await savedPreferences(),migrated);
+    assert.deepEqual(JSON.parse(fs.readFileSync(preferencesPath,'utf8')),migrated);
+    const local=await invoke('analyzeText','然后行动');
+    assert.equal(local.fillers.length,1,'Main ignores retired user words and uses the default lexicon');
+    check('Legacy preferences migrate to two fields without losing instructions; Main local counts ignore retired custom words');
     await preserve('Training Preparing','settings','ai','i5-default-startup-utility');
     await open();
     assert.ok(await evaluate(`document.getElementById('content').textContent.includes('配置')`));
@@ -327,15 +335,16 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     await wait('analysis fixture restored',`!${utility}.state.dirty`);await close();
     check('Configuration text is escaped, API key remains masked, explicit auto-analysis setting persists, and changing model identity resets auto-analysis');
 
-    const preferences={schemaVersion:1,goals:'I5 重点观察具体例子。',customRules:'I5 必须引用原话。',styleRef:'I5 自然清楚，简短反馈。',customWords:'I5 关注词、就是说'};
+    const preferences={schemaVersion:2,goals:'I5 重点观察具体例子。',styleRef:'I5 自然清楚，简短反馈。'};
     await open('settings','preferences');
-    for(const [ui,keyName] of Object.entries({goals:'goals',rules:'customRules',style:'styleRef',words:'customWords'}))await field(ui,preferences[keyName],'pref');
+    assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('[data-pref]'),el=>el.dataset.pref)`),['goals','style']);
+    for(const [ui,keyName] of Object.entries({goals:'goals',style:'styleRef'}))await field(ui,preferences[keyName],'pref');
     await click('[data-save-pref]');await wait('analysis preferences saved',`!${utility}.state.dirty`);
     assert.deepEqual(await savedPreferences(),preferences);assert.deepEqual(JSON.parse(fs.readFileSync(preferencesPath,'utf8')),preferences);
     await field('goals','I5 尚未保存','pref');await click('#close-surface');
     await wait('preference close guarded',`!document.getElementById('unsaved').hidden`);await click('#discard');
     await wait('preference discard closes',`!document.getElementById('utility').open`);assert.deepEqual(await savedPreferences(),preferences);
-    check('All four analysis preference fields persist to custom-prompt.json, and discarded preference edits never overwrite saved text');
+    check('Both analysis preference fields persist to custom-prompt.json, and discarded preference edits never overwrite saved text');
 
     await open('settings','speech');const actualModels=await invoke('getAsrModelState');
     assert.equal(actualModels.ok,true);assert.ok(actualModels.state.models.length>=4);

@@ -14,7 +14,9 @@ test('fresh analysis records local counts and its vocabulary for stable retries'
   assert.deepEqual(retry.localStats,first.localStats);
   assert.deepEqual(retry.provenance,first.provenance);
   assert.equal(retry.analysisInstructions.goals,'新的建议目标');
-  assert.equal(first.localStats.fillers,2);
+  assert.equal(first.localStats.fillers,1);
+  assert.deepEqual(first.analysisInstructions,{schemaVersion:2,goals:'',styleRef:''});
+  assert.deepEqual(first.provenance,{promptSnapshot:{customWords:''}});
 });
 
 test('legacy local counts take precedence over current words and missing history stays unavailable', () => {

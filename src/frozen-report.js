@@ -113,12 +113,11 @@
       (!model.summary || model.assessmentStatus==='limited' || record.structuredReport?.latestAttempt ? copy : info).append(...statuses);
     } else if (!record.report) body.replaceChildren();
     info.append(...details);
-    if(!details.length && byId('report-local-statistics')){
+    if(!details.length){
       const reportUI=typeof module==='object' && module.exports ? require('./structured-report') : globalThis.StructuredReport;
       info.appendChild(reportUI.createReportMetrics(document,{record,metrics:record.structuredReport?.metricRun?.value?.metrics || [],evidenceRun:record.structuredReport?.evidenceRun}));
     }
     for(const basic of info.querySelectorAll('.metric-basics'))basic.remove();
-    const legacyStatistics=byId('report-local-statistics');if(legacyStatistics)legacyStatistics.hidden=true;
     for (const line of byId('subtitle-container').querySelectorAll('[data-segment-id]')) {
       const segment=record.segments.find(item=>item.id === line.dataset.segmentId);
       if (!Number.isFinite(segment?.startMs)) continue;

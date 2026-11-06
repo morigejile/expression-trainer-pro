@@ -93,12 +93,6 @@
 #utility[data-surface="settings"] .preference-fields{display:grid;gap:22px}
 #utility[data-surface="settings"] .preference-field{display:grid;gap:8px;margin:0;font-size:12px;color:#817b6e}
 #utility[data-surface="settings"] .preference-field textarea{min-height:100px;line-height:1.85}
-#utility[data-surface="settings"] .preference-more{margin-top:25px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-#utility[data-surface="settings"] .preference-more>summary{display:flex;justify-content:space-between;align-items:center;gap:15px;padding:19px 0;font-size:12px;list-style:none;cursor:pointer}
-#utility[data-surface="settings"] .preference-more>summary span{margin-left:auto;font-size:10px;color:var(--muted)}
-#utility[data-surface="settings"] .preference-more>summary:after{content:'＋';font-size:17px;color:#9b896d}
-#utility[data-surface="settings"] .preference-more[open]>summary:after{content:'−'}
-#utility[data-surface="settings"] .preference-more>div{display:grid;gap:22px;padding:0 0 22px}
 #utility[data-surface="settings"] #unsaved{font-size:12px}
 #utility[data-surface="settings"] #unsaved button{font-size:11px;padding:5px 10px;min-height:32px}
 @media(max-width:850px){#utility[data-surface="settings"] .config-actions{grid-template-columns:58px 40px 28px;gap:4px}#utility[data-surface="settings"] .config-row{gap:10px}#utility[data-surface="settings"] .settings-form{grid-template-columns:1fr}}
@@ -159,16 +153,15 @@
 #utility .active-status{letter-spacing:normal}
 #utility[data-surface] .content-scroll :is(h2,h3,dt){font-weight:350;line-height:1.7;letter-spacing:.02em}
 #utility[data-surface] .content-scroll :is(p,dd,.faq>div){line-height:1.8}
-#utility[data-surface] :is(.faq,.preference-more)>summary{align-items:center}
-#utility[data-surface] :is(.faq,.preference-more)>summary::after{content:"";box-sizing:border-box;width:38px;height:32px;flex:0 0 38px;border:0;border-radius:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a08d6b' stroke-width='1.3'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-size:16px 16px;background-repeat:no-repeat;background-position:center}
-#utility[data-surface] :is(.faq,.preference-more)[open]>summary::after{content:"";background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a08d6b' stroke-width='1.3'%3E%3Cpath d='m6 15 6-6 6 6'/%3E%3C/svg%3E")}
-#utility[data-surface] :is(.faq,.preference-more)>summary:hover::after{background-color:#ded4bc27}
+#utility[data-surface] .faq>summary{align-items:center}
+#utility[data-surface] .faq>summary::after{content:"";box-sizing:border-box;width:38px;height:32px;flex:0 0 38px;border:0;border-radius:0;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a08d6b' stroke-width='1.3'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-size:16px 16px;background-repeat:no-repeat;background-position:center}
+#utility[data-surface] .faq[open]>summary::after{content:"";background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23a08d6b' stroke-width='1.3'%3E%3Cpath d='m6 15 6-6 6 6'/%3E%3C/svg%3E")}
+#utility[data-surface] .faq>summary:hover::after{background-color:#ded4bc27}
 
 /* Compact disclosure rows; expanded answers and form spacing stay unchanged. */
 #utility[data-surface] .faq{padding-top:6px;padding-bottom:6px}
 #utility[data-surface] .faq[open]{padding-bottom:17px}
-#utility[data-surface] :is(.faq,.preference-more)>summary{min-height:32px}
-#utility[data-surface="settings"] .preference-more>summary{padding-top:6px;padding-bottom:6px}
+#utility[data-surface] .faq>summary{min-height:32px}
 #utility[data-surface="help"] :is(.quick-start-faq,.feedback-faq){padding:16px 0}
 #utility[data-surface="help"] :is(.quick-start-faq,.feedback-faq) h3{margin:0 0 7px;font-size:13px;font-weight:400;line-height:1.8;color:var(--ink)}
 #utility[data-surface="help"] :is(.quick-start-faq,.feedback-faq) p{font-size:12px;color:var(--muted)}

@@ -24,7 +24,7 @@ test('all 48 reviewed card IDs and required fields are compiled from the single 
   const source=fs.readFileSync(path.join(__dirname,'../docs/product/expression-problem-library.md'),'utf8');
   const compiled=compileProblemLibrary(source);
   assert.deepEqual(require('../lib/expression-problem-library.generated.json'),compiled,'regenerate after changing authoring content');
-  assert.equal(lib.PROBLEM_LIBRARY_VERSION,'expression-problem-library-v0.5');
+  assert.equal(lib.PROBLEM_LIBRARY_VERSION,'expression-problem-library-v0.6');
   assert.equal(lib.cards.length,48);
   assert.equal(new Set(lib.cards.map(x=>x.id)).size,48);
   for(const card of lib.cards){
@@ -65,7 +65,7 @@ test('only the selected framework is included; explicit analysis target wins; lo
 test('production prompt assembles rules, dynamic cards, evidence limits, optional practice and existing output without review examples',()=>{
   library();
   const {getStructuredDiagnosisPrompt,DIAGNOSIS_PROMPT_VERSION}=require('../lib/structured-diagnosis');
-  assert.equal(DIAGNOSIS_PROMPT_VERSION,'structured-diagnosis-v12');
+  assert.equal(DIAGNOSIS_PROMPT_VERSION,'structured-diagnosis-v14');
   const source=context('star');
   const prompt=getStructuredDiagnosisPrompt(source);
   const sections=['【1 共同判断规则】','【2 本次通用检查卡】','【3 所选框架专项检查卡】','【4 本次证据与质量限制】','【6 结构化输出要求】'];
@@ -75,9 +75,10 @@ test('production prompt assembles rules, dynamic cards, evidence limits, optiona
   assert.doesNotMatch(prompt.system,/\[PREP-\d|\[PYR-\d|### E01|想做看说|代码事实核对/);
   assert.match(prompt.system,/数值明显极端/);
   assert.match(prompt.system,/同一片段/);
-  assert.match(prompt.system,/expression-problem-library-v0\.5/);
+  assert.match(prompt.system,/expression-problem-library-v0\.6/);
   assert.doesNotMatch(prompt.system,/【5 针对性练习规则】/);
-  assert.deepEqual(JSON.parse(prompt.user),source);
+  assert.deepEqual(JSON.parse(prompt.user).transcript.segments.map(x=>x.text),source.transcript.segments.map(x=>x.text));
+  assert.equal(Object.hasOwn(JSON.parse(prompt.user),'frameworkDefinition'),false);
   const local=getStructuredDiagnosisPrompt(context('star','segment'));
   assert.match(local.system,/【5 针对性练习规则】/);
   assert.doesNotMatch(local.system,/\[STAR-\d/);
@@ -86,6 +87,38 @@ test('production prompt assembles rules, dynamic cards, evidence limits, optiona
   assert.equal(Object.hasOwn(template,'frameworkSummary'),false);
   assert.deepEqual(template.frameworkFindings,[]);
   assert.deepEqual(template.findings,[],'the output skeleton must not imply that a defect is mandatory');
+});
+
+test('cleaned prompts preserve evidence and status contracts across framework, scope and duration combinations',()=>{
+  const {getStructuredDiagnosisPrompt,parseStructuredDiagnosisResponse}=require('../lib/structured-diagnosis');
+  let combinations=0;
+  for(const framework of [null,'prep','star','pyramid']) for(const scope of [null,'full','sentence','segment']) {
+    for(const durationAvailable of [false,true]) {
+      const source=context(framework,scope);
+      if(durationAvailable) source.metrics.push({id:'metric:audio-duration-ms',metricId:'audio-duration-ms',label:'录音时长',unit:'ms',status:'available',value:60000});
+      const {system,user}=getStructuredDiagnosisPrompt(source);
+      const input=JSON.parse(user);
+      assert.deepEqual(input.transcript.segments.map(x=>[x.id,x.text]),source.transcript.segments.map(x=>[x.id,x.text]),'cleanup must not alter transcript material');
+      assert.deepEqual(input.metrics || [],source.metrics.filter(x=>x.status==='available').map(({id,label,value,unit})=>({id,label,value,unit})));
+      assert.ok(!/本批没有新增候选线索|本节只给内容写作准则|旧参考快照|排序和默认展示的主定义见|现有页面先通用后专项/.test(system),'runtime prompt must exclude maintenance and retired sorting notes');
+      assert.ok(system.includes('assessment 中的 status、categories、frameworkAssessable 仅为示例值，不是默认结论'),'assessment examples must not imply a default judgement');
+      if(framework && !['sentence','segment'].includes(scope)) {
+        assert.ok(system.includes('结构、教学指导和例子仅用于理解框架，不是本次表达必须逐项完成的清单'),'framework guidance must not impose slots');
+      }
+      const template=JSON.parse(system.match(/\n(\{\n[\s\S]+?\n\})\n/)[1]);
+      for(const status of ['analyzable','limited','insufficient']) {
+        const response=structuredClone(template);
+        response.assessment={status,reason:'按实际材料确定评价范围。',
+          categories:status==='insufficient'?[]:['wording'],frameworkAssessable:false,evidenceRefs:['s1']};
+        const parsed=parseStructuredDiagnosisResponse(JSON.stringify(response),source,{requireAssessment:true,currentFormat:true});
+        assert.equal(parsed.assessment.status,status);
+        assert.deepEqual(parsed.findings,[]);
+        assert.deepEqual(parsed.findingOrder,[]);
+      }
+      combinations++;
+    }
+  }
+  assert.equal(combinations,32);
 });
 
 test('E01–E08 inputs are reconstructed from synthetic document text; baseline uses the old prompt, not a mock model result',()=>{
