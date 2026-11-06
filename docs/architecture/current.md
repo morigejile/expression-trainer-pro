@@ -195,7 +195,7 @@ Main 只持有 `AsrProcessController`；实际 session wrapper、managed provide
 
 `custom-prompt.json` 由 `lib/custom-prompt-store.js` 读写，与其余 store 同形；解析结果按 mtime+size 缓存、保存时失效，避免逐句分析反复同步读盘。
 
-Settings / Help 当前由主窗口的 Frozen Utility 承载，AI 与分析偏好不再从用户入口打开独立窗口。Settings 新增「外观」子页，旧主题／布局入口继续隐藏；外观切换规则见 Training Flow §12.1，Utility 接线与验证边界见 §20。
+Settings / Help 当前由主窗口的 Frozen Utility 承载，AI 与分析偏好不再从用户入口打开独立窗口。分析偏好通过 Utility 内导航进入，AI 配置选择通过现有设置保存接口持久化；已移除无界面调用的旧偏好快捷入口、配置摘要和独立选择 IPC。Settings 新增「外观」子页，旧主题／布局入口继续隐藏；外观切换规则见 Training Flow §12.1，Utility 接线与验证边界见 §20。
 
 `appearance.json` 保持 schema 1，主题标识为 `graphite`（当前默认）、`coral-glow`、`ink-night`、`frosted-mist`（柔雾 · 毛玻璃）。预览标识 `frost` 只用于验收来源，不是正式配置值；新标识与旧 `mist` 独立。旧 `midnight/paper/mist`、未知主题和旧布局均规范为当前默认主题/`coach-rail`，已知新主题保留，布局固定为 `coach-rail`。读取不重写原文件；缺失、损坏或未知配置安全回退，future schema 可读取已知值但拒绝显式保存。`asr-selection.json` 只保存 `selectedModelId`；缺失或稳定损坏在默认模型成功后原子恢复，瞬时初始化失败不改写选择。外观和模型操作都独立于 LLM 保存/连接测试。
 
@@ -242,8 +242,8 @@ Renderer 请求 AudioCapture flush，关闭队列入口并 drain 已接受 chunk
 
 ```text
 endpoint/final sentence
-→ analyze-text invoke → Main lexicon → stats/建议
-→ Renderer 本地规则提示
+→ analyze-text invoke → Main lexicon → 本地统计
+→ Renderer 更新统计，随事实保存；不写入逐句提醒栏
 
 录音结束 → 保存事实/WAV → Main VAD/Common/按 profile 启用的 AI 诊断 → 结果快照 → 共享 Report
 历史打开 → 读取原快照 → 共享 Report（不自动请求 AI）
@@ -379,7 +379,7 @@ npm run smoke:package
 | AC-M1-05 | Store/Application/Product Electron 测试：文件与元数据删除、部分失败重试、删除后空态 |
 | AC-M1-06 | Store/Results/Product Electron 测试：缺失/损坏音频、损坏结果与健康事实隔离 |
 | AC-M1-07 | Store/Results/API Electron 测试：v1→v2、未知未来版本拒写与正常启动错误 |
-| AC-M1-08 | `test/recording-policy-store.test.js`、`test/analysis-provenance.test.js`、现有 LLM/诊断/Renderer 测试：v2 告知、实际请求/来源白名单、授权前不申请麦克风 |
+| AC-M1-08 | `test/recording-policy-store.test.js`、`test/analysis-context.test.js`、现有 LLM/诊断/Renderer 测试：v2 告知、实际请求/来源白名单、授权前不申请麦克风 |
 | AC-M1-09 | Product Electron offline/offline-read 两个进程：阻断 HTTP(S)/Main fetch 且无 AI 配置，完成同一记录的保存、重启、读取、播放与删除 |
 | AC-M1-10 | `test/transcript.test.js` 与 ASR/audio/PCM/Electron 回归：暂停、恢复、收尾、过载和单条上限 |
 
@@ -414,7 +414,7 @@ npm run smoke:package
 - Silero VAD 使用独立 `models/speech-evidence-registry.json`，复用 Model Manager 的固定文件大小/hash 安装与离线缓存；首次分析按需安装到 modelRoot 下的 speech-evidence 目录。独立 utility process 隔离 native 崩溃，并支持硬取消/超时；单个 Main 串行执行 VAD，最多接纳三条分析任务。整个分析预算为 120 秒，AI 请求预算为 60 秒。失败保存 unavailable，已保存事实与可用指标继续可读。
 - Common 的 15 个指标是确定性观测值，不输出表达质量分。`session-analysis-inputs.js` 复用已保存词项输入，首次 finalize 的新训练才可采用当前词表；历史缺失统计不以当前设置补算。VAD 区间明确带未校准限制；缺失/不连续证据按依赖使指标 unknown，不用零填补。AnalysisContext 只携带当前文本、允许的指标/语音区间、质量及分析指令；没有音频字节、Key、endpoint、路径或其他记录。
 - LLM 配置 schema 3 增加每个 profile 的自动诊断开关；新配置为空、旧配置迁移默认关闭。Main 在实际发起前重新解析精确 active profile，未启用、缺失或删除不会自动选择其他服务。界面披露实际本地/远程目标与发送内容；改变 Provider、模型或地址会清除该 profile 的自动启用状态。
-- 训练中只使用本地规则。报告显示摘要、首项 Finding、可展开的更多发现/指标、证据定位及缺失状态。四类 Finding 与未校准雷达的产品语义只见 [Training Flow](../product/training-flow.md)。Processing 在事实保存后可离开到 History，完成不会强制跳回；分析取消/失败可恢复，历史读取保持原快照。
+- 训练中保留本地规则统计，旧隐藏反馈栏、逐句词语提醒及其状态更新已清除；本地计数、表达密度和事实保存保持原路径。报告显示摘要、首项 Finding、可展开的更多发现/指标、证据定位及缺失状态。Finding 的产品语义只见 [Training Flow](../product/training-flow.md)。Processing 在事实保存后可离开到 History，完成不会强制跳回；分析取消/失败可恢复，历史读取保持原快照。
 - 保存期间取消分析后，Renderer 只读取已保存结果，不再调用可能新建任务的分析入口。分析刷新保留尚未写入的结果、统计和失败提示；成功重试同一结果 ID 后才清除待保存状态。
 
 历史真实模型有限测量与本轮有限人工复核边界见 [M2](../milestones/m2-speech-evidence-and-ai-diagnosis.md#当前实施与有限证据)。真实 Electron 43.4.1 / 内置 Node 24.18.1 已验证 VAD 中文 WAV、损坏 ONNX 子进程退出隔离、取消及下一任务恢复；这些探测不代表准确率、资格线硬件或全部 M2 验收。

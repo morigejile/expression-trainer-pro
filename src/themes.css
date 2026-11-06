@@ -266,7 +266,7 @@ html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-the
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .playback-segment-button{color:var(--ink)}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(.playback-segment-time,.playback-position,.playback-advice-label){color:var(--muted)}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .playback-segment-button[aria-pressed="true"]{background:var(--evidence);box-shadow:inset 2px 0 var(--accent)}
-html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo .playback-inline-feedback{background:var(--evidence);color:var(--ink);border-color:var(--line)}
+
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#playback-seek,#playback-volume){background:transparent!important}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo :is(#playback-seek,#playback-volume)::-webkit-slider-runnable-track{background:var(--line)}
 html[data-theme]:is([data-theme="coral-glow"],[data-theme="ink-night"],[data-theme="frosted-mist"]) body.beo #playback-seek::-webkit-slider-runnable-track{background:linear-gradient(to right,var(--accent) var(--playback-progress,0%),var(--line) var(--playback-progress,0%))}

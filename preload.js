@@ -4,8 +4,6 @@ contextBridge.exposeInMainWorld('api', {
   // LLM Provider 设置
   getLlmProviderSettings: () => ipcRenderer.invoke('get-llm-provider-settings'),
   saveLlmProviderSettings: (settings) => ipcRenderer.invoke('save-llm-provider-settings', settings),
-  getLlmProfileSummaries: () => ipcRenderer.invoke('get-llm-profile-summaries'),
-  selectLlmProfile: profileId => ipcRenderer.invoke('select-llm-profile', profileId),
   openSettings: () => ipcRenderer.invoke('open-settings'),
   getAppInfo: () => ipcRenderer.invoke('get-app-info'),
   onUtilityOpen: (callback) => {
@@ -32,8 +30,7 @@ contextBridge.exposeInMainWorld('api', {
     return () => ipcRenderer.removeListener('appearance-changed', wrapped);
   },
 
-  // Prompt编辑器
-  openPromptEditor: () => ipcRenderer.invoke('open-prompt-editor'),
+  // 分析偏好
   getCustomPrompt: () => ipcRenderer.invoke('get-custom-prompt'),
   saveCustomPrompt: (data) => ipcRenderer.invoke('save-custom-prompt', data),
 

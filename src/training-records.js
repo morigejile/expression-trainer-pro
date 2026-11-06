@@ -86,12 +86,5 @@
     return { add, remove, replace, select, selected, list, clear };
   }
 
-  function pad(value) { return String(value).padStart(2, '0'); }
-  function formatRecordLabel(record) {
-    const date = new Date(record.createdAt);
-    const totalSeconds = Math.max(0, Math.floor((Number(record.durationMs) || 0) / 1000));
-    return `${pad(date.getHours())}:${pad(date.getMinutes())} · ${pad(Math.floor(totalSeconds / 60))}:${pad(totalSeconds % 60)}`;
-  }
-
-  return { createTrainingRecordStore, findSegmentAtTime, formatRecordLabel };
+  return { createTrainingRecordStore, findSegmentAtTime };
 });

@@ -22,7 +22,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   const audioRoot = path.join(root,'training','audio');
   const owned = new Set();
   const observations = [];
-  const reportDirectory = 'C:/Users/mr/.codex/visualizations/2026/10/12/i4';
+  const reportDirectory = process.env.EXPRESSION_TRAINER_PRODUCT_SCREENSHOTS || root;
   const check = label => observations.push(label);
   const pause = ms => new Promise(resolve => setTimeout(resolve,ms));
   const session = async id => {

@@ -469,11 +469,12 @@ test('provider response validation pins the selected framework and both practice
   assert.deepEqual(result,{...data});
 });
 
-test('structured invalid output uses the existing safe invalid-response envelope', async () => {
-  const {sendStructuredDiagnosis,runCoordinatedRequest,createRequestCoordinator} = require('../lib/ai-feedback');
-  const result = await runCoordinatedRequest(createRequestCoordinator(),'session-1','diagnosis','diagnosis',
-    signal=>sendStructuredDiagnosis(context(),profile,{signal,fetchImpl:async()=>apiResponse('{"secret":"DO_NOT_ECHO"}')}));
-  assert.deepEqual(result,{success:false,error:'大模型响应结构无效',errorCode:'invalid-response'});
+test('structured invalid output rejects with a safe invalid-response error', async () => {
+  const {sendStructuredDiagnosis} = require('../lib/ai-feedback');
+  await assert.rejects(
+    sendStructuredDiagnosis(context(),profile,{fetchImpl:async()=>apiResponse('{"secret":"DO_NOT_ECHO"}')}),
+    error=>error.code==='invalid-response' && error.message==='大模型响应结构无效'
+  );
 });
 
 test('structured request uses a sixty-second default deadline and supports external cancellation', async t => {

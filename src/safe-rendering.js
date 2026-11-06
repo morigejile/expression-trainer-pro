@@ -15,15 +15,6 @@
   if (!rules) throw new Error('Expression rules are required');
   const VAGUE_WORDS = Object.keys(rules.VAGUE_TO_PRECISE);
 
-  function escapeHtml(text) {
-    return String(text ?? '')
-      .replace(/&/g, '&amp;')
-      .replace(/</g, '&lt;')
-      .replace(/>/g, '&gt;')
-      .replace(/"/g, '&quot;')
-      .replace(/'/g, '&#39;');
-  }
-
   function escapeRegExp(text) {
     return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
@@ -154,7 +145,6 @@
   }
 
   return {
-    escapeHtml,
     renderHighlightedText,
     renderReportContent,
     tokenizeHighlightedText

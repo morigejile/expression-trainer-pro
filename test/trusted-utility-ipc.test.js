@@ -42,9 +42,8 @@ function fixture(t, overrides = {}) {
 
 test('Utility commands accept only the current Main document and reject same-URL child frames, other windows, and query URLs', async t => {
   const f = fixture(t);
-  const commands = {'get-app-info': undefined, 'open-settings': undefined, 'open-prompt-editor': undefined,
-    'get-llm-provider-settings': undefined, 'save-llm-provider-settings': settings(), 'get-llm-profile-summaries': undefined,
-    'select-llm-profile': 'editor', 'get-custom-prompt': undefined,
+  const commands = {'get-app-info': undefined, 'open-settings': undefined,
+    'get-llm-provider-settings': undefined, 'save-llm-provider-settings': settings(), 'get-custom-prompt': undefined,
     'save-custom-prompt': {schemaVersion: 1, goals: '', customRules: '', styleRef: '', customWords: ''},
     'test-llm-connection': settings(), 'cancel-llm-requests': undefined, 'export-diagnostics': undefined,
     'open-support-link': FEEDBACK_DOCUMENT_URL};
@@ -66,11 +65,10 @@ test('Utility commands accept only the current Main document and reject same-URL
   assert.deepEqual(fs.readdirSync(f.root), []);
 });
 
-test('legacy open entry points route to the main Utility and narrow preload notifications unsubscribe', async t => {
+test('settings open in the main Utility and narrow preload notifications unsubscribe', async t => {
   const f = fixture(t);
   assert.deepEqual(await f.call('open-settings'), {success: true});
-  assert.deepEqual(await f.call('open-prompt-editor'), {success: true});
-  assert.deepEqual(f.effects.opens, [{surface: 'settings', page: 'ai'}, {surface: 'settings', page: 'preferences'}]);
+  assert.deepEqual(f.effects.opens, [{surface: 'settings', page: 'ai'}]);
   let api;
   const listeners = new Map();
   const removed = [];
@@ -121,11 +119,10 @@ test('typed bounded invalid Utility parameters are rejected before writes, testi
     {...prompt, goals: 'x'.repeat(20001)}]) {
     assert.equal((await f.call('save-custom-prompt', value)).errorCode, 'invalid-ipc-input');
   }
-  for (const name of ['get-app-info', 'open-settings', 'open-prompt-editor', 'get-llm-provider-settings',
-    'get-llm-profile-summaries', 'get-custom-prompt', 'cancel-llm-requests']) {
+  for (const name of ['get-app-info', 'open-settings', 'get-llm-provider-settings',
+    'get-custom-prompt', 'cancel-llm-requests']) {
     assert.equal((await f.call(name, {})).errorCode, 'invalid-ipc-input');
   }
-  for (const value of [null, '', [], 'x'.repeat(129)]) assert.equal((await f.call('select-llm-profile', value)).errorCode, 'invalid-ipc-input');
   for (const value of [[], {}, {requestedSampleRateHz: 16000, contextSampleRateHz: 48000, trackSampleRateHz: 48000, key: 'secret'},
     {requestedSampleRateHz: 0, contextSampleRateHz: null, trackSampleRateHz: null}]) {
     assert.equal((await f.call('export-diagnostics', value)).errorCode, 'invalid-ipc-input');
@@ -163,7 +160,7 @@ test('Utility failures use safe envelopes and never expose private endpoint, key
     openSupportLink: async () => {throw secretError;}});
   const prompt = {schemaVersion: 1, goals: '', customRules: '', styleRef: '', customWords: ''};
   for (const [channel, value] of [['get-llm-provider-settings'], ['save-llm-provider-settings', settings()],
-    ['get-llm-profile-summaries'], ['select-llm-profile', 'editor'], ['get-custom-prompt'], ['save-custom-prompt', prompt],
+    ['get-custom-prompt'], ['save-custom-prompt', prompt],
     ['test-llm-connection', settings()], ['export-diagnostics'], ['open-support-link', FEEDBACK_DOCUMENT_URL]]) {
     const result = await f.call(channel, value);
     assert.equal(result.success, false, channel);

@@ -67,7 +67,6 @@ if (isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTe
 const smokeTest = isSmokeTest ? require('./smoke/electron-smoke-runner') : null;
 const {
   createRequestCoordinator,
-  runCoordinatedRequest,
   testConnection
 } = isSmokeTest
   ? smokeTest.fakeLlm

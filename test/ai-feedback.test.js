@@ -3,7 +3,6 @@ const assert = require('node:assert/strict');
 
 const {
   createRequestCoordinator,
-  runCoordinatedRequest,
   sendStructuredDiagnosis,
   testConnection
 } = require('../lib/ai-feedback');
@@ -338,89 +337,6 @@ test('request coordinator supersedes matching work and cancels a renderer sessio
 
   assert.equal(report.signal.aborted, true);
   assert.equal(nextRealtime.signal.aborted, true);
-});
-
-test('coordinated request returns a named success result', async () => {
-  const coordinator = createRequestCoordinator();
-
-  const result = await runCoordinatedRequest(
-    coordinator,
-    7,
-    'realtime',
-    'feedback',
-    async (signal) => {
-      assert.equal(signal instanceof AbortSignal, true);
-      return '说结论';
-    }
-  );
-
-  assert.deepEqual(result, { success: true, feedback: '说结论' });
-});
-
-test('coordinated request returns a safe cancellation result', async () => {
-  const coordinator = createRequestCoordinator();
-  const pending = runCoordinatedRequest(
-    coordinator,
-    7,
-    'realtime',
-    'feedback',
-    (signal) => diagnoseText('文本', OPENAI_SETTINGS, null, {
-      fetchImpl: abortableFetch(),
-      timeoutMs: 1000,
-      signal
-    })
-  );
-
-  coordinator.cancelAll(7);
-
-  assert.deepEqual(await pending, {
-    success: false,
-    error: '大模型请求已取消',
-    errorCode: 'cancelled'
-  });
-});
-
-test('coordinated request suppresses a late result after session cancellation', async () => {
-  const coordinator = createRequestCoordinator();
-  let resolveRequest;
-  const pending = runCoordinatedRequest(
-    coordinator,
-    7,
-    'realtime',
-    'feedback',
-    async () => new Promise((resolve) => {
-      resolveRequest = resolve;
-    })
-  );
-
-  coordinator.cancelAll(7);
-  resolveRequest('迟到结果');
-
-  assert.deepEqual(await pending, {
-    success: false,
-    error: '大模型请求已取消',
-    errorCode: 'cancelled'
-  });
-});
-
-test('coordinated request generalizes unexpected failures', async () => {
-  const coordinator = createRequestCoordinator();
-
-  const result = await runCoordinatedRequest(
-    coordinator,
-    7,
-    'report',
-    'report',
-    async () => {
-      throw new Error(`Authorization: Bearer ${OPENAI_SETTINGS.apiKey}`);
-    }
-  );
-
-  assert.deepEqual(result, {
-    success: false,
-    error: '大模型请求失败，请稍后重试',
-    errorCode: 'generic'
-  });
 });
 
 test('connection testing rejects a missing model before fetching', async () => {

@@ -78,7 +78,7 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
   await wait('renderer prepared', `window.__trainingProductTrainer.asrPreparationState==='ready' && !window.__trainingProductTrainer.firstRunRecordingPolicyPending && !window.__trainingProductTrainer.firstRunRecordingPolicyRunning`);
   assert.equal(await evaluate(`Boolean(document.getElementById('training-topic') && document.getElementById('training-scenario'))`), true, 'Preparing offers independent topic/scenario capsules');
   await evaluate('window.__trainingProductTrainer.trainingSetup.ready');
-  if (offline) assert.equal((await evaluate('window.api.getLlmProfileSummaries()')).profiles.length, 0);
+  if (offline) assert.equal((await evaluate('window.api.getLlmProviderSettings()')).profiles.length, 0);
   if (phase === 'countdown') {
     await require('./countdown-smoke').run({app,mainWindow,evaluate,wait,invoke});
     assert.deepEqual(aiCalls(),initialCalls,'Countdown regression must issue zero AI requests');
@@ -99,7 +99,7 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
     const config = {schemaVersion:3,activeProfileId:'product-smoke',profiles:[{id:'product-smoke',name:'Product smoke',provider:'deepseek',apiKey:'smoke-only-key',model,ollamaUrl:'',baseUrl:'',customModel:'',autoDiagnosisEnabled}]};
     const saved = await invoke('saveLlmProviderSettings',config);
     assert.equal(saved.success, true);
-    await wait('provider selection reached renderer', `(async()=>{const summary=await window.api.getLlmProfileSummaries();return summary.profiles.some(p=>p.model===${JSON.stringify(model)});})()`);
+    await wait('provider selection reached renderer', `(async()=>{const settings=await window.api.getLlmProviderSettings();return settings.profiles.some(p=>p.id===settings.activeProfileId&&p.model===${JSON.stringify(model)});})()`);
     await evaluate('window.__trainingProductTrainer.utility.requestClose()');
   };
 
@@ -356,7 +356,7 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
 
   if (phase === 'write' || phase === 'offline') {
     if (phase === 'write') await saveProfile('fake-model');
-    else assert.equal((await evaluate('window.api.getLlmProfileSummaries()')).profiles.length, 0);
+    else assert.equal((await evaluate('window.api.getLlmProviderSettings()')).profiles.length, 0);
     const ids=[];
     let lastPrompt=null;
     for (let i=0;i<(phase==='write'?7:2);i++) {

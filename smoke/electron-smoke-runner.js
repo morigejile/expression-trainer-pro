@@ -69,27 +69,6 @@ function createRequestCoordinator() {
   };
 }
 
-async function runCoordinatedRequest(
-  coordinator,
-  ownerId,
-  requestType,
-  resultKey,
-  requestFactory
-) {
-  const request = coordinator.begin(ownerId, requestType);
-  try {
-    const value = await requestFactory(request.signal);
-    if (request.signal.aborted) {
-      return { success: false, error: '大模型请求已取消' };
-    }
-    return { success: true, [resultKey]: value };
-  } catch {
-    return { success: false, error: '大模型请求失败，请稍后重试' };
-  } finally {
-    request.finish();
-  }
-}
-
 const fakeLlm = {
   async sendStructuredDiagnosis(context,profile) {
     calls.llmDiagnosis += 1;
@@ -133,7 +112,6 @@ const fakeLlm = {
     return parseStructuredDiagnosisResponse(JSON.stringify({...wire,frameworkFindings:frameworkAnalysis?.findings || []}),context,{requireAssessment:true,currentFormat:true});
   },
   createRequestCoordinator,
-  runCoordinatedRequest,
 
   async testConnection() {
     calls.llmConnection += 1;
@@ -205,10 +183,10 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     const expected = [
       'getLlmProviderSettings', 'saveLlmProviderSettings', 'openSettings',
       'getAppInfo', 'onUtilityOpen', 'trainingCloseDecisionPending',
-      'getLlmProfileSummaries', 'selectLlmProfile', 'onLlmProviderSettingsChanged',
+      'onLlmProviderSettingsChanged',
       'getAppearance', 'saveAppearance', 'onAppearanceChanged',
       'getRecordingPolicy', 'acknowledgeRecordingPolicy',
-      'openPromptEditor', 'getCustomPrompt', 'saveCustomPrompt',
+      'getCustomPrompt', 'saveCustomPrompt',
       'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText',
       'createTrainingSession', 'finalizeTrainingSession', 'appendTrainingResult',
       'listTrainingSessions', 'getTrainingSession', 'deleteTrainingSession', 'readTrainingAudio',
@@ -218,18 +196,18 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     return {
       title: document.title,
       missing: expected.filter(name => typeof window.api?.[name] !== 'function'),
-      removedApis: ['analyzeTexts', 'closeWindow', 'saveFile', 'getFinalReport', 'getRealtimeFeedback', 'analyzePlayback'].filter(name => name in window.api),
+      removedApis: ['analyzeTexts', 'closeWindow', 'saveFile', 'getFinalReport', 'getRealtimeFeedback', 'analyzePlayback', 'getLlmProfileSummaries', 'selectLlmProfile', 'openPromptEditor'].filter(name => name in window.api),
       removedUi: ['btn-paste','paste-modal','btn-copy-text','btn-save-text','btn-clear',
-        'report-modal','training-record-select','btn-diagnostics'].filter(id => document.getElementById(id)),
+        'report-modal','training-record-select','btn-diagnostics',
+        'panel-right','coach-title','feedback-status','feedback-content'].filter(id => document.getElementById(id)),
       missingUi: [
         'user-message', 'user-message-text', 'user-message-action', 'user-message-close',
-        'training-status', 'feedback-status'
+        'training-status'
       ].filter(id => !document.getElementById(id)),
       initialUi: {
         theme: document.documentElement.dataset.theme,
         layout: document.documentElement.dataset.layout,
         trainingStatus: document.getElementById('training-status')?.textContent.trim(),
-        feedbackStatus: document.getElementById('feedback-status')?.textContent.trim(),
         vagueClass: document.getElementById('stat-vague')?.className,
         fillerClass: document.getElementById('stat-fillers')?.className,
         hedgeClass: document.getElementById('stat-hedges')?.className,
@@ -247,7 +225,6 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     theme: 'graphite',
     layout: 'coach-rail',
     trainingStatus: apiContract.initialUi.trainingStatus,
-    feedbackStatus: '训练中使用本地规则；结束后按设置自动生成 AI 诊断',
     vagueClass: 'stat-value stat-yellow',
     fillerClass: 'stat-value stat-red',
     hedgeClass: 'stat-value stat-orange',
@@ -333,21 +310,6 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.deepEqual(smokeProfileSave, {success: true});
   const notice=await mainWindow.webContents.executeJavaScript('window.api.getAiDisclosureState()');
   assert.equal((await mainWindow.webContents.executeJavaScript(`window.api.acknowledgeAiDisclosure({scopeVersion:${JSON.stringify(notice.scopeVersion)}})`)).success,true);
-
-  const llmProfileIpcState = await mainWindow.webContents.executeJavaScript(`(async () => {
-    const initial = await window.api.getLlmProfileSummaries();
-    const selected = await window.api.selectLlmProfile(initial.activeProfileId);
-    const invalid = await window.api.selectLlmProfile('');
-    return {initial, selected, invalid};
-  })()`);
-  assert.equal(llmProfileIpcState.initial.profiles.length, 1);
-  assert.equal(llmProfileIpcState.initial.profiles[0].active, true);
-  assert.equal(llmProfileIpcState.selected.success, true);
-  assert.equal(llmProfileIpcState.selected.summary.activeProfileId, llmProfileIpcState.initial.activeProfileId);
-  assert.deepEqual(llmProfileIpcState.invalid, {success: false, errorCode: 'invalid-ipc-input', error: '设置或帮助请求无效。'});
-  for (const summary of [llmProfileIpcState.initial, llmProfileIpcState.selected.summary]) {
-    assert.doesNotMatch(JSON.stringify(summary), /apiKey|baseUrl|ollamaUrl/);
-  }
 
   const initialRecordingPolicy = await mainWindow.webContents.executeJavaScript(
     'window.api.getRecordingPolicy()'
@@ -469,27 +431,19 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   await mainWindow.webContents.executeJavaScript(`(() => {
     document.body.dataset.trainingState = 'recording';
     const transcript = document.getElementById('subtitle-scroll');
-    const feedback = document.getElementById('feedback-content');
     const transcriptSpacer = document.createElement('div');
-    const feedbackSpacer = document.createElement('div');
     transcriptSpacer.dataset.smokeSpacer = 'transcript';
-    feedbackSpacer.dataset.smokeSpacer = 'feedback';
     transcriptSpacer.style.height = '1200px';
-    feedbackSpacer.style.height = '900px';
     transcript.append(transcriptSpacer);
-    feedback.append(feedbackSpacer);
     transcript.scrollTop = 57;
-    feedback.scrollTop = 31;
     document.getElementById('timer').textContent = '12:34';
     document.getElementById('training-status').textContent = '布局切换状态保真';
     window.__layoutSmoke = {
       transcript: document.getElementById('subtitle-container'),
-      feedback,
       insights: document.querySelector('[data-region="insights"]'),
       timer: document.getElementById('timer'),
       trainingStatus: document.getElementById('training-status'),
       transcriptScroll: transcript.scrollTop,
-      feedbackScroll: feedback.scrollTop,
       controlState: ['btn-start', 'btn-pause', 'btn-resume', 'btn-stop', 'btn-report']
         .map(id => document.getElementById(id).className).join('|')
     };
@@ -515,20 +469,17 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
           return {left: value.left, top: value.top, right: value.right, bottom: value.bottom, width: value.width, height: value.height};
         };
         const transcriptScroll = document.getElementById('subtitle-scroll');
-        const feedbackScroll = document.getElementById('feedback-content');
         return {
           viewport: {width: innerWidth, height: innerHeight},
           stage: rect('#frozen-recording .session-stage'),
           transcript: rect('#subtitle-scroll'),
-          coach: rect('[data-region="coach"]'),
+          coachAbsent: !document.querySelector('[data-region="coach"]'),
           insights: rect('[data-region="insights"]'),
           nodesPreserved: window.__layoutSmoke.transcript === document.getElementById('subtitle-container')
-            && window.__layoutSmoke.feedback === feedbackScroll
             && window.__layoutSmoke.insights === document.querySelector('[data-region="insights"]')
             && window.__layoutSmoke.timer === document.getElementById('timer')
             && window.__layoutSmoke.trainingStatus === document.getElementById('training-status'),
-          scrollPreserved: transcriptScroll.scrollTop === window.__layoutSmoke.transcriptScroll
-            && feedbackScroll.scrollTop === window.__layoutSmoke.feedbackScroll,
+          scrollPreserved: transcriptScroll.scrollTop === window.__layoutSmoke.transcriptScroll,
           controlsPreserved: ['btn-start', 'btn-pause', 'btn-resume', 'btn-stop', 'btn-report']
             .map(id => document.getElementById(id).className).join('|') === window.__layoutSmoke.controlState,
           timer: document.getElementById('timer').textContent,
@@ -543,7 +494,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       assert.equal(geometry.timer, '12:34');
       assert.equal(geometry.trainingStatus, '布局切换状态保真');
       assert.ok(geometry.transcript.left >= geometry.stage.left && geometry.transcript.right <= geometry.stage.right + 1,'Frozen recording transcript stays inside the stage');
-      assert.equal(geometry.coach.height,0,'legacy coaching rail is absent from migrated recording');
+      assert.equal(geometry.coachAbsent,true,'obsolete coaching rail is removed from recording');
       assert.equal(geometry.insights.height,0,'legacy metric panel is absent from migrated recording');
     }
   }
@@ -870,7 +821,6 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     });
     window.__appearanceSmoke = {
       transcript: document.getElementById('subtitle-container'),
-      feedback: document.getElementById('feedback-content'),
       insights: document.querySelector('[data-region="insights"]'),
       trainingStatus: document.getElementById('training-status'),
       timer: document.getElementById('timer'),
@@ -887,7 +837,6 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
         theme: document.documentElement.dataset.theme,
         layout: document.documentElement.dataset.layout,
         transcriptPreserved: window.__appearanceSmoke.transcript === document.getElementById('subtitle-container'),
-        feedbackPreserved: window.__appearanceSmoke.feedback === document.getElementById('feedback-content'),
         insightsPreserved: window.__appearanceSmoke.insights === document.querySelector('[data-region="insights"]'),
         trainingStatusPreserved: window.__appearanceSmoke.trainingStatus === document.getElementById('training-status'),
         timerPreserved: window.__appearanceSmoke.timer === document.getElementById('timer'),
@@ -902,7 +851,6 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       theme: 'graphite',
       layout: 'coach-rail',
       transcriptPreserved: true,
-      feedbackPreserved: true,
       insightsPreserved: true,
       trainingStatusPreserved: true,
       timerPreserved: true,
@@ -948,7 +896,11 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   );
   assert.equal(successfulSwitch.ok, true);
   assert.equal(successfulSwitch.state.effectiveModelId, 'zipformer-small-ctc-zh-int8-2025-04-01');
-  await mainWindow.webContents.executeJavaScript(`window.api.openPromptEditor()`);
+  await mainWindow.webContents.executeJavaScript(`window.api.openSettings()`);
+  await waitUntil('settings Utility opens', () => mainWindow.webContents.executeJavaScript(
+    `document.getElementById('utility').open && document.querySelector('#local-nav [data-page="preferences"]') !== null`
+  ));
+  await mainWindow.webContents.executeJavaScript(`document.querySelector('#local-nav [data-page="preferences"]').click()`);
   await waitUntil('preferences open in the same Main Utility', () => mainWindow.webContents.executeJavaScript(
     `document.getElementById('utility').open && document.getElementById('surface-title').textContent === '分析偏好'
       && document.querySelector('#utility [data-pref="goals"]') !== null`

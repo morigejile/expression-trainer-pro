@@ -73,14 +73,14 @@ IA 归属与确认状态以 [Training Flow §13](training-flow.md#13-screen-stru
 
 ## 4. 当前核心能力
 
-这些能力记录当前实现及后续重构需要保持的行为。训练中本地规则与结束后 AI 的分工已按 [Training Flow §4](training-flow.md#4-训练页与实时交互) 确认；未来独立启用的实时 AI 由 Backlog B-19 跟踪。历史 AI 路径与目标 Workspace 的归属统一见 [Training Flow §13](training-flow.md#13-screen-structure-收敛基线)。
+这些能力记录当前实现及后续重构需要保持的行为。训练中本地统计与结束后 AI 的分工按 [Training Flow §4](training-flow.md#4-训练页与实时交互)；旧隐藏反馈栏及逐句提醒已退出，未来独立启用的实时 AI 由 Backlog B-19 跟踪。历史 AI 路径与目标 Workspace 的归属统一见 [Training Flow §13](training-flow.md#13-screen-structure-收敛基线)。
 
 | ID | 需求 | Acceptance Criteria | Priority | Status | Target Milestone |
 |---|---|---|---|---|---|
 | R-C01 | 用户可通过麦克风完成一次自由表达训练。 | 可开始、暂停、继续、结束和取消；准备与收尾期间阻止重复操作；结束后释放采集资源。 | P0 | Existing | Continuous |
 | R-C03 | 应用在本地提供流式语音识别。 | 展示 partial 与 final 文本；旧会话、重复或倒序事件不污染当前训练；执行单元失败可见且下次训练可恢复。 | P0 | Existing | Continuous |
 | R-C04 | 用户可获得本地、确定性的基础表达统计。 | 填充词等规则命中返回计数与位置；无 LLM 时仍能完成；界面解释指标含义。 | P0 | Existing | M2 |
-| R-C05 | 应用支持可配置 LLM Provider；训练结束后使用结构化诊断，旧实时反馈、自由文本报告和独立逐段反馈已退出。 | Provider 未配置、离线、超时或失败时本地结果不丢失，错误可恢复；M2 将训练结束后的报告诊断升级为按 profile 明确启用的自动流程，训练中使用本地规则，后续可选实时 AI 见 Backlog B-19。三条路径不各自形成独立 Screen；更深层 AI 探索另见 Backlog B-18。 | P1 | Existing | M2 |
+| R-C05 | 应用支持可配置 LLM Provider；训练结束后使用结构化诊断，旧实时反馈、自由文本报告和独立逐段反馈已退出。 | Provider 未配置、离线、超时或失败时本地结果不丢失，错误可恢复；训练结束后的报告诊断按 profile 明确启用自动流程，训练中保留本地规则统计，不展示逐句词语提醒；后续可选实时 AI 见 Backlog B-19。三条历史路径不各自形成独立 Screen；更深层 AI 探索另见 Backlog B-18。 | P1 | Existing | M2 |
 | R-C06 | 用户可回放完成的录音并定位已有片段。 | 原生播放、拖动和快捷键共用同一时间轴；播放不触发新的推理；片段切换才更新关联内容。 | P1 | Existing | M1 持久化 |
 | R-C07 | 用户可安全管理 LLM 配置、自定义规则、主题、布局和本地 ASR 模型。 | 配置可跨重启恢复；迁移失败不破坏旧值；Renderer 不接收密钥；模型安装或激活失败保留上一可用版本。 | P1 | Existing | Continuous |
 | R-C09 | 应用提供普通用户可安装的桌面制品。 | 内部制品可安装、启动、升级和卸载；公开发布另受签名、模型许可和目标环境证据约束。 | P1 | External Gate | Public Delivery |
@@ -143,8 +143,8 @@ M1 完成录音的音频随 Session 保留至用户明确删除；不按条数�
 | R-F03 | Session 开始后，其训练上下文冻结。 | Preparing 阶段可切换；进入 Recording 或 Processing 后不得修改当前 Session 的 mode/framework 或 Topic/Scenario；改用其他 framework 必须开始新 Session。 | P1 | Accepted | M4 |
 | R-F04 | 训练前 Framework Guidance 是辅助，不是必填表单。 | 选择 Structured framework 后可展示步骤、适用场景和轻量提示，但不得要求用户先填写每个框架槽位；训练前 Guidance 与训练后 Analysis 使用不同文案和职责。 | P1 | Accepted | M4 |
 | R-F05 | Structured Session 在 Common Analysis 之外增加对应 Framework Analysis。 | PREP、STAR 或 Pyramid 只加载与所选 framework 对应的专项判断；专项 finding 指出缺失、顺序、比例或支撑问题，并尽可能锚定 transcript segment/timestamp；training mode 与 analysis mode 分别记录。 | P1 | Accepted | M4 |
-| R-F06 | Free Session 可获得 framework 推荐，但选择权始终属于用户。 | 推荐说明理由和适用场景；应用不得自动把原 Session 改为 Structured、不得自动启动重练，也不得把一般组织问题冒充某一 framework 的不合格。 | P1 | Accepted | M4 |
-| R-F07 | 诊断失败重试与 re-training 是两个独立动作；重练不强制选择框架。 | 失败重试追加版本化结果，不修改事实；报告不提供换框架分析，训练前仍可选框架；按 [Training Flow §8–§10](training-flow.md#8-finding-原位展开与证据) 验收 Finding-aware 入口、上下文继承与独立练习目标、范围调整、新 Session、针对性练习反馈及多轮 Practice Chain。来源关系遵循 [Data Model §6](../architecture/data-model.md#6-analysis-and-retraining-invariants)，新事实/结果自动保存且不覆盖原记录；实体实现不由本需求锁定。 | P1 | Accepted | M4 |
+| R-F06 | 自动 framework 推荐已随 v10 退出。 | 不再作为 M4 验收项；准备区手动选择框架按 R-F01/R-F04，历史推荐只保留快照读取兼容，不恢复推荐展示或采用入口。 | — | Retired | — |
+| R-F07 | 诊断失败重试与 re-training 是两个独立动作；重练不强制选择框架。 | 失败重试追加版本化结果，不修改事实；报告不提供换框架分析，训练前仍可选框架；按 [Training Flow §8–§10](training-flow.md#8-finding-原位展开与证据) 验收 Finding-aware 入口、上下文继承与独立练习目标、完整表达重练、新 Session、针对性练习反馈及多轮 Practice Chain。来源关系遵循 [Data Model §6](../architecture/data-model.md#6-analysis-and-retraining-invariants)，新事实/结果自动保存且不覆盖原记录；实体实现不由本需求锁定。 | P1 | Accepted | M4 |
 | R-F08 | 新增 framework 只扩展 framework layer。 | 新 framework 复用训练入口、Session 生命周期、Common Analysis 和报告骨架，只新增版本化 definition、Guidance、Framework Analysis 与对应报告区段；不得为每个 framework 新建训练或报告架构。 | P1 | Accepted | M4 |
 
 ## 9. 非功能需求

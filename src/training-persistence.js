@@ -4,7 +4,6 @@
   else root.TrainingPersistence = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function() {
   'use strict';
-  const emptyStats = () => ({fillers:0,hedges:0,vagueWords:0,totalWords:0,duration:0,excludedCharacters:0,hedgeCharacters:0});
   const reportView = typeof module !== 'undefined' && module.exports ? require('./structured-report') : globalThis.StructuredReport;
   function sessionToRecord(session) {
     const results = session.results || [];

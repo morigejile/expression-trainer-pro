@@ -1,6 +1,6 @@
 Visual baseline: `demo/freeze-v1`, commit `ab714d641829fd8db8beae1fd17ae1d180284ded`, `design-preview-merged/`.
 
-`training.css` contains the frozen training app, continuity, spacing, panel font and content alignment styles in their original order. `report.css` contains the frozen study and state styles. They are enabled for the migrated Training, Report, History and Comparison surfaces. `../frozen-flow.css` adapts existing Renderer controls to that geometry. No Demo business, recording, timing or persistence scripts are included.
+`training.css` contains the retained training app, continuity, spacing, panel font and content alignment styles in their original relative order. Production copies omit unused Demo review/gallery and iOS/Gram selectors; shared state styles and panel font declarations are defined once in `training.css`. `report.css` extends the report surfaces. They are enabled for the migrated Training, Report, History and Comparison surfaces. `../frozen-flow.css` adapts existing Renderer controls to that geometry. No Demo business, recording, timing or persistence scripts are included.
 
 The Report stage selector in `report.css` accepts the regional scrolling wrapper without changing the frozen style values or their order; compact summary height and direct Finding insets are adapted in `../frozen-flow.css`.
 

@@ -49,7 +49,7 @@ const { createPcmWavRecorder } = PcmWav;
 const TrainingRecords = typeof module !== 'undefined' && module.exports
   ? require('./training-records')
   : window.TrainingRecords;
-const { createTrainingRecordStore, findSegmentAtTime, formatRecordLabel } = TrainingRecords;
+const { createTrainingRecordStore, findSegmentAtTime } = TrainingRecords;
 const TextStatistics = typeof module !== 'undefined' && module.exports
   ? require('../shared/text-statistics')
   : window.TextStatistics;
@@ -143,7 +143,6 @@ class ExpressionTrainer {
     this.btnPause = document.getElementById('btn-pause');
     this.btnResume = document.getElementById('btn-resume');
     this.btnStop = document.getElementById('btn-stop');
-    this.btnStopLabel = this.btnStop.querySelector('.btn-label');
     this.btnCancelProcessing = document.getElementById('btn-cancel-processing');
     this.btnLeaveProcessing = document.getElementById('btn-leave-processing');
     this.btnReport = document.getElementById('btn-report');
@@ -154,14 +153,12 @@ class ExpressionTrainer {
     this.soundBars = document.getElementById('sound-bars');
     this.subtitleScroll = document.getElementById('subtitle-scroll');
     this.subtitleContainer = document.getElementById('subtitle-container');
-    this.feedbackContent = document.getElementById('feedback-content');
     this.reportBody = document.getElementById('report-body');
     this.userMessage = document.getElementById('user-message');
     this.userMessageText = document.getElementById('user-message-text');
     this.userMessageAction = document.getElementById('user-message-action');
     this.userMessageClose = document.getElementById('user-message-close');
     this.trainingStatus = document.getElementById('training-status');
-    this.feedbackStatus = document.getElementById('feedback-status');
     this.btnCloseHelp = document.getElementById('close-surface');
     this.recordingPolicyModal = document.getElementById('recording-policy-modal');
     this.btnCloseRecordingPolicy = document.getElementById('btn-close-recording-policy');
@@ -170,7 +167,6 @@ class ExpressionTrainer {
     this.playbackControls = document.getElementById('playback-controls');
     this.audioPlayer = document.getElementById('recording-player');
     this.reportAiStatus = document.getElementById('report-ai-status');
-    this.recordIdentity = document.getElementById('record-identity');
     this.recordSaveStatus = document.getElementById('record-save-status');
     this.retrySave = document.getElementById('btn-retry-save');
     this.historyList = document.getElementById('history-list');
@@ -1176,7 +1172,6 @@ class ExpressionTrainer {
           return analysis;
         });
 
-      // M2: training-time feedback uses local rules; structured AI runs after saving.
     }
     if (!this.recordingStopOperation?.left) this.renderSubtitle(text, isFinal);
     return analysisPromise;
@@ -1228,23 +1223,6 @@ class ExpressionTrainer {
       stats.hedgeCharacters += hedgeCharacters;
       if (this.recordingStopOperation?.left) return analysis;
       this.updateStatsDisplay();
-      // 碰到笼统词 → 立刻在反馈栏弹出替换建议
-      if (analysis.vagueWords && analysis.vagueWords.length > 0) {
-        analysis.vagueWords.forEach(item => {
-          const alts = item.alternatives.slice(0, 3).join(' / ');
-          this.addFeedbackItem(`「${item.word}」→ ${alts}`, 'vague');
-        });
-      }
-      // 碰到填充词 → 弹提醒
-      if (analysis.fillers && analysis.fillers.length >= 2) {
-        const uniqueFillers = [...new Set(analysis.fillers.map(f => f.word))].slice(0, 3);
-        this.addFeedbackItem(`填充词：${uniqueFillers.join('、')}——试试停顿`, 'filler');
-      }
-      // 碰到犹豫词 → 弹提醒
-      if (analysis.hedges && analysis.hedges.length >= 1) {
-        const uniqueHedges = [...new Set(analysis.hedges.map(h => h.word))].slice(0, 2);
-        this.addFeedbackItem(`「${uniqueHedges.join('」「')}」→ 直接说`, 'hedge');
-      }
     }
     return analysis;
   }
@@ -1255,21 +1233,6 @@ class ExpressionTrainer {
     this.statVague.textContent = this.stats.vagueWords;
     const density = densityPercent(this.stats.totalWords, this.stats.excludedCharacters);
     this.statDensity.textContent = density === null ? '--' : `${density}%`;
-  }
-
-  addFeedbackItem(text, type = 'ai') {
-    // 去重：如果前3条已经有相同内容，跳过
-    const existing = Array.from(this.feedbackContent.children).slice(-3);
-    if (existing.some(el => el.textContent === text)) return;
-
-    const item = document.createElement('div');
-    item.className = `feedback-item type-${type}`;
-    item.textContent = text;
-    this.feedbackContent.appendChild(item);
-    while (this.feedbackContent.children.length > 12) {
-      this.feedbackContent.removeChild(this.feedbackContent.firstChild);
-    }
-    this.feedbackContent.scrollTop = this.feedbackContent.scrollHeight;
   }
 
   // ===== 报告 =====
@@ -1451,8 +1414,6 @@ class ExpressionTrainer {
   resetStats() {
     this.stats = { fillers: 0, hedges: 0, vagueWords: 0, totalWords: 0, duration: 0, excludedCharacters: 0, hedgeCharacters: 0 };
     this.updateStatsDisplay();
-    this.feedbackContent.replaceChildren();
-    this.feedbackStatus.textContent = '训练中使用本地规则；结束后按设置自动生成 AI 诊断';
   }
 
   advanceLLMGeneration() {
@@ -1486,7 +1447,6 @@ class ExpressionTrainer {
     const dismissedConfigurationMessage = this.userMessageRequiresSettings;
     if (dismissedConfigurationMessage) {
       this.hideUserMessage();
-      this.feedbackStatus.textContent='训练中使用本地规则；结束后按设置自动生成 AI 诊断';
     }
     return null;
   }
@@ -1875,8 +1835,6 @@ class ExpressionTrainer {
     return record;
   }
 
-  refreshTrainingRecordSelect() {}
-
   selectTrainingRecord(recordId) {
     const record = this.getTrainingRecordStore().select(recordId);
     if (!record) return null;
@@ -1923,7 +1881,6 @@ class ExpressionTrainer {
     const totalSeconds = Math.max(0, Math.floor(record.durationMs / 1000));
     this.timer.textContent = `${String(Math.floor(totalSeconds / 60)).padStart(2, '0')}:${String(totalSeconds % 60).padStart(2, '0')}`;
     this.btnReport.classList.toggle('hidden', !record.fullText.trim());
-    this.refreshTrainingRecordSelect();
     this.playbackSegmentId = null;
     const initialSegment = findSegmentAtTime(record.segments, 0);
     if (initialSegment) {

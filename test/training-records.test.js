@@ -2,7 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { createTrainingRecordStore, findSegmentAtTime, formatRecordLabel } = require('../src/training-records');
+const { createTrainingRecordStore, findSegmentAtTime } = require('../src/training-records');
 
 function record(number, audioUrl) {
   return { id: `r${number}`, audioUrl, createdAt: `2026-09-01T0${number}:05:00.000Z`, durationMs: 65 * 1000 };
@@ -25,13 +25,12 @@ test('segment lookup uses half-open boundaries and retains the final segment at 
   assert.equal(findSegmentAtTime(segments, -1), null);
 });
 
-test('record store replaces immutably, selects records, clears, and formats labels', () => {
+test('record store replaces immutably, selects records and clears', () => {
   const revoked = [];
   const store = createTrainingRecordStore({ revokeObjectURL: url => revoked.push(url) });
   store.add(record(1, 'blob:1'));
   assert.equal(store.replace('r1', current => ({ ...current, durationMs: 125000 })).durationMs, 125000);
   assert.equal(store.select('r1').id, 'r1');
-  assert.equal(formatRecordLabel({ createdAt: '2026-09-01T13:04:05.000Z', durationMs: 125000 }), '21:04 · 02:05');
   store.clear();
   store.clear();
   assert.deepEqual(revoked, ['blob:1']);

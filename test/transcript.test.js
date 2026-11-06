@@ -152,7 +152,7 @@ function createTrainer() {
   trainer.ensureAiDisclosure=async () => true;
   trainer.offerAutomaticDisclosure=async () => {};
   trainer.historyOffset = 0;
-  for (const field of ['reportAiStatus', 'recordSaveStatus', 'recordIdentity', 'retrySave', 'reportBack', 'historyList', 'historyStatus', 'historyMore']) trainer[field] = createElement();
+  for (const field of ['reportAiStatus', 'recordSaveStatus', 'retrySave', 'reportBack', 'historyList', 'historyStatus', 'historyMore']) trainer[field] = createElement();
   trainer.audioCaptureFactory = createAudioCapture;
   trainer.audioCapture = null;
   trainer.audioCaptureStopPromise = null;
@@ -180,7 +180,6 @@ function createTrainer() {
   trainer.viewingTrainingRecordId = null;
   trainer.renderSubtitle = () => {};
   trainer.btnStop = createElement();
-  trainer.btnStopLabel = createElement();
   trainer.btnPause = createElement();
   trainer.btnResume = createElement();
   trainer.btnStart = createElement();
@@ -188,7 +187,6 @@ function createTrainer() {
   trainer.btnReport = createElement();
   trainer.timer = createElement();
   trainer.subtitleContainer = createElement();
-  trainer.feedbackContent = createElement();
   trainer.statFillers = createElement();
   trainer.statHedges = createElement();
   trainer.statVague = createElement();
@@ -199,7 +197,6 @@ function createTrainer() {
   trainer.userMessageText = createElement();
   trainer.userMessageAction = createElement();
   trainer.trainingStatus = createElement();
-  trainer.feedbackStatus = createElement();
   trainer.recordingPolicyModal = createElement();
   trainer.btnCloseRecordingPolicy = createElement('button');
   trainer.btnRecordingPolicyConfirm = createElement('button');
@@ -727,7 +724,6 @@ function startupTrainer(t, prepare, {
     removeListener() {},
     invoke(channel) {
       if (channel === 'prepare-asr') return prepare();
-      if (channel === 'get-llm-profile-summaries') return Promise.resolve({activeProfileId: null, profiles: []});
       if (channel === 'cancel-llm-requests') return Promise.resolve({success: true});
       if (channel === 'get-recording-policy') return getRecordingPolicy();
       if (channel === 'acknowledge-recording-policy') return acknowledgeRecordingPolicy();
@@ -1158,14 +1154,13 @@ test('user messages can be dismissed explicitly', () => {
 
 test('saved LLM settings dismiss only a configuration-related message', async (t) => {
   global.document = {createElement};
-  global.window = {api: {getLlmProfileSummaries: async () => profileSummary}};
+  global.window = {api: {}};
   t.after(() => { delete global.document; delete global.window; });
   const trainer = createTrainer();
 
   trainer.showUserMessage('实时反馈失败：请先配置 API Key', {openSettings: true});
   await trainer.handleLlmProviderSettingsChanged();
   assert.equal(trainer.userMessage.classList.contains('hidden'), true);
-  assert.equal(trainer.feedbackStatus.textContent, '训练中使用本地规则；结束后按设置自动生成 AI 诊断');
 
   trainer.showUserMessage('复制失败，请重试');
   await trainer.handleLlmProviderSettingsChanged();
@@ -1248,21 +1243,20 @@ test('successful recording, pause, and resume expose the current operation state
   assert.equal(trainer.trainingStatus.textContent, '正在录音');
 });
 
-test('feedback items follow the transcript reading direction from oldest to newest', () => {
-  global.document = { createElement };
+test('local word statistics remain available without the retired feedback panel', async t => {
+  const analysis = {totalWords:10, fillers:[{word:'嗯',position:0},{word:'嗯',position:0}],
+    hedges:[{word:'可能',position:1}], vagueWords:[{word:'东西',position:2}]};
+  global.window = {api:{analyzeText:async () => analysis}};
+  t.after(() => {delete global.window;});
   const trainer = createTrainer();
-
-  try {
-    trainer.addFeedbackItem('第一条');
-    trainer.addFeedbackItem('第二条');
-
-    assert.deepEqual(
-      trainer.feedbackContent.children.map(item => item.textContent),
-      ['第一条', '第二条']
-    );
-  } finally {
-    delete global.document;
-  }
+  trainer.resetStats();
+  assert.equal(await trainer.analyzeCurrentSentence('嗯，可能是那个东西。'),analysis);
+  assert.equal(trainer.statFillers.textContent,2);
+  assert.equal(trainer.statHedges.textContent,1);
+  assert.equal(trainer.statVague.textContent,1);
+  assert.equal(trainer.statDensity.textContent,'70%');
+  assert.equal(trainer.stats.excludedCharacters,3);
+  assert.equal(trainer.stats.hedgeCharacters,2);
 });
 
 
@@ -1675,7 +1669,6 @@ test('recording failure during stop-final analysis prevents stale analysis side 
   assert.equal(trainer.fullText, '已经确认尾部文本');
   assert.deepEqual(trainer.sentences, ['已经确认', '尾部文本']);
   assert.equal(trainer.stats.totalWords, 4);
-  assert.equal(trainer.feedbackContent.children.length, 0);
 });
 
 test('LLM cancellation alone does not discard analysis owned by the active ASR session', async (t) => {
@@ -2406,7 +2399,6 @@ test('normal stop creates and selects a complete WAV training record', async (t)
       stopASR: async () => stopEnvelope('session-a', '完成文本'),
       cancelLLMRequests: async () => ({ success: true }),
       analyzeText: async () => ({ totalWords: 4, fillers: [], hedges: [], vagueWords: [] }),
-      getLlmProfileSummaries: async () => profileSummary,
       analyzePlayback: async payload => {
         playbackPayloads.push(payload);
         return {success: true, analysis: {items: [], profile: profileSummary.profiles[0]}};
