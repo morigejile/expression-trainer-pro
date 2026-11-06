@@ -178,10 +178,25 @@ body[data-frozen-ui="report"] .finding-evidence blockquote{background:#eae4d83d;
 body[data-frozen-ui="report"] .practice-actions{display:flex;gap:12px;margin-top:18px;align-items:end}
 body[data-frozen-ui="report"] :is(.evidence-button,.practice-start,#btn-retry-save){font-size:11px;padding:8px 16px;border:1px solid var(--line);border-radius:4px;min-height:39px}
 /* Saved recording playback: native media drives a light, single-column surface. */
-body[data-frozen-ui="report"] #report-audio .playback-controls{display:block;margin:12px 0 15px;padding:0;border:0;background:none;font-size:11px;color:var(--muted)}
+body[data-frozen-ui="report"] #report-materials{--playback-surface:var(--reading,var(--panel,#faf8f1))}
+body[data-frozen-ui="report"] #report-materials>summary{position:sticky;top:0;z-index:4;box-sizing:border-box;height:44px;font-size:13px;font-weight:400;background:var(--playback-surface)}
+body[data-frozen-ui="report"] #report-materials>div{padding-top:0}
+body[data-frozen-ui="report"] #report-audio{position:sticky;top:44px;z-index:3;background:var(--playback-surface)}
+body[data-frozen-ui="report"] #report-audio .playback-controls{display:block;margin:0 0 12px;padding:8px 0 10px;border:0;background:none;font-size:11px;color:var(--muted)}
+body[data-frozen-ui="report"] .playback-follow-controls{display:flex;align-items:center;justify-content:flex-end;gap:16px;margin-left:auto;font-size:12px;letter-spacing:normal}
+body[data-frozen-ui="report"] .playback-follow-controls[hidden],body[data-frozen-ui="report"] #playback-return[hidden]{display:none}
+body[data-frozen-ui="report"] .playback-follow-label{display:flex;align-items:center;gap:9px;min-height:36px;margin:0;color:var(--muted);font-size:12px;cursor:pointer;white-space:nowrap}
+body[data-frozen-ui="report"] #playback-follow{appearance:none;position:relative;flex:0 0 30px;width:30px;height:17px;min-height:0;margin:0;padding:0;border:0;border-radius:12px;background:var(--line);cursor:pointer}
+body[data-frozen-ui="report"] #playback-follow::before{content:'';position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:var(--playback-surface)}
+body[data-frozen-ui="report"] #playback-follow:checked{background:var(--accent)}
+body[data-frozen-ui="report"] #playback-follow:checked::before{transform:translateX(13px)}
+body[data-frozen-ui="report"] #playback-return{display:inline-flex;align-items:center;gap:6px;min-height:36px;padding:4px 0;border:0;border-radius:3px;background:none;color:var(--accent);font:inherit;white-space:nowrap}
+body[data-frozen-ui="report"] #playback-return svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.6}
+body[data-frozen-ui="report"] #playback-return:hover{text-decoration:underline;text-underline-offset:3px}
 body[data-frozen-ui="report"] #recording-player[hidden]{display:none}
 body[data-frozen-ui="report"] #playback-player{display:flex;align-items:center;flex-wrap:wrap;gap:12px;min-height:48px}
 body[data-frozen-ui="report"] #playback-player[hidden]{display:none}
+body[data-frozen-ui="report"] .playback-actions{display:flex;align-items:center;justify-content:flex-end;gap:8px;flex:0 0 auto;margin-left:auto}
 body[data-frozen-ui="report"] .playback-player button{display:grid;place-items:center;color:#6b6150;background:none;border:0;padding:0;min-width:32px;min-height:36px;border-radius:3px}
 body[data-frozen-ui="report"] .playback-player svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 body[data-frozen-ui="report"] #playback-toggle{width:42px;height:42px;flex:0 0 42px;border:1px solid #cec4b3;border-radius:50%;background:#f3efe5}
@@ -203,16 +218,18 @@ body[data-frozen-ui="report"] #playback-speed{font:inherit;font-size:11px;width:
 body[data-frozen-ui="report"] .playback-note{font-size:11px;line-height:1.8;color:var(--muted);margin:7px 0 0}
 body[data-frozen-ui="report"] .playback-note:empty{display:none}
 body[data-frozen-ui="report"] #playback-segments{padding-top:3px}
-body[data-frozen-ui="report"] .playback-segment{margin:0 0 6px}
-body[data-frozen-ui="report"] .playback-segment-button{display:grid;grid-template-columns:38px minmax(0,1fr) auto;gap:12px;align-items:start;width:100%;min-height:48px;padding:10px 12px;text-align:left;background:none;border:0;border-radius:3px;font:inherit;color:#393831}
+body[data-frozen-ui="report"] .playback-segment{margin:0 0 2px}
+body[data-frozen-ui="report"] .playback-segment-button{display:grid;grid-template-columns:48px minmax(0,1fr) 54px;gap:12px;align-items:baseline;width:100%;padding:10px 12px;text-align:left;background:none;border:0;border-radius:5px;font:inherit;color:#393831}
 body[data-frozen-ui="report"] .playback-segment-button:hover{background:#f0ece3}
-body[data-frozen-ui="report"] .playback-segment-button[aria-pressed="true"]{background:#eee9de}
-body[data-frozen-ui="report"] .playback-segment-time{font-size:10px;color:var(--muted);line-height:2.3;font-variant-numeric:tabular-nums}
-body[data-frozen-ui="report"] .playback-segment-text{font-size:13px;font-weight:350;line-height:1.8;letter-spacing:.025em;overflow-wrap:anywhere}
-body[data-frozen-ui="report"] .playback-position{font-size:10px;line-height:2.3;color:#8d7654;white-space:nowrap}
+body[data-frozen-ui="report"] .playback-segment.is-current>.playback-segment-button{background:#eee9de;box-shadow:inset 2px 0 var(--accent)}
+body[data-frozen-ui="report"] .playback-segment-time{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+body[data-frozen-ui="report"] .playback-segment-text{font-size:15px;font-weight:400;line-height:1.75;letter-spacing:normal;overflow-wrap:anywhere}
+body[data-frozen-ui="report"] .playback-position{font-size:11px;color:var(--muted);text-align:right;white-space:nowrap}
 
 body[data-frozen-ui="report"] .playback-plain-transcript{font-size:13px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}
-body[data-frozen-ui="report"] :is(#playback-controls,#playback-segments) :is(button,input,select):focus-visible{outline:2px solid #8c7650;outline-offset:3px}
+body[data-frozen-ui="report"] :is(#playback-controls,#playback-segments,#playback-follow-controls) :is(button,input,select):focus-visible{outline:2px solid var(--accent,#8c7650);outline-offset:3px}
+@media(max-width:1100px){body[data-frozen-ui="report"] .playback-actions{flex-basis:100%}body[data-frozen-ui="report"] #playback-player{gap:4px 12px}}
+@media(pointer:coarse){body[data-frozen-ui="report"] :is(.playback-player button,.playback-follow-label,#playback-return){min-height:44px}body[data-frozen-ui="report"] .playback-player button{min-width:44px}}
 body[data-frozen-ui="report"] #report-scroll{scrollbar-gutter:stable;scrollbar-width:auto;scrollbar-color:auto}
 body[data-frozen-ui="report"] #report-scroll::-webkit-scrollbar{width:8px;height:8px}
 body[data-frozen-ui="report"] #report-scroll::-webkit-scrollbar-track,body[data-frozen-ui="report"] #report-scroll::-webkit-scrollbar-corner{background:transparent}

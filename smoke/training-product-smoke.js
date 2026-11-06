@@ -388,6 +388,13 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
       fs.writeFileSync(fixturePath, JSON.stringify({ids,lastPrompt}));
     }
     await compareHistory(ids);
+    if(phase==='offline'){
+      await openHistory(ids.at(-1));
+      const before=await invoke('getTrainingSession',{requestId:'before-playback-layout',sessionId:ids.at(-1)});
+      await require('./report-playback-smoke').run({mainWindow,evaluate,wait,click,capture});
+      assert.deepEqual(await invoke('getTrainingSession',{requestId:'before-playback-layout',sessionId:ids.at(-1)}),before,'playback presentation never rewrites saved facts');
+      assert.deepEqual(aiCalls(),initialCalls,'playback controls never request AI');
+    }
   } else {
     const fixture = JSON.parse(fs.readFileSync(fixturePath,'utf8'));
     assert.deepEqual(await evaluate('window.__trainingProductTrainer.trainingSetup.snapshot().trainingPrompt'),fixture.lastPrompt);

@@ -10,12 +10,18 @@ class Element {
   setAttribute(key,value){this.attributes[key]=String(value);}
   getAttribute(key){return this.attributes[key]??null;}
   addEventListener(type,listener){const list=this.listeners.get(type)||[];list.push(listener);this.listeners.set(type,list);}
-  dispatch(type){for(const listener of this.listeners.get(type)||[])listener({target:this,preventDefault(){}});}
+  dispatch(type,event={}){for(const listener of this.listeners.get(type)||[])listener({target:this,preventDefault(){},...event});}
+  getBoundingClientRect(){return this.rect||{top:0,bottom:40,height:40};}
+  scrollTo(options){this.scrollTop=options.top;this.scrolls=(this.scrolls||[]).concat(options);}
   focus(){this.ownerDocument.activeElement=this;}
 }
 function fixture({withoutFeedback=false}={}){
-  const nodes=new Map(),document={createElement:tag=>new Element(document,tag),getElementById:id=>nodes.get(id)};
-  for(const id of ['playback-player','playback-toggle','playback-seek','playback-current-time','playback-duration','playback-volume','playback-mute','playback-speed','playback-audio-status','playback-feedback-status','playback-result-source','playback-analysis-note','playback-notice','playback-segments','playback-inline-feedback','btn-reanalyze'])nodes.set(id,new Element(document));
+  const nodes=new Map(),document={body:{dataset:{frozenUi:'report'}},createElement:tag=>new Element(document,tag),getElementById:id=>nodes.get(id)};
+  for(const id of ['playback-player','playback-toggle','playback-backward','playback-forward','playback-follow-controls','playback-follow','playback-return','report-scroll','report-materials','report-materials-heading','report-audio','playback-seek','playback-current-time','playback-duration','playback-volume','playback-mute','playback-speed','playback-audio-status','playback-feedback-status','playback-result-source','playback-analysis-note','playback-notice','playback-segments','playback-inline-feedback','btn-reanalyze'])nodes.set(id,new Element(document));
+  Object.assign(nodes.get('report-scroll'),{scrollTop:0,clientHeight:300,rect:{top:0,bottom:300,height:300}});
+  nodes.get('report-materials').open=true;
+  nodes.get('report-materials-heading').rect={top:0,bottom:44,height:44};
+  nodes.get('report-audio').rect={top:44,bottom:124,height:80};
   const audio=new Element(document,'audio');Object.assign(audio,{src:'blob:fixture',duration:10,currentTime:0,paused:true,ended:false,volume:1,muted:false,playbackRate:1,readyState:1,playCalls:0,pauseCalls:0,play(){this.playCalls++;this.paused=false;this.ended=false;this.dispatch('play');return Promise.resolve();},pause(){this.pauseCalls++;this.paused=true;this.dispatch('pause');}});
   if(withoutFeedback)for(const id of ['playback-feedback-status','playback-result-source','playback-analysis-note','playback-notice','playback-inline-feedback','btn-reanalyze'])nodes.delete(id);
   const selected=[],{createReportPlayback}=require('../src/report-playback');
@@ -57,4 +63,62 @@ test('audio-only records remain playable and missing segments do not invent tran
 
 test('media updates do not pull the seek thumb away while the user is dragging',()=>{
   const f=fixture(),seek=f.nodes.get('playback-seek');seek.dispatch('pointerdown');seek.value='6';f.audio.currentTime=2;f.audio.dispatch('timeupdate');assert.equal(seek.value,'6');seek.dispatch('pointerup');assert.equal(Number(seek.value),2);
+});
+
+test('five-second jumps clamp to the saved recording bounds without changing playback state',()=>{
+  const f=fixture(),back=f.nodes.get('playback-backward'),forward=f.nodes.get('playback-forward');
+  f.audio.currentTime=3;back.dispatch('click');assert.equal(f.audio.currentTime,0);
+  f.audio.currentTime=8;forward.dispatch('click');assert.equal(f.audio.currentTime,10);
+  assert.equal(f.audio.paused,true);assert.equal(f.audio.playCalls,0);
+  f.audio.paused=false;f.audio.currentTime=7;back.dispatch('click');assert.equal(f.audio.currentTime,2);assert.equal(f.audio.paused,false);
+  f.audio.duration=NaN;f.audio.dispatch('durationchange');forward.dispatch('click');
+  assert.equal(forward.disabled,true);assert.equal(f.audio.currentTime,2);
+  f.record.audioState='missing';f.view.setRecord(f.record);back.dispatch('click');assert.equal(f.audio.currentTime,2);
+});
+
+test('following reveals the playing segment inside the report without moving focus or seeking audio',()=>{
+  const f=fixture(),get=id=>f.nodes.get(id),row=get('playback-segments').children[1].children[0];
+  row.rect={top:460,bottom:500,height:40};row.focus();f.audio.currentTime=5;f.audio.paused=false;
+  f.view.setCurrentSegment('two');
+  assert.equal(get('playback-follow').checked,true);
+  assert.equal(get('report-scroll').scrollTop,324);
+  assert.equal(f.document.activeElement,row);assert.equal(f.audio.currentTime,5);
+  get('report-scroll').dispatch('wheel');assert.equal(get('playback-follow').checked,false);assert.equal(get('playback-return').hidden,false);
+  const count=get('report-scroll').scrolls.length;f.view.setCurrentSegment('one');assert.equal(get('report-scroll').scrolls.length,count);
+  f.view.setCurrentSegment('two');get('playback-return').dispatch('click');
+  assert.equal(get('playback-follow').checked,true);assert.equal(get('playback-return').hidden,true);
+  assert.equal(get('report-scroll').scrolls.length,count+1);assert.equal(f.audio.currentTime,5);
+});
+
+test('follow switch preserves a paused recording and resets only when opening a different recording',()=>{
+  const f=fixture(),get=id=>f.nodes.get(id);
+  get('playback-follow').checked=false;get('playback-follow').dispatch('change');
+  assert.equal(get('playback-return').hidden,false);assert.equal(f.audio.paused,true);assert.equal(f.audio.playCalls,0);
+  f.view.setRecord({...f.record});assert.equal(get('playback-follow').checked,false);
+  f.view.setRecord({...f.record,audioUrl:'blob:refreshed'});assert.equal(get('playback-follow').checked,false,'reloading audio for the same recording preserves follow');
+  f.view.setRecord({...f.record,id:'another'});assert.equal(get('playback-follow').checked,true);assert.equal(get('playback-return').hidden,true);
+});
+
+test('returning to playback retains a visible keyboard target when the return button disappears',()=>{
+  const f=fixture(),get=id=>f.nodes.get(id);
+  get('playback-follow').checked=false;get('playback-follow').dispatch('change');
+  get('playback-return').focus();get('playback-return').dispatch('click');
+  assert.equal(get('playback-return').hidden,true);
+  assert.equal(f.document.activeElement,get('playback-follow'));
+  assert.equal(f.audio.paused,true);
+});
+
+test('collapsed, hidden, paused and unavailable recordings never pull the report scroll position',()=>{
+  const f=fixture(),get=id=>f.nodes.get(id);get('playback-segments').children[1].children[0].rect={top:460,bottom:500,height:40};
+  f.view.setCurrentSegment('two');assert.equal(get('report-scroll').scrollTop,0);
+  f.audio.paused=false;get('report-materials').open=false;f.view.setCurrentSegment('two');assert.equal(get('report-scroll').scrollTop,0);
+  get('report-materials').open=true;f.document.body.dataset.frozenUi='history';f.view.setCurrentSegment('two');assert.equal(get('report-scroll').scrollTop,0);
+  f.document.body.dataset.frozenUi='report';f.audio.error={code:3};f.view.setCurrentSegment('two');assert.equal(get('report-scroll').scrollTop,0);
+  f.audio.dispatch('error');assert.equal(get('playback-follow-controls').hidden,true);
+});
+
+test('operating playback controls does not switch off follow, while reading with the keyboard does',()=>{
+  const f=fixture(),get=id=>f.nodes.get(id);f.audio.paused=false;
+  get('report-scroll').dispatch('wheel',{target:{closest:()=>get('playback-volume')}});assert.equal(get('playback-follow').checked,true);
+  get('report-scroll').dispatch('keydown',{key:'PageDown'});assert.equal(get('playback-follow').checked,false);
 });
