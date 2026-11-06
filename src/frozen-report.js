@@ -44,9 +44,11 @@
         : reason === 'disclosure-required' ? '等待 AI 数据告知'
         : reason === 'not-enabled' ? '本次未生成 AI 分析'
         : reason === 'not-configured' ? '尚未配置分析模型' : '分析暂不可用',
-      reason,metrics:[
-        {label:'表达时长',value:Number.isFinite(record.durationMs) ? record.durationMs : null,unit:'ms'},
-        {label:'转写字数',value:fallback(measured('text-character-count'),'totalWords'),unit:'字'},
+      reason,analysisAction:{
+        visible:assessment?.status!=='insufficient' && (Boolean(record.reportPending) || !summary || projection?.snapshot?.value?.availability==='partial'),
+        label:record.reportPending ? '分析中…' : !summary && ['not-enabled','not-configured','disclosure-required'].includes(reason) ? '分析这一次' : '重试诊断'},metrics:[
+        {id:'audio-duration-ms',label:'表达时长',value:Number.isFinite(record.durationMs) ? record.durationMs : null,unit:'ms'},
+        {id:'text-character-count',label:'转写字数',value:fallback(measured('text-character-count'),'totalWords'),unit:'字'},
         {label:'填充词',value:fallback(measured('filler-count'),'fillers'),unit:'次'}]};
   }
   // Adapt the existing report projection and controls; no analysis or storage
@@ -69,7 +71,7 @@
       practiceSlot.replaceChildren();practiceSlot.hidden=!record.practice || !practice;
       if (record.practice && practice) practiceSlot.append(practice);
     }
-    const detailSelector = '.metric-details,.report-limitations';
+    const detailSelector = '.report-metrics';
     const details = [...(root?.querySelectorAll(detailSelector) || [])];
     // A navigation/state refresh can project the same report twice; retain
     // already moved controls and listeners instead of deleting them.
@@ -100,18 +102,23 @@
     }
     for (const metric of model.metrics) {
       const row = node('div');row.append(node('span',metric.label));
+      if(metric.id)row.id=`metric:${metric.id}`;
       const value = metric.value === null ? '—' : metric.unit === 'ms'
         ? `${String(Math.floor(metric.value/60000)).padStart(2,'0')}:${String(Math.floor(metric.value/1000)%60).padStart(2,'0')}`
         : `${metric.value} ${metric.unit}`;
       row.append(node('strong',value));metrics.append(row);
     }
-    info.append(node('p',`训练方式与上下文：${model.analysisContext}`,'source-note'));
-    info.append(node('p',`ASR：${record.sourceSnapshot?.asr?.modelId || record.sourceSnapshot?.asr?.provider || '来源信息不可用'}。片段时间按保存的来源标记，不表示精确词语起止。`,'source-note'));
     if (root) {
       for (const element of root.querySelectorAll('.report-title,.report-summary')) element.remove();
-      (model.assessmentStatus==='limited' || model.summary && record.structuredReport?.latestAttempt ? copy : info).append(...statuses);
+      (!model.summary || model.assessmentStatus==='limited' || record.structuredReport?.latestAttempt ? copy : info).append(...statuses);
     } else if (!record.report) body.replaceChildren();
     info.append(...details);
+    if(!details.length && byId('report-local-statistics')){
+      const reportUI=typeof module==='object' && module.exports ? require('./structured-report') : globalThis.StructuredReport;
+      info.appendChild(reportUI.createReportMetrics(document,{record,metrics:record.structuredReport?.metricRun?.value?.metrics || [],evidenceRun:record.structuredReport?.evidenceRun}));
+    }
+    for(const basic of info.querySelectorAll('.metric-basics'))basic.remove();
+    const legacyStatistics=byId('report-local-statistics');if(legacyStatistics)legacyStatistics.hidden=true;
     for (const line of byId('subtitle-container').querySelectorAll('[data-segment-id]')) {
       const segment=record.segments.find(item=>item.id === line.dataset.segmentId);
       if (!Number.isFinite(segment?.startMs)) continue;
@@ -120,11 +127,11 @@
       line.title=segment.timingSource === 'estimated' ? '片段播放位置为估计值' : '保存的片段播放位置';
     }
     if (actions) {
-      actions.hidden=record.structuredReport?.analysisRun?.value.assessment?.status==='insufficient';
+      actions.hidden=!model.analysisAction.visible;
       actions.classList?.toggle('hidden',actions.hidden);
       (model.summary ? info : copy).append(actions);
       const label=actions.querySelector('.btn-label');
-      if (label) label.textContent=record.reportPending ? '分析中…' : !model.summary && ['not-enabled','not-configured','disclosure-required'].includes(model.reason) ? '分析这一次' : '重试诊断';
+      if (label) label.textContent=model.analysisAction.label;
     }
     renderIdentity(document,record);
   }

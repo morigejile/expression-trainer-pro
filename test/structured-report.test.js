@@ -99,6 +99,40 @@ function descendants(node,predicate) {
 function byClass(node,name) {return descendants(node,child=>child.className.split(' ').includes(name));}
 function container() {return new Document().createElement('div');}
 
+test('compact metrics retain saved values, all evidence anchors and optional explanations without duplicating counts',()=>{
+  const target=container();
+  const metrics=[['filler-count',6,'occurrences'],['hedge-count',0,'occurrences'],['vague-word-count',8,'occurrences'],
+    ['text-rate-per-recorded-minute',180,'characters/recorded-minute'],['non-filler-hedge-character-percent',96,'percent'],
+    ['speech-duration-ms',110000,'ms'],['text-character-count',450,'characters'],['audio-duration-ms',150000,'ms']]
+    .map(([id,value,unit])=>({id,value,unit,status:'available',label:id}));
+  const before=JSON.stringify(metrics);
+  target.appendChild(api().createReportMetrics(target.ownerDocument,{metrics,record:{stats:{fillers:99},sourceSnapshot:{asr:{modelId:'saved-model <script>'}}}}));
+  assert.equal(byClass(target,'word-statistics')[0].children.length,3);
+  assert.equal(byClass(target,'metric-group').length,2);
+  assert.equal(byClass(target,'metric-details')[0].open,false);
+  assert.equal(byClass(target,'metric-source-details')[0].open,false);
+  for(const metric of metrics)assert.equal(descendants(target,node=>node.id===`metric:${metric.id}`).length,1);
+  assert.match(descendants(target,node=>node.id==='metric:filler-count')[0].textContent,/6 次/);
+  assert.match(descendants(target,node=>node.id==='metric:hedge-count')[0].textContent,/0 次/);
+  assert.match(descendants(target,node=>node.id==='metric:speech-duration-ms')[0].textContent,/1 分 50 秒/);
+  assert.match(target.textContent,/剩余字符占比|不是质量评分/);
+  assert.doesNotMatch(target.textContent,/确定性计算|详细本地指标|表达分析/);
+  assert.match(target.textContent,/saved-model <script>/);
+  assert.equal(descendants(target,node=>node.tagName==='SCRIPT').length,0);
+  assert.equal(JSON.stringify(metrics),before);
+});
+
+test('compact metrics distinguish unavailable saved measurements from zero and use saved legacy counts only when absent',()=>{
+  const target=container();target.appendChild(api().createReportMetrics(target.ownerDocument,{record:{metricsAvailable:true,stats:{fillers:0,hedges:2,vagueWords:3}},
+    metrics:[{id:'hedge-count',status:'unavailable',reason:'local-stats-invalid'}]}));
+  assert.match(descendants(target,node=>node.id==='metric:filler-count')[0].textContent,/0 次/);
+  assert.match(descendants(target,node=>node.id==='metric:hedge-count')[0].textContent,/暂不可用/);
+  assert.doesNotMatch(descendants(target,node=>node.id==='metric:hedge-count')[0].textContent,/2 次/);
+  assert.match(descendants(target,node=>node.id==='metric:vague-word-count')[0].textContent,/3 次/);
+  const missing=container();missing.appendChild(api().createReportMetrics(missing.ownerDocument,{record:{metricsAvailable:false,stats:{fillers:6}}}));
+  assert.match(descendants(missing,node=>node.id==='metric:filler-count')[0].textContent,/暂不可用/);
+});
+
 test('an insufficient saved report keeps local measurements without problem, framework or practice controls', () => {
   const source=runs('1',{findings:0});
   source[2].value.assessment={status:'insufficient',reason:'只有试音，没有展开表达内容。',
@@ -199,7 +233,7 @@ test('frozen finding practice stays outside collapsed evidence and evidence acti
   }
   assert.deepEqual(clicked,['segment-1','metric:text-character-count','speech-0']);
   assert.match(blocks[0].textContent,/00:31/);assert.match(blocks[0].textContent,/这是原文。/);
-  assert.equal(byClass(target,'metric-details')[0].open,true);
+  assert.equal(byClass(target,'metric-details')[0].open,false);
 });
 
 test('more disclosure changes its footer label while preserving native expanded state',()=>{
@@ -348,7 +382,7 @@ test('frozen report initially shows only the first finding and keeps the remaind
   }
 });
 
-test('evidence buttons preserve real references, disclose transcript quotes and model intervals, and open the metric table', () => {
+test('evidence buttons preserve references and keep directly visible metric targets outside More', () => {
   const target = container();const clicked = [];
   api().renderStructuredReport(target,api().selectStructuredReport(runs()),{
     segments:[{id:'segment-1',text:'这是原文。'}],onEvidence:ref=>clicked.push(ref)});
@@ -363,15 +397,15 @@ test('evidence buttons preserve real references, disclose transcript quotes and 
   assert.match(target.textContent,/这是原文。/);
   assert.match(target.textContent,/16000.*48000/);
   assert.match(target.textContent,/模型估计/);
-  assert.equal(byClass(target,'metric-details')[0].open,true);
+  assert.equal(byClass(target,'metric-details')[0].open,false);
   assert.equal(descendants(target,node=>node.id === 'metric:text-character-count').length,1);
 });
 
-test('unavailable metric values render as unknown rather than zero and radar never fabricates calibrated scores', () => {
+test('unavailable metric values retain reasons instead of zero and radar never fabricates calibrated scores', () => {
   const target = container();
   api().renderStructuredReport(target,api().selectStructuredReport(runs()));
   const unavailable = descendants(target,node=>node.id === 'metric:speech-duration-ms')[0];
-  assert.match(unavailable.textContent,/未知/);
+  assert.match(unavailable.textContent,/暂不可用/);
   assert.doesNotMatch(unavailable.textContent,/0/);
   assert.match(unavailable.textContent,/语音活动证据不可用/);
   assert.match(target.textContent,/短停顿可能合并/);

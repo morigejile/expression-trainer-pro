@@ -31,6 +31,72 @@
     'occurrences/recorded-minute':'次/录音分钟'};
   const reasonText = reason => REASONS[reason] || '当前证据或分析不可用';
 
+  const COUNT_METRICS=[['vague-word-count','笼统词','vagueWords'],['filler-count','填充词','fillers'],['hedge-count','犹豫词','hedges']];
+  const BASIC_METRICS=['text-character-count','audio-duration-ms'];
+  function createReportMetrics(document,{metrics=[],record={},evidenceRun}={}) {
+    const node=(tag,className,text)=>{const value=document.createElement(tag);if(className)value.className=className;if(text!==undefined)value.textContent=String(text);return value;};
+    const root=node('section','report-metrics'),byId=new Map(metrics.map(metric=>[metric.id,metric]));
+    const rendered=new Set();
+    function formatted(metric) {
+      if(metric?.status!=='available' || !Number.isFinite(metric.value))return '暂不可用';
+      const value=Number(metric.value.toFixed(2));
+      if(metric.unit==='ms'){
+        const total=Number((value/1000).toFixed(2)),minutes=Math.floor(total/60),seconds=Number((total%60).toFixed(2));
+        return minutes?`${minutes} 分${seconds?` ${seconds} 秒`:''}`:`${seconds} 秒`;
+      }
+      return `${value} ${({'characters/recorded-minute':'字/分','characters/speech-minute':'字/分','occurrences/recorded-minute':'次/分'})[metric.unit] || UNITS[metric.unit] || metric.unit || ''}`.trim();
+    }
+    function row(metric,label) {
+      rendered.add(metric.id);
+      const item=node('div','metric-item');item.id=`metric:${metric.id}`;
+      item.append(node('dt',null,label || metric.label),node('dd',null,formatted(metric)));
+      if(metric.status!=='available' || !Number.isFinite(metric.value))item.appendChild(node('p','metric-reason',reasonText(metric.reason)));
+      return item;
+    }
+    const basics=node('dl','metric-basics');
+    for(const id of BASIC_METRICS)if(byId.has(id))basics.appendChild(row(byId.get(id)));
+    root.appendChild(basics);
+    const counts=node('dl','word-statistics');counts.setAttribute('aria-label','词语命中次数');
+    for(const [id,label,key] of COUNT_METRICS){
+      const saved=record.metricsAvailable!==false && Number.isFinite(record.stats?.[key]) ? record.stats[key] : null;
+      counts.appendChild(row(byId.get(id) || {id,status:saved===null?'unavailable':'available',value:saved,unit:'occurrences',reason:'local-stats-unavailable'},label));
+    }
+    root.append(counts,node('p','metric-count-note','词表命中次数，需结合原文判断是否影响表达。'));
+    if(evidenceRun && evidenceRun.value?.status!=='completed')root.appendChild(node('p','metric-availability',`语音区间暂不可用：${reasonText(evidenceRun.value?.reason)}。词语统计仍可查看。`));
+    const more=node('details','metric-details');more.id='report-more-metrics';more.appendChild(node('summary',null,'更多指标'));
+    const groups=node('div','metric-groups');
+    const layouts=[
+      ['词语与速率',[
+        ['text-rate-per-recorded-minute','录音平均字数'],['filler-rate-per-recorded-minute','填充词频率'],
+        ['hedge-character-percent','犹豫词字符占比'],['non-filler-hedge-character-percent','剩余字符占比']],
+        '录音速率含静音；剩余字符占比排除填充词与犹豫词，不是质量评分。'],
+      ['语音区间 · 模型估计',[
+        ['speech-duration-ms','语音时长'],['non-speech-duration-ms','非语音时长'],['between-speech-gap-count','区间间隔'],
+        ['between-speech-gap-total-ms','间隔合计'],['between-speech-gap-max-ms','最长间隔'],['text-rate-per-speech-minute','语音分钟字数']],
+        '仅供核对，不能单凭数值判断语速或停顿是否合适。']];
+    for(const [title,entries,note] of layouts){
+      const selected=entries.filter(([id])=>byId.has(id));if(!selected.length)continue;
+      const group=node('section','metric-group'),list=node('dl','metric-list');group.appendChild(node('h3',null,title));
+      for(const [id,label] of selected)list.appendChild(row(byId.get(id),label));
+      group.append(list,node('p','metric-group-note',note));groups.appendChild(group);
+    }
+    const extra=metrics.filter(metric=>!rendered.has(metric.id));
+    if(extra.length){const group=node('section','metric-group'),list=node('dl','metric-list');group.appendChild(node('h3',null,'其他已保存指标'));for(const metric of extra)list.appendChild(row(metric));group.appendChild(list);groups.appendChild(group);}
+    more.appendChild(groups);more.hidden=!groups.children.length;root.appendChild(more);
+    const source=node('details','metric-source-details');source.id='report-metric-source';source.appendChild(node('summary',null,'分析说明'));
+    const explanations=node('dl','metric-source-list');
+    const asr=record.sourceSnapshot?.asr;
+    for(const [label,copy] of [
+      ['词语命中','沿用本次保存的词表统计。正常用词也可能命中，次数不等于问题数量。未提供的指标显示为“暂不可用”，不记作 0。'],
+      ['字数与速率','字数只计文字和数字，不含标点、空白。录音平均字数与填充词频率按整段录音时长计算，包含静音。'],
+      ['剩余字符','从总字数中排除填充词和犹豫词字符，同一字符只扣除一次，再计算剩余占比。对应原“表达密度”。'],
+      ['语音估计','短停顿可能合并，尚未完成代表性标注校准。区间间隔只计相邻语音区间之间的间隔；语音分钟字数依赖检测区间，不是逐字对齐的语速。'],
+      ['识别来源',asr?.modelName || asr?.provider || asr?.modelId || '来源信息不可用']]){
+      const entry=node('div');entry.append(node('dt',null,label),node('dd',null,copy));explanations.appendChild(entry);
+    }
+    source.appendChild(explanations);root.appendChild(source);return root;
+  }
+
   function renderStructuredReport(container,projection,{onEvidence,onPractice,onOpen,onLayout,record,api,segments = []} = {}) {
     container.replaceChildren();
     if (!projection) return;
@@ -64,29 +130,8 @@
     const metricById = new Map(metrics.map(metric => [metric.id,metric]));
     const segmentById = new Map(segments.map(segment => [segment.id,segment]));
     const speechById = new Map((evidenceRun.value?.segments || []).map(segment => [segment.id,segment]));
-    const metricDetails = element('details','metric-details');
-    metricDetails.appendChild(element('summary',null,'详细本地指标'));
-    const table = element('table','metric-table');
-    table.appendChild(element('caption',null,'确定性本地指标'));
-    const heading = element('thead');
-    const headers = element('tr');
-    for (const label of ['指标','数值','说明']) {
-      const cell = element('th',null,label);cell.setAttribute('scope','col');headers.appendChild(cell);
-    }
-    heading.appendChild(headers);table.appendChild(heading);
-    const body = element('tbody');
-    function formattedMetric(metric) {
-      if (metric.status !== 'available' || !Number.isFinite(metric.value)) return '未知';
-      return `${Number(metric.value.toFixed(2))} ${UNITS[metric.unit] ?? metric.unit}`;
-    }
-    for (const metric of metrics) {
-      const row = element('tr');row.id = `metric:${metric.id}`;
-      const label = element('th',null,metric.label);label.setAttribute('scope','row');
-      row.append(label,element('td',null,formattedMetric(metric)),
-        element('td',null,metric.status === 'available' && Number.isFinite(metric.value) ? '确定性计算' : reasonText(metric.reason)));
-      body.appendChild(row);
-    }
-    table.appendChild(body);metricDetails.appendChild(table);
+    const metricContent=createReportMetrics(document,{metrics,record,evidenceRun});
+    const metricDetails=metricContent.querySelector('details');
 
     let findingIndex=0;
     function findingCard(finding) {
@@ -112,7 +157,7 @@
         button.type = 'button';
         button.setAttribute('data-evidence-ref',ref);
         button.addEventListener('click',() => {
-          if (metric) metricDetails.open = true;
+          if (metric && !BASIC_METRICS.includes(metric.id) && !COUNT_METRICS.some(([id])=>id===metric.id)) metricDetails.open = true;
           if (typeof onEvidence === 'function') onEvidence(ref);
         });
         const block=element('div','evidence-block');
@@ -162,13 +207,10 @@
         root.appendChild(element('p','report-empty-state','本次分析未形成有充分证据的改善建议。'));
       }
     }
-    root.appendChild(metricDetails);
-    root.appendChild(element('p','report-limitations',evidenceRun.value?.status === 'completed'
-      ? '语音区间为模型估计，短停顿可能合并；尚未完成代表性标注校准。'
-      : `语音活动分析暂不可用：${reasonText(evidenceRun.value?.reason)}。相关指标显示未知。`));
+    root.appendChild(metricContent);
     container.appendChild(root);
     return dispose;
   }
 
-  return {selectStructuredReport,renderStructuredReport};
+  return {selectStructuredReport,renderStructuredReport,createReportMetrics};
 });

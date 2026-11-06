@@ -65,7 +65,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   assert.equal(calls.llmDiagnosis,1);assert.equal((await invoke('getAiDisclosureState',{})).required,false);
   assert.equal((await invoke('getAiDisclosureState',{})).profile.autoDiagnosisEnabled,automatic,'notice does not change auto switch');
   const original=await session(id),records=[{id,framework:null}];
-  await click('btn-report');await wait('covered repeat finishes',`!${trainer}.trainingRecords.selected().reportPending`);
+  assert.equal(await evaluate(`document.getElementById('report-analysis-actions').hidden`),true,'complete report has no retry action');
   assert.equal(await evaluate(modal),false);assert.equal(calls.llmDiagnosis,1,'complete history keeps existing reanalysis policy');
   await evaluate(`document.getElementById('report-information').open=true;document.getElementById('report-materials').open=true;document.querySelector('.finding-evidence-toggle').click()`);
   assert.equal(await evaluate(`document.querySelector('.finding-details').open`),true);

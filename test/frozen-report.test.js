@@ -48,6 +48,18 @@ test('failed persistence or transcription is visibly distinct from a successful 
   assert.equal(reportModel(record).summary,null);
 });
 
+test('diagnosis actions appear only for missing, partial or pending analysis, never normal complete or insufficient reports',()=>{
+  const record={structuredReport:{snapshot:{value:{availability:'complete'}},analysisRun:{status:'completed',value:{summary:'已保存摘要'}}}};
+  assert.equal(reportModel(record).analysisAction.visible,false);
+  record.structuredReport.snapshot.value.availability='partial';
+  assert.deepEqual(reportModel(record).analysisAction,{visible:true,label:'重试诊断'});
+  record.reportPending=true;assert.equal(reportModel(record).analysisAction.label,'分析中…');
+  record.reportPending=false;record.structuredReport.analysisRun={status:'unavailable',value:{reason:'not-enabled'}};
+  assert.deepEqual(reportModel(record).analysisAction,{visible:true,label:'分析这一次'});
+  record.structuredReport.analysisRun={status:'completed',value:{assessment:{status:'insufficient',reason:'试音'}}};
+  assert.equal(reportModel(record).analysisAction.visible,false);
+});
+
 test('moved report controls survive the same projection but cannot leak to another record or projection', () => {
   const makeNode=(className='')=>({className,children:[],textContent:'',dataset:{},setAttribute(){},
     append(...nodes){for(const child of nodes){child.remove?.();this.children.push(child);child.parent=this;}},
@@ -58,17 +70,17 @@ test('moved report controls survive the same projection but cannot leak to anoth
   const nodes=new Map(['report-summary-copy','report-summary-metrics','report-analysis-info','report-body','subtitle-container','record-identity'].map(id=>[id,makeNode()]));
   const document={getElementById:id=>nodes.get(id),createElement:()=>makeNode()};
   const body=nodes.get('report-body'),info=nodes.get('report-analysis-info');
-  const root=makeNode('structured-report'),control=makeNode('report-limitations'),metric=makeNode('metric-details');
-  root.append(control,metric);body.append(root);
+  const root=makeNode('structured-report'),control=makeNode('report-metrics'),metric=makeNode('metric-details');
+  control.append(metric);root.append(control);body.append(root);
   const a={id:'A',createdAt:'2026-10-11',segments:[],structuredReport:{analysisRun:{status:'unavailable',value:{reason:'not-enabled'}}}};
-  present(document,a);assert.equal(info.querySelector('.report-limitations'),control);
-  present(document,a);assert.equal(info.querySelector('.report-limitations'),control,'same projection retains its actual control and listeners');
+  present(document,a);assert.equal(info.querySelector('.report-metrics'),control);
+  present(document,a);assert.equal(info.querySelector('.report-metrics'),control,'same projection retains its actual control and listeners');
   body.replaceChildren();
   present(document,{id:'B',createdAt:'2026-10-11',segments:[]});
-  assert.equal(info.querySelector('.report-limitations'),null,'another legacy record must not show or operate on A');
+  assert.equal(info.querySelector('.report-metrics'),null,'another legacy record must not show or operate on A');
   assert.equal(info.querySelector('.metric-details'),null);
-  root.append(control,metric);body.append(root);present(document,a);
+  control.append(metric);root.append(control);body.append(root);present(document,a);
   body.replaceChildren(makeNode('structured-report'));
   present(document,{...a,structuredReport:{analysisRun:{status:'unavailable',value:{reason:'evidence'}}}});
-  assert.equal(info.querySelector('.report-limitations'),null,'a new projection cannot inherit stale controls');
+  assert.equal(info.querySelector('.report-metrics'),null,'a new projection cannot inherit stale controls');
 });
