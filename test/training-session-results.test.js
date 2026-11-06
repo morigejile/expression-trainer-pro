@@ -103,6 +103,7 @@ test('E06 findings in the current format pass HTTP and reopened SQLite without r
   const input=require('../scripts/evaluate-problem-library').buildCases()[5].context;
   const raw=require('../benchmark/prompt-evaluation/problem-library-v03/refined/actual-results.json').cases.find(x=>x.id==='E06').outputs.new.raw;
   const data=JSON.parse(raw);delete data.frameworkSummary;for(const finding of [...data.findings,...data.frameworkFindings]){delete finding.example;delete finding.exampleEvidenceRefs;}
+  data.findingOrder=[...data.frameworkFindings,...data.findings].map(f=>f.id);
   const currentRaw=JSON.stringify(data);
   const {id}=store.create({...start(),trainingMode:'structured',framework:'star',frameworkDefinitionVersion:'star-v1'});
   const complete=completion();complete.transcript={text:input.transcript.segments.map(x=>x.text).join(''),segments:input.transcript.segments};
@@ -121,6 +122,7 @@ test('E06 findings in the current format pass HTTP and reopened SQLite without r
   assert.equal(diagnosis.status,'completed');assert.equal(Object.hasOwn(diagnosis.value,'frameworkRecommendation'),false);
   assert.equal(Object.hasOwn(diagnosis.provenance,'responseNormalization'),false);
   assert.equal(diagnosis.value.findings.length,2);assert.equal(diagnosis.value.frameworkAnalysis.findings.length,2);
+  assert.deepEqual(diagnosis.value.findingOrder,data.findingOrder);
   assert.deepEqual(record.transcript,before.transcript);
 });
 

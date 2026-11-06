@@ -26,7 +26,7 @@ afterEach(() => {
 });
 
 function diagnosisJson(summary) {
-  return JSON.stringify({schemaVersion:1,summary,assessment:{status:'analyzable',reason:'有表达内容',categories:['argument'],frameworkAssessable:false,evidenceRefs:['segment-1']},findings:[],frameworkFindings:[]});
+  return JSON.stringify({schemaVersion:1,summary,assessment:{status:'analyzable',reason:'有表达内容',categories:['argument'],frameworkAssessable:false,evidenceRefs:['segment-1']},findings:[],frameworkFindings:[],findingOrder:[]});
 }
 async function diagnoseText(text,settings,_unused,options) {
   const context={schemaVersion:1,allowedEvidenceRefs:['segment-1'],transcript:{segments:[{id:'segment-1',text}]},trainingContext:{trainingMode:'free'}};

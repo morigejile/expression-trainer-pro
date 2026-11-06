@@ -109,6 +109,7 @@ const fakeLlm = {
         reason:previous && current?'受控用例两侧有对应目标的转写。':'来源证据不可用。'};
     }
     const {frameworkAnalysis,...wire}=data;
+    wire.findingOrder=[...(frameworkAnalysis?.findings || []),...data.findings].map(finding=>finding.id);
     return parseStructuredDiagnosisResponse(JSON.stringify({...wire,frameworkFindings:frameworkAnalysis?.findings || []}),context,{requireAssessment:true,currentFormat:true});
   },
   createRequestCoordinator,

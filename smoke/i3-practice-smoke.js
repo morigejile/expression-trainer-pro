@@ -2,7 +2,7 @@
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
-const {selectStructuredReport} = require('../shared/report-selection');
+const {selectStructuredReport,getOrderedFindings} = require('../shared/report-selection');
 
 async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capture,
   saveProfile,recordOnce,openHistory,aiCalls,choose,setCustom}) {
@@ -40,7 +40,9 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     assert.equal(await evaluate(`document.querySelector('.round-action .practice-start').textContent`),'重新练习');
     assert.equal(await evaluate(`(()=>{const s=document.querySelector('.practice-result'),e=s.querySelector('.practice-evidence'),h=s.querySelector('.practice-history'),a=s.querySelector('.round-action');return Boolean((e.compareDocumentPosition(h)&Node.DOCUMENT_POSITION_FOLLOWING)&&(h.compareDocumentPosition(a)&Node.DOCUMENT_POSITION_FOLLOWING));})()`),true,
       'same-goal action follows evidence and history inside the top result area');
-    const findings=[...report(saved).analysisRun.value.findings,...(report(saved).analysisRun.value.frameworkAnalysis?.findings || [])];
+    const findings=getOrderedFindings(report(saved).analysisRun.value);
+    assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('#report-body [data-finding-id]'),node=>node.dataset.findingId)`),findings.map(finding=>finding.id),
+      'report DOM follows the saved cross-group order, including after restart');
     assert.equal(await evaluate(`document.querySelectorAll('#report-body .finding-evidence-toggle').length`),findings.length,
       'current Findings retain Frozen disclosure and explicit new-goal actions');
     if(findings.length){
@@ -69,7 +71,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     assert.equal(setup.trainingMode,before.trainingMode); assert.equal(setup.framework,before.framework || 'free');
     const focus = await evaluate(`document.getElementById('training-practice-focus').textContent`);
     assert.ok(focus.includes(continuing ? before.practice.goal.observation
-      : [...report(before).analysisRun.value.findings,...(report(before).analysisRun.value.frameworkAnalysis?.findings || [])][index].observation));
+      : getOrderedFindings(report(before).analysisRun.value)[index].observation));
     assert.ok(focus.includes('重新讲完整表达')); await disclosure(); assert.deepEqual(aiCalls(),beforeCalls);
     return setup;
   };
@@ -199,7 +201,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   await startPractice({index:1});
   const eId = await recordOnce(d.trainingPrompt,{practice:true}); const e = await assertPracticeReport(eId,2); await assertFeedback(e);
   assert.notEqual(e.practice.chainId,d.practice.chainId); assert.equal(e.practice.origin.sessionId,dId);
-  const selectedFinding=[...report(d).analysisRun.value.findings,...(report(d).analysisRun.value.frameworkAnalysis?.findings || [])][1];
+  const selectedFinding=getOrderedFindings(report(d).analysisRun.value)[1];
   assert.equal(e.practice.origin.findingId,selectedFinding.id); assert.deepEqual(e.practice.history,[{sessionId:dId,reportId:report(d).snapshot.id,round:1}]);
   assert.deepEqual(immutable(await session(dId)),immutable(d));
   const listed = (await invoke('listTrainingSessions',{requestId:'i3-no-duplicate-basis'})).value;

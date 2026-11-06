@@ -13,6 +13,15 @@
     ['id','observation','recommendation'].every(key => typeof value[key] === 'string') &&
     (!Object.hasOwn(value,'interpretation') || typeof value.interpretation==='string' && Boolean(value.interpretation.trim()) && value.interpretation.length<=1200) &&
     refs(value.evidenceRefs) && exampleValid(value);
+  function getOrderedFindings(value) {
+    const findings=[...value.findings,...(value.frameworkAnalysis?.findings || [])];
+    if (!Object.hasOwn(value,'findingOrder')) return findings;
+    const order=value.findingOrder;
+    if (!refs(order) || order.length!==findings.length || new Set(order).size!==order.length) return null;
+    const byId=new Map(findings.map(finding=>[finding?.id,finding]));
+    if (byId.size!==findings.length || order.some(id=>!byId.has(id))) return null;
+    return order.map(id=>byId.get(id));
+  }
   function assessmentValid(value) {
     const a=value.assessment;
     if (a===undefined) return true;
@@ -76,7 +85,7 @@
           metricRun.value.speechEvidenceRunId !== evidenceRunId ||
           analysisRun.value?.schemaVersion !== 1 || !Array.isArray(analysisRun.value.findings) ||
           analysisRun.value.speechEvidenceRunId !== evidenceRunId || analysisRun.value.metricRunId !== metricRunId) continue;
-      if (!extensionsValid(analysisRun.value)) continue;
+      if (!extensionsValid(analysisRun.value) || !getOrderedFindings(analysisRun.value)) continue;
       if (analysisRun.status === 'completed' && (typeof analysisRun.value.summary !== 'string' ||
           analysisRun.value.findings.some(finding => !finding || !Object.hasOwn(CATEGORIES,finding.category) ||
             ['observation','recommendation'].some(key => typeof finding[key] !== 'string') ||
@@ -94,5 +103,5 @@
     }};
   }
 
-  return {selectStructuredReport,CATEGORIES};
+  return {selectStructuredReport,getOrderedFindings,CATEGORIES};
 });

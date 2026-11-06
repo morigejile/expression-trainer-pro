@@ -5,7 +5,7 @@
 })(typeof globalThis !== 'undefined' ? globalThis : this,() => {
   'use strict';
 
-  const {selectStructuredReport,CATEGORIES} = typeof module === 'object' && module.exports
+  const {selectStructuredReport,getOrderedFindings,CATEGORIES} = typeof module === 'object' && module.exports
     ? require('../shared/report-selection') : globalThis.ReportSelection;
   const REASONS = {
     'not-configured':'尚未配置 AI 服务，可在设置中添加配置后重试',
@@ -144,10 +144,9 @@
       return card;
     }
     if (successful && !insufficient) {
-      const framework = analysisRun.value.frameworkAnalysis;
-      const findings = [...analysisRun.value.findings,...(framework?.findings || [])];
+      const findings = getOrderedFindings(analysisRun.value);
       const priorityCount=1;
-      root.appendChild(element('h2',null,'优先改善'));
+      root.appendChild(element('h2',null,analysisRun.value.findingOrder?'优先改善':'发现的问题'));
       for (const finding of findings.slice(0,priorityCount)) root.appendChild(findingCard(finding));
       if (findings.length > priorityCount) {
         const more = element('details','more-findings report-disclosure');

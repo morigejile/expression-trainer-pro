@@ -53,6 +53,8 @@ async function fixture(t, provider = 'custom', {speechAvailable=false,framework=
       diagnosis.summary='本次材料不足以形成表达诊断。';diagnosis.findings=[];
       diagnosis.frameworkFindings=[];
     }
+    diagnosis.findingOrder=[...diagnosis.frameworkFindings,...diagnosis.findings].map(f=>f.id);
+    if (responseMode==='invalid-order') diagnosis.findingOrder=['unknown'];
     response.writeHead(200, {'Content-Type':'application/json'});
     response.end(JSON.stringify({choices:[{message:{content:JSON.stringify(diagnosis)}}]}));
   });
@@ -136,10 +138,26 @@ for(const framework of ['prep','star','pyramid'])test(`${framework} diagnosis pe
   assert.equal(Object.hasOwn(report.analysisRun.value.findings[0],'interpretation'),false);
   assert.equal(report.analysisRun.value.frameworkAnalysis.findings.length,1);
   assert.deepEqual(report.analysisRun.value.frameworkAnalysis.findings[0].evidenceRefs,['segment-1']);
+  assert.deepEqual(report.analysisRun.value.findingOrder,['framework-1','finding-1']);
   await f.app.close();
   const restored=(await f.command('get',{},f.open())).value;
   assert.deepEqual(restored.results,saved.results);assert.ok(selectStructuredReport(restored.results));
+  assert.deepEqual(require('../shared/report-selection').getOrderedFindings(selectStructuredReport(restored.results).analysisRun.value).map(f=>f.id),['framework-1','finding-1']);
   assert.equal(f.received.length,1);
+});
+
+test('invalid cross-group order fails without hiding the saved report or dispatching a repair request',async t=>{
+  const f=await fixture(t,'custom',{framework:'prep'}),saved=await f.complete();
+  const original=selectStructuredReport(saved.results);
+  f.mode('invalid-order');await f.command('analyze',{retry:true});
+  const failed=(await f.command('get')).value,selected=selectStructuredReport(failed.results);
+  assert.equal(selected.analysisRun.id,original.analysisRun.id);
+  assert.equal(selected.latestAttempt.reason,'invalid-response');
+  assert.deepEqual(selected.analysisRun.value.findingOrder,['framework-1','finding-1']);
+  assert.equal(f.received.length,2,'one request per explicit attempt, without a repair call');
+  await f.app.close();
+  const restored=(await f.command('get',{},f.open())).value;
+  assert.deepEqual(restored.results,failed.results);
 });
 
 test('speech, metric and Finding evidence keep exact run ownership through HTTP and restart',async t=>{
@@ -158,7 +176,7 @@ test('speech, metric and Finding evidence keep exact run ownership through HTTP 
   for (const ref of finding.evidenceRefs) assert.ok(Object.hasOwn(context.evidenceMap,ref));
   assert.deepEqual(context.quality.vad,{status:'degraded',reasons:['vad-thresholds-uncalibrated']});
   assert.equal(report.analysisRun.provenance.profileId,'approved');
-  assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v11');
+  assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v12');
   assert.equal(report.analysisRun.provenance.problemLibraryVersion,'expression-problem-library-v0.4');
   assert.equal((await f.command('analyze',{retry:true})).value.id,report.snapshot.id,'complete report is not reanalyzed');
   await f.app.close();

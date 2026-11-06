@@ -44,6 +44,34 @@ function runs(suffix = '1', {status = 'completed', reason = null, findings = 1} 
   return [evidence,metrics,diagnosis,report];
 }
 
+test('saved cross-group order controls the first finding, More order and practice target without mutating the snapshot',()=>{
+  const source=runs('1',{findings:2}),value=source[2].value;
+  value.frameworkAnalysis={framework:'prep',definitionVersion:'prep-v1',findings:[
+    {...value.findings[0],id:'framework-1',observation:'专项优先问题'}]};
+  const legacy=container();api().renderStructuredReport(legacy,api().selectStructuredReport(source));
+  assert.deepEqual(byClass(legacy,'finding-observation').map(node=>node.textContent),['观察 0','观察 1','专项优先问题']);
+  assert.match(legacy.textContent,/发现的问题/);assert.doesNotMatch(legacy.textContent,/优先改善/);
+  value.findingOrder=['framework-1',value.findings[1].id,value.findings[0].id];
+  const before=JSON.stringify(source),target=container(),practiced=[];
+  api().renderStructuredReport(target,api().selectStructuredReport(source),{onPractice:finding=>practiced.push(finding.id)});
+  assert.deepEqual(byClass(target,'finding-observation').map(node=>node.textContent),['专项优先问题','观察 1','观察 0']);
+  assert.match(target.textContent,/优先改善/);
+  assert.equal(byClass(target,'more-findings')[0].open,false);
+  byClass(target,'practice-start')[0].click();assert.deepEqual(practiced,['framework-1']);
+  assert.equal(JSON.stringify(source),before);
+});
+
+test('invalid saved finding orders cannot replace an earlier readable report; legacy order stays unchanged',()=>{
+  const legacy=runs('1',{findings:2}),latest=runs('2',{findings:2});
+  for(const order of [null,[],['finding-2-0'],['finding-2-0','finding-2-0'],['finding-2-0','unknown']]){
+    latest[2].value.findingOrder=order;
+    assert.equal(api().selectStructuredReport([...legacy,...latest]).snapshot.id,legacy[3].id);
+    assert.equal(api().selectStructuredReport(latest),null);
+  }
+  const target=container();api().renderStructuredReport(target,api().selectStructuredReport(legacy));
+  assert.deepEqual(byClass(target,'finding-observation').map(node=>node.textContent),['观察 0','观察 1']);
+});
+
 class Node {
   constructor(document,tagName = '',data = '') {
     this.ownerDocument = document;this.tagName = tagName.toUpperCase();this.data = data;
