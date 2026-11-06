@@ -97,7 +97,7 @@
       details.appendChild(summary);
       card.className+=' frozen-finding';
       const row=element('div','finding-row');row.appendChild(element('span','finding-index',String(++findingIndex).padStart(2,'0')));
-      row.appendChild(element('p','finding-category',`问题语义类型：${CATEGORIES[finding.category]}`));
+      row.appendChild(element('p','finding-category',`问题与类型：${CATEGORIES[finding.category]}`));
       const title=element('div');title.appendChild(element('h3','finding-observation',finding.observation));
       details.id=`finding-detail-${finding.id}`;
       details.addEventListener('toggle',()=>{summary.textContent=details.open?'收起证据':'查看证据';});
@@ -150,7 +150,7 @@
     if (successful && !insufficient) {
       const findings = getOrderedFindings(analysisRun.value);
       const priorityCount=1;
-      root.appendChild(element('h2',null,analysisRun.value.findingOrder?'优先改善':'发现的问题'));
+      root.appendChild(element('h2',null,'改进建议'));
       for (const finding of findings.slice(0,priorityCount)) root.appendChild(findingCard(finding));
       if (findings.length > priorityCount) {
         const more = element('details','more-findings report-disclosure');

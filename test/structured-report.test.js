@@ -51,12 +51,12 @@ test('saved cross-group order controls the first finding, More order and practic
     {...value.findings[0],id:'framework-1',observation:'专项优先问题'}]};
   const legacy=container();api().renderStructuredReport(legacy,api().selectStructuredReport(source));
   assert.deepEqual(byClass(legacy,'finding-observation').map(node=>node.textContent),['观察 0','观察 1','专项优先问题']);
-  assert.match(legacy.textContent,/发现的问题/);assert.doesNotMatch(legacy.textContent,/优先改善/);
+  assert.match(legacy.textContent,/改进建议/);assert.doesNotMatch(legacy.textContent,/发现的问题|优先改善/);
   value.findingOrder=['framework-1',value.findings[1].id,value.findings[0].id];
   const before=JSON.stringify(source),target=container(),practiced=[];
   api().renderStructuredReport(target,api().selectStructuredReport(source),{onPractice:finding=>practiced.push(finding.id)});
   assert.deepEqual(byClass(target,'finding-observation').map(node=>node.textContent),['专项优先问题','观察 1','观察 0']);
-  assert.match(target.textContent,/优先改善/);
+  assert.match(target.textContent,/改进建议/);
   assert.equal(byClass(target,'more-findings')[0].open,false);
   byClass(target,'practice-start')[0].click();assert.deepEqual(practiced,['framework-1']);
   assert.equal(JSON.stringify(source),before);
@@ -114,7 +114,7 @@ test('an insufficient saved report keeps local measurements without problem, fra
   assert.equal(byClass(target,'finding').length,0);
   assert.equal(byClass(target,'framework-reanalysis').length,0);
   assert.equal(byClass(target,'practice-start').length,0);
-  assert.doesNotMatch(target.textContent,/优先改善|本次分析未形成有充分证据的改善建议/);
+  assert.doesNotMatch(target.textContent,/改进建议|本次分析未形成有充分证据的改善建议/);
 });
 
 test('a saved assessment cannot admit contradictory Findings or replace a valid legacy snapshot', () => {
@@ -190,7 +190,7 @@ test('frozen finding practice stays outside collapsed evidence and evidence acti
   const guidance=byClass(card,'finding-guidance')[0],practice=byClass(guidance,'practice-start')[0];
   assert.ok(practice);assert.ok(byClass(guidance,'finding-details').includes(details));
   assert.equal(byClass(guidance,'finding-actions').length,1);
-  assert.equal(byClass(card,'finding-category')[0].textContent,'问题语义类型：组织与衔接');
+  assert.equal(byClass(card,'finding-category')[0].textContent,'问题与类型：组织与衔接');
   practice.click();assert.equal(practiced[0][1],'full');
   const blocks=byClass(card,'evidence-block');assert.equal(blocks.length,3);
   for(const block of blocks){
@@ -220,7 +220,7 @@ test('optional explanations use a compact labeled row without inventing missing 
       assert.equal(byClass(why[0],'finding-interpretation')[0].textContent,'解释 0');
     }else assert.doesNotMatch(target.textContent,/为什么值得练/);
     assert.equal(byClass(target,'finding-practice-guidance').length,1);
-    assert.equal(byClass(target,'finding-category')[0].textContent,'问题语义类型：组织与衔接');
+    assert.equal(byClass(target,'finding-category')[0].textContent,'问题与类型：组织与衔接');
   }
 });
 
