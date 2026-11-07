@@ -22,9 +22,10 @@ async function run({mainWindow,evaluate,wait,click,capture}){
   try{
     await wait('synthetic WAV metadata and seek controls ready',`document.getElementById('recording-player').duration===120 && !document.getElementById('playback-forward').disabled`);
     await click('#playback-forward');
+    await wait('native audio seeks forward five seconds',`document.getElementById('recording-player').currentTime===5`);
     assert.equal(await evaluate(`document.getElementById('recording-player').currentTime`),5);
     assert.equal(await evaluate(`document.getElementById('recording-player').paused`),true);
-    await click('#playback-backward');assert.equal(await evaluate(`document.getElementById('recording-player').currentTime`),0);
+    await click('#playback-backward');await wait('native audio seeks back to the beginning',`document.getElementById('recording-player').currentTime===0`);
     await evaluate(`(()=>{const seek=document.getElementById('playback-seek');seek.value=60;seek.dispatchEvent(new Event('input',{bubbles:true}));})()`);
     await wait('saved segment selected at 60 seconds',`document.querySelector('.playback-segment.is-current')?.dataset.segmentId==='playback-smoke-30'`);
     await click('#playback-toggle');await wait('native audio advances',`document.getElementById('recording-player').currentTime>60.2`);
@@ -63,7 +64,11 @@ async function run({mainWindow,evaluate,wait,click,capture}){
         const layout=await evaluate(`(()=>{
           const region=document.getElementById('report-scroll'),toolbar=document.getElementById('report-audio'),heading=document.getElementById('report-materials-heading'),seek=document.getElementById('playback-seek'),actions=document.querySelector('.playback-actions'),controls=document.querySelector('.playback-toolbar');
           const rect=node=>{const r=node.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,height:r.height,width:r.width};};
-          return {viewport:innerWidth,page:document.documentElement.scrollWidth,region:rect(region),toolbar:rect(toolbar),heading:rect(heading),rail:rect(seek),actions:rect(actions),controls:rect(controls),timeline:rect(document.querySelector('.playback-timeline')),times:rect(document.querySelector('.playback-time')),volume:rect(document.querySelector('.playback-sound')),follow:rect(document.querySelector('.playback-follow-label')),speed:rect(document.querySelector('.playback-speed-label')),
+          const follow=document.querySelector('.playback-follow-label'),speed=document.querySelector('.playback-speed-label'),row=document.querySelector('.playback-segment-button'),text=document.querySelector('.playback-segment-text');
+          return {viewport:innerWidth,page:document.documentElement.scrollWidth,region:rect(region),toolbar:rect(toolbar),heading:rect(heading),rail:rect(seek),actions:rect(actions),controls:rect(controls),timeline:rect(document.querySelector('.playback-timeline')),times:rect(document.querySelector('.playback-time')),volume:rect(document.querySelector('.playback-sound')),follow:rect(follow),speed:rect(speed),
+            timeGap:rect(document.getElementById('playback-duration')).left-rect(document.getElementById('playback-current-time')).right,timeText:document.querySelector('.playback-time').textContent,
+            followGap:rect(document.getElementById('playback-follow')).left-rect(follow.querySelector('span')).right,speedGap:rect(document.getElementById('playback-speed')).left-rect(speed.querySelector('span')).right,
+            rowPadding:parseFloat(getComputedStyle(row).paddingTop),textLeading:parseFloat(getComputedStyle(text).lineHeight)/parseFloat(getComputedStyle(text).fontSize),
             fits:[...document.querySelectorAll('.playback-toolbar button,.playback-toolbar input,.playback-toolbar select,.playback-follow-label,#playback-return')].filter(node=>node.checkVisibility()).every(node=>{const r=node.getBoundingClientRect(),p=region.getBoundingClientRect();return r.left>=p.left&&r.right<=p.right;}),
             surface:getComputedStyle(toolbar).backgroundColor,headerSurface:getComputedStyle(heading).backgroundColor,
             currentShadow:getComputedStyle(document.querySelector('.playback-segment.is-current button')).boxShadow,
@@ -80,6 +85,11 @@ async function run({mainWindow,evaluate,wait,click,capture}){
         assert.ok(Math.abs(layout.controls.right-layout.controls.left-248)<2,'accepted 248px control width');
         assert.ok(Math.abs(center(layout.rail)-center(layout.volume))<2&&Math.abs(center(layout.volume)-center(layout.follow))<2,'volume and follow align with the progress bar');
         assert.ok(Math.abs(center(layout.times)-center(layout.actions))<2&&Math.abs(center(layout.actions)-center(layout.speed))<2,'transport and speed align with the times');
+        assert.match(layout.timeText,/\d{2}:\d{2}\s*\/\s*02:00/,'elapsed and total time are combined');
+        assert.ok(layout.timeGap>0&&layout.timeGap<28,'combined times stay adjacent on a wide rail');
+        assert.ok(Math.abs(layout.followGap-8)<1&&Math.abs(layout.speedGap-8)<1,'setting labels stay close to their controls');
+        assert.equal(layout.rowPadding,6,'transcript rows use compact vertical padding');
+        assert.ok(layout.textLeading>=1.7,'multi-line transcript keeps readable line height');
         assert.ok(layout.actions.top>=layout.volume.bottom&&layout.speed.top>=layout.follow.bottom,'playback and speed stay below volume and follow');
         assert.equal(layout.currentShadow,'none','current transcript has no dark vertical inset');
         assert.ok(layout.clip>0,'scrolled transcript is clipped underneath the transparent controls');
