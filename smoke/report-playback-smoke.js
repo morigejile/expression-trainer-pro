@@ -66,8 +66,9 @@ async function run({mainWindow,evaluate,wait,click,capture}){
           const rect=node=>{const r=node.getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,height:r.height,width:r.width};};
           const follow=document.querySelector('.playback-follow-label'),speed=document.querySelector('.playback-speed-label'),row=document.querySelector('.playback-segment-button'),text=document.querySelector('.playback-segment-text');
           return {viewport:innerWidth,page:document.documentElement.scrollWidth,region:rect(region),toolbar:rect(toolbar),heading:rect(heading),rail:rect(seek),actions:rect(actions),controls:rect(controls),timeline:rect(document.querySelector('.playback-timeline')),times:rect(document.querySelector('.playback-time')),volume:rect(document.querySelector('.playback-sound')),follow:rect(follow),speed:rect(speed),
+            volumeRail:rect(document.getElementById('playback-volume')),mute:rect(document.getElementById('playback-mute')),back:rect(document.getElementById('playback-backward')),play:rect(document.getElementById('playback-toggle')),forward:rect(document.getElementById('playback-forward')),
             timeGap:rect(document.getElementById('playback-duration')).left-rect(document.getElementById('playback-current-time')).right,timeText:document.querySelector('.playback-time').textContent,
-            followGap:rect(document.getElementById('playback-follow')).left-rect(follow.querySelector('span')).right,speedGap:rect(document.getElementById('playback-speed')).left-rect(speed.querySelector('span')).right,
+            followGap:rect(document.getElementById('playback-follow')).left-rect(follow.querySelector('span')).right,speedLabel:speed.querySelector('span')?.textContent||'',speedOptions:[...document.getElementById('playback-speed').options].map(option=>option.value),
             rowPadding:parseFloat(getComputedStyle(row).paddingTop),textLeading:parseFloat(getComputedStyle(text).lineHeight)/parseFloat(getComputedStyle(text).fontSize),
             fits:[...document.querySelectorAll('.playback-toolbar button,.playback-toolbar input,.playback-toolbar select,.playback-follow-label,#playback-return')].filter(node=>node.checkVisibility()).every(node=>{const r=node.getBoundingClientRect(),p=region.getBoundingClientRect();return r.left>=p.left&&r.right<=p.right;}),
             surface:getComputedStyle(toolbar).backgroundColor,headerSurface:getComputedStyle(heading).backgroundColor,
@@ -81,16 +82,23 @@ async function run({mainWindow,evaluate,wait,click,capture}){
         assert.equal(layout.surface,'rgba(0, 0, 0, 0)','controls expose the actual report material instead of painting a different surface');
         const center=rect=>rect.top+rect.height/2;
         assert.ok(layout.timeline.right<layout.controls.left&&layout.timeline.width>layout.controls.right-layout.controls.left,'wide progress area stays left of the compact controls');
-        assert.ok(Math.abs(layout.controls.left-layout.timeline.right-36)<2,'accepted 36px separation');
-        assert.ok(Math.abs(layout.controls.right-layout.controls.left-248)<2,'accepted 248px control width');
-        assert.ok(Math.abs(center(layout.rail)-center(layout.volume))<2&&Math.abs(center(layout.volume)-center(layout.follow))<2,'volume and follow align with the progress bar');
-        assert.ok(Math.abs(center(layout.times)-center(layout.actions))<2&&Math.abs(center(layout.actions)-center(layout.speed))<2,'transport and speed align with the times');
+        assert.ok(Math.abs(layout.controls.left-layout.timeline.right-28)<2,'accepted 28px separation');
+        assert.ok(Math.abs(layout.controls.width-200)<2,'accepted compact 200px control width');
+        assert.ok(Math.abs(center(layout.rail)-center(layout.volume))<2&&Math.abs(center(layout.volume)-center(layout.speed))<2,'volume and speed align with the progress bar');
+        assert.ok(Math.abs(center(layout.times)-center(layout.actions))<2&&Math.abs(center(layout.times)-center(layout.follow))<2,'transport and follow align with the times');
+        assert.ok(layout.follow.left>=layout.timeline.left&&layout.follow.right<=layout.timeline.right+1,'follow stays in the left progress area');
+        assert.ok(Math.abs(layout.mute.left-layout.back.left)<1,'upper and lower left controls share an edge');
+        assert.ok(Math.abs(layout.speed.right-layout.forward.right)<1,'upper and lower right controls share an edge');
+        assert.ok(Math.abs(layout.volumeRail.right-layout.play.right)<1,'volume rail ends at the play button right edge');
+        assert.ok(Math.abs((layout.play.left+layout.play.right)/2-(layout.controls.left+layout.controls.right)/2)<1,'play button stays centered in the right control module');
         assert.match(layout.timeText,/\d{2}:\d{2}\s*\/\s*02:00/,'elapsed and total time are combined');
         assert.ok(layout.timeGap>0&&layout.timeGap<28,'combined times stay adjacent on a wide rail');
-        assert.ok(Math.abs(layout.followGap-8)<1&&Math.abs(layout.speedGap-8)<1,'setting labels stay close to their controls');
+        assert.ok(Math.abs(layout.followGap-8)<1,'follow label stays close to its switch');
+        assert.equal(layout.speedLabel,'','speed dropdown has no redundant visible label');
+        assert.deepEqual(layout.speedOptions,['0.25','0.5','0.75','1','1.25','1.5','1.75','2'],'all playback speeds remain available');
         assert.equal(layout.rowPadding,6,'transcript rows use compact vertical padding');
         assert.ok(layout.textLeading>=1.7,'multi-line transcript keeps readable line height');
-        assert.ok(layout.actions.top>=layout.volume.bottom&&layout.speed.top>=layout.follow.bottom,'playback and speed stay below volume and follow');
+        assert.ok(layout.actions.top>=layout.volume.bottom&&layout.actions.top>=layout.speed.bottom,'transport stays below volume and speed');
         assert.equal(layout.currentShadow,'none','current transcript has no dark vertical inset');
         assert.ok(layout.clip>0,'scrolled transcript is clipped underneath the transparent controls');
         if(width===1280)await capture('playback-'+theme);

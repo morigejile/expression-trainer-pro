@@ -182,7 +182,7 @@ body[data-frozen-ui="report"] #report-materials>div{padding-top:0}
 body[data-frozen-ui="report"] #report-audio{position:sticky;top:44px;z-index:3;background:transparent}
 body[data-frozen-ui="report"] #report-transcript{clip-path:inset(var(--playback-transcript-clip,0px) 0 0)}
 body[data-frozen-ui="report"] #report-audio .playback-controls{display:block;margin:0 0 12px;padding:8px 0 10px;border:0;background:none;font-size:11px;color:var(--muted)}
-body[data-frozen-ui="report"] .playback-follow-controls{grid-column:2;grid-row:1;display:flex;align-items:center;font-size:12px;letter-spacing:normal}
+body[data-frozen-ui="report"] .playback-follow-controls{display:flex;align-items:center;font-size:12px;letter-spacing:normal}
 body[data-frozen-ui="report"] .playback-follow-controls[hidden],body[data-frozen-ui="report"] #playback-return[hidden]{display:none}
 body[data-frozen-ui="report"] .playback-follow-label{display:flex;align-items:center;justify-content:flex-start;gap:8px;min-height:28px;width:100%;margin:0;color:var(--muted);font-size:12px;cursor:pointer;white-space:nowrap}
 body[data-frozen-ui="report"] #playback-follow{appearance:none;position:relative;flex:0 0 30px;width:30px;height:17px;min-height:0;margin:0;padding:0;border:0;border-radius:12px;background:var(--line);cursor:pointer}
@@ -193,12 +193,14 @@ body[data-frozen-ui="report"] #playback-return{display:inline-flex;align-items:c
 body[data-frozen-ui="report"] #playback-return svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.6}
 body[data-frozen-ui="report"] #playback-return:hover{text-decoration:underline;text-underline-offset:3px}
 body[data-frozen-ui="report"] #recording-player[hidden]{display:none}
-body[data-frozen-ui="report"] #playback-player{display:grid;grid-template-columns:minmax(0,1fr) 248px;align-items:start;gap:36px;min-height:48px}
-body[data-frozen-ui="report"] .playback-timeline{display:grid;grid-template-rows:28px 40px;row-gap:4px;min-width:0}
-body[data-frozen-ui="report"] .playback-toolbar{display:grid;grid-template-columns:110px minmax(0,1fr);grid-template-rows:28px 40px;gap:4px 16px;width:248px}
-body[data-frozen-ui="report"] .playback-speed-label{grid-column:2;grid-row:2;display:flex;align-items:center;gap:8px;min-width:0;margin:0;font-size:12px;color:var(--muted)}
+body[data-frozen-ui="report"] #playback-player{--playback-button-half:18px;display:grid;grid-template-columns:minmax(0,1fr) 200px;align-items:start;gap:28px;min-height:48px}
+body[data-frozen-ui="report"] .playback-timeline{display:grid;grid-template-rows:28px 40px;row-gap:8px;min-width:0}
+body[data-frozen-ui="report"] .playback-timeline-meta{display:flex;align-items:center;justify-content:space-between;gap:12px;min-width:0;flex-wrap:wrap}
+/* The volume rail ends at the centered play button's right edge. */
+body[data-frozen-ui="report"] .playback-toolbar{display:grid;grid-template-columns:calc(50% + var(--playback-button-half)) minmax(0,1fr);grid-template-rows:28px 40px;gap:8px 16px;min-width:0}
+body[data-frozen-ui="report"] .playback-speed-label{grid-column:2;grid-row:1;display:flex;align-items:center;justify-self:end;min-width:0;margin:0;font-size:12px;color:var(--muted)}
 body[data-frozen-ui="report"] #playback-player[hidden]{display:none}
-body[data-frozen-ui="report"] .playback-actions{grid-column:1;grid-row:2;display:flex;align-items:center;gap:4px}
+body[data-frozen-ui="report"] .playback-actions{grid-column:1/-1;grid-row:2;display:flex;align-items:center;justify-content:space-between}
 body[data-frozen-ui="report"] .playback-player button{display:grid;place-items:center;color:#6b6150;background:none;border:0;padding:0;width:32px;min-width:32px;min-height:28px;height:28px;border-radius:3px}
 body[data-frozen-ui="report"] .playback-player svg{width:17px;height:17px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 body[data-frozen-ui="report"] :is(#playback-backward,#playback-forward) svg{width:18px;height:18px}
@@ -233,8 +235,8 @@ body[data-frozen-ui="report"] .playback-position{font-size:11px;color:var(--mute
 body[data-frozen-ui="report"] .playback-plain-transcript{font-size:13px;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}
 body[data-frozen-ui="report"] :is(#playback-controls,#playback-segments,#playback-follow-controls) :is(button,input,select):focus-visible{outline:2px solid var(--accent,#8c7650);outline-offset:3px}
 @media(pointer:coarse){body[data-frozen-ui="report"] :is(.playback-player button,.playback-follow-label,.playback-segment-button,#playback-return,#playback-speed,#playback-seek,#playback-volume){min-height:44px}body[data-frozen-ui="report"] .playback-player button{min-width:44px}}
-@media(pointer:coarse){body[data-frozen-ui="report"] #playback-player{grid-template-columns:minmax(0,1fr) 260px}body[data-frozen-ui="report"] .playback-toolbar{grid-template-columns:140px minmax(0,1fr);grid-template-rows:44px 44px;width:260px;max-width:100%}body[data-frozen-ui="report"] .playback-timeline{grid-template-rows:44px 44px}body[data-frozen-ui="report"] .playback-sound{grid-template-columns:44px minmax(0,1fr)}}
-@media(max-width:800px){body[data-frozen-ui="report"] #playback-player{grid-template-columns:minmax(0,1fr);gap:12px}body[data-frozen-ui="report"] .playback-timeline{grid-template-rows:28px 22px;row-gap:0}body[data-frozen-ui="report"] .playback-toolbar{justify-self:end}}
+@media(pointer:coarse){body[data-frozen-ui="report"] #playback-player{--playback-button-half:22px}body[data-frozen-ui="report"] .playback-toolbar,body[data-frozen-ui="report"] .playback-timeline{grid-template-rows:44px 44px}body[data-frozen-ui="report"] .playback-sound{grid-template-columns:44px minmax(0,1fr)}}
+@media(max-width:800px){body[data-frozen-ui="report"] #playback-player{grid-template-columns:minmax(0,1fr) 176px;gap:16px}body[data-frozen-ui="report"] .playback-toolbar{column-gap:8px}}
 body[data-frozen-ui="report"] #report-scroll{scrollbar-gutter:stable;scrollbar-width:auto;scrollbar-color:auto}
 body[data-frozen-ui="report"] #report-scroll::-webkit-scrollbar{width:8px;height:8px}
 body[data-frozen-ui="report"] #report-scroll::-webkit-scrollbar-track,body[data-frozen-ui="report"] #report-scroll::-webkit-scrollbar-corner{background:transparent}
