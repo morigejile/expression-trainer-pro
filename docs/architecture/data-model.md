@@ -301,9 +301,23 @@ VAD 是模型观察。当前 `vad-thresholds-uncalibrated` 作为降级原因随
 
 AI 输入是有界的 `AnalysisContext`：同一 Session/revision 的 transcript、可用音频时间事实、Speech Evidence、Common Metrics、分区 quality 和已捕获的分析指令；不附带原始录音、完整设置或凭据。`allowedEvidenceRefs` 由上述真实输入生成；超过输入上限或 revision 不匹配时显式不可用，不静默截断后假装证据完整。可执行边界见 [Analysis Context](../../lib/analysis-context.js)。
 
-远程请求由 [diagnosis-input](../../lib/diagnosis-input.js) 从完整上下文生成精简投影：原文和证据 ID 不变，保留全部可用指标及真实零值；不可用指标、空偏好、空背景项、普通报告的练习字段直接省略，不附缺失清单或原因说明。指标只发送 ID、名称、值与单位，省略推导引用和重复状态；语音区间用等值毫秒边界表示，省略采样信息、引擎/模型版本、哈希及阈值。重复的 `evidenceMap`、本地会话/报告身份和重复框架定义不发送；框架定义仅在系统提示保留一份。保留转写不完整、音频覆盖不完整、所提供时间为估计值及 VAD 未校准等影响判断的限制；普通的“正常/不可用”状态不逐项发送。针对性练习仍保留目标、范围和可用前轮原文；来源缺失时保留练习身份，不附缺失原因说明。统一规则禁止推测缺失数据、补零或将缺失视为没有问题。返回校验绑定精简请求的实际证据清单和前后原文，不能引用留在本地但未发送的证据。本地上下文、指标定义、持久化与历史快照不因投影改变。
+远程请求由 [diagnosis-input](../../lib/diagnosis-input.js) 从完整上下文生成精简投影：原文和保留证据的 ID 不变，指标按以下名单筛选后只发送可用值，真实零值保留。不可用指标、空偏好、空背景项、普通报告的练习字段直接省略，不附缺失清单或原因说明。指标只发送 ID、名称、值与单位，省略推导引用和重复状态。重复的 `evidenceMap`、本地会话/报告身份、技术元数据和重复框架定义不发送；框架定义仅在系统提示保留一份。针对性练习仍保留目标、范围和可用前轮原文；来源缺失时保留练习身份，不附缺失原因说明。统一规则禁止推测缺失数据、补零或将缺失视为没有问题。
 
-新主诊断使用 `structured-diagnosis-v14`，沿用 v12 响应契约：`schemaVersion=1`、唯一的整体 `summary`、`assessment`、通用 `findings`、所选框架的 `frameworkFindings` 和跨组顺序 `findingOrder`，针对性练习另含 `practiceFeedback`。每个 Finding 必须包含唯一 `id`、受控 `category`、`observation`、`recommendation` 和至少一个真实 `evidenceRefs`；`interpretation` 可省略，提供时必须为 1～1200 字符的非空字符串，只补充必要影响或限定。新响应不接受 `frameworkSummary`、`example`、`exampleEvidenceRefs` 或自动推荐字段。其他未知字段、未知引用、重复 ID 或无效类型仍拒绝；没有充分证据时 Findings 可以为空。类别与排序规则见 [Training Flow §7.1](../product/training-flow.md#71-完整分析与训练重点分层)，边界实现见 [Structured Diagnosis](../../lib/structured-diagnosis.js)。
+**主诊断指标评估与收敛规则：**15 项本地测量不等于 15 项必要的 AI 输入。按当前问题库允许的判断能力和测量限制，主诊断最多发送 3 项；自由表达、框架分析及针对性练习采用同一名单，不按关键词临时加回指标。
+
+| 指标（定义见 §5.3） | 数量 | 主诊断发送 | 依据与取舍 |
+|---|---:|---|---|
+| `text-character-count`、`audio-duration-ms`、`filler-count` | 3 | 可用时发送 | 字数/时长提供材料规模及明确时长要求的依据；填充词命中仅作上下文核查线索，不能证明多余或影响表达，也不按次数排序问题 |
+| `hedge-count`、`vague-word-count` | 2 | 不发送 | 词表命中不能证明真实不确定性、礼貌或正常指代有害；保留完整原文供语义判断，不删除相应问题检查卡 |
+| `filler-rate-per-recorded-minute`、`hedge-character-percent`、`non-filler-hedge-character-percent` | 3 | 不发送 | 属于频率/字符比例的派生信息，容易与次数重复或被当作表达质量分；本地测量及对比仍保留 |
+| `text-rate-per-recorded-minute` | 1 | 不发送 | 分母包含静音，受转写覆盖影响，不能据此判定实际语速不当 |
+| `speech-duration-ms`、`non-speech-duration-ms`、`between-speech-gap-count`、`between-speech-gap-total-ms`、`between-speech-gap-max-ms`、`text-rate-per-speech-minute` | 6 | 不发送 | VAD 尚未校准且缺可靠词级对齐，不能支持当前主诊断中的精确停顿、局部语速或声音节奏结论；保留其本地复核价值 |
+
+原始 `speech` 区间同步退出远程主诊断，避免从区间重新推算被收敛的指标；不再发送只服务于该证据的 `quality.vad`，也不补充“已省略 VAD”说明。转写不完整、音频覆盖不完整和所提供转写时间为估计值等仍相关的限制继续发送。此规则不禁用基于原文的节奏检查，例如重复起句、文字推进被打断；不改变 ORG-09 的明确时长要求检查。返回校验绑定精简请求的实际证据清单和前后原文，不能引用留在本地但未发送的指标或语音区间。本地完整上下文、15 项定义/计算/展示/对比与历史快照不变，旧报告中的完整指标和语音引用继续按原快照读取。
+
+上述评价依据当前实现和问题库边界，不代表 3 项输入的真实 AI 报告质量已经优于 15 项；受控请求/引用/历史兼容检查与真实模型内容验收分开。
+
+新主诊断使用 `structured-diagnosis-v16`，沿用 v12 响应契约：`schemaVersion=1`、唯一的整体 `summary`、`assessment`、通用 `findings`、所选框架的 `frameworkFindings` 和跨组顺序 `findingOrder`，针对性练习另含 `practiceFeedback`。每个 Finding 必须包含唯一 `id`、受控 `category`、`observation`、`recommendation` 和至少一个真实 `evidenceRefs`；`interpretation` 可省略，提供时必须为 1～1200 字符的非空字符串，只补充必要影响或限定。新响应不接受 `frameworkSummary`、`example`、`exampleEvidenceRefs` 或自动推荐字段。其他未知字段、未知引用、重复 ID 或无效类型仍拒绝；没有充分证据时 Findings 可以为空。类别与排序规则见 [Training Flow §7.1](../product/training-flow.md#71-完整分析与训练重点分层)，边界实现见 [Structured Diagnosis](../../lib/structured-diagnosis.js)。
 
 `findingOrder` 按展示顺序包含两组全部 Finding ID，每个恰好一次；没有问题时必须为 `[]`。新响应缺失顺序、重复、遗漏或引用不存在的 ID 均拒绝，走既有失败重试路径，不发起修复请求或补造顺序。解析后原样保存到不可变 `diagnosis.value.findingOrder`，不改变两组 Finding 的身份、内容或证据。报告读取和渲染共用该顺序；历史缺失字段时沿用通用后接专项的原顺序，不补写或自动重算。扩展不增加 SQLite/Session schema；结构校验不能证明重要程度判断正确。
 

@@ -462,7 +462,7 @@ test('structured request separates untrusted quoted source data from system inst
   assert.equal(wire.analysisInstructions.goals,source.analysisInstructions.goals);
   assert.deepEqual(wire.transcript.segments.map(x=>[x.id,x.text]),source.transcript.segments.map(x=>[x.id,x.text]));
   assert.equal(Object.hasOwn(wire,'evidenceMap'),false);
-  assert.deepEqual(wire.allowedEvidenceRefs,source.allowedEvidenceRefs);
+  assert.deepEqual(wire.allowedEvidenceRefs,['segment-1','metric:text-character-count','metric:audio-duration-ms']);
   assert.equal(request.messages[1].content.includes('test-secret-key'),false);
   assert.match(request.messages[0].content,/PREP/);
   assert.match(request.messages[0].content,/词.*时间|逐字/);

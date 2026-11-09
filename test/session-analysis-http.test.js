@@ -43,7 +43,7 @@ async function fixture(t, provider = 'custom', {speechAvailable=false,framework=
       id:'finding-1',category:'argument',observation:'表达提出了先明确目标的主张。',
       recommendation:'补充一个实际例子。',
       evidenceRefs:responseMode === 'invalid-ref' ? ['another-session'] : [context.transcript.segments[0].id,
-        ...(speechAvailable ? ['metric:speech-duration-ms','speech-0'] : [])]
+        ...(speechAvailable ? ['metric:audio-duration-ms','metric:filler-count'] : [])]
     }]};
     diagnosis.frameworkFindings = context.analysisTarget
       ? [{...diagnosis.findings[0],id:'framework-1',evidenceRefs:[context.transcript.segments[0].id]}] : [];
@@ -54,6 +54,7 @@ async function fixture(t, provider = 'custom', {speechAvailable=false,framework=
       diagnosis.frameworkFindings=[];
     }
     diagnosis.findingOrder=[...diagnosis.frameworkFindings,...diagnosis.findings].map(f=>f.id);
+    if(responseMode.startsWith('excluded-ref:'))diagnosis.findings[0].evidenceRefs=[responseMode.slice('excluded-ref:'.length)];
     if (responseMode==='invalid-order') diagnosis.findingOrder=['unknown'];
     response.writeHead(200, {'Content-Type':'application/json'});
     response.end(JSON.stringify({choices:[{message:{content:JSON.stringify(diagnosis)}}]}));
@@ -162,7 +163,7 @@ test('invalid cross-group order fails without hiding the saved report or dispatc
   assert.deepEqual(restored.results,failed.results);
 });
 
-test('speech, metric and Finding evidence keep exact run ownership through HTTP and restart',async t=>{
+test('three remote metrics retain exact ownership while all local metrics and speech survive HTTP and restart',async t=>{
   const f=await fixture(t,'custom',{speechAvailable:true});
   const saved=await f.complete();
   const report=selectStructuredReport(saved.results);
@@ -173,21 +174,41 @@ test('speech, metric and Finding evidence keep exact run ownership through HTTP 
   assert.equal(report.analysisRun.value.metricRunId,report.metricRun.id);
   assert.equal(report.metricRun.value.metrics.find(metric=>metric.id==='speech-duration-ms').value,500);
   const finding=report.analysisRun.value.findings[0];
-  assert.deepEqual(finding.evidenceRefs,['segment-1','metric:speech-duration-ms','speech-0']);
+  assert.deepEqual(finding.evidenceRefs,['segment-1','metric:audio-duration-ms','metric:filler-count']);
   const context=f.received[0].context;
-  const visible=new Set([...context.transcript.segments,...context.metrics,...context.speech.segments].map(x=>x.id));
+  const visible=new Set([...context.transcript.segments,...context.metrics].map(x=>x.id));
   for (const ref of finding.evidenceRefs) assert.ok(visible.has(ref) && context.allowedEvidenceRefs.includes(ref));
   assert.equal(Object.hasOwn(context,'evidenceMap'),false);
-  assert.deepEqual(context.speech.segments,[{id:'speech-0',startMs:100,endMs:600}]);
-  assert.deepEqual(context.quality.vad,{status:'degraded',reasons:['vad-thresholds-uncalibrated']});
+  assert.deepEqual(context.metrics.map(x=>x.id),['metric:text-character-count','metric:audio-duration-ms','metric:filler-count']);
+  assert.equal(Object.hasOwn(context,'speech'),false);
+  assert.equal(Object.hasOwn(context,'quality'),false);
+  assert.equal(report.metricRun.value.metrics.length,15);
+  assert.deepEqual(report.evidenceRun.value.segments,[{id:'speech-0',startSample:1600,endSample:9600}]);
   assert.equal(report.analysisRun.provenance.profileId,'approved');
-  assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v14');
+  assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v16');
   assert.equal(report.analysisRun.provenance.problemLibraryVersion,'expression-problem-library-v0.6');
   assert.equal((await f.command('analyze',{retry:true})).value.id,report.snapshot.id,'complete report is not reanalyzed');
   await f.app.close();
   const restored=(await f.command('get',{},f.open())).value;
   assert.deepEqual(selectStructuredReport(restored.results),report);
   assert.equal(f.received.length,1);
+});
+
+test('HTTP diagnoses cannot cite excluded metrics or raw intervals that still exist locally',async t=>{
+  const f=await fixture(t,'custom',{speechAvailable:true});
+  f.mode('excluded-ref:metric:hedge-count');
+  const saved=await f.complete(),initial=selectStructuredReport(saved.results);
+  const excluded=initial.metricRun.value.metrics.filter(x=>!['text-character-count','audio-duration-ms','filler-count'].includes(x.id)).map(x=>`metric:${x.id}`);
+  assert.equal(excluded.length,12);
+  for(const [index,ref] of [...excluded,'speech-0'].entries()){
+    f.mode(`excluded-ref:${ref}`);
+    if(index)assert.equal((await f.command('analyze',{retry:true})).ok,true);
+    const current=(await f.command('get')).value;
+    assert.equal(selectStructuredReport(current.results).analysisRun.value.reason,'invalid-response');
+    assert.equal(selectStructuredReport(current.results).metricRun.value.metrics.length,15);
+    assert.equal(f.received.at(-1).context.allowedEvidenceRefs.includes(ref),false);
+  }
+  assert.equal(f.received.length,13,'one request per attempt, no repair request');
 });
 
 test('insufficient-material assessment survives real HTTP, immutable persistence and restart as a successful result',async t=>{

@@ -21,22 +21,24 @@ test('outgoing input omits empty preferences, unavailable measurements and local
   assert.deepEqual(wire.transcript.segments,[{id:'s1',text:'如果测试通过，明天上线。'}]);
   for(const key of ['analysisInstructions','practiceComparison','evidenceMap','frameworkDefinition','analysisTarget',
     'sessionId','transcriptRevision','metricsDefinitionVersion','speech','quality'])assert.equal(Object.hasOwn(wire,key),false,key);
-  assert.deepEqual(wire.metrics.map(x=>x.id),source.metrics.filter(x=>x.status==='available').map(x=>x.id));
+  assert.deepEqual(wire.metrics.map(x=>x.id),['metric:text-character-count','metric:audio-duration-ms']);
   for(const metric of wire.metrics)assert.deepEqual(Object.keys(metric).sort(),['id','label','unit','value']);
   assert.equal(Object.hasOwn(wire.trainingContext,'trainingPrompt'),false);
   assert.doesNotMatch(JSON.stringify(wire),/unavailable|omitted|not-provided|不可用|未提供/);
   assert.deepEqual(source,before,'outgoing slimming never rewrites local context');
 });
 
-test('outgoing input keeps every available measurement including zero and does not replace it with a default shortlist',()=>{
-  const source=context({speech:true,stats:true}),wire=sent(source);
-  assert.equal(wire.metrics.length,15);
+test('outgoing input keeps only three core metrics including zero while all fifteen remain intact locally',()=>{
+  const source=context({speech:true,stats:true}),before=structuredClone(source),wire=sent(source);
+  assert.equal(source.metrics.filter(x=>x.status==='available').length,15);
+  assert.deepEqual(wire.metrics.map(x=>x.id),['metric:text-character-count','metric:audio-duration-ms','metric:filler-count']);
   assert.equal(wire.metrics.find(x=>x.id==='metric:filler-count').value,0);
-  assert.deepEqual(wire.speech.segments,[{id:'speech-0',startMs:1000.0625,endMs:3000.1875}]);
-  assert.deepEqual(wire.quality.vad,{status:'degraded',reasons:['vad-thresholds-uncalibrated']});
+  assert.equal(Object.hasOwn(wire,'speech'),false,'raw intervals cannot bypass metric convergence');
+  assert.equal(Object.hasOwn(wire,'quality'),false,'omitted VAD needs no extra limitation notice');
   assert.doesNotMatch(JSON.stringify(wire),/"(?:modelSha256|thresholds|sampleRateHz|sampleCount|startSample|provenance)":/);
-  const actual=[...wire.transcript.segments,...wire.metrics,...wire.speech.segments].map(x=>x.id);
+  const actual=[...wire.transcript.segments,...wire.metrics].map(x=>x.id);
   assert.deepEqual(new Set(wire.allowedEvidenceRefs),new Set(actual));
+  assert.deepEqual(source,before);
 });
 
 test('framework definition is sent once while independent topic, scenario and nonempty preferences retain their meaning',()=>{
@@ -75,6 +77,28 @@ test('outgoing evidence list excludes unseen or unavailable measurements instead
   const wire=sent(source);
   assert.equal(wire.allowedEvidenceRefs.includes('metric:filler-count'),false);
   assert.equal(wire.allowedEvidenceRefs.includes('unseen'),false);
+});
+
+test('metric convergence applies consistently across free, framework and targeted delivery practice without dropping semantic checks',()=>{
+  for(const framework of [null,'prep','star','pyramid'])for(const scope of [null,'full','sentence','segment']){
+    const source=context({speech:true,stats:true});
+    if(framework)source.analysisTarget={framework,definitionVersion:`${framework}-v1`};
+    if(scope)source.practiceComparison={status:'unavailable',scope,goal:{category:'delivery',observation:'多次重新起句',recommendation:'完成一句再接下一句'}};
+    const prompt=getStructuredDiagnosisPrompt(source),wire=JSON.parse(prompt.user);
+    assert.equal(wire.metrics.length,3);
+    assert.equal(Object.hasOwn(wire,'speech'),false);
+    assert.equal(wire.allowedEvidenceRefs.some(ref=>ref.startsWith('speech-')),false);
+    assert.match(prompt.system,/ORG-09/,'recording-duration checks stay available');
+    for(const card of ['ARG-03','WRD-01','WRD-02','WRD-04','DEL-02','DEL-03'])assert.ok(prompt.system.includes(card),card);
+    if(scope)assert.deepEqual(wire.practiceComparison.goal,source.practiceComparison.goal);
+  }
+});
+
+test('incomplete ASR and audio coverage remain explicit after unrelated acoustic data are removed',()=>{
+  const source=context({speech:true,stats:true});
+  source.quality.asr={status:'degraded',reasons:['asr-incomplete']};
+  source.quality.audio={status:'degraded',reasons:['audio-coverage-incomplete']};
+  assert.deepEqual(sent(source).quality,{asr:source.quality.asr,audio:source.quality.audio});
 });
 
 test('independent topic and scenario, legacy prompts and style-only preferences retain only their supplied content',()=>{

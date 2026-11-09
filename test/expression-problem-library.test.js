@@ -65,7 +65,7 @@ test('only the selected framework is included; explicit analysis target wins; lo
 test('production prompt assembles rules, dynamic cards, evidence limits, optional practice and existing output without review examples',()=>{
   library();
   const {getStructuredDiagnosisPrompt,DIAGNOSIS_PROMPT_VERSION}=require('../lib/structured-diagnosis');
-  assert.equal(DIAGNOSIS_PROMPT_VERSION,'structured-diagnosis-v14');
+  assert.equal(DIAGNOSIS_PROMPT_VERSION,'structured-diagnosis-v16');
   const source=context('star');
   const prompt=getStructuredDiagnosisPrompt(source);
   const sections=['【1 共同判断规则】','【2 本次通用检查卡】','【3 所选框架专项检查卡】','【4 本次证据与质量限制】','【6 结构化输出要求】'];
@@ -99,13 +99,19 @@ test('cleaned prompts preserve evidence and status contracts across framework, s
       const {system,user}=getStructuredDiagnosisPrompt(source);
       const input=JSON.parse(user);
       assert.deepEqual(input.transcript.segments.map(x=>[x.id,x.text]),source.transcript.segments.map(x=>[x.id,x.text]),'cleanup must not alter transcript material');
-      assert.deepEqual(input.metrics || [],source.metrics.filter(x=>x.status==='available').map(({id,label,value,unit})=>({id,label,value,unit})));
+      assert.deepEqual(input.metrics || [],source.metrics.filter(x=>x.status==='available' && ['text-character-count','audio-duration-ms','filler-count'].includes(x.metricId)).map(({id,label,value,unit})=>({id,label,value,unit})));
       assert.ok(!/本批没有新增候选线索|本节只给内容写作准则|旧参考快照|排序和默认展示的主定义见|现有页面先通用后专项/.test(system),'runtime prompt must exclude maintenance and retired sorting notes');
       assert.ok(system.includes('assessment 中的 status、categories、frameworkAssessable 仅为示例值，不是默认结论'),'assessment examples must not imply a default judgement');
+      assert.ok(!system.includes('摘要的主要改进方向与第一条问题及其建议一致'),'summary must not be bound to the first finding');
+      assert.ok(system.includes('改进方向应基于已成立的问题，与问题的重要程度排序不矛盾'),'summary must remain grounded in the ranked findings');
+      assert.ok(system.includes('可以综合多个发现，不必复述第一条问题或具体建议'),'summary may synthesize findings without repeating advice');
+      assert.ok(system.includes('没有明确问题时，不强行提出改进方向'),'summary must not manufacture a training direction');
+      assert.ok(system.includes('将两组已成立的问题按对本次表达目的的影响统一排序'),'summary changes must preserve cross-group ranking');
       if(framework && !['sentence','segment'].includes(scope)) {
         assert.ok(system.includes('结构、教学指导和例子仅用于理解框架，不是本次表达必须逐项完成的清单'),'framework guidance must not impose slots');
       }
       const template=JSON.parse(system.match(/\n(\{\n[\s\S]+?\n\})\n/)[1]);
+      assert.ok(template.summary.includes('必要时'),'the output example must not demand an improvement direction');
       for(const status of ['analyzable','limited','insufficient']) {
         const response=structuredClone(template);
         response.assessment={status,reason:'按实际材料确定评价范围。',
