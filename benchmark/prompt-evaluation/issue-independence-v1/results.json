@@ -1,0 +1,620 @@
+{
+  "experiment": "issue-independence-v1",
+  "startedAt": "2026-11-03T05:53:51.687Z",
+  "provider": "deepseek",
+  "requestModel": "deepseek-chat",
+  "endpoint": "https://api.deepseek.com/v1/chat/completions",
+  "networkCalls": 12,
+  "outputs": [
+    {
+      "sequence": 1,
+      "pair": "P1",
+      "variant": "ordinary",
+      "repeat": 1,
+      "startedAt": "2026-11-03T05:53:51.782Z",
+      "status": "completed",
+      "request": {
+        "model": "deepseek-chat",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你在核对表达训练反馈的问题划分，不生成或改写报告。用户消息提供完整原始输入和两条已有反馈。反馈是待检查的判断，不能当作已经证实的事实。判断这两条是在指出两个独立的表达障碍，还是重复指出同一障碍；材料不足以判断时可以保留不确定。以本次表达任务和原文为依据，不新增事实、因果、承诺或未给出的后续内容。\n只返回 JSON：{\"judgment\":\"independent 或 duplicate 或 uncertain\",\"reason\":\"简短、可用原文核查的判断理由\",\"contentRisks\":[\"已有反馈或建议存在的事实、限定条件或原意风险；没有则空数组\"]}。"
+          },
+          {
+            "role": "user",
+            "content": "{\"originalInput\":{\"schemaVersion\":1,\"sessionId\":\"synthetic-E05\",\"transcriptRevision\":1,\"transcript\":{\"segments\":[{\"id\":\"s1\",\"text\":\"试点组上月订单增加了。同期我们更换了首页。\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"},{\"id\":\"s2\",\"text\":\"因此，可以确定订单增长完全是首页改版带来的，应该立即全量推广。\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"}]},\"metricsDefinitionVersion\":\"common-metrics-v1\",\"metrics\":[{\"id\":\"metric:text-character-count\",\"metricId\":\"text-character-count\",\"label\":\"文字与数字字符数\",\"value\":47,\"unit\":\"characters\",\"status\":\"available\",\"reason\":null,\"evidenceRefs\":[\"s1\",\"s2\"]},{\"id\":\"metric:audio-duration-ms\",\"metricId\":\"audio-duration-ms\",\"label\":\"已保存录音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-count\",\"metricId\":\"filler-count\",\"label\":\"填充词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-count\",\"metricId\":\"hedge-count\",\"label\":\"犹豫词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:vague-word-count\",\"metricId\":\"vague-word-count\",\"label\":\"笼统词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-recorded-minute\",\"metricId\":\"text-rate-per-recorded-minute\",\"label\":\"每录音分钟字符数（含静音）\",\"value\":null,\"unit\":\"characters/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-rate-per-recorded-minute\",\"metricId\":\"filler-rate-per-recorded-minute\",\"label\":\"每录音分钟填充词命中次数\",\"value\":null,\"unit\":\"occurrences/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-character-percent\",\"metricId\":\"hedge-character-percent\",\"label\":\"犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-filler-hedge-character-percent\",\"metricId\":\"non-filler-hedge-character-percent\",\"label\":\"非填充词与犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:speech-duration-ms\",\"metricId\":\"speech-duration-ms\",\"label\":\"VAD 检测语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-speech-duration-ms\",\"metricId\":\"non-speech-duration-ms\",\"label\":\"VAD 检测非语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-count\",\"metricId\":\"between-speech-gap-count\",\"label\":\"语音区间之间的间隔次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-total-ms\",\"metricId\":\"between-speech-gap-total-ms\",\"label\":\"语音区间之间的间隔总时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-max-ms\",\"metricId\":\"between-speech-gap-max-ms\",\"label\":\"语音区间之间的最长间隔\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-speech-minute\",\"metricId\":\"text-rate-per-speech-minute\",\"label\":\"每检测语音分钟字符数（非逐字对齐）\",\"value\":null,\"unit\":\"characters/speech-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]}],\"speech\":{\"status\":\"unavailable\",\"sampleRateHz\":null,\"sampleCount\":null,\"segments\":[],\"provenance\":null,\"limitations\":[\"vad-unavailable\"]},\"trainingContext\":{\"trainingMode\":\"free\",\"framework\":null,\"frameworkDefinitionVersion\":null,\"trainingPrompt\":{\"schemaVersion\":2,\"topic\":{\"source\":\"user\",\"text\":\"向团队解释为什么应全面推广一次改版，完整论证。\"},\"scenario\":null}},\"frameworkDefinition\":null,\"analysisTarget\":null,\"quality\":{\"audio\":{\"status\":\"unavailable\",\"reasons\":[\"audio-unavailable\"]},\"timing\":{\"status\":\"degraded\",\"reasons\":[\"timing-unavailable\"]},\"vad\":{\"status\":\"unavailable\",\"reasons\":[\"vad-unavailable\"]},\"asr\":{\"status\":\"ok\",\"reasons\":[]}},\"analysisInstructions\":{\"schemaVersion\":1,\"goals\":\"\",\"customRules\":\"\",\"styleRef\":\"\",\"customWords\":\"\"},\"evidenceMap\":{\"s1\":{\"type\":\"transcript\",\"index\":0},\"s2\":{\"type\":\"transcript\",\"index\":1},\"metric:text-character-count\":{\"type\":\"metric\",\"index\":0}},\"allowedEvidenceRefs\":[\"s1\",\"s2\",\"metric:text-character-count\"]},\"feedback\":[{\"id\":\"common-1\",\"category\":\"argument\",\"observation\":\"原文只交代试点组订单增加与同期更换首页，随后直接说“可以确定订单增长完全是首页改版带来的”。\",\"interpretation\":\"同期发生不等于因果，听者无法判断是否还有其他因素，也难以评估“完全”这一排他结论。\",\"recommendation\":\"补充能区分首页改版与其他因素的实际依据，或把结论改为与现有证据相符的推测程度。\",\"evidenceRefs\":[\"s1\",\"s2\"],\"example\":null,\"exampleEvidenceRefs\":[]},{\"id\":\"common-2\",\"category\":\"argument\",\"observation\":\"从“试点组上月订单增加了”直接跳到“应该立即全量推广”，中间没有说明试点范围与推广对象的关系。\",\"interpretation\":\"听者难以确认试点结果能否外推到全量用户，也无法判断“立即”的必要性。\",\"recommendation\":\"说明试点覆盖的人群与全量推广对象的可比性，并交代推广前是否需要进一步验证。\",\"evidenceRefs\":[\"s1\",\"s2\"],\"example\":null,\"exampleEvidenceRefs\":[]}]}"
+          }
+        ],
+        "max_tokens": 8192,
+        "response_format": {
+          "type": "json_object"
+        },
+        "temperature": 0.2
+      },
+      "raw": "{\"judgment\":\"independent\",\"reason\":\"common-1针对s2中“订单增长完全是首页改版带来的”这一因果与排他结论；common-2针对从s1试点结果直接跳到s2“应该立即全量推广”的外推与紧迫性，二者指向不同表达障碍。\",\"contentRisks\":[\"common-1建议“改为与现有证据相符的推测程度”，但原文未给出可用的推测程度或依据，建议本身不构成事实补充\",\"common-2提到“试点范围与推广对象的关系”，原文未说明试点覆盖人群或全量对象，需避免被理解为原文已交代这些信息\"]}",
+      "httpStatus": 200,
+      "responseModel": "deepseek-flash",
+      "usage": {
+        "prompt_tokens": 1638,
+        "completion_tokens": 136,
+        "total_tokens": 1774,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 1638
+      },
+      "finishReason": "stop",
+      "parsed": {
+        "judgment": "independent",
+        "reason": "common-1针对s2中“订单增长完全是首页改版带来的”这一因果与排他结论；common-2针对从s1试点结果直接跳到s2“应该立即全量推广”的外推与紧迫性，二者指向不同表达障碍。",
+        "contentRisks": [
+          "common-1建议“改为与现有证据相符的推测程度”，但原文未给出可用的推测程度或依据，建议本身不构成事实补充",
+          "common-2提到“试点范围与推广对象的关系”，原文未说明试点覆盖人群或全量对象，需避免被理解为原文已交代这些信息"
+        ]
+      },
+      "elapsedMs": 1527,
+      "rawSha256": "548878274d893d911513bf40269f92936918b6946386ad6f83af9f2098d2b28d"
+    },
+    {
+      "sequence": 2,
+      "pair": "P1",
+      "variant": "residual",
+      "repeat": 1,
+      "startedAt": "2026-11-03T05:53:53.411Z",
+      "status": "completed",
+      "request": {
+        "model": "deepseek-chat",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你在核对表达训练反馈的问题划分，不生成或改写报告。用户消息提供完整原始输入和两条已有反馈。反馈是待检查的判断，不能当作已经证实的事实。判断这两条是在指出两个独立的表达障碍，还是重复指出同一障碍；材料不足以判断时可以保留不确定。以本次表达任务和原文为依据，不新增事实、因果、承诺或未给出的后续内容。\n只返回 JSON：{\"judgment\":\"independent 或 duplicate 或 uncertain\",\"reason\":\"简短、可用原文核查的判断理由\",\"contentRisks\":[\"已有反馈或建议存在的事实、限定条件或原意风险；没有则空数组\"]}。\n判断时请检查：假定第一条所指的实质问题已经修好，第二条是否仍有原文支持的独立障碍？在 reason 中说明剩余障碍；若没有，说明为何。"
+          },
+          {
+            "role": "user",
+            "content": "{\"originalInput\":{\"schemaVersion\":1,\"sessionId\":\"synthetic-E05\",\"transcriptRevision\":1,\"transcript\":{\"segments\":[{\"id\":\"s1\",\"text\":\"试点组上月订单增加了。同期我们更换了首页。\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"},{\"id\":\"s2\",\"text\":\"因此，可以确定订单增长完全是首页改版带来的，应该立即全量推广。\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"}]},\"metricsDefinitionVersion\":\"common-metrics-v1\",\"metrics\":[{\"id\":\"metric:text-character-count\",\"metricId\":\"text-character-count\",\"label\":\"文字与数字字符数\",\"value\":47,\"unit\":\"characters\",\"status\":\"available\",\"reason\":null,\"evidenceRefs\":[\"s1\",\"s2\"]},{\"id\":\"metric:audio-duration-ms\",\"metricId\":\"audio-duration-ms\",\"label\":\"已保存录音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-count\",\"metricId\":\"filler-count\",\"label\":\"填充词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-count\",\"metricId\":\"hedge-count\",\"label\":\"犹豫词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:vague-word-count\",\"metricId\":\"vague-word-count\",\"label\":\"笼统词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-recorded-minute\",\"metricId\":\"text-rate-per-recorded-minute\",\"label\":\"每录音分钟字符数（含静音）\",\"value\":null,\"unit\":\"characters/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-rate-per-recorded-minute\",\"metricId\":\"filler-rate-per-recorded-minute\",\"label\":\"每录音分钟填充词命中次数\",\"value\":null,\"unit\":\"occurrences/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-character-percent\",\"metricId\":\"hedge-character-percent\",\"label\":\"犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-filler-hedge-character-percent\",\"metricId\":\"non-filler-hedge-character-percent\",\"label\":\"非填充词与犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:speech-duration-ms\",\"metricId\":\"speech-duration-ms\",\"label\":\"VAD 检测语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-speech-duration-ms\",\"metricId\":\"non-speech-duration-ms\",\"label\":\"VAD 检测非语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-count\",\"metricId\":\"between-speech-gap-count\",\"label\":\"语音区间之间的间隔次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-total-ms\",\"metricId\":\"between-speech-gap-total-ms\",\"label\":\"语音区间之间的间隔总时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-max-ms\",\"metricId\":\"between-speech-gap-max-ms\",\"label\":\"语音区间之间的最长间隔\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-speech-minute\",\"metricId\":\"text-rate-per-speech-minute\",\"label\":\"每检测语音分钟字符数（非逐字对齐）\",\"value\":null,\"unit\":\"characters/speech-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]}],\"speech\":{\"status\":\"unavailable\",\"sampleRateHz\":null,\"sampleCount\":null,\"segments\":[],\"provenance\":null,\"limitations\":[\"vad-unavailable\"]},\"trainingContext\":{\"trainingMode\":\"free\",\"framework\":null,\"frameworkDefinitionVersion\":null,\"trainingPrompt\":{\"schemaVersion\":2,\"topic\":{\"source\":\"user\",\"text\":\"向团队解释为什么应全面推广一次改版，完整论证。\"},\"scenario\":null}},\"frameworkDefinition\":null,\"analysisTarget\":null,\"quality\":{\"audio\":{\"status\":\"unavailable\",\"reasons\":[\"audio-unavailable\"]},\"timing\":{\"status\":\"degraded\",\"reasons\":[\"timing-unavailable\"]},\"vad\":{\"status\":\"unavailable\",\"reasons\":[\"vad-unavailable\"]},\"asr\":{\"status\":\"ok\",\"reasons\":[]}},\"analysisInstructions\":{\"schemaVersion\":1,\"goals\":\"\",\"customRules\":\"\",\"styleRef\":\"\",\"customWords\":\"\"},\"evidenceMap\":{\"s1\":{\"type\":\"transcript\",\"index\":0},\"s2\":{\"type\":\"transcript\",\"index\":1},\"metric:text-character-count\":{\"type\":\"metric\",\"index\":0}},\"allowedEvidenceRefs\":[\"s1\",\"s2\",\"metric:text-character-count\"]},\"feedback\":[{\"id\":\"common-1\",\"category\":\"argument\",\"observation\":\"原文只交代试点组订单增加与同期更换首页，随后直接说“可以确定订单增长完全是首页改版带来的”。\",\"interpretation\":\"同期发生不等于因果，听者无法判断是否还有其他因素，也难以评估“完全”这一排他结论。\",\"recommendation\":\"补充能区分首页改版与其他因素的实际依据，或把结论改为与现有证据相符的推测程度。\",\"evidenceRefs\":[\"s1\",\"s2\"],\"example\":null,\"exampleEvidenceRefs\":[]},{\"id\":\"common-2\",\"category\":\"argument\",\"observation\":\"从“试点组上月订单增加了”直接跳到“应该立即全量推广”，中间没有说明试点范围与推广对象的关系。\",\"interpretation\":\"听者难以确认试点结果能否外推到全量用户，也无法判断“立即”的必要性。\",\"recommendation\":\"说明试点覆盖的人群与全量推广对象的可比性，并交代推广前是否需要进一步验证。\",\"evidenceRefs\":[\"s1\",\"s2\"],\"example\":null,\"exampleEvidenceRefs\":[]}]}"
+          }
+        ],
+        "max_tokens": 8192,
+        "response_format": {
+          "type": "json_object"
+        },
+        "temperature": 0.2
+      },
+      "raw": "{\"judgment\":\"independent\",\"reason\":\"第一条针对的是把同期发生直接说成“完全是首页改版带来的”这一因果与排他性结论；即使补上区分其他因素的依据或降低结论强度，第二条仍指出从试点组结果直接跳到“应该立即全量推广”时，缺少试点范围与全量对象可比性及“立即”必要性的说明，这是原文s1到s2之间另一处独立的外推障碍。\",\"contentRisks\":[\"第一条建议“补充能区分首页改版与其他因素的实际依据”可能被理解为原文已具备可补充的依据，原文并未给出\",\"第二条建议“交代推广前是否需要进一步验证”属于原文未给出的后续安排，引用时不应当作原文已有内容\",\"两条反馈均未涉及“立即”之外的时间或成本信息，不应据此新增事实\"]}",
+      "httpStatus": 200,
+      "responseModel": "deepseek-flash",
+      "usage": {
+        "prompt_tokens": 1675,
+        "completion_tokens": 174,
+        "total_tokens": 1849,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 1675
+      },
+      "finishReason": "stop",
+      "parsed": {
+        "judgment": "independent",
+        "reason": "第一条针对的是把同期发生直接说成“完全是首页改版带来的”这一因果与排他性结论；即使补上区分其他因素的依据或降低结论强度，第二条仍指出从试点组结果直接跳到“应该立即全量推广”时，缺少试点范围与全量对象可比性及“立即”必要性的说明，这是原文s1到s2之间另一处独立的外推障碍。",
+        "contentRisks": [
+          "第一条建议“补充能区分首页改版与其他因素的实际依据”可能被理解为原文已具备可补充的依据，原文并未给出",
+          "第二条建议“交代推广前是否需要进一步验证”属于原文未给出的后续安排，引用时不应当作原文已有内容",
+          "两条反馈均未涉及“立即”之外的时间或成本信息，不应据此新增事实"
+        ]
+      },
+      "elapsedMs": 1789,
+      "rawSha256": "d981174c0c32d645745f68c77f0df28bc9b745210747c8b23b2188dab2f6c35b"
+    },
+    {
+      "sequence": 3,
+      "pair": "P2",
+      "variant": "residual",
+      "repeat": 1,
+      "startedAt": "2026-11-03T05:53:55.300Z",
+      "status": "completed",
+      "request": {
+        "model": "deepseek-chat",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你在核对表达训练反馈的问题划分，不生成或改写报告。用户消息提供完整原始输入和两条已有反馈。反馈是待检查的判断，不能当作已经证实的事实。判断这两条是在指出两个独立的表达障碍，还是重复指出同一障碍；材料不足以判断时可以保留不确定。以本次表达任务和原文为依据，不新增事实、因果、承诺或未给出的后续内容。\n只返回 JSON：{\"judgment\":\"independent 或 duplicate 或 uncertain\",\"reason\":\"简短、可用原文核查的判断理由\",\"contentRisks\":[\"已有反馈或建议存在的事实、限定条件或原意风险；没有则空数组\"]}。\n判断时请检查：假定第一条所指的实质问题已经修好，第二条是否仍有原文支持的独立障碍？在 reason 中说明剩余障碍；若没有，说明为何。"
+          },
+          {
+            "role": "user",
+            "content": "{\"originalInput\":{\"schemaVersion\":1,\"sessionId\":\"synthetic-E05\",\"transcriptRevision\":1,\"transcript\":{\"segments\":[{\"id\":\"s1\",\"text\":\"试点组上月订单增加了。同期我们更换了首页。\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"},{\"id\":\"s2\",\"text\":\"因此，可以确定订单增长完全是首页改版带来的，应该立即全量推广。\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"}]},\"metricsDefinitionVersion\":\"common-metrics-v1\",\"metrics\":[{\"id\":\"metric:text-character-count\",\"metricId\":\"text-character-count\",\"label\":\"文字与数字字符数\",\"value\":47,\"unit\":\"characters\",\"status\":\"available\",\"reason\":null,\"evidenceRefs\":[\"s1\",\"s2\"]},{\"id\":\"metric:audio-duration-ms\",\"metricId\":\"audio-duration-ms\",\"label\":\"已保存录音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-count\",\"metricId\":\"filler-count\",\"label\":\"填充词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-count\",\"metricId\":\"hedge-count\",\"label\":\"犹豫词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:vague-word-count\",\"metricId\":\"vague-word-count\",\"label\":\"笼统词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-recorded-minute\",\"metricId\":\"text-rate-per-recorded-minute\",\"label\":\"每录音分钟字符数（含静音）\",\"value\":null,\"unit\":\"characters/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-rate-per-recorded-minute\",\"metricId\":\"filler-rate-per-recorded-minute\",\"label\":\"每录音分钟填充词命中次数\",\"value\":null,\"unit\":\"occurrences/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-character-percent\",\"metricId\":\"hedge-character-percent\",\"label\":\"犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-filler-hedge-character-percent\",\"metricId\":\"non-filler-hedge-character-percent\",\"label\":\"非填充词与犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:speech-duration-ms\",\"metricId\":\"speech-duration-ms\",\"label\":\"VAD 检测语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-speech-duration-ms\",\"metricId\":\"non-speech-duration-ms\",\"label\":\"VAD 检测非语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-count\",\"metricId\":\"between-speech-gap-count\",\"label\":\"语音区间之间的间隔次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-total-ms\",\"metricId\":\"between-speech-gap-total-ms\",\"label\":\"语音区间之间的间隔总时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-max-ms\",\"metricId\":\"between-speech-gap-max-ms\",\"label\":\"语音区间之间的最长间隔\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-speech-minute\",\"metricId\":\"text-rate-per-speech-minute\",\"label\":\"每检测语音分钟字符数（非逐字对齐）\",\"value\":null,\"unit\":\"characters/speech-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]}],\"speech\":{\"status\":\"unavailable\",\"sampleRateHz\":null,\"sampleCount\":null,\"segments\":[],\"provenance\":null,\"limitations\":[\"vad-unavailable\"]},\"trainingContext\":{\"trainingMode\":\"free\",\"framework\":null,\"frameworkDefinitionVersion\":null,\"trainingPrompt\":{\"schemaVersion\":2,\"topic\":{\"source\":\"user\",\"text\":\"向团队解释为什么应全面推广一次改版，完整论证。\"},\"scenario\":null}},\"frameworkDefinition\":null,\"analysisTarget\":null,\"quality\":{\"audio\":{\"status\":\"unavailable\",\"reasons\":[\"audio-unavailable\"]},\"timing\":{\"status\":\"degraded\",\"reasons\":[\"timing-unavailable\"]},\"vad\":{\"status\":\"unavailable\",\"reasons\":[\"vad-unavailable\"]},\"asr\":{\"status\":\"ok\",\"reasons\":[]}},\"analysisInstructions\":{\"schemaVersion\":1,\"goals\":\"\",\"customRules\":\"\",\"styleRef\":\"\",\"customWords\":\"\"},\"evidenceMap\":{\"s1\":{\"type\":\"transcript\",\"index\":0},\"s2\":{\"type\":\"transcript\",\"index\":1},\"metric:text-character-count\":{\"type\":\"metric\",\"index\":0}},\"allowedEvidenceRefs\":[\"s1\",\"s2\",\"metric:text-character-count\"]},\"feedback\":[{\"id\":\"common-1\",\"category\":\"argument\",\"observation\":\"原文只交代试点组订单增加与同期更换首页，随后直接说“可以确定订单增长完全是首页改版带来的”。\",\"interpretation\":\"同期发生不等于因果，听者无法判断是否还有其他因素，也难以评估“完全”这一排他结论。\",\"recommendation\":\"补充能区分首页改版与其他因素的实际依据，或把结论改为与现有证据相符的推测程度。\",\"evidenceRefs\":[\"s1\",\"s2\"],\"example\":null,\"exampleEvidenceRefs\":[]},{\"id\":\"common-3\",\"category\":\"organization\",\"observation\":\"先给出现象，再在第二句用“因此”直接给出确定结论和推广要求，中间缺少从观察到判断的过渡。\",\"interpretation\":\"结论与依据之间的推理过程被压缩，听者需要自行补足因果链条。\",\"recommendation\":\"在现象与结论之间加一句说明你如何从订单变化推断出首页改版的作用。\",\"evidenceRefs\":[\"s1\",\"s2\"],\"example\":null,\"exampleEvidenceRefs\":[]}]}"
+          }
+        ],
+        "max_tokens": 8192,
+        "response_format": {
+          "type": "json_object"
+        },
+        "temperature": 0.2
+      },
+      "raw": "{\"judgment\":\"duplicate\",\"reason\":\"第一条指出的是把同期发生当作因果、并作出“完全”这一排他结论的论证问题；若该问题已修好（补充区分依据或降低结论强度），第二条所说的“缺少从观察到判断的过渡”实际上就是同一因果推理缺环，原文没有支持另一个独立的组织障碍。\",\"contentRisks\":[\"第二条建议“加一句说明如何从订单变化推断出首页改版的作用”，在原文没有给出任何区分依据的情况下，可能诱导补写原文未提供的事实或因果依据。\",\"第一条建议“补充能区分首页改版与其他因素的实际依据”同样要求原文未给出的事实，需限定为提示用户自行补充，而非由反馈代拟。\"]}",
+      "httpStatus": 200,
+      "responseModel": "deepseek-flash",
+      "usage": {
+        "prompt_tokens": 1674,
+        "completion_tokens": 155,
+        "total_tokens": 1829,
+        "prompt_tokens_details": {
+          "cached_tokens": 1408
+        },
+        "prompt_cache_hit_tokens": 1408,
+        "prompt_cache_miss_tokens": 266
+      },
+      "finishReason": "stop",
+      "parsed": {
+        "judgment": "duplicate",
+        "reason": "第一条指出的是把同期发生当作因果、并作出“完全”这一排他结论的论证问题；若该问题已修好（补充区分依据或降低结论强度），第二条所说的“缺少从观察到判断的过渡”实际上就是同一因果推理缺环，原文没有支持另一个独立的组织障碍。",
+        "contentRisks": [
+          "第二条建议“加一句说明如何从订单变化推断出首页改版的作用”，在原文没有给出任何区分依据的情况下，可能诱导补写原文未提供的事实或因果依据。",
+          "第一条建议“补充能区分首页改版与其他因素的实际依据”同样要求原文未给出的事实，需限定为提示用户自行补充，而非由反馈代拟。"
+        ]
+      },
+      "elapsedMs": 1748,
+      "rawSha256": "e8068327c940f4ceffe0098b0a0ce03d8d2af016ad7ca1e8c62279d91814ba00"
+    },
+    {
+      "sequence": 4,
+      "pair": "P2",
+      "variant": "ordinary",
+      "repeat": 1,
+      "startedAt": "2026-11-03T05:53:57.147Z",
+      "status": "completed",
+      "request": {
+        "model": "deepseek-chat",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你在核对表达训练反馈的问题划分，不生成或改写报告。用户消息提供完整原始输入和两条已有反馈。反馈是待检查的判断，不能当作已经证实的事实。判断这两条是在指出两个独立的表达障碍，还是重复指出同一障碍；材料不足以判断时可以保留不确定。以本次表达任务和原文为依据，不新增事实、因果、承诺或未给出的后续内容。\n只返回 JSON：{\"judgment\":\"independent 或 duplicate 或 uncertain\",\"reason\":\"简短、可用原文核查的判断理由\",\"contentRisks\":[\"已有反馈或建议存在的事实、限定条件或原意风险；没有则空数组\"]}。"
+          },
+          {
+            "role": "user",
+            "content": "{\"originalInput\":{\"schemaVersion\":1,\"sessionId\":\"synthetic-E05\",\"transcriptRevision\":1,\"transcript\":{\"segments\":[{\"id\":\"s1\",\"text\":\"试点组上月订单增加了。同期我们更换了首页。\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"},{\"id\":\"s2\",\"text\":\"因此，可以确定订单增长完全是首页改版带来的，应该立即全量推广。\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"}]},\"metricsDefinitionVersion\":\"common-metrics-v1\",\"metrics\":[{\"id\":\"metric:text-character-count\",\"metricId\":\"text-character-count\",\"label\":\"文字与数字字符数\",\"value\":47,\"unit\":\"characters\",\"status\":\"available\",\"reason\":null,\"evidenceRefs\":[\"s1\",\"s2\"]},{\"id\":\"metric:audio-duration-ms\",\"metricId\":\"audio-duration-ms\",\"label\":\"已保存录音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-count\",\"metricId\":\"filler-count\",\"label\":\"填充词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-count\",\"metricId\":\"hedge-count\",\"label\":\"犹豫词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:vague-word-count\",\"metricId\":\"vague-word-count\",\"label\":\"笼统词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-recorded-minute\",\"metricId\":\"text-rate-per-recorded-minute\",\"label\":\"每录音分钟字符数（含静音）\",\"value\":null,\"unit\":\"characters/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-rate-per-recorded-minute\",\"metricId\":\"filler-rate-per-recorded-minute\",\"label\":\"每录音分钟填充词命中次数\",\"value\":null,\"unit\":\"occurrences/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-character-percent\",\"metricId\":\"hedge-character-percent\",\"label\":\"犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-filler-hedge-character-percent\",\"metricId\":\"non-filler-hedge-character-percent\",\"label\":\"非填充词与犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:speech-duration-ms\",\"metricId\":\"speech-duration-ms\",\"label\":\"VAD 检测语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-speech-duration-ms\",\"metricId\":\"non-speech-duration-ms\",\"label\":\"VAD 检测非语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-count\",\"metricId\":\"between-speech-gap-count\",\"label\":\"语音区间之间的间隔次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-total-ms\",\"metricId\":\"between-speech-gap-total-ms\",\"label\":\"语音区间之间的间隔总时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-max-ms\",\"metricId\":\"between-speech-gap-max-ms\",\"label\":\"语音区间之间的最长间隔\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-speech-minute\",\"metricId\":\"text-rate-per-speech-minute\",\"label\":\"每检测语音分钟字符数（非逐字对齐）\",\"value\":null,\"unit\":\"characters/speech-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]}],\"speech\":{\"status\":\"unavailable\",\"sampleRateHz\":null,\"sampleCount\":null,\"segments\":[],\"provenance\":null,\"limitations\":[\"vad-unavailable\"]},\"trainingContext\":{\"trainingMode\":\"free\",\"framework\":null,\"frameworkDefinitionVersion\":null,\"trainingPrompt\":{\"schemaVersion\":2,\"topic\":{\"source\":\"user\",\"text\":\"向团队解释为什么应全面推广一次改版，完整论证。\"},\"scenario\":null}},\"frameworkDefinition\":null,\"analysisTarget\":null,\"quality\":{\"audio\":{\"status\":\"unavailable\",\"reasons\":[\"audio-unavailable\"]},\"timing\":{\"status\":\"degraded\",\"reasons\":[\"timing-unavailable\"]},\"vad\":{\"status\":\"unavailable\",\"reasons\":[\"vad-unavailable\"]},\"asr\":{\"status\":\"ok\",\"reasons\":[]}},\"analysisInstructions\":{\"schemaVersion\":1,\"goals\":\"\",\"customRules\":\"\",\"styleRef\":\"\",\"customWords\":\"\"},\"evidenceMap\":{\"s1\":{\"type\":\"transcript\",\"index\":0},\"s2\":{\"type\":\"transcript\",\"index\":1},\"metric:text-character-count\":{\"type\":\"metric\",\"index\":0}},\"allowedEvidenceRefs\":[\"s1\",\"s2\",\"metric:text-character-count\"]},\"feedback\":[{\"id\":\"common-1\",\"category\":\"argument\",\"observation\":\"原文只交代试点组订单增加与同期更换首页，随后直接说“可以确定订单增长完全是首页改版带来的”。\",\"interpretation\":\"同期发生不等于因果，听者无法判断是否还有其他因素，也难以评估“完全”这一排他结论。\",\"recommendation\":\"补充能区分首页改版与其他因素的实际依据，或把结论改为与现有证据相符的推测程度。\",\"evidenceRefs\":[\"s1\",\"s2\"],\"example\":null,\"exampleEvidenceRefs\":[]},{\"id\":\"common-3\",\"category\":\"organization\",\"observation\":\"先给出现象，再在第二句用“因此”直接给出确定结论和推广要求，中间缺少从观察到判断的过渡。\",\"interpretation\":\"结论与依据之间的推理过程被压缩，听者需要自行补足因果链条。\",\"recommendation\":\"在现象与结论之间加一句说明你如何从订单变化推断出首页改版的作用。\",\"evidenceRefs\":[\"s1\",\"s2\"],\"example\":null,\"exampleEvidenceRefs\":[]}]}"
+          }
+        ],
+        "max_tokens": 8192,
+        "response_format": {
+          "type": "json_object"
+        },
+        "temperature": 0.2
+      },
+      "raw": "{\"judgment\":\"independent\",\"reason\":\"common-1 针对“同期发生不等于因果”及“完全”这一排他结论；common-3 针对从观察到结论之间缺少推理过渡。两者分别指向因果证据不足和推理过程被压缩，虽都涉及 s1 到 s2 的衔接，但障碍点不同。\",\"contentRisks\":[\"common-1 的“听者无法判断是否还有其他因素”是对听者理解状态的推断，原文未直接给出听者反应。\",\"common-3 的“听者需要自行补足因果链条”同样是对听者认知负担的推断，原文未直接说明。\",\"两条建议都要求补充依据或过渡句，属于对原文未给出内容的建议，不应被当作原文已有事实。\"]}",
+      "httpStatus": 200,
+      "responseModel": "deepseek-flash",
+      "usage": {
+        "prompt_tokens": 1637,
+        "completion_tokens": 165,
+        "total_tokens": 1802,
+        "prompt_tokens_details": {
+          "cached_tokens": 1280
+        },
+        "prompt_cache_hit_tokens": 1280,
+        "prompt_cache_miss_tokens": 357
+      },
+      "finishReason": "stop",
+      "parsed": {
+        "judgment": "independent",
+        "reason": "common-1 针对“同期发生不等于因果”及“完全”这一排他结论；common-3 针对从观察到结论之间缺少推理过渡。两者分别指向因果证据不足和推理过程被压缩，虽都涉及 s1 到 s2 的衔接，但障碍点不同。",
+        "contentRisks": [
+          "common-1 的“听者无法判断是否还有其他因素”是对听者理解状态的推断，原文未直接给出听者反应。",
+          "common-3 的“听者需要自行补足因果链条”同样是对听者认知负担的推断，原文未直接说明。",
+          "两条建议都要求补充依据或过渡句，属于对原文未给出内容的建议，不应被当作原文已有事实。"
+        ]
+      },
+      "elapsedMs": 1875,
+      "rawSha256": "993c95d46292ddcd14bb54f8315686cb90b123065492f8ff543dfad9cafa4cc4"
+    },
+    {
+      "sequence": 5,
+      "pair": "P3",
+      "variant": "ordinary",
+      "repeat": 1,
+      "startedAt": "2026-11-03T05:53:59.133Z",
+      "status": "completed",
+      "request": {
+        "model": "deepseek-chat",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你在核对表达训练反馈的问题划分，不生成或改写报告。用户消息提供完整原始输入和两条已有反馈。反馈是待检查的判断，不能当作已经证实的事实。判断这两条是在指出两个独立的表达障碍，还是重复指出同一障碍；材料不足以判断时可以保留不确定。以本次表达任务和原文为依据，不新增事实、因果、承诺或未给出的后续内容。\n只返回 JSON：{\"judgment\":\"independent 或 duplicate 或 uncertain\",\"reason\":\"简短、可用原文核查的判断理由\",\"contentRisks\":[\"已有反馈或建议存在的事实、限定条件或原意风险；没有则空数组\"]}。"
+          },
+          {
+            "role": "user",
+            "content": "{\"originalInput\":{\"schemaVersion\":1,\"sessionId\":\"synthetic-E07\",\"transcriptRevision\":1,\"transcript\":{\"segments\":[{\"id\":\"s1\",\"text\":\"我先说上线时间，先说功能，不，还是说上线时间，刚才那个先不说，我们，还是先说功能……\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"}]},\"metricsDefinitionVersion\":\"common-metrics-v1\",\"metrics\":[{\"id\":\"metric:text-character-count\",\"metricId\":\"text-character-count\",\"label\":\"文字与数字字符数\",\"value\":34,\"unit\":\"characters\",\"status\":\"available\",\"reason\":null,\"evidenceRefs\":[\"s1\"]},{\"id\":\"metric:audio-duration-ms\",\"metricId\":\"audio-duration-ms\",\"label\":\"已保存录音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-count\",\"metricId\":\"filler-count\",\"label\":\"填充词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-count\",\"metricId\":\"hedge-count\",\"label\":\"犹豫词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:vague-word-count\",\"metricId\":\"vague-word-count\",\"label\":\"笼统词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-recorded-minute\",\"metricId\":\"text-rate-per-recorded-minute\",\"label\":\"每录音分钟字符数（含静音）\",\"value\":null,\"unit\":\"characters/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-rate-per-recorded-minute\",\"metricId\":\"filler-rate-per-recorded-minute\",\"label\":\"每录音分钟填充词命中次数\",\"value\":null,\"unit\":\"occurrences/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-character-percent\",\"metricId\":\"hedge-character-percent\",\"label\":\"犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-filler-hedge-character-percent\",\"metricId\":\"non-filler-hedge-character-percent\",\"label\":\"非填充词与犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:speech-duration-ms\",\"metricId\":\"speech-duration-ms\",\"label\":\"VAD 检测语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-speech-duration-ms\",\"metricId\":\"non-speech-duration-ms\",\"label\":\"VAD 检测非语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-count\",\"metricId\":\"between-speech-gap-count\",\"label\":\"语音区间之间的间隔次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-total-ms\",\"metricId\":\"between-speech-gap-total-ms\",\"label\":\"语音区间之间的间隔总时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-max-ms\",\"metricId\":\"between-speech-gap-max-ms\",\"label\":\"语音区间之间的最长间隔\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-speech-minute\",\"metricId\":\"text-rate-per-speech-minute\",\"label\":\"每检测语音分钟字符数（非逐字对齐）\",\"value\":null,\"unit\":\"characters/speech-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]}],\"speech\":{\"status\":\"unavailable\",\"sampleRateHz\":null,\"sampleCount\":null,\"segments\":[],\"provenance\":null,\"limitations\":[\"vad-unavailable\"]},\"trainingContext\":{\"trainingMode\":\"free\",\"framework\":null,\"frameworkDefinitionVersion\":null,\"trainingPrompt\":{\"schemaVersion\":2,\"topic\":{\"source\":\"user\",\"text\":\"只练汇报开头，要求先确定本段讲哪一点；不评价整篇完整性。\"},\"scenario\":null}},\"frameworkDefinition\":null,\"analysisTarget\":null,\"quality\":{\"audio\":{\"status\":\"unavailable\",\"reasons\":[\"audio-unavailable\"]},\"timing\":{\"status\":\"degraded\",\"reasons\":[\"timing-unavailable\"]},\"vad\":{\"status\":\"unavailable\",\"reasons\":[\"vad-unavailable\"]},\"asr\":{\"status\":\"ok\",\"reasons\":[]}},\"analysisInstructions\":{\"schemaVersion\":1,\"goals\":\"\",\"customRules\":\"\",\"styleRef\":\"\",\"customWords\":\"\"},\"evidenceMap\":{\"s1\":{\"type\":\"transcript\",\"index\":0},\"metric:text-character-count\":{\"type\":\"metric\",\"index\":0}},\"allowedEvidenceRefs\":[\"s1\",\"metric:text-character-count\"],\"practiceComparison\":{\"status\":\"unavailable\",\"reason\":\"source-unavailable\",\"goal\":{\"category\":\"delivery\",\"observation\":\"局部开头反复重启\",\"recommendation\":\"确定本段要点，再完成它\"},\"scope\":\"segment\"}},\"feedback\":[{\"id\":\"common-1\",\"category\":\"delivery\",\"observation\":\"同一句里先说“上线时间”，又改说“功能”，再回到“上线时间”，最后仍以“先说功能”收尾，多次重启没有形成确定的说法。\",\"interpretation\":\"听者无法确认本段究竟先讲哪一点，开头无法起到定方向的作用。\",\"recommendation\":\"下一轮先在心里选定“上线时间”或“功能”其中一个，再只用一个起句把它说完，不再中途改口。\",\"evidenceRefs\":[\"s1\"],\"example\":null,\"exampleEvidenceRefs\":[]},{\"id\":\"common-2\",\"category\":\"organization\",\"observation\":\"开头先交代“我先说上线时间”，随即自我否定并转向“功能”，方向在句内来回切换。\",\"interpretation\":\"本段要讲的重点没有在开头立住，听者需要跟着改口重新判断方向。\",\"recommendation\":\"把要讲的那一点放在第一句开头直接说出，再展开与它直接相关的内容。\",\"evidenceRefs\":[\"s1\"],\"example\":null,\"exampleEvidenceRefs\":[]}]}"
+          }
+        ],
+        "max_tokens": 8192,
+        "response_format": {
+          "type": "json_object"
+        },
+        "temperature": 0.2
+      },
+      "raw": "{\"judgment\":\"duplicate\",\"reason\":\"两条反馈都指向同一处原文现象：s1 中开头在“上线时间”和“功能”之间反复改口、未确定先讲哪一点；common-1 的“多次重启没有形成确定的说法”与 common-2 的“方向在句内来回切换”是对同一表达障碍的不同措辞，并非两个独立障碍。\",\"contentRisks\":[\"common-1 的“多次重启”在原文中可核查为两次改口，但“多次”的计数口径未给出，存在程度表述风险\",\"common-2 的“本段要讲的重点没有在开头立住”属于解释性判断，原文只显示改口，未直接给出重点是否立住\",\"两条建议都要求下一轮选定一点并直接说出，属于训练建议，不构成对本次已完成表达的后续事实或承诺\"]}",
+      "httpStatus": 200,
+      "responseModel": "deepseek-flash",
+      "usage": {
+        "prompt_tokens": 1646,
+        "completion_tokens": 189,
+        "total_tokens": 1835,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 1646
+      },
+      "finishReason": "stop",
+      "parsed": {
+        "judgment": "duplicate",
+        "reason": "两条反馈都指向同一处原文现象：s1 中开头在“上线时间”和“功能”之间反复改口、未确定先讲哪一点；common-1 的“多次重启没有形成确定的说法”与 common-2 的“方向在句内来回切换”是对同一表达障碍的不同措辞，并非两个独立障碍。",
+        "contentRisks": [
+          "common-1 的“多次重启”在原文中可核查为两次改口，但“多次”的计数口径未给出，存在程度表述风险",
+          "common-2 的“本段要讲的重点没有在开头立住”属于解释性判断，原文只显示改口，未直接给出重点是否立住",
+          "两条建议都要求下一轮选定一点并直接说出，属于训练建议，不构成对本次已完成表达的后续事实或承诺"
+        ]
+      },
+      "elapsedMs": 1664,
+      "rawSha256": "3e710d3b3a3f82e6c5ab2347d1a9cbdc71700894e8b16770fd1432db91ce62ed"
+    },
+    {
+      "sequence": 6,
+      "pair": "P3",
+      "variant": "residual",
+      "repeat": 1,
+      "startedAt": "2026-11-03T05:54:00.906Z",
+      "status": "completed",
+      "request": {
+        "model": "deepseek-chat",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你在核对表达训练反馈的问题划分，不生成或改写报告。用户消息提供完整原始输入和两条已有反馈。反馈是待检查的判断，不能当作已经证实的事实。判断这两条是在指出两个独立的表达障碍，还是重复指出同一障碍；材料不足以判断时可以保留不确定。以本次表达任务和原文为依据，不新增事实、因果、承诺或未给出的后续内容。\n只返回 JSON：{\"judgment\":\"independent 或 duplicate 或 uncertain\",\"reason\":\"简短、可用原文核查的判断理由\",\"contentRisks\":[\"已有反馈或建议存在的事实、限定条件或原意风险；没有则空数组\"]}。\n判断时请检查：假定第一条所指的实质问题已经修好，第二条是否仍有原文支持的独立障碍？在 reason 中说明剩余障碍；若没有，说明为何。"
+          },
+          {
+            "role": "user",
+            "content": "{\"originalInput\":{\"schemaVersion\":1,\"sessionId\":\"synthetic-E07\",\"transcriptRevision\":1,\"transcript\":{\"segments\":[{\"id\":\"s1\",\"text\":\"我先说上线时间，先说功能，不，还是说上线时间，刚才那个先不说，我们，还是先说功能……\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"}]},\"metricsDefinitionVersion\":\"common-metrics-v1\",\"metrics\":[{\"id\":\"metric:text-character-count\",\"metricId\":\"text-character-count\",\"label\":\"文字与数字字符数\",\"value\":34,\"unit\":\"characters\",\"status\":\"available\",\"reason\":null,\"evidenceRefs\":[\"s1\"]},{\"id\":\"metric:audio-duration-ms\",\"metricId\":\"audio-duration-ms\",\"label\":\"已保存录音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-count\",\"metricId\":\"filler-count\",\"label\":\"填充词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-count\",\"metricId\":\"hedge-count\",\"label\":\"犹豫词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:vague-word-count\",\"metricId\":\"vague-word-count\",\"label\":\"笼统词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-recorded-minute\",\"metricId\":\"text-rate-per-recorded-minute\",\"label\":\"每录音分钟字符数（含静音）\",\"value\":null,\"unit\":\"characters/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-rate-per-recorded-minute\",\"metricId\":\"filler-rate-per-recorded-minute\",\"label\":\"每录音分钟填充词命中次数\",\"value\":null,\"unit\":\"occurrences/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-character-percent\",\"metricId\":\"hedge-character-percent\",\"label\":\"犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-filler-hedge-character-percent\",\"metricId\":\"non-filler-hedge-character-percent\",\"label\":\"非填充词与犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:speech-duration-ms\",\"metricId\":\"speech-duration-ms\",\"label\":\"VAD 检测语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-speech-duration-ms\",\"metricId\":\"non-speech-duration-ms\",\"label\":\"VAD 检测非语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-count\",\"metricId\":\"between-speech-gap-count\",\"label\":\"语音区间之间的间隔次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-total-ms\",\"metricId\":\"between-speech-gap-total-ms\",\"label\":\"语音区间之间的间隔总时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-max-ms\",\"metricId\":\"between-speech-gap-max-ms\",\"label\":\"语音区间之间的最长间隔\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-speech-minute\",\"metricId\":\"text-rate-per-speech-minute\",\"label\":\"每检测语音分钟字符数（非逐字对齐）\",\"value\":null,\"unit\":\"characters/speech-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]}],\"speech\":{\"status\":\"unavailable\",\"sampleRateHz\":null,\"sampleCount\":null,\"segments\":[],\"provenance\":null,\"limitations\":[\"vad-unavailable\"]},\"trainingContext\":{\"trainingMode\":\"free\",\"framework\":null,\"frameworkDefinitionVersion\":null,\"trainingPrompt\":{\"schemaVersion\":2,\"topic\":{\"source\":\"user\",\"text\":\"只练汇报开头，要求先确定本段讲哪一点；不评价整篇完整性。\"},\"scenario\":null}},\"frameworkDefinition\":null,\"analysisTarget\":null,\"quality\":{\"audio\":{\"status\":\"unavailable\",\"reasons\":[\"audio-unavailable\"]},\"timing\":{\"status\":\"degraded\",\"reasons\":[\"timing-unavailable\"]},\"vad\":{\"status\":\"unavailable\",\"reasons\":[\"vad-unavailable\"]},\"asr\":{\"status\":\"ok\",\"reasons\":[]}},\"analysisInstructions\":{\"schemaVersion\":1,\"goals\":\"\",\"customRules\":\"\",\"styleRef\":\"\",\"customWords\":\"\"},\"evidenceMap\":{\"s1\":{\"type\":\"transcript\",\"index\":0},\"metric:text-character-count\":{\"type\":\"metric\",\"index\":0}},\"allowedEvidenceRefs\":[\"s1\",\"metric:text-character-count\"],\"practiceComparison\":{\"status\":\"unavailable\",\"reason\":\"source-unavailable\",\"goal\":{\"category\":\"delivery\",\"observation\":\"局部开头反复重启\",\"recommendation\":\"确定本段要点，再完成它\"},\"scope\":\"segment\"}},\"feedback\":[{\"id\":\"common-1\",\"category\":\"delivery\",\"observation\":\"同一句里先说“上线时间”，又改说“功能”，再回到“上线时间”，最后仍以“先说功能”收尾，多次重启没有形成确定的说法。\",\"interpretation\":\"听者无法确认本段究竟先讲哪一点，开头无法起到定方向的作用。\",\"recommendation\":\"下一轮先在心里选定“上线时间”或“功能”其中一个，再只用一个起句把它说完，不再中途改口。\",\"evidenceRefs\":[\"s1\"],\"example\":null,\"exampleEvidenceRefs\":[]},{\"id\":\"common-2\",\"category\":\"organization\",\"observation\":\"开头先交代“我先说上线时间”，随即自我否定并转向“功能”，方向在句内来回切换。\",\"interpretation\":\"本段要讲的重点没有在开头立住，听者需要跟着改口重新判断方向。\",\"recommendation\":\"把要讲的那一点放在第一句开头直接说出，再展开与它直接相关的内容。\",\"evidenceRefs\":[\"s1\"],\"example\":null,\"exampleEvidenceRefs\":[]}]}"
+          }
+        ],
+        "max_tokens": 8192,
+        "response_format": {
+          "type": "json_object"
+        },
+        "temperature": 0.2
+      },
+      "raw": "{\"judgment\":\"duplicate\",\"reason\":\"两条反馈都指向同一原文障碍：s1 中开头在“上线时间”和“功能”之间反复改口、未确定先讲哪一点。假定第一条所指的“多次重启未形成确定说法”已修好，第二条所说的“方向在句内来回切换、重点没在开头立住”也随之消失，没有独立的剩余障碍。\",\"contentRisks\":[\"两条反馈的 interpretation 都推断“听者无法确认/需要重新判断方向”，原文只有说话人自我改口，未提供听者反应，属于超出原文的推断。\",\"第一条建议“下一轮先在心里选定……再只用一个起句说完”引入了原文未给出的后续练习安排与心理过程，且“不再中途改口”是额外要求。\",\"第二条建议“再展开与它直接相关的内容”超出本次任务限定的“只练汇报开头”，引入了后续展开内容的要求。\"]}",
+      "httpStatus": 200,
+      "responseModel": "deepseek-flash",
+      "usage": {
+        "prompt_tokens": 1683,
+        "completion_tokens": 199,
+        "total_tokens": 1882,
+        "prompt_tokens_details": {
+          "cached_tokens": 0
+        },
+        "prompt_cache_hit_tokens": 0,
+        "prompt_cache_miss_tokens": 1683
+      },
+      "finishReason": "stop",
+      "parsed": {
+        "judgment": "duplicate",
+        "reason": "两条反馈都指向同一原文障碍：s1 中开头在“上线时间”和“功能”之间反复改口、未确定先讲哪一点。假定第一条所指的“多次重启未形成确定说法”已修好，第二条所说的“方向在句内来回切换、重点没在开头立住”也随之消失，没有独立的剩余障碍。",
+        "contentRisks": [
+          "两条反馈的 interpretation 都推断“听者无法确认/需要重新判断方向”，原文只有说话人自我改口，未提供听者反应，属于超出原文的推断。",
+          "第一条建议“下一轮先在心里选定……再只用一个起句说完”引入了原文未给出的后续练习安排与心理过程，且“不再中途改口”是额外要求。",
+          "第二条建议“再展开与它直接相关的内容”超出本次任务限定的“只练汇报开头”，引入了后续展开内容的要求。"
+        ]
+      },
+      "elapsedMs": 2182,
+      "rawSha256": "b46d87cc94589617812c25293894902a60e6aa1d4ef292ab24f291f5cd4143ed"
+    },
+    {
+      "sequence": 7,
+      "pair": "P1",
+      "variant": "residual",
+      "repeat": 2,
+      "startedAt": "2026-11-03T05:54:03.186Z",
+      "status": "completed",
+      "request": {
+        "model": "deepseek-chat",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你在核对表达训练反馈的问题划分，不生成或改写报告。用户消息提供完整原始输入和两条已有反馈。反馈是待检查的判断，不能当作已经证实的事实。判断这两条是在指出两个独立的表达障碍，还是重复指出同一障碍；材料不足以判断时可以保留不确定。以本次表达任务和原文为依据，不新增事实、因果、承诺或未给出的后续内容。\n只返回 JSON：{\"judgment\":\"independent 或 duplicate 或 uncertain\",\"reason\":\"简短、可用原文核查的判断理由\",\"contentRisks\":[\"已有反馈或建议存在的事实、限定条件或原意风险；没有则空数组\"]}。\n判断时请检查：假定第一条所指的实质问题已经修好，第二条是否仍有原文支持的独立障碍？在 reason 中说明剩余障碍；若没有，说明为何。"
+          },
+          {
+            "role": "user",
+            "content": "{\"originalInput\":{\"schemaVersion\":1,\"sessionId\":\"synthetic-E05\",\"transcriptRevision\":1,\"transcript\":{\"segments\":[{\"id\":\"s1\",\"text\":\"试点组上月订单增加了。同期我们更换了首页。\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"},{\"id\":\"s2\",\"text\":\"因此，可以确定订单增长完全是首页改版带来的，应该立即全量推广。\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"}]},\"metricsDefinitionVersion\":\"common-metrics-v1\",\"metrics\":[{\"id\":\"metric:text-character-count\",\"metricId\":\"text-character-count\",\"label\":\"文字与数字字符数\",\"value\":47,\"unit\":\"characters\",\"status\":\"available\",\"reason\":null,\"evidenceRefs\":[\"s1\",\"s2\"]},{\"id\":\"metric:audio-duration-ms\",\"metricId\":\"audio-duration-ms\",\"label\":\"已保存录音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-count\",\"metricId\":\"filler-count\",\"label\":\"填充词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-count\",\"metricId\":\"hedge-count\",\"label\":\"犹豫词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:vague-word-count\",\"metricId\":\"vague-word-count\",\"label\":\"笼统词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-recorded-minute\",\"metricId\":\"text-rate-per-recorded-minute\",\"label\":\"每录音分钟字符数（含静音）\",\"value\":null,\"unit\":\"characters/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-rate-per-recorded-minute\",\"metricId\":\"filler-rate-per-recorded-minute\",\"label\":\"每录音分钟填充词命中次数\",\"value\":null,\"unit\":\"occurrences/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-character-percent\",\"metricId\":\"hedge-character-percent\",\"label\":\"犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-filler-hedge-character-percent\",\"metricId\":\"non-filler-hedge-character-percent\",\"label\":\"非填充词与犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:speech-duration-ms\",\"metricId\":\"speech-duration-ms\",\"label\":\"VAD 检测语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-speech-duration-ms\",\"metricId\":\"non-speech-duration-ms\",\"label\":\"VAD 检测非语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-count\",\"metricId\":\"between-speech-gap-count\",\"label\":\"语音区间之间的间隔次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-total-ms\",\"metricId\":\"between-speech-gap-total-ms\",\"label\":\"语音区间之间的间隔总时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-max-ms\",\"metricId\":\"between-speech-gap-max-ms\",\"label\":\"语音区间之间的最长间隔\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-speech-minute\",\"metricId\":\"text-rate-per-speech-minute\",\"label\":\"每检测语音分钟字符数（非逐字对齐）\",\"value\":null,\"unit\":\"characters/speech-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]}],\"speech\":{\"status\":\"unavailable\",\"sampleRateHz\":null,\"sampleCount\":null,\"segments\":[],\"provenance\":null,\"limitations\":[\"vad-unavailable\"]},\"trainingContext\":{\"trainingMode\":\"free\",\"framework\":null,\"frameworkDefinitionVersion\":null,\"trainingPrompt\":{\"schemaVersion\":2,\"topic\":{\"source\":\"user\",\"text\":\"向团队解释为什么应全面推广一次改版，完整论证。\"},\"scenario\":null}},\"frameworkDefinition\":null,\"analysisTarget\":null,\"quality\":{\"audio\":{\"status\":\"unavailable\",\"reasons\":[\"audio-unavailable\"]},\"timing\":{\"status\":\"degraded\",\"reasons\":[\"timing-unavailable\"]},\"vad\":{\"status\":\"unavailable\",\"reasons\":[\"vad-unavailable\"]},\"asr\":{\"status\":\"ok\",\"reasons\":[]}},\"analysisInstructions\":{\"schemaVersion\":1,\"goals\":\"\",\"customRules\":\"\",\"styleRef\":\"\",\"customWords\":\"\"},\"evidenceMap\":{\"s1\":{\"type\":\"transcript\",\"index\":0},\"s2\":{\"type\":\"transcript\",\"index\":1},\"metric:text-character-count\":{\"type\":\"metric\",\"index\":0}},\"allowedEvidenceRefs\":[\"s1\",\"s2\",\"metric:text-character-count\"]},\"feedback\":[{\"id\":\"common-1\",\"category\":\"argument\",\"observation\":\"原文只交代试点组订单增加与同期更换首页，随后直接说“可以确定订单增长完全是首页改版带来的”。\",\"interpretation\":\"同期发生不等于因果，听者无法判断是否还有其他因素，也难以评估“完全”这一排他结论。\",\"recommendation\":\"补充能区分首页改版与其他因素的实际依据，或把结论改为与现有证据相符的推测程度。\",\"evidenceRefs\":[\"s1\",\"s2\"],\"example\":null,\"exampleEvidenceRefs\":[]},{\"id\":\"common-2\",\"category\":\"argument\",\"observation\":\"从“试点组上月订单增加了”直接跳到“应该立即全量推广”，中间没有说明试点范围与推广对象的关系。\",\"interpretation\":\"听者难以确认试点结果能否外推到全量用户，也无法判断“立即”的必要性。\",\"recommendation\":\"说明试点覆盖的人群与全量推广对象的可比性，并交代推广前是否需要进一步验证。\",\"evidenceRefs\":[\"s1\",\"s2\"],\"example\":null,\"exampleEvidenceRefs\":[]}]}"
+          }
+        ],
+        "max_tokens": 8192,
+        "response_format": {
+          "type": "json_object"
+        },
+        "temperature": 0.2
+      },
+      "raw": "{\"judgment\":\"independent\",\"reason\":\"第一条针对的是把同期发生直接说成“完全是首页改版带来的”这一因果与排他结论问题；即使补上区分其他因素的依据或弱化结论，第二条仍指出从“试点组”直接跳到“应该立即全量推广”缺少试点范围与推广对象可比性及“立即”必要性的说明，原文s1、s2支持这一独立障碍。\",\"contentRisks\":[\"第一条建议“补充能区分首页改版与其他因素的实际依据”可能超出原文已有信息，需避免暗示原文存在未给出的对照数据\",\"第二条建议“交代推广前是否需要进一步验证”属于新增后续安排，原文未提及验证计划，反馈应保持为表达缺口而非既定步骤\"]}",
+      "httpStatus": 200,
+      "responseModel": "deepseek-flash",
+      "usage": {
+        "prompt_tokens": 1675,
+        "completion_tokens": 157,
+        "total_tokens": 1832,
+        "prompt_tokens_details": {
+          "cached_tokens": 1536
+        },
+        "prompt_cache_hit_tokens": 1536,
+        "prompt_cache_miss_tokens": 139
+      },
+      "finishReason": "stop",
+      "parsed": {
+        "judgment": "independent",
+        "reason": "第一条针对的是把同期发生直接说成“完全是首页改版带来的”这一因果与排他结论问题；即使补上区分其他因素的依据或弱化结论，第二条仍指出从“试点组”直接跳到“应该立即全量推广”缺少试点范围与推广对象可比性及“立即”必要性的说明，原文s1、s2支持这一独立障碍。",
+        "contentRisks": [
+          "第一条建议“补充能区分首页改版与其他因素的实际依据”可能超出原文已有信息，需避免暗示原文存在未给出的对照数据",
+          "第二条建议“交代推广前是否需要进一步验证”属于新增后续安排，原文未提及验证计划，反馈应保持为表达缺口而非既定步骤"
+        ]
+      },
+      "elapsedMs": 1690,
+      "rawSha256": "93ba5f942b12f1620583e8f26122a1519bd1f4985052be2cbd14ab59f22a971c"
+    },
+    {
+      "sequence": 8,
+      "pair": "P1",
+      "variant": "ordinary",
+      "repeat": 2,
+      "startedAt": "2026-11-03T05:54:04.973Z",
+      "status": "completed",
+      "request": {
+        "model": "deepseek-chat",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你在核对表达训练反馈的问题划分，不生成或改写报告。用户消息提供完整原始输入和两条已有反馈。反馈是待检查的判断，不能当作已经证实的事实。判断这两条是在指出两个独立的表达障碍，还是重复指出同一障碍；材料不足以判断时可以保留不确定。以本次表达任务和原文为依据，不新增事实、因果、承诺或未给出的后续内容。\n只返回 JSON：{\"judgment\":\"independent 或 duplicate 或 uncertain\",\"reason\":\"简短、可用原文核查的判断理由\",\"contentRisks\":[\"已有反馈或建议存在的事实、限定条件或原意风险；没有则空数组\"]}。"
+          },
+          {
+            "role": "user",
+            "content": "{\"originalInput\":{\"schemaVersion\":1,\"sessionId\":\"synthetic-E05\",\"transcriptRevision\":1,\"transcript\":{\"segments\":[{\"id\":\"s1\",\"text\":\"试点组上月订单增加了。同期我们更换了首页。\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"},{\"id\":\"s2\",\"text\":\"因此，可以确定订单增长完全是首页改版带来的，应该立即全量推广。\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"}]},\"metricsDefinitionVersion\":\"common-metrics-v1\",\"metrics\":[{\"id\":\"metric:text-character-count\",\"metricId\":\"text-character-count\",\"label\":\"文字与数字字符数\",\"value\":47,\"unit\":\"characters\",\"status\":\"available\",\"reason\":null,\"evidenceRefs\":[\"s1\",\"s2\"]},{\"id\":\"metric:audio-duration-ms\",\"metricId\":\"audio-duration-ms\",\"label\":\"已保存录音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-count\",\"metricId\":\"filler-count\",\"label\":\"填充词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-count\",\"metricId\":\"hedge-count\",\"label\":\"犹豫词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:vague-word-count\",\"metricId\":\"vague-word-count\",\"label\":\"笼统词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-recorded-minute\",\"metricId\":\"text-rate-per-recorded-minute\",\"label\":\"每录音分钟字符数（含静音）\",\"value\":null,\"unit\":\"characters/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-rate-per-recorded-minute\",\"metricId\":\"filler-rate-per-recorded-minute\",\"label\":\"每录音分钟填充词命中次数\",\"value\":null,\"unit\":\"occurrences/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-character-percent\",\"metricId\":\"hedge-character-percent\",\"label\":\"犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-filler-hedge-character-percent\",\"metricId\":\"non-filler-hedge-character-percent\",\"label\":\"非填充词与犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:speech-duration-ms\",\"metricId\":\"speech-duration-ms\",\"label\":\"VAD 检测语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-speech-duration-ms\",\"metricId\":\"non-speech-duration-ms\",\"label\":\"VAD 检测非语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-count\",\"metricId\":\"between-speech-gap-count\",\"label\":\"语音区间之间的间隔次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-total-ms\",\"metricId\":\"between-speech-gap-total-ms\",\"label\":\"语音区间之间的间隔总时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-max-ms\",\"metricId\":\"between-speech-gap-max-ms\",\"label\":\"语音区间之间的最长间隔\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-speech-minute\",\"metricId\":\"text-rate-per-speech-minute\",\"label\":\"每检测语音分钟字符数（非逐字对齐）\",\"value\":null,\"unit\":\"characters/speech-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]}],\"speech\":{\"status\":\"unavailable\",\"sampleRateHz\":null,\"sampleCount\":null,\"segments\":[],\"provenance\":null,\"limitations\":[\"vad-unavailable\"]},\"trainingContext\":{\"trainingMode\":\"free\",\"framework\":null,\"frameworkDefinitionVersion\":null,\"trainingPrompt\":{\"schemaVersion\":2,\"topic\":{\"source\":\"user\",\"text\":\"向团队解释为什么应全面推广一次改版，完整论证。\"},\"scenario\":null}},\"frameworkDefinition\":null,\"analysisTarget\":null,\"quality\":{\"audio\":{\"status\":\"unavailable\",\"reasons\":[\"audio-unavailable\"]},\"timing\":{\"status\":\"degraded\",\"reasons\":[\"timing-unavailable\"]},\"vad\":{\"status\":\"unavailable\",\"reasons\":[\"vad-unavailable\"]},\"asr\":{\"status\":\"ok\",\"reasons\":[]}},\"analysisInstructions\":{\"schemaVersion\":1,\"goals\":\"\",\"customRules\":\"\",\"styleRef\":\"\",\"customWords\":\"\"},\"evidenceMap\":{\"s1\":{\"type\":\"transcript\",\"index\":0},\"s2\":{\"type\":\"transcript\",\"index\":1},\"metric:text-character-count\":{\"type\":\"metric\",\"index\":0}},\"allowedEvidenceRefs\":[\"s1\",\"s2\",\"metric:text-character-count\"]},\"feedback\":[{\"id\":\"common-1\",\"category\":\"argument\",\"observation\":\"原文只交代试点组订单增加与同期更换首页，随后直接说“可以确定订单增长完全是首页改版带来的”。\",\"interpretation\":\"同期发生不等于因果，听者无法判断是否还有其他因素，也难以评估“完全”这一排他结论。\",\"recommendation\":\"补充能区分首页改版与其他因素的实际依据，或把结论改为与现有证据相符的推测程度。\",\"evidenceRefs\":[\"s1\",\"s2\"],\"example\":null,\"exampleEvidenceRefs\":[]},{\"id\":\"common-2\",\"category\":\"argument\",\"observation\":\"从“试点组上月订单增加了”直接跳到“应该立即全量推广”，中间没有说明试点范围与推广对象的关系。\",\"interpretation\":\"听者难以确认试点结果能否外推到全量用户，也无法判断“立即”的必要性。\",\"recommendation\":\"说明试点覆盖的人群与全量推广对象的可比性，并交代推广前是否需要进一步验证。\",\"evidenceRefs\":[\"s1\",\"s2\"],\"example\":null,\"exampleEvidenceRefs\":[]}]}"
+          }
+        ],
+        "max_tokens": 8192,
+        "response_format": {
+          "type": "json_object"
+        },
+        "temperature": 0.2
+      },
+      "raw": "{\"judgment\":\"independent\",\"reason\":\"common-1针对“同期发生”被直接说成“完全”因果，common-2针对试点结果直接跳到“立即全量推广”的外推与时机问题；两者分别指向因果断言和推广结论两个不同表达障碍，原文s1、s2可分别核查。\",\"contentRisks\":[\"common-1建议“把结论改为与现有证据相符的推测程度”，但原文未给出可接受的推测程度或依据，属于建议性补充而非原文事实。\",\"common-2建议“说明试点覆盖的人群与全量推广对象的可比性”，原文未提供试点人群或推广对象信息，该建议依赖未给出的事实。\"]}",
+      "httpStatus": 200,
+      "responseModel": "deepseek-flash",
+      "usage": {
+        "prompt_tokens": 1638,
+        "completion_tokens": 147,
+        "total_tokens": 1785,
+        "prompt_tokens_details": {
+          "cached_tokens": 1408
+        },
+        "prompt_cache_hit_tokens": 1408,
+        "prompt_cache_miss_tokens": 230
+      },
+      "finishReason": "stop",
+      "parsed": {
+        "judgment": "independent",
+        "reason": "common-1针对“同期发生”被直接说成“完全”因果，common-2针对试点结果直接跳到“立即全量推广”的外推与时机问题；两者分别指向因果断言和推广结论两个不同表达障碍，原文s1、s2可分别核查。",
+        "contentRisks": [
+          "common-1建议“把结论改为与现有证据相符的推测程度”，但原文未给出可接受的推测程度或依据，属于建议性补充而非原文事实。",
+          "common-2建议“说明试点覆盖的人群与全量推广对象的可比性”，原文未提供试点人群或推广对象信息，该建议依赖未给出的事实。"
+        ]
+      },
+      "elapsedMs": 1724,
+      "rawSha256": "c199ca214ca80d84f2dcbea8445738dd78331b44f61d3e05fa477398b6b2e3d9"
+    },
+    {
+      "sequence": 9,
+      "pair": "P2",
+      "variant": "ordinary",
+      "repeat": 2,
+      "startedAt": "2026-11-03T05:54:06.792Z",
+      "status": "completed",
+      "request": {
+        "model": "deepseek-chat",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你在核对表达训练反馈的问题划分，不生成或改写报告。用户消息提供完整原始输入和两条已有反馈。反馈是待检查的判断，不能当作已经证实的事实。判断这两条是在指出两个独立的表达障碍，还是重复指出同一障碍；材料不足以判断时可以保留不确定。以本次表达任务和原文为依据，不新增事实、因果、承诺或未给出的后续内容。\n只返回 JSON：{\"judgment\":\"independent 或 duplicate 或 uncertain\",\"reason\":\"简短、可用原文核查的判断理由\",\"contentRisks\":[\"已有反馈或建议存在的事实、限定条件或原意风险；没有则空数组\"]}。"
+          },
+          {
+            "role": "user",
+            "content": "{\"originalInput\":{\"schemaVersion\":1,\"sessionId\":\"synthetic-E05\",\"transcriptRevision\":1,\"transcript\":{\"segments\":[{\"id\":\"s1\",\"text\":\"试点组上月订单增加了。同期我们更换了首页。\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"},{\"id\":\"s2\",\"text\":\"因此，可以确定订单增长完全是首页改版带来的，应该立即全量推广。\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"}]},\"metricsDefinitionVersion\":\"common-metrics-v1\",\"metrics\":[{\"id\":\"metric:text-character-count\",\"metricId\":\"text-character-count\",\"label\":\"文字与数字字符数\",\"value\":47,\"unit\":\"characters\",\"status\":\"available\",\"reason\":null,\"evidenceRefs\":[\"s1\",\"s2\"]},{\"id\":\"metric:audio-duration-ms\",\"metricId\":\"audio-duration-ms\",\"label\":\"已保存录音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-count\",\"metricId\":\"filler-count\",\"label\":\"填充词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-count\",\"metricId\":\"hedge-count\",\"label\":\"犹豫词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:vague-word-count\",\"metricId\":\"vague-word-count\",\"label\":\"笼统词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-recorded-minute\",\"metricId\":\"text-rate-per-recorded-minute\",\"label\":\"每录音分钟字符数（含静音）\",\"value\":null,\"unit\":\"characters/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-rate-per-recorded-minute\",\"metricId\":\"filler-rate-per-recorded-minute\",\"label\":\"每录音分钟填充词命中次数\",\"value\":null,\"unit\":\"occurrences/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-character-percent\",\"metricId\":\"hedge-character-percent\",\"label\":\"犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-filler-hedge-character-percent\",\"metricId\":\"non-filler-hedge-character-percent\",\"label\":\"非填充词与犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:speech-duration-ms\",\"metricId\":\"speech-duration-ms\",\"label\":\"VAD 检测语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-speech-duration-ms\",\"metricId\":\"non-speech-duration-ms\",\"label\":\"VAD 检测非语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-count\",\"metricId\":\"between-speech-gap-count\",\"label\":\"语音区间之间的间隔次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-total-ms\",\"metricId\":\"between-speech-gap-total-ms\",\"label\":\"语音区间之间的间隔总时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-max-ms\",\"metricId\":\"between-speech-gap-max-ms\",\"label\":\"语音区间之间的最长间隔\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-speech-minute\",\"metricId\":\"text-rate-per-speech-minute\",\"label\":\"每检测语音分钟字符数（非逐字对齐）\",\"value\":null,\"unit\":\"characters/speech-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]}],\"speech\":{\"status\":\"unavailable\",\"sampleRateHz\":null,\"sampleCount\":null,\"segments\":[],\"provenance\":null,\"limitations\":[\"vad-unavailable\"]},\"trainingContext\":{\"trainingMode\":\"free\",\"framework\":null,\"frameworkDefinitionVersion\":null,\"trainingPrompt\":{\"schemaVersion\":2,\"topic\":{\"source\":\"user\",\"text\":\"向团队解释为什么应全面推广一次改版，完整论证。\"},\"scenario\":null}},\"frameworkDefinition\":null,\"analysisTarget\":null,\"quality\":{\"audio\":{\"status\":\"unavailable\",\"reasons\":[\"audio-unavailable\"]},\"timing\":{\"status\":\"degraded\",\"reasons\":[\"timing-unavailable\"]},\"vad\":{\"status\":\"unavailable\",\"reasons\":[\"vad-unavailable\"]},\"asr\":{\"status\":\"ok\",\"reasons\":[]}},\"analysisInstructions\":{\"schemaVersion\":1,\"goals\":\"\",\"customRules\":\"\",\"styleRef\":\"\",\"customWords\":\"\"},\"evidenceMap\":{\"s1\":{\"type\":\"transcript\",\"index\":0},\"s2\":{\"type\":\"transcript\",\"index\":1},\"metric:text-character-count\":{\"type\":\"metric\",\"index\":0}},\"allowedEvidenceRefs\":[\"s1\",\"s2\",\"metric:text-character-count\"]},\"feedback\":[{\"id\":\"common-1\",\"category\":\"argument\",\"observation\":\"原文只交代试点组订单增加与同期更换首页，随后直接说“可以确定订单增长完全是首页改版带来的”。\",\"interpretation\":\"同期发生不等于因果，听者无法判断是否还有其他因素，也难以评估“完全”这一排他结论。\",\"recommendation\":\"补充能区分首页改版与其他因素的实际依据，或把结论改为与现有证据相符的推测程度。\",\"evidenceRefs\":[\"s1\",\"s2\"],\"example\":null,\"exampleEvidenceRefs\":[]},{\"id\":\"common-3\",\"category\":\"organization\",\"observation\":\"先给出现象，再在第二句用“因此”直接给出确定结论和推广要求，中间缺少从观察到判断的过渡。\",\"interpretation\":\"结论与依据之间的推理过程被压缩，听者需要自行补足因果链条。\",\"recommendation\":\"在现象与结论之间加一句说明你如何从订单变化推断出首页改版的作用。\",\"evidenceRefs\":[\"s1\",\"s2\"],\"example\":null,\"exampleEvidenceRefs\":[]}]}"
+          }
+        ],
+        "max_tokens": 8192,
+        "response_format": {
+          "type": "json_object"
+        },
+        "temperature": 0.2
+      },
+      "raw": "{\"judgment\":\"independent\",\"reason\":\"common-1 针对的是“同期发生不等于因果”以及“完全”这一排他结论的证据不足；common-3 针对的是从观察到结论之间缺少推理过渡。两者分别指向证据/结论强度问题和组织衔接问题，虽都引用 s1、s2，但指出的表达障碍不同。\",\"contentRisks\":[\"common-1 的解读称“听者无法判断是否还有其他因素”，属于对听者认知的推断，原文未提供听者反应信息。\",\"common-3 称“中间缺少从观察到判断的过渡”，是对文本结构的判断；原文第二句确有“因此”，但未展开推理，需注意不要表述为完全无连接词。\",\"两条反馈的建议均要求补充依据或推理说明，属于对原文未给出内容的建议，不应被当作原文已有事实。\"]}",
+      "httpStatus": 200,
+      "responseModel": "deepseek-flash",
+      "usage": {
+        "prompt_tokens": 1637,
+        "completion_tokens": 183,
+        "total_tokens": 1820,
+        "prompt_tokens_details": {
+          "cached_tokens": 1408
+        },
+        "prompt_cache_hit_tokens": 1408,
+        "prompt_cache_miss_tokens": 229
+      },
+      "finishReason": "stop",
+      "parsed": {
+        "judgment": "independent",
+        "reason": "common-1 针对的是“同期发生不等于因果”以及“完全”这一排他结论的证据不足；common-3 针对的是从观察到结论之间缺少推理过渡。两者分别指向证据/结论强度问题和组织衔接问题，虽都引用 s1、s2，但指出的表达障碍不同。",
+        "contentRisks": [
+          "common-1 的解读称“听者无法判断是否还有其他因素”，属于对听者认知的推断，原文未提供听者反应信息。",
+          "common-3 称“中间缺少从观察到判断的过渡”，是对文本结构的判断；原文第二句确有“因此”，但未展开推理，需注意不要表述为完全无连接词。",
+          "两条反馈的建议均要求补充依据或推理说明，属于对原文未给出内容的建议，不应被当作原文已有事实。"
+        ]
+      },
+      "elapsedMs": 1919,
+      "rawSha256": "cf3c1009ad850131f2e7c6edeb875bb5f0a783a27f566239ae3cc9c5b47802dc"
+    },
+    {
+      "sequence": 10,
+      "pair": "P2",
+      "variant": "residual",
+      "repeat": 2,
+      "startedAt": "2026-11-03T05:54:08.810Z",
+      "status": "completed",
+      "request": {
+        "model": "deepseek-chat",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你在核对表达训练反馈的问题划分，不生成或改写报告。用户消息提供完整原始输入和两条已有反馈。反馈是待检查的判断，不能当作已经证实的事实。判断这两条是在指出两个独立的表达障碍，还是重复指出同一障碍；材料不足以判断时可以保留不确定。以本次表达任务和原文为依据，不新增事实、因果、承诺或未给出的后续内容。\n只返回 JSON：{\"judgment\":\"independent 或 duplicate 或 uncertain\",\"reason\":\"简短、可用原文核查的判断理由\",\"contentRisks\":[\"已有反馈或建议存在的事实、限定条件或原意风险；没有则空数组\"]}。\n判断时请检查：假定第一条所指的实质问题已经修好，第二条是否仍有原文支持的独立障碍？在 reason 中说明剩余障碍；若没有，说明为何。"
+          },
+          {
+            "role": "user",
+            "content": "{\"originalInput\":{\"schemaVersion\":1,\"sessionId\":\"synthetic-E05\",\"transcriptRevision\":1,\"transcript\":{\"segments\":[{\"id\":\"s1\",\"text\":\"试点组上月订单增加了。同期我们更换了首页。\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"},{\"id\":\"s2\",\"text\":\"因此，可以确定订单增长完全是首页改版带来的，应该立即全量推广。\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"}]},\"metricsDefinitionVersion\":\"common-metrics-v1\",\"metrics\":[{\"id\":\"metric:text-character-count\",\"metricId\":\"text-character-count\",\"label\":\"文字与数字字符数\",\"value\":47,\"unit\":\"characters\",\"status\":\"available\",\"reason\":null,\"evidenceRefs\":[\"s1\",\"s2\"]},{\"id\":\"metric:audio-duration-ms\",\"metricId\":\"audio-duration-ms\",\"label\":\"已保存录音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-count\",\"metricId\":\"filler-count\",\"label\":\"填充词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-count\",\"metricId\":\"hedge-count\",\"label\":\"犹豫词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:vague-word-count\",\"metricId\":\"vague-word-count\",\"label\":\"笼统词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-recorded-minute\",\"metricId\":\"text-rate-per-recorded-minute\",\"label\":\"每录音分钟字符数（含静音）\",\"value\":null,\"unit\":\"characters/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-rate-per-recorded-minute\",\"metricId\":\"filler-rate-per-recorded-minute\",\"label\":\"每录音分钟填充词命中次数\",\"value\":null,\"unit\":\"occurrences/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-character-percent\",\"metricId\":\"hedge-character-percent\",\"label\":\"犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-filler-hedge-character-percent\",\"metricId\":\"non-filler-hedge-character-percent\",\"label\":\"非填充词与犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:speech-duration-ms\",\"metricId\":\"speech-duration-ms\",\"label\":\"VAD 检测语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-speech-duration-ms\",\"metricId\":\"non-speech-duration-ms\",\"label\":\"VAD 检测非语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-count\",\"metricId\":\"between-speech-gap-count\",\"label\":\"语音区间之间的间隔次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-total-ms\",\"metricId\":\"between-speech-gap-total-ms\",\"label\":\"语音区间之间的间隔总时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-max-ms\",\"metricId\":\"between-speech-gap-max-ms\",\"label\":\"语音区间之间的最长间隔\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-speech-minute\",\"metricId\":\"text-rate-per-speech-minute\",\"label\":\"每检测语音分钟字符数（非逐字对齐）\",\"value\":null,\"unit\":\"characters/speech-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]}],\"speech\":{\"status\":\"unavailable\",\"sampleRateHz\":null,\"sampleCount\":null,\"segments\":[],\"provenance\":null,\"limitations\":[\"vad-unavailable\"]},\"trainingContext\":{\"trainingMode\":\"free\",\"framework\":null,\"frameworkDefinitionVersion\":null,\"trainingPrompt\":{\"schemaVersion\":2,\"topic\":{\"source\":\"user\",\"text\":\"向团队解释为什么应全面推广一次改版，完整论证。\"},\"scenario\":null}},\"frameworkDefinition\":null,\"analysisTarget\":null,\"quality\":{\"audio\":{\"status\":\"unavailable\",\"reasons\":[\"audio-unavailable\"]},\"timing\":{\"status\":\"degraded\",\"reasons\":[\"timing-unavailable\"]},\"vad\":{\"status\":\"unavailable\",\"reasons\":[\"vad-unavailable\"]},\"asr\":{\"status\":\"ok\",\"reasons\":[]}},\"analysisInstructions\":{\"schemaVersion\":1,\"goals\":\"\",\"customRules\":\"\",\"styleRef\":\"\",\"customWords\":\"\"},\"evidenceMap\":{\"s1\":{\"type\":\"transcript\",\"index\":0},\"s2\":{\"type\":\"transcript\",\"index\":1},\"metric:text-character-count\":{\"type\":\"metric\",\"index\":0}},\"allowedEvidenceRefs\":[\"s1\",\"s2\",\"metric:text-character-count\"]},\"feedback\":[{\"id\":\"common-1\",\"category\":\"argument\",\"observation\":\"原文只交代试点组订单增加与同期更换首页，随后直接说“可以确定订单增长完全是首页改版带来的”。\",\"interpretation\":\"同期发生不等于因果，听者无法判断是否还有其他因素，也难以评估“完全”这一排他结论。\",\"recommendation\":\"补充能区分首页改版与其他因素的实际依据，或把结论改为与现有证据相符的推测程度。\",\"evidenceRefs\":[\"s1\",\"s2\"],\"example\":null,\"exampleEvidenceRefs\":[]},{\"id\":\"common-3\",\"category\":\"organization\",\"observation\":\"先给出现象，再在第二句用“因此”直接给出确定结论和推广要求，中间缺少从观察到判断的过渡。\",\"interpretation\":\"结论与依据之间的推理过程被压缩，听者需要自行补足因果链条。\",\"recommendation\":\"在现象与结论之间加一句说明你如何从订单变化推断出首页改版的作用。\",\"evidenceRefs\":[\"s1\",\"s2\"],\"example\":null,\"exampleEvidenceRefs\":[]}]}"
+          }
+        ],
+        "max_tokens": 8192,
+        "response_format": {
+          "type": "json_object"
+        },
+        "temperature": 0.2
+      },
+      "raw": "{\"judgment\":\"uncertain\",\"reason\":\"第一条针对的是因果推断本身（同期不等于因果、'完全'排他结论缺乏依据）；第二条针对的是从观察到结论之间缺少推理过渡。若第一条的实质问题（补充区分依据或弱化结论）已修好，第二条所指的'缺少过渡'是否仍独立存在，取决于修改后是否显式呈现推理步骤，原文无法确定；两条观察点不同但高度重叠，材料不足以判定独立或重复。\",\"contentRisks\":[\"第二条建议'加一句说明如何推断'可能被理解为要求补出原文未给出的推理依据，存在新增事实风险\",\"第一条'补充实际依据'若被当作可直接生成的内容，可能引入原文没有的因素或数据\",\"两条均未限定'完全'一词的排他性程度，修改建议可能改变原意强度\"]}",
+      "httpStatus": 200,
+      "responseModel": "deepseek-flash",
+      "usage": {
+        "prompt_tokens": 1674,
+        "completion_tokens": 176,
+        "total_tokens": 1850,
+        "prompt_tokens_details": {
+          "cached_tokens": 1536
+        },
+        "prompt_cache_hit_tokens": 1536,
+        "prompt_cache_miss_tokens": 138
+      },
+      "finishReason": "stop",
+      "parsed": {
+        "judgment": "uncertain",
+        "reason": "第一条针对的是因果推断本身（同期不等于因果、'完全'排他结论缺乏依据）；第二条针对的是从观察到结论之间缺少推理过渡。若第一条的实质问题（补充区分依据或弱化结论）已修好，第二条所指的'缺少过渡'是否仍独立存在，取决于修改后是否显式呈现推理步骤，原文无法确定；两条观察点不同但高度重叠，材料不足以判定独立或重复。",
+        "contentRisks": [
+          "第二条建议'加一句说明如何推断'可能被理解为要求补出原文未给出的推理依据，存在新增事实风险",
+          "第一条'补充实际依据'若被当作可直接生成的内容，可能引入原文没有的因素或数据",
+          "两条均未限定'完全'一词的排他性程度，修改建议可能改变原意强度"
+        ]
+      },
+      "elapsedMs": 2241,
+      "rawSha256": "8b6ba068b5afae80a988b2698056d2818baf49a6c2308cc9c0a336e3cf1e7328"
+    },
+    {
+      "sequence": 11,
+      "pair": "P3",
+      "variant": "residual",
+      "repeat": 2,
+      "startedAt": "2026-11-03T05:54:11.143Z",
+      "status": "completed",
+      "request": {
+        "model": "deepseek-chat",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你在核对表达训练反馈的问题划分，不生成或改写报告。用户消息提供完整原始输入和两条已有反馈。反馈是待检查的判断，不能当作已经证实的事实。判断这两条是在指出两个独立的表达障碍，还是重复指出同一障碍；材料不足以判断时可以保留不确定。以本次表达任务和原文为依据，不新增事实、因果、承诺或未给出的后续内容。\n只返回 JSON：{\"judgment\":\"independent 或 duplicate 或 uncertain\",\"reason\":\"简短、可用原文核查的判断理由\",\"contentRisks\":[\"已有反馈或建议存在的事实、限定条件或原意风险；没有则空数组\"]}。\n判断时请检查：假定第一条所指的实质问题已经修好，第二条是否仍有原文支持的独立障碍？在 reason 中说明剩余障碍；若没有，说明为何。"
+          },
+          {
+            "role": "user",
+            "content": "{\"originalInput\":{\"schemaVersion\":1,\"sessionId\":\"synthetic-E07\",\"transcriptRevision\":1,\"transcript\":{\"segments\":[{\"id\":\"s1\",\"text\":\"我先说上线时间，先说功能，不，还是说上线时间，刚才那个先不说，我们，还是先说功能……\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"}]},\"metricsDefinitionVersion\":\"common-metrics-v1\",\"metrics\":[{\"id\":\"metric:text-character-count\",\"metricId\":\"text-character-count\",\"label\":\"文字与数字字符数\",\"value\":34,\"unit\":\"characters\",\"status\":\"available\",\"reason\":null,\"evidenceRefs\":[\"s1\"]},{\"id\":\"metric:audio-duration-ms\",\"metricId\":\"audio-duration-ms\",\"label\":\"已保存录音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-count\",\"metricId\":\"filler-count\",\"label\":\"填充词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-count\",\"metricId\":\"hedge-count\",\"label\":\"犹豫词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:vague-word-count\",\"metricId\":\"vague-word-count\",\"label\":\"笼统词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-recorded-minute\",\"metricId\":\"text-rate-per-recorded-minute\",\"label\":\"每录音分钟字符数（含静音）\",\"value\":null,\"unit\":\"characters/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-rate-per-recorded-minute\",\"metricId\":\"filler-rate-per-recorded-minute\",\"label\":\"每录音分钟填充词命中次数\",\"value\":null,\"unit\":\"occurrences/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-character-percent\",\"metricId\":\"hedge-character-percent\",\"label\":\"犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-filler-hedge-character-percent\",\"metricId\":\"non-filler-hedge-character-percent\",\"label\":\"非填充词与犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:speech-duration-ms\",\"metricId\":\"speech-duration-ms\",\"label\":\"VAD 检测语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-speech-duration-ms\",\"metricId\":\"non-speech-duration-ms\",\"label\":\"VAD 检测非语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-count\",\"metricId\":\"between-speech-gap-count\",\"label\":\"语音区间之间的间隔次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-total-ms\",\"metricId\":\"between-speech-gap-total-ms\",\"label\":\"语音区间之间的间隔总时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-max-ms\",\"metricId\":\"between-speech-gap-max-ms\",\"label\":\"语音区间之间的最长间隔\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-speech-minute\",\"metricId\":\"text-rate-per-speech-minute\",\"label\":\"每检测语音分钟字符数（非逐字对齐）\",\"value\":null,\"unit\":\"characters/speech-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]}],\"speech\":{\"status\":\"unavailable\",\"sampleRateHz\":null,\"sampleCount\":null,\"segments\":[],\"provenance\":null,\"limitations\":[\"vad-unavailable\"]},\"trainingContext\":{\"trainingMode\":\"free\",\"framework\":null,\"frameworkDefinitionVersion\":null,\"trainingPrompt\":{\"schemaVersion\":2,\"topic\":{\"source\":\"user\",\"text\":\"只练汇报开头，要求先确定本段讲哪一点；不评价整篇完整性。\"},\"scenario\":null}},\"frameworkDefinition\":null,\"analysisTarget\":null,\"quality\":{\"audio\":{\"status\":\"unavailable\",\"reasons\":[\"audio-unavailable\"]},\"timing\":{\"status\":\"degraded\",\"reasons\":[\"timing-unavailable\"]},\"vad\":{\"status\":\"unavailable\",\"reasons\":[\"vad-unavailable\"]},\"asr\":{\"status\":\"ok\",\"reasons\":[]}},\"analysisInstructions\":{\"schemaVersion\":1,\"goals\":\"\",\"customRules\":\"\",\"styleRef\":\"\",\"customWords\":\"\"},\"evidenceMap\":{\"s1\":{\"type\":\"transcript\",\"index\":0},\"metric:text-character-count\":{\"type\":\"metric\",\"index\":0}},\"allowedEvidenceRefs\":[\"s1\",\"metric:text-character-count\"],\"practiceComparison\":{\"status\":\"unavailable\",\"reason\":\"source-unavailable\",\"goal\":{\"category\":\"delivery\",\"observation\":\"局部开头反复重启\",\"recommendation\":\"确定本段要点，再完成它\"},\"scope\":\"segment\"}},\"feedback\":[{\"id\":\"common-1\",\"category\":\"delivery\",\"observation\":\"同一句里先说“上线时间”，又改说“功能”，再回到“上线时间”，最后仍以“先说功能”收尾，多次重启没有形成确定的说法。\",\"interpretation\":\"听者无法确认本段究竟先讲哪一点，开头无法起到定方向的作用。\",\"recommendation\":\"下一轮先在心里选定“上线时间”或“功能”其中一个，再只用一个起句把它说完，不再中途改口。\",\"evidenceRefs\":[\"s1\"],\"example\":null,\"exampleEvidenceRefs\":[]},{\"id\":\"common-2\",\"category\":\"organization\",\"observation\":\"开头先交代“我先说上线时间”，随即自我否定并转向“功能”，方向在句内来回切换。\",\"interpretation\":\"本段要讲的重点没有在开头立住，听者需要跟着改口重新判断方向。\",\"recommendation\":\"把要讲的那一点放在第一句开头直接说出，再展开与它直接相关的内容。\",\"evidenceRefs\":[\"s1\"],\"example\":null,\"exampleEvidenceRefs\":[]}]}"
+          }
+        ],
+        "max_tokens": 8192,
+        "response_format": {
+          "type": "json_object"
+        },
+        "temperature": 0.2
+      },
+      "raw": "{\"judgment\":\"duplicate\",\"reason\":\"两条反馈都指向同一处原文现象：开头在“上线时间”和“功能”之间反复改口、未确定先讲哪一点。假定第一条所指的“多次重启、未形成确定说法”已修好（即已选定一点并只用一个起句说完），第二条所指的“方向在句内来回切换、重点没在开头立住”也随之消失，原文中不存在另一处独立的表达障碍。\",\"contentRisks\":[\"两条反馈均把“听者无法确认/需要重新判断方向”作为听者反应写入，但原文只有转写文本，未提供听者反馈或实际收听证据，属于推断而非原文事实。\",\"第二条将问题归为“organization（组织）”，而原文任务限定为“只练汇报开头、先确定本段讲哪一点”，且不评价整篇完整性；该归类可能超出本次训练范围。\",\"两条建议都要求“下一轮”如何做，属于对后续练习的指示，原文未给出后续安排。\"]}",
+      "httpStatus": 200,
+      "responseModel": "deepseek-flash",
+      "usage": {
+        "prompt_tokens": 1683,
+        "completion_tokens": 222,
+        "total_tokens": 1905,
+        "prompt_tokens_details": {
+          "cached_tokens": 1536
+        },
+        "prompt_cache_hit_tokens": 1536,
+        "prompt_cache_miss_tokens": 147
+      },
+      "finishReason": "stop",
+      "parsed": {
+        "judgment": "duplicate",
+        "reason": "两条反馈都指向同一处原文现象：开头在“上线时间”和“功能”之间反复改口、未确定先讲哪一点。假定第一条所指的“多次重启、未形成确定说法”已修好（即已选定一点并只用一个起句说完），第二条所指的“方向在句内来回切换、重点没在开头立住”也随之消失，原文中不存在另一处独立的表达障碍。",
+        "contentRisks": [
+          "两条反馈均把“听者无法确认/需要重新判断方向”作为听者反应写入，但原文只有转写文本，未提供听者反馈或实际收听证据，属于推断而非原文事实。",
+          "第二条将问题归为“organization（组织）”，而原文任务限定为“只练汇报开头、先确定本段讲哪一点”，且不评价整篇完整性；该归类可能超出本次训练范围。",
+          "两条建议都要求“下一轮”如何做，属于对后续练习的指示，原文未给出后续安排。"
+        ]
+      },
+      "elapsedMs": 2278,
+      "rawSha256": "57f5feabd6c68e12428715b594f649eb403d5fa446dca526737cb5d31f2ea2df"
+    },
+    {
+      "sequence": 12,
+      "pair": "P3",
+      "variant": "ordinary",
+      "repeat": 2,
+      "startedAt": "2026-11-03T05:54:13.515Z",
+      "status": "completed",
+      "request": {
+        "model": "deepseek-chat",
+        "messages": [
+          {
+            "role": "system",
+            "content": "你在核对表达训练反馈的问题划分，不生成或改写报告。用户消息提供完整原始输入和两条已有反馈。反馈是待检查的判断，不能当作已经证实的事实。判断这两条是在指出两个独立的表达障碍，还是重复指出同一障碍；材料不足以判断时可以保留不确定。以本次表达任务和原文为依据，不新增事实、因果、承诺或未给出的后续内容。\n只返回 JSON：{\"judgment\":\"independent 或 duplicate 或 uncertain\",\"reason\":\"简短、可用原文核查的判断理由\",\"contentRisks\":[\"已有反馈或建议存在的事实、限定条件或原意风险；没有则空数组\"]}。"
+          },
+          {
+            "role": "user",
+            "content": "{\"originalInput\":{\"schemaVersion\":1,\"sessionId\":\"synthetic-E07\",\"transcriptRevision\":1,\"transcript\":{\"segments\":[{\"id\":\"s1\",\"text\":\"我先说上线时间，先说功能，不，还是说上线时间，刚才那个先不说，我们，还是先说功能……\",\"startMs\":null,\"endMs\":null,\"timingSource\":\"unavailable\"}]},\"metricsDefinitionVersion\":\"common-metrics-v1\",\"metrics\":[{\"id\":\"metric:text-character-count\",\"metricId\":\"text-character-count\",\"label\":\"文字与数字字符数\",\"value\":34,\"unit\":\"characters\",\"status\":\"available\",\"reason\":null,\"evidenceRefs\":[\"s1\"]},{\"id\":\"metric:audio-duration-ms\",\"metricId\":\"audio-duration-ms\",\"label\":\"已保存录音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-count\",\"metricId\":\"filler-count\",\"label\":\"填充词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-count\",\"metricId\":\"hedge-count\",\"label\":\"犹豫词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:vague-word-count\",\"metricId\":\"vague-word-count\",\"label\":\"笼统词命中次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-recorded-minute\",\"metricId\":\"text-rate-per-recorded-minute\",\"label\":\"每录音分钟字符数（含静音）\",\"value\":null,\"unit\":\"characters/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:filler-rate-per-recorded-minute\",\"metricId\":\"filler-rate-per-recorded-minute\",\"label\":\"每录音分钟填充词命中次数\",\"value\":null,\"unit\":\"occurrences/recorded-minute\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:hedge-character-percent\",\"metricId\":\"hedge-character-percent\",\"label\":\"犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-filler-hedge-character-percent\",\"metricId\":\"non-filler-hedge-character-percent\",\"label\":\"非填充词与犹豫词字符占比\",\"value\":null,\"unit\":\"percent\",\"status\":\"unavailable\",\"reason\":\"local-stats-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:speech-duration-ms\",\"metricId\":\"speech-duration-ms\",\"label\":\"VAD 检测语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:non-speech-duration-ms\",\"metricId\":\"non-speech-duration-ms\",\"label\":\"VAD 检测非语音时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-count\",\"metricId\":\"between-speech-gap-count\",\"label\":\"语音区间之间的间隔次数\",\"value\":null,\"unit\":\"occurrences\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-total-ms\",\"metricId\":\"between-speech-gap-total-ms\",\"label\":\"语音区间之间的间隔总时长\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:between-speech-gap-max-ms\",\"metricId\":\"between-speech-gap-max-ms\",\"label\":\"语音区间之间的最长间隔\",\"value\":null,\"unit\":\"ms\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]},{\"id\":\"metric:text-rate-per-speech-minute\",\"metricId\":\"text-rate-per-speech-minute\",\"label\":\"每检测语音分钟字符数（非逐字对齐）\",\"value\":null,\"unit\":\"characters/speech-minute\",\"status\":\"unavailable\",\"reason\":\"audio-unavailable\",\"evidenceRefs\":[]}],\"speech\":{\"status\":\"unavailable\",\"sampleRateHz\":null,\"sampleCount\":null,\"segments\":[],\"provenance\":null,\"limitations\":[\"vad-unavailable\"]},\"trainingContext\":{\"trainingMode\":\"free\",\"framework\":null,\"frameworkDefinitionVersion\":null,\"trainingPrompt\":{\"schemaVersion\":2,\"topic\":{\"source\":\"user\",\"text\":\"只练汇报开头，要求先确定本段讲哪一点；不评价整篇完整性。\"},\"scenario\":null}},\"frameworkDefinition\":null,\"analysisTarget\":null,\"quality\":{\"audio\":{\"status\":\"unavailable\",\"reasons\":[\"audio-unavailable\"]},\"timing\":{\"status\":\"degraded\",\"reasons\":[\"timing-unavailable\"]},\"vad\":{\"status\":\"unavailable\",\"reasons\":[\"vad-unavailable\"]},\"asr\":{\"status\":\"ok\",\"reasons\":[]}},\"analysisInstructions\":{\"schemaVersion\":1,\"goals\":\"\",\"customRules\":\"\",\"styleRef\":\"\",\"customWords\":\"\"},\"evidenceMap\":{\"s1\":{\"type\":\"transcript\",\"index\":0},\"metric:text-character-count\":{\"type\":\"metric\",\"index\":0}},\"allowedEvidenceRefs\":[\"s1\",\"metric:text-character-count\"],\"practiceComparison\":{\"status\":\"unavailable\",\"reason\":\"source-unavailable\",\"goal\":{\"category\":\"delivery\",\"observation\":\"局部开头反复重启\",\"recommendation\":\"确定本段要点，再完成它\"},\"scope\":\"segment\"}},\"feedback\":[{\"id\":\"common-1\",\"category\":\"delivery\",\"observation\":\"同一句里先说“上线时间”，又改说“功能”，再回到“上线时间”，最后仍以“先说功能”收尾，多次重启没有形成确定的说法。\",\"interpretation\":\"听者无法确认本段究竟先讲哪一点，开头无法起到定方向的作用。\",\"recommendation\":\"下一轮先在心里选定“上线时间”或“功能”其中一个，再只用一个起句把它说完，不再中途改口。\",\"evidenceRefs\":[\"s1\"],\"example\":null,\"exampleEvidenceRefs\":[]},{\"id\":\"common-2\",\"category\":\"organization\",\"observation\":\"开头先交代“我先说上线时间”，随即自我否定并转向“功能”，方向在句内来回切换。\",\"interpretation\":\"本段要讲的重点没有在开头立住，听者需要跟着改口重新判断方向。\",\"recommendation\":\"把要讲的那一点放在第一句开头直接说出，再展开与它直接相关的内容。\",\"evidenceRefs\":[\"s1\"],\"example\":null,\"exampleEvidenceRefs\":[]}]}"
+          }
+        ],
+        "max_tokens": 8192,
+        "response_format": {
+          "type": "json_object"
+        },
+        "temperature": 0.2
+      },
+      "raw": "{\"judgment\":\"duplicate\",\"reason\":\"两条反馈都基于 s1 中“上线时间”与“功能”的反复改口，指向同一开头方向未定的表达障碍；common-1 侧重多次重启，common-2 侧重句内方向切换，但观察与解释实质重合。\",\"contentRisks\":[\"common-1 的“最后仍以‘先说功能’收尾”与原文“还是先说功能……”一致，但“多次重启”是对同一句内改口的概括，未给出次数依据。\",\"common-2 的“自我否定”是对“不，还是说上线时间”的解释，原文未明说否定，属推断性表述。\",\"两条建议都要求下一轮选定一点并直接说出，但材料未提供后续练习或执行结果，不能视为已验证的改进。\"]}",
+      "httpStatus": 200,
+      "responseModel": "deepseek-flash",
+      "usage": {
+        "prompt_tokens": 1646,
+        "completion_tokens": 177,
+        "total_tokens": 1823,
+        "prompt_tokens_details": {
+          "cached_tokens": 1408
+        },
+        "prompt_cache_hit_tokens": 1408,
+        "prompt_cache_miss_tokens": 238
+      },
+      "finishReason": "stop",
+      "parsed": {
+        "judgment": "duplicate",
+        "reason": "两条反馈都基于 s1 中“上线时间”与“功能”的反复改口，指向同一开头方向未定的表达障碍；common-1 侧重多次重启，common-2 侧重句内方向切换，但观察与解释实质重合。",
+        "contentRisks": [
+          "common-1 的“最后仍以‘先说功能’收尾”与原文“还是先说功能……”一致，但“多次重启”是对同一句内改口的概括，未给出次数依据。",
+          "common-2 的“自我否定”是对“不，还是说上线时间”的解释，原文未明说否定，属推断性表述。",
+          "两条建议都要求下一轮选定一点并直接说出，但材料未提供后续练习或执行结果，不能视为已验证的改进。"
+        ]
+      },
+      "elapsedMs": 2074,
+      "rawSha256": "bcdb68d287c1b3a0dc1a94496f31e87a4f742dbf9d04845d43e7da7e164280fb"
+    }
+  ],
+  "finishedAt": "2026-11-03T05:54:15.795Z",
+  "productionAndEarlierEvidenceUnchanged": true
+}

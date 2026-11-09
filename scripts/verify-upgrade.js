@@ -77,7 +77,7 @@ function seedUserData(userDataPath) {
   const settings = createDefaultLlmProviderSettings();
   settings.providers.deepseek.model = DATA_TOKEN;
   const customPrompt = createDefaultCustomPrompt();
-  customPrompt.customRules = DATA_TOKEN;
+  customPrompt.goals = DATA_TOKEN;
   const files = new Map([
     [path.join(userDataPath, 'settings.json'), Buffer.from(JSON.stringify(settings, null, 2))],
     [path.join(userDataPath, 'custom-prompt.json'), Buffer.from(JSON.stringify(customPrompt, null, 2))],

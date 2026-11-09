@@ -1,0 +1,399 @@
+✔ original E06 missing-null field is narrowly normalized with an explicit receipt and original bytes preserved (6.6853ms)
+✔ missing-null compatibility does not relax Free, invalid targets, non-null values or any other strict field/ref validation (3.6963ms)
+✔ the provider boundary emits original raw and normalization receipt after one synthetic HTTP response, without a second model call (4.7851ms)
+✔ production cards omit per-card practice while the full source retains it and merge counterexamples remain in the rules (1.864ms)
+✔ controlled variants freeze v7, preserve full source and isolate task, lean and merge changes (11.6998ms)
+✔ all 48 reviewed card IDs and required fields are compiled from the single authoring source (21.0664ms)
+✔ Free preserves semantic checks without candidates, excludes framework cards and unavailable numeric or sound judgements (3.8927ms)
+✔ authoring rules compile identically after Windows checkout line-ending conversion (2.3206ms)
+✔ only the selected framework is included; explicit analysis target wins; local scopes do not check whole frameworks (1.9485ms)
+✔ production prompt assembles rules, dynamic cards, evidence limits, optional practice and existing output without review examples (3.9586ms)
+✔ E01–E08 inputs are reconstructed from synthetic document text; baseline uses the old prompt, not a mock model result (113.15ms)
+[词库] 加载完成，共 146 个情绪词
+✖ custom protocol preserves a validated report across restart without repeating HTTP (88.5784ms)
+✖ ollama protocol preserves a validated report across restart without repeating HTTP (40.7844ms)
+✖ speech, metric and Finding evidence keep exact run ownership through HTTP and restart (33.2491ms)
+✖ insufficient-material assessment survives real HTTP, immutable persistence and restart as a successful result (31.9272ms)
+✖ flat HTTP output supports all framework switches and explicit retry without overwriting facts or prior reports (34.8ms)
+✖ HTTP 401 preserves facts, saves a safe partial result and recovers only on explicit retry (33.2047ms)
+✖ HTTP 429 preserves facts, saves a safe partial result and recovers only on explicit retry (30.7034ms)
+✖ HTTP 503 preserves facts, saves a safe partial result and recovers only on explicit retry (31.9783ms)
+✖ cancelling an active HTTP diagnosis preserves a partial snapshot without an automatic replacement request (32.2118ms)
+✖ HTTP timeout and invalid evidence remain partial; explicit retry recovers and revocation prevents further dispatch (31.8722ms)
+✖ new diagnosis provenance records the problem library without changing old snapshots or Finding fields (79.59ms)
+✖ accepted response normalization retains original raw and receipt only in diagnosis provenance (38.5453ms)
+✖ completed facts receive immutable local evidence and metric/report snapshots without any configured AI (29.1413ms)
+✖ explicit framework reanalysis reuses saved evidence and appends results without changing original training facts (30.4804ms)
+✖ retry after a failed framework reanalysis preserves the requested framework and saved local evidence (29.7571ms)
+✖ revoking AI during previous-round reads prevents the subsequent remote diagnosis (28.7591ms)
+✖ deletion cancels slow inference and late output never revives a deleted session (30.3892ms)
+✖ analysis timeout preserves local facts and returns a usable partial report even when a provider ignores abort (28.3869ms)
+✖ revoked automatic AI is checked after speech processing and never reaches the provider (29.157ms)
+✖ explicit retry appends a new snapshot after failure and preserves the prior successful local runs (27.1589ms)
+✖ blocked audio reads and broken profile settings cannot strand Processing or discard local analysis (27.0428ms)
+✖ profile read failure produces an unavailable diagnosis and usable local report (27.8538ms)
+✖ a result write failure retains facts and retry never mixes orphaned evidence into a new report (27.3564ms)
+✔ an insufficient saved report keeps local measurements without problem, framework or practice controls (7.8353ms)
+✔ a saved assessment cannot admit contradictory Findings or replace a valid legacy snapshot (0.2783ms)
+✔ damaged assessed snapshots are skipped without making the prior report unreadable (0.2936ms)
+✔ limited report exposes its assessment boundary and keeps only supported existing practice targets (0.5396ms)
+✔ framework report keeps common advice and evidence while recommendation requires an explicit click (2.3437ms)
+✔ finding practice actions expose adjustable scope and the current goal keeps a distinct continuation action (0.8699ms)
+✔ damaged optional framework or practice results cannot replace an earlier readable report (0.225ms)
+✔ a deleted practice source hides the old improvement claim while retaining the current goal (9.7304ms)
+✔ report selection resolves each exact referenced run instead of mixing later orphaned metrics or diagnoses (0.4148ms)
+✔ invalid or cross-version references yield no report instead of assembling a replacement (0.4146ms)
+✔ a later successful diagnosis replaces the selected snapshot even when its VAD is still unavailable (0.1488ms)
+✔ a failed retry preserves the prior successful diagnosis snapshot with a separate latest attempt (0.3096ms)
+✔ without any successful AI diagnosis the latest valid partial report still exposes local measurements (0.1697ms)
+✔ hostile summary, findings and transcript quotes remain literal text and never create executable markup (0.3995ms)
+✔ three primary findings and all additional findings remain accessible through native details (1.2473ms)
+✔ evidence buttons preserve real references, disclose transcript quotes and model intervals, and open the metric table (0.3913ms)
+✔ unavailable metric values render as unknown rather than zero and radar never fabricates calibrated scores (0.2783ms)
+✔ known zero remains zero and a successful empty diagnosis does not invent findings (0.1746ms)
+✔ the browser global exposes the same safe renderer used in node tests (3.3183ms)
+✔ clearing the projection removes the previous report without leaving stale findings (0.1621ms)
+✔ common and framework expression references are optional suggestions separate from original evidence (0.5467ms)
+ℹ tests 55
+ℹ suites 0
+ℹ pass 32
+ℹ fail 23
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 584.752
+
+✖ failing tests:
+
+test at test\session-analysis-http.test.js:110:45
+✖ custom protocol preserves a validated report across restart without repeating HTTP (88.5784ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at Object.complete (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:103:14)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:112:15)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\session-analysis-http.test.js:110:45
+✖ ollama protocol preserves a validated report across restart without repeating HTTP (40.7844ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at Object.complete (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:103:14)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:112:15)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\session-analysis-http.test.js:132:1
+✖ speech, metric and Finding evidence keep exact run ownership through HTTP and restart (33.2491ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at Object.complete (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:103:14)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:134:15)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\session-analysis-http.test.js:157:1
+✖ insufficient-material assessment survives real HTTP, immutable persistence and restart as a successful result (31.9272ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at Object.complete (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:103:14)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:159:15)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\session-analysis-http.test.js:173:1
+✖ flat HTTP output supports all framework switches and explicit retry without overwriting facts or prior reports (34.8ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at Object.complete (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:103:14)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:175:18)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\session-analysis-http.test.js:208:3
+✖ HTTP 401 preserves facts, saves a safe partial result and recovers only on explicit retry (33.2047ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at Object.complete (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:103:14)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:211:17)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\session-analysis-http.test.js:208:3
+✖ HTTP 429 preserves facts, saves a safe partial result and recovers only on explicit retry (30.7034ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at Object.complete (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:103:14)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:211:17)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\session-analysis-http.test.js:208:3
+✖ HTTP 503 preserves facts, saves a safe partial result and recovers only on explicit retry (31.9783ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at Object.complete (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:103:14)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:211:17)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\session-analysis-http.test.js:230:1
+✖ cancelling an active HTTP diagnosis preserves a partial snapshot without an automatic replacement request (32.2118ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at Object.complete (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:103:14) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\session-analysis-http.test.js:247:1
+✖ HTTP timeout and invalid evidence remain partial; explicit retry recovers and revocation prevents further dispatch (31.8722ms)
+  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+  
+  false !== true
+  
+      at Object.complete (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:103:14)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis-http.test.js:250:15)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    generatedMessage: true,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: 'strictEqual',
+    diff: 'simple'
+  }
+
+test at test\session-analysis.test.js:24:1
+✖ new diagnosis provenance records the problem library without changing old snapshots or Finding fields (79.59ms)
+  Error: Training could not be saved. Retry while this recording is available.
+      at sessionError (D:\Codex_projects\expression-trainer-pro\lib\training-session-data.js:8:24)
+      at D:\Codex_projects\expression-trainer-pro\lib\training-session-store.js:63:15
+      at async fixture (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:19:3)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:26:20)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async startSubtestAfterBootstrap (node:internal/test_runner/harness:387:3) {
+    code: 'FINALIZATION_FAILED'
+  }
+
+test at test\session-analysis.test.js:41:1
+✖ accepted response normalization retains original raw and receipt only in diagnosis provenance (38.5453ms)
+  Error: Training could not be saved. Retry while this recording is available.
+      at sessionError (D:\Codex_projects\expression-trainer-pro\lib\training-session-data.js:8:24)
+      at D:\Codex_projects\expression-trainer-pro\lib\training-session-store.js:63:15
+      at async fixture (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:19:3)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:43:20)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'FINALIZATION_FAILED'
+  }
+
+test at test\session-analysis.test.js:55:1
+✖ completed facts receive immutable local evidence and metric/report snapshots without any configured AI (29.1413ms)
+  Error: Training could not be saved. Retry while this recording is available.
+      at sessionError (D:\Codex_projects\expression-trainer-pro\lib\training-session-data.js:8:24)
+      at D:\Codex_projects\expression-trainer-pro\lib\training-session-store.js:63:15
+      at async fixture (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:19:3)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:57:22)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'FINALIZATION_FAILED'
+  }
+
+test at test\session-analysis.test.js:72:1
+✖ explicit framework reanalysis reuses saved evidence and appends results without changing original training facts (30.4804ms)
+  Error: Training could not be saved. Retry while this recording is available.
+      at sessionError (D:\Codex_projects\expression-trainer-pro\lib\training-session-data.js:8:24)
+      at D:\Codex_projects\expression-trainer-pro\lib\training-session-store.js:63:15
+      at async fixture (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:19:3)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:74:22)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'FINALIZATION_FAILED'
+  }
+
+test at test\session-analysis.test.js:97:1
+✖ retry after a failed framework reanalysis preserves the requested framework and saved local evidence (29.7571ms)
+  Error: Training could not be saved. Retry while this recording is available.
+      at sessionError (D:\Codex_projects\expression-trainer-pro\lib\training-session-data.js:8:24)
+      at D:\Codex_projects\expression-trainer-pro\lib\training-session-store.js:63:15
+      at async fixture (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:19:3)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:99:22)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'FINALIZATION_FAILED'
+  }
+
+test at test\session-analysis.test.js:110:1
+✖ revoking AI during previous-round reads prevents the subsequent remote diagnosis (28.7591ms)
+  Error: Training could not be saved. Retry while this recording is available.
+      at sessionError (D:\Codex_projects\expression-trainer-pro\lib\training-session-data.js:8:24)
+      at D:\Codex_projects\expression-trainer-pro\lib\training-session-store.js:63:15
+      at async fixture (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:19:3)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:112:22)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'FINALIZATION_FAILED'
+  }
+
+test at test\session-analysis.test.js:122:1
+✖ deletion cancels slow inference and late output never revives a deleted session (30.3892ms)
+  Error: Training could not be saved. Retry while this recording is available.
+      at sessionError (D:\Codex_projects\expression-trainer-pro\lib\training-session-data.js:8:24)
+      at D:\Codex_projects\expression-trainer-pro\lib\training-session-store.js:63:15
+      at async fixture (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:19:3)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:124:22)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'FINALIZATION_FAILED'
+  }
+
+test at test\session-analysis.test.js:139:1
+✖ analysis timeout preserves local facts and returns a usable partial report even when a provider ignores abort (28.3869ms)
+  Error: Training could not be saved. Retry while this recording is available.
+      at sessionError (D:\Codex_projects\expression-trainer-pro\lib\training-session-data.js:8:24)
+      at D:\Codex_projects\expression-trainer-pro\lib\training-session-store.js:63:15
+      at async fixture (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:19:3)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:141:20)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'FINALIZATION_FAILED'
+  }
+
+test at test\session-analysis.test.js:150:1
+✖ revoked automatic AI is checked after speech processing and never reaches the provider (29.157ms)
+  Error: Training could not be saved. Retry while this recording is available.
+      at sessionError (D:\Codex_projects\expression-trainer-pro\lib\training-session-data.js:8:24)
+      at D:\Codex_projects\expression-trainer-pro\lib\training-session-store.js:63:15
+      at async fixture (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:19:3)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:152:20)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'FINALIZATION_FAILED'
+  }
+
+test at test\session-analysis.test.js:163:1
+✖ explicit retry appends a new snapshot after failure and preserves the prior successful local runs (27.1589ms)
+  Error: Training could not be saved. Retry while this recording is available.
+      at sessionError (D:\Codex_projects\expression-trainer-pro\lib\training-session-data.js:8:24)
+      at D:\Codex_projects\expression-trainer-pro\lib\training-session-store.js:63:15
+      at async fixture (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:19:3)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:165:20)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'FINALIZATION_FAILED'
+  }
+
+test at test\session-analysis.test.js:180:1
+✖ blocked audio reads and broken profile settings cannot strand Processing or discard local analysis (27.0428ms)
+  Error: Training could not be saved. Retry while this recording is available.
+      at sessionError (D:\Codex_projects\expression-trainer-pro\lib\training-session-data.js:8:24)
+      at D:\Codex_projects\expression-trainer-pro\lib\training-session-store.js:63:15
+      at async fixture (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:19:3)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:182:20)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'FINALIZATION_FAILED'
+  }
+
+test at test\session-analysis.test.js:191:1
+✖ profile read failure produces an unavailable diagnosis and usable local report (27.8538ms)
+  Error: Training could not be saved. Retry while this recording is available.
+      at sessionError (D:\Codex_projects\expression-trainer-pro\lib\training-session-data.js:8:24)
+      at D:\Codex_projects\expression-trainer-pro\lib\training-session-store.js:63:15
+      at async fixture (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:19:3)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:193:20)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'FINALIZATION_FAILED'
+  }
+
+test at test\session-analysis.test.js:203:1
+✖ a result write failure retains facts and retry never mixes orphaned evidence into a new report (27.3564ms)
+  Error: Training could not be saved. Retry while this recording is available.
+      at sessionError (D:\Codex_projects\expression-trainer-pro\lib\training-session-data.js:8:24)
+      at D:\Codex_projects\expression-trainer-pro\lib\training-session-store.js:63:15
+      at async fixture (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:19:3)
+      at async TestContext.<anonymous> (D:\Codex_projects\expression-trainer-pro\test\session-analysis.test.js:206:20)
+      at async Test.run (node:internal/test_runner/test:1409:7)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:974:7) {
+    code: 'FINALIZATION_FAILED'
+  }

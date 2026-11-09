@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 2,
+  "defaultModelId": "silero-vad",
+  "models": [
+    {
+      "modelId": "silero-vad",
+      "version": "sha256-9e2449e1087496d8",
+      "displayName": "Silero VAD",
+      "description": "独立语音证据模型；不参与主 ASR 选择。",
+      "providerType": "sherpa.vad-silero",
+      "minAppVersion": "1.0.1",
+      "downloadBytes": 643854,
+      "sources": [
+        {
+          "type": "file",
+          "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+          "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+          "bytes": 643854,
+          "relativePath": "silero_vad.onnx",
+          "builtIn": false
+        }
+      ],
+      "files": [
+        {
+          "relativePath": "silero_vad.onnx",
+          "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
+          "bytes": 643854,
+          "role": "model"
+        }
+      ],
+      "license": {
+        "sourceUrl": "https://k2-fsa.github.io/sherpa/onnx/vad/silero-vad.html",
+        "notice": "从官方来源单独安装；本项目尚未完成该模型文件的公开再分发审核。",
+        "redistribution": "not-approved"
+      }
+    }
+  ]
+}

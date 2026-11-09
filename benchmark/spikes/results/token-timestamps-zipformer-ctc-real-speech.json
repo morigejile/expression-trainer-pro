@@ -1,0 +1,365 @@
+{
+  "recordedAt": "2026-09-14T09:41:42.651Z",
+  "runtime": {
+    "node": "22.23.0",
+    "modules": "127",
+    "platform": "win32",
+    "arch": "x64",
+    "sherpaVersion": "1.13.3",
+    "sherpaPackage": "1.13.3"
+  },
+  "input": {
+    "wav": "reference-real-speech-16k.wav",
+    "sampleRate": 16000,
+    "audioSeconds": 10.053,
+    "chunkMs": 100,
+    "chunks": 101
+  },
+  "model": {
+    "family": "zipformer-ctc",
+    "directory": "2025-06-30",
+    "configKeys": [
+      "featConfig",
+      "decodingMethod",
+      "maxActivePaths",
+      "enableEndpoint",
+      "rule1MinTrailingSilence",
+      "rule2MinTrailingSilence",
+      "rule3MinUtteranceLength",
+      "modelConfig"
+    ]
+  },
+  "resultKeysObserved": [
+    "context_scores",
+    "is_eof",
+    "is_final",
+    "lm_probs",
+    "segment",
+    "start_time",
+    "text",
+    "timestamps",
+    "tokens",
+    "words",
+    "ys_probs"
+  ],
+  "referenceSpeechWindows": [
+    {
+      "startSeconds": 0.64,
+      "endSeconds": 1.56
+    },
+    {
+      "startSeconds": 1.6,
+      "endSeconds": 2.3
+    },
+    {
+      "startSeconds": 3.8,
+      "endSeconds": 4.38
+    },
+    {
+      "startSeconds": 4.46,
+      "endSeconds": 4.92
+    },
+    {
+      "startSeconds": 5.22,
+      "endSeconds": 5.94
+    },
+    {
+      "startSeconds": 6.5,
+      "endSeconds": 7.06
+    },
+    {
+      "startSeconds": 7.08,
+      "endSeconds": 7.7
+    },
+    {
+      "startSeconds": 7.72,
+      "endSeconds": 8.3
+    },
+    {
+      "startSeconds": 8.7,
+      "endSeconds": 9.9
+    }
+  ],
+  "alignmentAgainstSpeechWindows": {
+    "scored": 22,
+    "insideSpeech": 18,
+    "insideSpeechRatio": 0.818,
+    "meanDistanceSeconds": 0.023,
+    "maxDistanceSeconds": 0.18
+  },
+  "segments": [
+    {
+      "audioOffsetSeconds": 0,
+      "audioEndSeconds": 4,
+      "keys": [
+        "text",
+        "tokens",
+        "timestamps",
+        "ys_probs",
+        "lm_probs",
+        "context_scores",
+        "segment",
+        "words",
+        "start_time",
+        "is_final",
+        "is_eof"
+      ],
+      "text": " 昨天是MADY",
+      "tokensCount": 8,
+      "timestampsCount": 8,
+      "tokensSample": [
+        " ",
+        "昨",
+        "天",
+        "是",
+        "M",
+        "A",
+        "D",
+        "Y"
+      ],
+      "timestampsSample": [
+        0.64,
+        0.8,
+        1.12,
+        1.6,
+        1.96,
+        2.04,
+        2.36,
+        2.48
+      ],
+      "words": [],
+      "start_time": 0,
+      "is_final": false,
+      "hasTimestampsField": true,
+      "hasAnyNonZeroTimestamp": true,
+      "pair": [
+        {
+          "index": 0,
+          "token": " ",
+          "startSeconds": 0.64,
+          "endSeconds": 0.8,
+          "absoluteStartSeconds": 0.64
+        },
+        {
+          "index": 1,
+          "token": "昨",
+          "startSeconds": 0.8,
+          "endSeconds": 1.12,
+          "absoluteStartSeconds": 0.8
+        },
+        {
+          "index": 2,
+          "token": "天",
+          "startSeconds": 1.12,
+          "endSeconds": 1.6,
+          "absoluteStartSeconds": 1.12
+        },
+        {
+          "index": 3,
+          "token": "是",
+          "startSeconds": 1.6,
+          "endSeconds": 1.96,
+          "absoluteStartSeconds": 1.6
+        },
+        {
+          "index": 4,
+          "token": "M",
+          "startSeconds": 1.96,
+          "endSeconds": 2.04,
+          "absoluteStartSeconds": 1.96
+        },
+        {
+          "index": 5,
+          "token": "A",
+          "startSeconds": 2.04,
+          "endSeconds": 2.36,
+          "absoluteStartSeconds": 2.04
+        },
+        {
+          "index": 6,
+          "token": "D",
+          "startSeconds": 2.36,
+          "endSeconds": 2.48,
+          "absoluteStartSeconds": 2.36
+        },
+        {
+          "index": 7,
+          "token": "Y",
+          "startSeconds": 2.48,
+          "endSeconds": null,
+          "absoluteStartSeconds": 2.48
+        }
+      ]
+    }
+  ],
+  "lastFinal": {
+    "keys": [
+      "text",
+      "tokens",
+      "timestamps",
+      "ys_probs",
+      "lm_probs",
+      "context_scores",
+      "segment",
+      "words",
+      "start_time",
+      "is_final",
+      "is_eof"
+    ],
+    "text": " 里巴二只对阿F特吃毛肉是星",
+    "tokensCount": 14,
+    "timestampsCount": 14,
+    "tokensSample": [
+      " ",
+      "里",
+      "巴",
+      "二",
+      "只",
+      "对",
+      "阿",
+      "F",
+      "特",
+      "吃",
+      "毛",
+      "肉"
+    ],
+    "timestampsSample": [
+      0.32,
+      1.64,
+      1.76,
+      2.08,
+      2.96,
+      3.28,
+      3.52,
+      3.64,
+      3.88,
+      4.2,
+      4.32,
+      4.6
+    ],
+    "words": [],
+    "start_time": 3.84,
+    "is_final": false,
+    "hasTimestampsField": true,
+    "hasAnyNonZeroTimestamp": true
+  },
+  "tokenTimeline": [
+    {
+      "index": 0,
+      "token": " ",
+      "startSeconds": 0.32,
+      "endSeconds": 1.64,
+      "absoluteStartSeconds": 4.32
+    },
+    {
+      "index": 1,
+      "token": "里",
+      "startSeconds": 1.64,
+      "endSeconds": 1.76,
+      "absoluteStartSeconds": 5.64
+    },
+    {
+      "index": 2,
+      "token": "巴",
+      "startSeconds": 1.76,
+      "endSeconds": 2.08,
+      "absoluteStartSeconds": 5.76
+    },
+    {
+      "index": 3,
+      "token": "二",
+      "startSeconds": 2.08,
+      "endSeconds": 2.96,
+      "absoluteStartSeconds": 6.08
+    },
+    {
+      "index": 4,
+      "token": "只",
+      "startSeconds": 2.96,
+      "endSeconds": 3.28,
+      "absoluteStartSeconds": 6.96
+    },
+    {
+      "index": 5,
+      "token": "对",
+      "startSeconds": 3.28,
+      "endSeconds": 3.52,
+      "absoluteStartSeconds": 7.28
+    },
+    {
+      "index": 6,
+      "token": "阿",
+      "startSeconds": 3.52,
+      "endSeconds": 3.64,
+      "absoluteStartSeconds": 7.52
+    },
+    {
+      "index": 7,
+      "token": "F",
+      "startSeconds": 3.64,
+      "endSeconds": 3.88,
+      "absoluteStartSeconds": 7.64
+    },
+    {
+      "index": 8,
+      "token": "特",
+      "startSeconds": 3.88,
+      "endSeconds": 4.2,
+      "absoluteStartSeconds": 7.88
+    },
+    {
+      "index": 9,
+      "token": "吃",
+      "startSeconds": 4.2,
+      "endSeconds": 4.32,
+      "absoluteStartSeconds": 8.2
+    },
+    {
+      "index": 10,
+      "token": "毛",
+      "startSeconds": 4.32,
+      "endSeconds": 4.6,
+      "absoluteStartSeconds": 8.32
+    },
+    {
+      "index": 11,
+      "token": "肉",
+      "startSeconds": 4.6,
+      "endSeconds": 5.2,
+      "absoluteStartSeconds": 8.6
+    },
+    {
+      "index": 12,
+      "token": "是",
+      "startSeconds": 5.2,
+      "endSeconds": 5.56,
+      "absoluteStartSeconds": 9.2
+    },
+    {
+      "index": 13,
+      "token": "星",
+      "startSeconds": 5.56,
+      "endSeconds": null,
+      "absoluteStartSeconds": 9.56
+    }
+  ],
+  "verdict": {
+    "tokensAcrossSegments": 22,
+    "hasTokens": true,
+    "hasTimestampsArray": true,
+    "timestampCountMatchesTokens": true,
+    "anyNonZeroTimestamp": true,
+    "absoluteMonotonic": true,
+    "absoluteWithinAudio": true,
+    "segmentLocalMonotonicNonDecreasing": false,
+    "segmentCount": 2,
+    "resetHappened": true,
+    "alignmentAgainstSpeechWindows": {
+      "scored": 22,
+      "insideSpeech": 18,
+      "insideSpeechRatio": 0.818,
+      "meanDistanceSeconds": 0.023,
+      "maxDistanceSeconds": 0.18
+    }
+  }
+}

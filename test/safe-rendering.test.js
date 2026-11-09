@@ -2,7 +2,6 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const {
-  escapeHtml,
   renderHighlightedText,
   renderReportContent,
   tokenizeHighlightedText
@@ -107,13 +106,4 @@ test('report renderer allows formatting without creating elements from hostile H
     '普通<script>evil()</script> 重点 代码',
     '引用 <span onclick=evil()>内容</span>'
   ]);
-});
-
-test('HTML escaping neutralizes tags, quotes, and event attributes', () => {
-  const input = '<script>evil()</script><img src=x onerror="evil()">\'';
-
-  assert.equal(
-    escapeHtml(input),
-    '&lt;script&gt;evil()&lt;/script&gt;&lt;img src=x onerror=&quot;evil()&quot;&gt;&#39;'
-  );
 });

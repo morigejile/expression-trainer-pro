@@ -1,0 +1,318 @@
+{
+  "recordedAt": "2026-09-14T09:41:45.762Z",
+  "runtime": {
+    "node": "22.23.0",
+    "modules": "127",
+    "platform": "win32",
+    "arch": "x64",
+    "sherpaVersion": "1.13.3",
+    "sherpaPackage": "1.13.3"
+  },
+  "input": {
+    "wav": "reference-real-speech-16k.wav",
+    "sampleRate": 16000,
+    "audioSeconds": 10.053,
+    "chunkMs": 100,
+    "chunks": 101
+  },
+  "model": {
+    "family": "paraformer",
+    "directory": "sherpa-onnx-streaming-paraformer-bilingual-zh-en",
+    "configKeys": [
+      "featConfig",
+      "decodingMethod",
+      "maxActivePaths",
+      "enableEndpoint",
+      "rule1MinTrailingSilence",
+      "rule2MinTrailingSilence",
+      "rule3MinUtteranceLength",
+      "modelConfig"
+    ]
+  },
+  "resultKeysObserved": [
+    "context_scores",
+    "is_eof",
+    "is_final",
+    "lm_probs",
+    "segment",
+    "start_time",
+    "text",
+    "timestamps",
+    "tokens",
+    "words",
+    "ys_probs"
+  ],
+  "referenceSpeechWindows": [
+    {
+      "startSeconds": 0.64,
+      "endSeconds": 1.56
+    },
+    {
+      "startSeconds": 1.6,
+      "endSeconds": 2.3
+    },
+    {
+      "startSeconds": 3.8,
+      "endSeconds": 4.38
+    },
+    {
+      "startSeconds": 4.46,
+      "endSeconds": 4.92
+    },
+    {
+      "startSeconds": 5.22,
+      "endSeconds": 5.94
+    },
+    {
+      "startSeconds": 6.5,
+      "endSeconds": 7.06
+    },
+    {
+      "startSeconds": 7.08,
+      "endSeconds": 7.7
+    },
+    {
+      "startSeconds": 7.72,
+      "endSeconds": 8.3
+    },
+    {
+      "startSeconds": 8.7,
+      "endSeconds": 9.9
+    }
+  ],
+  "alignmentAgainstSpeechWindows": {
+    "scored": 0,
+    "insideSpeech": 0,
+    "insideSpeechRatio": null,
+    "meanDistanceSeconds": null,
+    "maxDistanceSeconds": null
+  },
+  "segments": [
+    {
+      "audioOffsetSeconds": 0,
+      "audioEndSeconds": 3.7,
+      "keys": [
+        "text",
+        "tokens",
+        "timestamps",
+        "ys_probs",
+        "lm_probs",
+        "context_scores",
+        "segment",
+        "words",
+        "start_time",
+        "is_final",
+        "is_eof"
+      ],
+      "text": "昨天是 mon",
+      "tokensCount": 4,
+      "timestampsCount": 0,
+      "tokensSample": [
+        "昨",
+        "天",
+        "是",
+        "mon@@"
+      ],
+      "timestampsSample": [],
+      "words": [],
+      "start_time": 0,
+      "is_final": false,
+      "hasTimestampsField": true,
+      "hasAnyNonZeroTimestamp": false,
+      "pair": [
+        {
+          "index": 0,
+          "token": "昨",
+          "startSeconds": null,
+          "endSeconds": null,
+          "absoluteStartSeconds": null
+        },
+        {
+          "index": 1,
+          "token": "天",
+          "startSeconds": null,
+          "endSeconds": null,
+          "absoluteStartSeconds": null
+        },
+        {
+          "index": 2,
+          "token": "是",
+          "startSeconds": null,
+          "endSeconds": null,
+          "absoluteStartSeconds": null
+        },
+        {
+          "index": 3,
+          "token": "mon@@",
+          "startSeconds": null,
+          "endSeconds": null,
+          "absoluteStartSeconds": null
+        }
+      ]
+    }
+  ],
+  "lastFinal": {
+    "keys": [
+      "text",
+      "tokens",
+      "timestamps",
+      "ys_probs",
+      "lm_probs",
+      "context_scores",
+      "segment",
+      "words",
+      "start_time",
+      "is_final",
+      "is_eof"
+    ],
+    "text": " today is is 零班二 the day after tomorrow 是星期",
+    "tokensCount": 15,
+    "timestampsCount": 0,
+    "tokensSample": [
+      "today",
+      "is",
+      "is",
+      "零",
+      "班",
+      "二",
+      "the",
+      "day",
+      "after",
+      "tom@@",
+      "or@@",
+      "row"
+    ],
+    "timestampsSample": [],
+    "words": [],
+    "start_time": 0,
+    "is_final": false,
+    "hasTimestampsField": true,
+    "hasAnyNonZeroTimestamp": false
+  },
+  "tokenTimeline": [
+    {
+      "index": 0,
+      "token": "today",
+      "startSeconds": null,
+      "endSeconds": null,
+      "absoluteStartSeconds": null
+    },
+    {
+      "index": 1,
+      "token": "is",
+      "startSeconds": null,
+      "endSeconds": null,
+      "absoluteStartSeconds": null
+    },
+    {
+      "index": 2,
+      "token": "is",
+      "startSeconds": null,
+      "endSeconds": null,
+      "absoluteStartSeconds": null
+    },
+    {
+      "index": 3,
+      "token": "零",
+      "startSeconds": null,
+      "endSeconds": null,
+      "absoluteStartSeconds": null
+    },
+    {
+      "index": 4,
+      "token": "班",
+      "startSeconds": null,
+      "endSeconds": null,
+      "absoluteStartSeconds": null
+    },
+    {
+      "index": 5,
+      "token": "二",
+      "startSeconds": null,
+      "endSeconds": null,
+      "absoluteStartSeconds": null
+    },
+    {
+      "index": 6,
+      "token": "the",
+      "startSeconds": null,
+      "endSeconds": null,
+      "absoluteStartSeconds": null
+    },
+    {
+      "index": 7,
+      "token": "day",
+      "startSeconds": null,
+      "endSeconds": null,
+      "absoluteStartSeconds": null
+    },
+    {
+      "index": 8,
+      "token": "after",
+      "startSeconds": null,
+      "endSeconds": null,
+      "absoluteStartSeconds": null
+    },
+    {
+      "index": 9,
+      "token": "tom@@",
+      "startSeconds": null,
+      "endSeconds": null,
+      "absoluteStartSeconds": null
+    },
+    {
+      "index": 10,
+      "token": "or@@",
+      "startSeconds": null,
+      "endSeconds": null,
+      "absoluteStartSeconds": null
+    },
+    {
+      "index": 11,
+      "token": "row",
+      "startSeconds": null,
+      "endSeconds": null,
+      "absoluteStartSeconds": null
+    },
+    {
+      "index": 12,
+      "token": "是",
+      "startSeconds": null,
+      "endSeconds": null,
+      "absoluteStartSeconds": null
+    },
+    {
+      "index": 13,
+      "token": "星",
+      "startSeconds": null,
+      "endSeconds": null,
+      "absoluteStartSeconds": null
+    },
+    {
+      "index": 14,
+      "token": "期",
+      "startSeconds": null,
+      "endSeconds": null,
+      "absoluteStartSeconds": null
+    }
+  ],
+  "verdict": {
+    "tokensAcrossSegments": 19,
+    "hasTokens": true,
+    "hasTimestampsArray": true,
+    "timestampCountMatchesTokens": false,
+    "anyNonZeroTimestamp": false,
+    "absoluteMonotonic": true,
+    "absoluteWithinAudio": true,
+    "segmentLocalMonotonicNonDecreasing": true,
+    "segmentCount": 2,
+    "resetHappened": true,
+    "alignmentAgainstSpeechWindows": {
+      "scored": 0,
+      "insideSpeech": 0,
+      "insideSpeechRatio": null,
+      "meanDistanceSeconds": null,
+      "maxDistanceSeconds": null
+    }
+  }
+}

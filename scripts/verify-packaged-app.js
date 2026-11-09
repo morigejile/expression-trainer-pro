@@ -39,9 +39,9 @@ function stopProcessTree(child) {
   if (result.status !== 0) child.kill('SIGKILL');
 }
 
-async function runSmoke(executable, args, marker, userDataPath) {
+async function runSmoke(executable, args, marker, userDataPath, environment = {}) {
   const child = spawn(executable, args, {
-    env: {...process.env, EXPRESSION_TRAINER_SMOKE_USER_DATA: userDataPath},
+    env: {...process.env, ...environment, EXPRESSION_TRAINER_SMOKE_USER_DATA: userDataPath},
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true
   });
@@ -102,6 +102,31 @@ async function main() {
       'SHERPA_NATIVE_SMOKE_OK',
       userDataPath
     );
+    for (const phase of ['write', 'read']) {
+      await runSmoke(
+        executable,
+        [...HEADLESS_SWITCHES, '--smoke-test'],
+        `TRAINING_API_${phase.toUpperCase()}_OK`,
+        path.join(userDataPath, 'api'),
+        {EXPRESSION_TRAINER_TRAINING_API_SMOKE: phase}
+      );
+    }
+    for (const phase of ['write', 'read']) {
+      await runSmoke(
+        executable,
+        [...HEADLESS_SWITCHES, `--training-persistence-smoke=${phase}`],
+        `TRAINING_PERSISTENCE_${phase.toUpperCase()}_OK`,
+        path.join(userDataPath, 'foundation')
+      );
+    }
+    for (const phase of ['write', 'read']) {
+      await runSmoke(executable, [...HEADLESS_SWITCHES, '--smoke-test', `--training-product-smoke=${phase}`],
+        `TRAINING_PRODUCT_${phase.toUpperCase()}_OK`, path.join(userDataPath, 'product'));
+    }
+    for (const phase of ['offline', 'offline-read']) {
+      await runSmoke(executable, [...HEADLESS_SWITCHES, '--smoke-test', `--training-product-smoke=${phase}`],
+        `TRAINING_PRODUCT_${phase.toUpperCase()}_OK`, path.join(userDataPath, 'offline-product'));
+    }
     assert.equal(
       fs.existsSync(path.join(userDataPath, 'models')),
       false,

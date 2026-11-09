@@ -8,3 +8,4 @@ dist/
 out/
 .DS_Store
 .idea/
+docs/archive/diagrams/*.visual-check.*

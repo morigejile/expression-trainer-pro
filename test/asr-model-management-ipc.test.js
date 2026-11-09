@@ -58,6 +58,32 @@ test('model management IPC rejects callers outside the settings window', async (
   assert.equal(calls, 0);
 });
 
+test('model management IPC checks the complete event before routing trusted-window subframes', async () => {
+  const {registerAsrModelManagementIpc} = require('../lib/asr-model-management-ipc');
+  const ipcMain = fakeIpcMain();
+  const sender = {id: 7};
+  const mainFrame = {url: 'file:///D:/app/src/index.html'};
+  let calls = 0;
+  const router = Object.fromEntries(['getModelState', 'installModel', 'cancelModelInstall', 'switchModel']
+    .map(name => [name, async () => { calls += 1; return {ok: true, state: {models: []}}; }]));
+  registerAsrModelManagementIpc({ipcMain, router, isAllowedSender: value => value === sender,
+    isAllowedEvent: event => event.sender === sender && event.senderFrame === mainFrame});
+  for (const handler of ipcMain.handlers.values()) {
+    assert.equal((await handler({sender, senderFrame: {url: mainFrame.url}}, {modelId: 'model-a'})).ok, false);
+  }
+  assert.equal(calls, 0);
+  assert.equal((await ipcMain.handlers.get('get-asr-model-state')({sender, senderFrame: mainFrame})).ok, true);
+});
+
+test('model state IPC forwards unexpected read parameters to router validation', async () => {
+  const {registerAsrModelManagementIpc} = require('../lib/asr-model-management-ipc');
+  const ipcMain = fakeIpcMain();
+  registerAsrModelManagementIpc({ipcMain, isAllowedSender: () => true,
+    router: {getModelState: command => command === undefined ? {ok: true} : {ok: false, error: {code: 'invalid-asr-model-command'}}}});
+  assert.equal((await ipcMain.handlers.get('get-asr-model-state')({sender: {}}, {path: 'private'})).error?.code,
+    'invalid-asr-model-command');
+});
+
 test('Preload exposes only narrow model methods and a removable dedicated subscription', () => {
   const source = fs.readFileSync(path.join(__dirname, '..', 'preload.js'), 'utf8');
   for (const name of ['getAsrModelState', 'installAsrModel', 'cancelAsrModelInstall', 'switchAsrModel', 'onAsrModelStateChanged']) {

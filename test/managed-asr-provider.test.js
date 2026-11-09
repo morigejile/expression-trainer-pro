@@ -22,26 +22,27 @@ function managedFiles(root) {
 }
 
 test('managed provider installs the default once and routes the provider contract', async () => {
-  const {createManagedParaformerProvider} = require('../lib/managed-asr-provider');
+  const {createManagedCatalogProvider} = require('../lib/managed-asr-provider');
   const installedPath = path.join('C:', 'user-data', 'models', 'paraformer', 'v1');
   const delegate = fakeProvider();
   const managerCalls = [];
   const installed = {modelPath: installedPath, version: 'v1', files: managedFiles(installedPath)};
-  const provider = createManagedParaformerProvider({
-    modelId: 'paraformer',
+  const provider = createManagedCatalogProvider({
+    catalogEntry: {modelId: 'paraformer'},
     manager: {
       async getActive(id) { managerCalls.push(['getActive', id]); return null; },
       async install(id, options) { managerCalls.push(['install', id, options]); return installed; },
       async activate(id, version) { managerCalls.push(['activate', id, version]); return installed; },
       async getPrevious() { assert.fail('getPrevious should not run'); }
     },
-    createProvider(options) {
-      assert.deepEqual(options, {modelFiles: {
+    createProviderFromCatalog({catalogEntry, modelFiles}) {
+      assert.equal(catalogEntry.modelId, 'paraformer');
+      assert.deepEqual(modelFiles, {
         encoder: path.join(installedPath, 'encoder.bin'),
         decoder: path.join(installedPath, 'decoder.bin'),
         tokens: path.join(installedPath, 'tokens.bin')
-      }});
-      return delegate;
+      });
+      return {provider: delegate};
     }
   });
 
@@ -58,21 +59,21 @@ test('managed provider installs the default once and routes the provider contrac
 });
 
 test('managed provider probes and activates the previous version once when the active model cannot initialize', async () => {
-  const {createManagedParaformerProvider} = require('../lib/managed-asr-provider');
+  const {createManagedCatalogProvider} = require('../lib/managed-asr-provider');
   const currentPath = path.join('C:', 'models', 'v2');
   const previousPath = path.join('C:', 'models', 'v1');
   const broken = fakeProvider({initializeError: new Error('native load failed')});
   const recovered = fakeProvider();
   const managerCalls = [];
-  const provider = createManagedParaformerProvider({
-    modelId: 'paraformer',
+  const provider = createManagedCatalogProvider({
+    catalogEntry: {modelId: 'paraformer'},
     manager: {
       async getActive(id) { managerCalls.push(['getActive', id]); return {modelPath: currentPath, previousVersion: 'v1', files: managedFiles(currentPath)}; },
       async install() { assert.fail('install should not run'); },
       async getPrevious(id) { managerCalls.push(['getPrevious', id]); return {version: 'v1', modelPath: previousPath, files: managedFiles(previousPath)}; },
       async activate(id, version) { managerCalls.push(['activate', id, version]); }
     },
-    createProvider({modelFiles}) { return modelFiles.encoder.startsWith(currentPath) ? broken : recovered; }
+    createProviderFromCatalog({modelFiles}) { return {provider: modelFiles.encoder.startsWith(currentPath) ? broken : recovered}; }
   });
 
   await provider.initialize();
@@ -82,18 +83,18 @@ test('managed provider probes and activates the previous version once when the a
 });
 
 test('managed provider recovers a corrupt active install through the raw previous pointer', async () => {
-  const {createManagedParaformerProvider} = require('../lib/managed-asr-provider');
+  const {createManagedCatalogProvider} = require('../lib/managed-asr-provider');
   const recovered = fakeProvider();
   const calls = [];
-  const provider = createManagedParaformerProvider({
-    modelId: 'paraformer',
+  const provider = createManagedCatalogProvider({
+    catalogEntry: {modelId: 'paraformer'},
     manager: {
       async getActive() { throw new Error('SHA-256 mismatch for encoder.int8.onnx'); },
       async install() { assert.fail('install should not run'); },
       async getPrevious() { calls.push('getPrevious'); const root = path.join('C:', 'models', 'v1'); return {version: 'v1', modelPath: root, files: managedFiles(root)}; },
       async activate() { calls.push('activate'); }
     },
-    createProvider() { return recovered; }
+    createProviderFromCatalog() { return {provider: recovered}; }
   });
 
   await provider.initialize();
@@ -102,18 +103,18 @@ test('managed provider recovers a corrupt active install through the raw previou
 });
 
 test('managed provider does not loop when the rollback model also fails', async () => {
-  const {createManagedParaformerProvider} = require('../lib/managed-asr-provider');
+  const {createManagedCatalogProvider} = require('../lib/managed-asr-provider');
   const providers = [fakeProvider({initializeError: new Error('current failed')}), fakeProvider({initializeError: new Error('fallback failed')})];
   let index = 0;
-  const provider = createManagedParaformerProvider({
-    modelId: 'paraformer',
+  const provider = createManagedCatalogProvider({
+    catalogEntry: {modelId: 'paraformer'},
     manager: {
       async getActive() { const root = path.join('C:', 'models', 'v2'); return {modelPath: root, previousVersion: 'v1', files: managedFiles(root)}; },
       async install() { assert.fail('install should not run'); },
       async getPrevious() { const root = path.join('C:', 'models', 'v1'); return {version: 'v1', modelPath: root, files: managedFiles(root)}; },
       async activate() { assert.fail('fallback must not activate after native failure'); }
     },
-    createProvider() { return providers[index++]; }
+    createProviderFromCatalog() { return {provider: providers[index++]}; }
   });
 
   await assert.rejects(provider.initialize(), /fallback failed/);
@@ -121,18 +122,18 @@ test('managed provider does not loop when the rollback model also fails', async 
 });
 
 test('first native initialization failure never activates the installed version', async () => {
-  const {createManagedParaformerProvider} = require('../lib/managed-asr-provider');
+  const {createManagedCatalogProvider} = require('../lib/managed-asr-provider');
   const root = path.join('C:', 'models', 'v1');
   let activations = 0;
-  const provider = createManagedParaformerProvider({
-    modelId: 'paraformer',
+  const provider = createManagedCatalogProvider({
+    catalogEntry: {modelId: 'paraformer'},
     manager: {
       async getActive() { return null; },
       async install() { return {version: 'v1', modelPath: root, files: managedFiles(root)}; },
       async activate() { activations += 1; },
       async getPrevious() { assert.fail('getPrevious should not run'); }
     },
-    createProvider() { return fakeProvider({initializeError: new Error('native load failed')}); }
+    createProviderFromCatalog() { return {provider: fakeProvider({initializeError: new Error('native load failed')})}; }
   });
 
   await assert.rejects(provider.initialize(), /native load failed/);
@@ -140,13 +141,13 @@ test('first native initialization failure never activates the installed version'
 });
 
 test('dispose aborts pending first-install preparation without starting a provider', async () => {
-  const {createManagedParaformerProvider} = require('../lib/managed-asr-provider');
+  const {createManagedCatalogProvider} = require('../lib/managed-asr-provider');
   let installSignal;
   let createCalls = 0;
   let releaseInstall;
   const installStarted = new Promise((resolve) => { releaseInstall = resolve; });
-  const provider = createManagedParaformerProvider({
-    modelId: 'paraformer',
+  const provider = createManagedCatalogProvider({
+    catalogEntry: {modelId: 'paraformer'},
     manager: {
       async getActive() { return null; },
       install(id, {signal}) {
@@ -157,7 +158,7 @@ test('dispose aborts pending first-install preparation without starting a provid
       async activate() { assert.fail('activate should not run'); },
       async getPrevious() { assert.fail('getPrevious should not run'); }
     },
-    createProvider() { createCalls += 1; return fakeProvider(); }
+    createProviderFromCatalog() { createCalls += 1; return {provider: fakeProvider()}; }
   });
 
   const initialization = provider.initialize();
@@ -167,88 +168,6 @@ test('dispose aborts pending first-install preparation without starting a provid
   await disposal;
   assert.equal(installSignal.aborted, true);
   assert.equal(createCalls, 0);
-});
-
-test('default managed provider can enforce a no-network offline smoke', async () => {
-  const {createDefaultManagedParaformerProvider} = require('../lib/managed-asr-provider');
-  let managerOptions;
-  createDefaultManagedParaformerProvider({
-    userDataPath: path.resolve('offline-user-data'),
-    appVersion: '1.0.0',
-    offline: true,
-    createManager(options) {
-      managerOptions = options;
-      return {
-        async getActive() { return null; },
-        async getPrevious() { return null; },
-        async install() { return null; },
-        async activate() {}
-      };
-    }
-  });
-
-  await assert.rejects(
-    managerOptions.fetchImpl('https://example.invalid/model'),
-    error => error.code === 'offline-model-smoke-network-access'
-  );
-});
-
-test('default managed provider forwards the Electron network fetch', () => {
-  const {createDefaultManagedParaformerProvider} = require('../lib/managed-asr-provider');
-  const fetchImpl = async () => ({ok: true});
-  let managerOptions;
-  createDefaultManagedParaformerProvider({
-    userDataPath: path.resolve('online-user-data'),
-    appVersion: '1.0.0',
-    fetchImpl,
-    createManager(options) {
-      managerOptions = options;
-      return {
-        async getActive() { return null; },
-        async getPrevious() { return null; },
-        async install() { return null; },
-        async activate() {}
-      };
-    }
-  });
-  assert.equal(managerOptions.fetchImpl, fetchImpl);
-});
-
-test('default managed startup stays pinned to Paraformer and creates it through the trusted factory', async () => {
-  const {
-    CURRENT_PARA_MODEL_ID,
-    createDefaultManagedParaformerProvider
-  } = require('../lib/managed-asr-provider');
-  const root = path.resolve('managed-default-paraformer');
-  const calls = [];
-  const delegate = fakeProvider();
-  const provider = createDefaultManagedParaformerProvider({
-    userDataPath: path.resolve('managed-user-data'),
-    appVersion: '1.0.0',
-    createManager({registry}) {
-      assert.notEqual(registry.defaultModelId, CURRENT_PARA_MODEL_ID);
-      return {
-        async getActive(modelId) {
-          calls.push(['getActive', modelId]);
-          return {version: '2024-03-10', files: managedFiles(root)};
-        },
-        async getPrevious() { assert.fail('getPrevious should not run'); },
-        async install() { assert.fail('install should not run'); },
-        async activate() { assert.fail('activate should not run'); }
-      };
-    },
-    createProviderFromCatalog({catalogEntry, modelFiles}) {
-      calls.push(['factory', catalogEntry.modelId, Object.keys(modelFiles).sort()]);
-      return {provider: delegate, capabilities: {mode: 'streaming', emitsPartial: true, sampleRateHz: 16000}};
-    }
-  });
-
-  await provider.initialize();
-  assert.deepEqual(calls, [
-    ['getActive', CURRENT_PARA_MODEL_ID],
-    ['factory', CURRENT_PARA_MODEL_ID, ['decoder', 'encoder', 'tokens']]
-  ]);
-  await provider.dispose();
 });
 
 test('catalog-managed provider maps every installed role for all three trusted models', async () => {

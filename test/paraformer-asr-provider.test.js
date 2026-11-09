@@ -88,7 +88,8 @@ test('Paraformer provider preserves the current model and decoding configuration
   }), {
     type: 'ready',
     sessionId: 'session-a',
-    sequence: 0
+    sequence: 0,
+    capabilities: {recognitionMode: 'streaming', partialResults: true, tokenTimestamps: false, timingSource: 'unavailable', confidence: false}
   });
   assert.equal(streamCount, 1);
 
@@ -98,7 +99,8 @@ test('Paraformer provider preserves the current model and decoding configuration
   }), {
     type: 'ready',
     sessionId: 'session-b',
-    sequence: 0
+    sequence: 0,
+    capabilities: {recognitionMode: 'streaming', partialResults: true, tokenTimestamps: false, timingSource: 'unavailable', confidence: false}
   });
   assert.equal(streamCount, 2);
 });
@@ -169,7 +171,7 @@ test('Paraformer provider feeds 16 kHz samples and returns trimmed partial text'
     type: 'partial',
     sessionId: 'partial-session',
     sequence: 1,
-    text: 'partial text'
+    text: 'partial text', acceptedSampleStart: 0, acceptedSampleEnd: 2, timingSource: 'unavailable'
   });
 });
 
@@ -211,7 +213,7 @@ test('Paraformer provider finalizes and resets a non-empty endpoint result', asy
     type: 'final',
     sessionId: 'endpoint-session',
     sequence: 1,
-    text: 'endpoint text'
+    text: 'endpoint text', acceptedSampleStart: 0, acceptedSampleEnd: 1, timingSource: 'unavailable'
   });
 });
 
@@ -251,12 +253,13 @@ test('Paraformer provider flushes and returns trimmed final text when stopped', 
       type: 'final',
       sessionId: 'stop-session',
       sequence: 1,
-      text: 'tail text'
+      text: 'tail text', timingSource: 'unavailable'
     },
     {
       type: 'stopped',
       sessionId: 'stop-session',
-      sequence: 2
+      sequence: 2, finalAcceptedSampleCursor: 0, timingSource: 'unavailable',
+      qualityEvents:[{code:'timing-unavailable',startSample:0,endSample:0}]
     }
   ]);
   assert.deepEqual(provider.stop({ sessionId: 'stop-session' }), []);
@@ -301,7 +304,8 @@ test('Paraformer provider releases its stream when stop finalization throws', as
     {
       type: 'stopped',
       sessionId: 'failed-stop-session',
-      sequence: 2
+      sequence: 2, finalAcceptedSampleCursor: 0, timingSource: 'unavailable',
+      qualityEvents:[{code:'timing-unavailable',startSample:0,endSample:0}]
     }
   ]);
   assert.doesNotThrow(() => adapter.stop());

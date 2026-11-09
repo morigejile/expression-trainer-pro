@@ -1,0 +1,8 @@
+{
+  "networkCalls": 0,
+  "mockSuccessRequests": 2,
+  "mockFailureRequests": 1,
+  "exactSingleFactor": true,
+  "fullInputsAndOriginalFeedback": true,
+  "invalidResponsesRejected": true
+}

@@ -1,0 +1,138 @@
+[
+  {
+    "blindId": "B1",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json",
+    "index": 14,
+    "id": "E07",
+    "variant": "scope",
+    "repeat": 1
+  },
+  {
+    "blindId": "B2",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json",
+    "index": 12,
+    "id": "E07",
+    "variant": "baseline",
+    "repeat": 1
+  },
+  {
+    "blindId": "B3",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json",
+    "index": 6,
+    "id": "P03-independent",
+    "variant": "unified",
+    "repeat": 1
+  },
+  {
+    "blindId": "B4",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json",
+    "index": 7,
+    "id": "P03-independent",
+    "variant": "baseline",
+    "repeat": 1
+  },
+  {
+    "blindId": "B5",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json",
+    "index": 4,
+    "id": "E03",
+    "variant": "baseline",
+    "repeat": 1
+  },
+  {
+    "blindId": "B6",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json",
+    "index": 9,
+    "id": "E06",
+    "variant": "unified",
+    "repeat": 1
+  },
+  {
+    "blindId": "B7",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json",
+    "index": 5,
+    "id": "E03",
+    "variant": "unified",
+    "repeat": 1
+  },
+  {
+    "blindId": "B8",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json",
+    "index": 0,
+    "id": "E01",
+    "variant": "baseline",
+    "repeat": 1
+  },
+  {
+    "blindId": "B9",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json",
+    "index": 8,
+    "id": "E06",
+    "variant": "baseline",
+    "repeat": 1
+  },
+  {
+    "blindId": "B10",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json",
+    "index": 3,
+    "id": "P01-execution",
+    "variant": "baseline",
+    "repeat": 1
+  },
+  {
+    "blindId": "B11",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json",
+    "index": 1,
+    "id": "E01",
+    "variant": "unified",
+    "repeat": 1
+  },
+  {
+    "blindId": "B12",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json",
+    "index": 15,
+    "id": "H04",
+    "variant": "baseline",
+    "repeat": 1
+  },
+  {
+    "blindId": "B13",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json",
+    "index": 11,
+    "id": "P06-vague",
+    "variant": "baseline",
+    "repeat": 1
+  },
+  {
+    "blindId": "B14",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json",
+    "index": 16,
+    "id": "H04",
+    "variant": "scope",
+    "repeat": 1
+  },
+  {
+    "blindId": "B15",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json",
+    "index": 10,
+    "id": "P06-vague",
+    "variant": "unified",
+    "repeat": 1
+  },
+  {
+    "blindId": "B16",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json",
+    "index": 2,
+    "id": "P01-execution",
+    "variant": "unified",
+    "repeat": 1
+  },
+  {
+    "blindId": "B17",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json",
+    "index": 13,
+    "id": "E07",
+    "variant": "unified",
+    "repeat": 1
+  }
+]

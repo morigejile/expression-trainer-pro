@@ -1,0 +1,122 @@
+{
+  "sameInputAndParameters": true,
+  "finalRequestsMatchCurrentPrompt": true,
+  "strictParsing": true,
+  "summarySentenceRange": "2–3",
+  "findingSentences": 3,
+  "renderedWithoutTruncation": {
+    "reports": 6,
+    "layouts": 2,
+    "fullFindingText": true,
+    "fullReferencedTranscript": true
+  },
+  "scope": "Node DOM fixture using production renderer, not Electron visual/device validation",
+  "stats": [
+    {
+      "id": "E02",
+      "repeat": 1,
+      "beforeStatus": "completed",
+      "beforeSummaryChars": 93,
+      "afterSummaryChars": 96,
+      "beforeFrameworkChars": null,
+      "afterFrameworkChars": null,
+      "beforeFindingCount": 0,
+      "afterFindingCount": 0,
+      "beforeFindingChars": [],
+      "afterFindingChars": []
+    },
+    {
+      "id": "E05",
+      "repeat": 1,
+      "beforeStatus": "failed",
+      "beforeSummaryChars": null,
+      "afterSummaryChars": 90,
+      "beforeFrameworkChars": null,
+      "afterFrameworkChars": null,
+      "beforeFindingCount": null,
+      "afterFindingCount": 3,
+      "beforeFindingChars": [],
+      "afterFindingChars": [
+        126,
+        118,
+        105
+      ]
+    },
+    {
+      "id": "E06",
+      "repeat": 1,
+      "beforeStatus": "completed",
+      "beforeSummaryChars": 138,
+      "afterSummaryChars": 106,
+      "beforeFrameworkChars": 155,
+      "afterFrameworkChars": 81,
+      "beforeFindingCount": 1,
+      "afterFindingCount": 1,
+      "beforeFindingChars": [
+        212
+      ],
+      "afterFindingChars": [
+        161
+      ]
+    },
+    {
+      "id": "E07",
+      "repeat": 1,
+      "beforeStatus": "completed",
+      "beforeSummaryChars": 110,
+      "afterSummaryChars": 90,
+      "beforeFrameworkChars": null,
+      "afterFrameworkChars": null,
+      "beforeFindingCount": 1,
+      "afterFindingCount": 2,
+      "beforeFindingChars": [
+        194
+      ],
+      "afterFindingChars": [
+        141,
+        120
+      ]
+    },
+    {
+      "id": "E05",
+      "repeat": 2,
+      "beforeStatus": "completed",
+      "beforeSummaryChars": 163,
+      "afterSummaryChars": 87,
+      "beforeFrameworkChars": null,
+      "afterFrameworkChars": null,
+      "beforeFindingCount": 3,
+      "afterFindingCount": 3,
+      "beforeFindingChars": [
+        290,
+        213,
+        205
+      ],
+      "afterFindingChars": [
+        150,
+        106,
+        116
+      ]
+    },
+    {
+      "id": "E07",
+      "repeat": 2,
+      "beforeStatus": "completed",
+      "beforeSummaryChars": 128,
+      "afterSummaryChars": 89,
+      "beforeFrameworkChars": null,
+      "afterFrameworkChars": null,
+      "beforeFindingCount": 2,
+      "afterFindingCount": 3,
+      "beforeFindingChars": [
+        193,
+        184
+      ],
+      "afterFindingChars": [
+        131,
+        101,
+        96
+      ]
+    }
+  ]
+}

@@ -37,7 +37,7 @@ function ignoreDevelopmentOnly(filePath) {
   const root = parts[0];
   if (DEVELOPMENT_ONLY_ROOTS.has(root)) return true;
   if (isModelPayloadPath(normalizedPath)) return true;
-  if (root === 'models' && normalizedPath !== 'models' && normalizedPath !== 'models/registry.json') return true;
+  if (root === 'models' && !['models', 'models/registry.json', 'models/speech-evidence-registry.json'].includes(normalizedPath)) return true;
   if (NON_RUNTIME_FILES.has(normalizedPath)) return true;
   return root === 'node_modules' && ['.bin', 'electron', 'electron-nightly'].includes(parts[1]);
 }
@@ -53,6 +53,7 @@ function createForgeConfig({environment = process.env, catalog = modelCatalog} =
   }
 
   const packagerConfig = {
+    icon: path.join(__dirname, 'src/assets/app-icon.ico'),
     arch: 'x64',
     executableName: 'ExpressionTrainer',
     asar: {
@@ -73,6 +74,7 @@ function createForgeConfig({environment = process.env, catalog = modelCatalog} =
       platforms: ['win32'],
       config: {
         name: makerName,
+        setupIcon: path.join(__dirname, 'src/assets/app-icon.ico'),
         setupExe: `${makerName}Setup.exe`
       }
     }

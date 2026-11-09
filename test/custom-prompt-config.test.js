@@ -14,11 +14,9 @@ test('legacy custom rules migrate to a versioned string-only schema', () => {
   }));
 
   assert.deepEqual(result.prompt, {
-    schemaVersion: 1,
+    schemaVersion: 2,
     goals: '清晰表达',
-    customRules: '',
-    styleRef: '简洁',
-    customWords: ''
+    styleRef: '简洁'
   });
   assert.equal(result.shouldPersist, true);
   assert.equal(result.error, null);
@@ -48,8 +46,16 @@ test('future custom rule schema is not automatically downgraded on read', () => 
   assert.equal(result.shouldPersist, false);
 });
 
-test('custom words become a bounded unique local filler list', () => {
-  const {customWordsToFillers} = require('../lib/custom-prompt-config');
-  assert.deepEqual(customWordsToFillers('属于是、确实\n属于是  特别特别'), ['属于是', '确实', '特别特别']);
-  assert.equal(customWordsToFillers(Array(80).fill('词').map((word, index) => `${word}${index}`).join('、')).length, 64);
+test('v1 preferences merge instructions once and retire custom words', () => {
+  const {normalizeCustomPrompt,parseCustomPromptJson} = require('../lib/custom-prompt-config');
+  const legacy={schemaVersion:1,goals:'关注论据',customRules:'保留条件',styleRef:'简洁',customWords:'行动'};
+  const migrated=normalizeCustomPrompt(legacy);
+  assert.deepEqual(migrated,{schemaVersion:2,goals:'关注论据\n\n保留条件',styleRef:'简洁'});
+  assert.deepEqual(normalizeCustomPrompt(migrated),migrated);
+  assert.equal(parseCustomPromptJson(JSON.stringify(migrated)).shouldPersist,false);
+  assert.equal(normalizeCustomPrompt({...legacy,customRules:'关注论据'}).goals,'关注论据');
+  assert.equal(normalizeCustomPrompt({...legacy,goals:''}).goals,'保留条件');
+  assert.equal(normalizeCustomPrompt({...migrated,customRules:'不再追加'}).goals,migrated.goals);
+  const full=normalizeCustomPrompt({...legacy,goals:'甲'.repeat(20000),customRules:'乙'.repeat(20000)});
+  assert.equal(full.goals.length,40002);
 });

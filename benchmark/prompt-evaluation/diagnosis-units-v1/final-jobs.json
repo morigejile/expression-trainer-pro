@@ -1,0 +1,172 @@
+[
+  {
+    "id": "E01",
+    "variant": "baseline"
+  },
+  {
+    "id": "E01",
+    "variant": "unified"
+  },
+  {
+    "id": "E02",
+    "variant": "unified"
+  },
+  {
+    "id": "E02",
+    "variant": "baseline"
+  },
+  {
+    "id": "E03",
+    "variant": "baseline"
+  },
+  {
+    "id": "E03",
+    "variant": "unified"
+  },
+  {
+    "id": "E04",
+    "variant": "unified"
+  },
+  {
+    "id": "E04",
+    "variant": "baseline"
+  },
+  {
+    "id": "E05",
+    "variant": "baseline"
+  },
+  {
+    "id": "E05",
+    "variant": "unified"
+  },
+  {
+    "id": "E06",
+    "variant": "unified"
+  },
+  {
+    "id": "E06",
+    "variant": "baseline"
+  },
+  {
+    "id": "E07",
+    "variant": "baseline"
+  },
+  {
+    "id": "E07",
+    "variant": "unified"
+  },
+  {
+    "id": "E08",
+    "variant": "unified"
+  },
+  {
+    "id": "E08",
+    "variant": "baseline"
+  },
+  {
+    "id": "P01-execution",
+    "variant": "baseline"
+  },
+  {
+    "id": "P01-execution",
+    "variant": "unified"
+  },
+  {
+    "id": "P03-late",
+    "variant": "unified"
+  },
+  {
+    "id": "P03-late",
+    "variant": "baseline"
+  },
+  {
+    "id": "P06-vague",
+    "variant": "baseline"
+  },
+  {
+    "id": "P06-vague",
+    "variant": "unified"
+  },
+  {
+    "id": "P03-independent",
+    "variant": "unified"
+  },
+  {
+    "id": "P03-independent",
+    "variant": "baseline"
+  },
+  {
+    "id": "H01",
+    "variant": "baseline"
+  },
+  {
+    "id": "H01",
+    "variant": "unified"
+  },
+  {
+    "id": "H02",
+    "variant": "unified"
+  },
+  {
+    "id": "H02",
+    "variant": "baseline"
+  },
+  {
+    "id": "H03",
+    "variant": "baseline"
+  },
+  {
+    "id": "H03",
+    "variant": "unified"
+  },
+  {
+    "id": "E03",
+    "variant": "unified",
+    "repeat": 2
+  },
+  {
+    "id": "E03",
+    "variant": "baseline",
+    "repeat": 2
+  },
+  {
+    "id": "E06",
+    "variant": "unified",
+    "repeat": 2
+  },
+  {
+    "id": "E06",
+    "variant": "baseline",
+    "repeat": 2
+  },
+  {
+    "id": "E07",
+    "variant": "unified",
+    "repeat": 2
+  },
+  {
+    "id": "E07",
+    "variant": "baseline",
+    "repeat": 2
+  },
+  {
+    "id": "P03-independent",
+    "variant": "unified",
+    "repeat": 2
+  },
+  {
+    "id": "P03-independent",
+    "variant": "baseline",
+    "repeat": 2
+  },
+  {
+    "id": "H03",
+    "variant": "unified",
+    "repeat": 2
+  },
+  {
+    "id": "H03",
+    "variant": "baseline",
+    "repeat": 2
+  }
+]

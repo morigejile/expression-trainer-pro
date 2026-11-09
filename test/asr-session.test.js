@@ -105,19 +105,20 @@ test('session protocol validates start and emits normalized monotonic events', a
   assert.deepEqual(ready, {
     type: 'ready',
     sessionId: 'session-a',
-    sequence: 0
+    sequence: 0,
+    capabilities: {recognitionMode: 'streaming', partialResults: true, tokenTimestamps: false, timingSource: 'unavailable', confidence: false}
   });
   assert.deepEqual(partial, {
     type: 'partial',
     sessionId: 'session-a',
     sequence: 1,
-    text: 'draft'
+    text: 'draft', acceptedSampleStart: 0, acceptedSampleEnd: 1, timingSource: 'unavailable'
   });
   assert.deepEqual(final, {
     type: 'final',
     sessionId: 'session-a',
     sequence: 2,
-    text: 'complete'
+    text: 'complete', acceptedSampleStart: 2, acceptedSampleEnd: 3, timingSource: 'unavailable'
   });
   assert.deepEqual(error, {
     type: 'error',
@@ -131,12 +132,13 @@ test('session protocol validates start and emits normalized monotonic events', a
       type: 'final',
       sessionId: 'session-a',
       sequence: 4,
-      text: 'tail'
+      text: 'tail', timingSource: 'unavailable'
     },
     {
       type: 'stopped',
       sessionId: 'session-a',
-      sequence: 5
+      sequence: 5, finalAcceptedSampleCursor: 3, timingSource: 'unavailable',
+      qualityEvents:[{code:'timing-unavailable',startSample:0,endSample:3}]
     }
   ]);
   assert.deepEqual(
@@ -216,12 +218,13 @@ test('stop and cancel are idempotent and have distinct tail semantics', async ()
       type: 'final',
       sessionId: 'stop-session',
       sequence: 1,
-      text: 'accepted tail'
+      text: 'accepted tail', timingSource: 'unavailable'
     },
     {
       type: 'stopped',
       sessionId: 'stop-session',
-      sequence: 2
+      sequence: 2, finalAcceptedSampleCursor: 0, timingSource: 'unavailable',
+      qualityEvents:[{code:'timing-unavailable',startSample:0,endSample:0}]
     }
   ]);
   assert.deepEqual(stopProvider.stop({ sessionId: 'stop-session' }), []);

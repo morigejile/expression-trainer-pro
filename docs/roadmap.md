@@ -1,7 +1,7 @@
 # Expression Trainer Roadmap
 
 > 状态：Active
-> 更新日期：2026-08-31
+> 更新日期：2026-11-09
 > 当前模式：内部开发/测试；公开模型分发、签名和扩展平台支持仍受外部条件约束。
 
 ## 1. 排序原则
@@ -17,14 +17,21 @@
 
 ```mermaid
 flowchart LR
-  B[已完成运行时、benchmark、UI、多模型与安装基线] --> M4[ASR-M04 公开包内默认资格]
+  B[已完成运行时、benchmark、UI、多模型与安装基线] --> M0[M0 架构与需求基线]
+  M0 --> M1[M1 训练记录持久化]
+  M1 --> V1[SP-A01 神经 VAD]
+  M1 --> U1[ASR-U01 SenseVoiceSmall]
+  V1 --> M2[M2 语音证据与默认 AI 诊断]
+  U1 -. 下载及实机验收延期 B-23 .-> U3[后续 SenseVoice 验证]
+  M2 --> M3[M3 对比与复盘]
+  M3 --> M4P[M4 结构化表达训练]
+  B --> M4[ASR-M04 公开包内默认资格]
   B --> P5[PKG-05 签名与公开发布材料]
   B --> P6[PKG-06 扩展平台证据]
-  B -. 产品重开 .-> U1[ASR-U01 SenseVoice]
   U1 --> U2[ASR-U02 FireRedASR2]
 ```
 
-ASR-M04 受模型再分发许可和公开制品条件约束；utterance 轨道不进入当前 streaming 关键路径。
+M1 持久化及 M2 稳定快照已构成后续基础。M2 已完成最终 Closeout，默认真实录音/播放/恢复、有限 VAD/Evidence 和真实 AI E2E 验收通过，详见 M2 矩阵。SenseVoice 下载及实机验收按 B-23 延期，不再作为 M2 → M3 的门禁；M3 首版指标与证据复盘已实现并通过自动化/制品验证，边界见 Current §14。ASR-M04 公开再分发许可、签名及扩展设备/平台资格仍独立跟进。
 
 ## 3. 已完成基线
 
@@ -38,57 +45,82 @@ ASR-M04 受模型再分发许可和公开制品条件约束；utterance 轨道�
 | Phase 5 | Windows x64 Forge/Squirrel 制品、真实模型首次安装、离线二次启动、升级和卸载数据保留 | [支持矩阵](support-matrix.md)、[ADR-0007](architecture/adr/0007-package-with-electron-forge.md) |
 | CONV-01～03 | 文档职责收敛、benchmark writer 竞态修复、LLM provider 配置迁移 | [CHANGELOG](../CHANGELOG.md)、Git 历史 |
 | UI-01～02 | 四套主题、双布局、窗口同步和响应式尺寸 | [当前架构](architecture/current.md) |
-| ASR-M01～M04a | 三模型 Catalog/Factory、选择恢复、安装切换与内部包内默认资格 | [当前架构](architecture/current.md)、[ADR-0009](architecture/adr/0009-productize-multiple-asr-models.md) |
+| ASR-M01～M03、ASR-M04a | 三模型 Catalog/Factory、选择恢复、安装切换与内部包内默认资格 | [当前架构](architecture/current.md)、[ADR-0009](architecture/adr/0009-productize-multiple-asr-models.md) |
 
 ## 4. 当前执行轨道
 
-### 4.1 Streaming ASR public delivery
+### 4.1 Product baseline and persistence
 
 | ID | P | 状态 | 任务 | 完成标准 |
 |---|---|---|---|---|
-| ASR-M04 | P1 | External gate | Zipformer Large 包内默认、升级保留和真实模型资格验证 | 获得再分发批准；离线首次导入、native 初始化、二次启动和升级保留通过 |
+| M0 | P0 | Complete | 冻结需求、目标架构、训练数据模型、训练/报告流程、Speech Engine 契约、Backlog 和 M1 范围 | 于 2026-09-16 完成基线一致性审查；M1 无需重议产品目标、数据模型和主要架构边界即可开发 |
+| M1 | P0 | Implementation complete / default-path manual evidence accepted | 持久化闭环已实施；默认真实录音、Report/History 播放及保存恢复在本轮 M2 人工验收确认，扩展设备限制继续保留（Current §10） | 满足 [M1 milestone](milestones/m1-training-persistence.md) 的交付边界；本次不另做 M1 Closeout |
 
-### 4.2 Deferred utterance ASR
+M0 的 Complete 记录上述历史完成事件；[当时的审查](archive/reviews/m0-consistency-review-2026-09-16.md)已归档，不证明后续修订仍通过审查。后续修订按[文档维护规则](README.md#维护规则)验证。
 
-| ID | P | 状态 | 任务 | 重开条件 |
+目标交互与 Screen Structure 统一见 [Training Flow](product/training-flow.md)，阶段切片见 M1/M2 milestone。本轮已确认的结构和导航不再作为开放选项；当前 Screen / State 结构已收口，deferred 定位与实现细节分别由该文档 §13.5/§14 维护；Processing timeout 交付跟随 M2 AC-M2-05，未来视觉/设备选择跟随 Backlog B-13～B-15。后续原型只细化既有未决项，不把 M2–M4、Focus Mode 或交互细节自动加入 M1；暂缓/待决项及重开条件见 [Backlog](product/backlog.md)。
+
+### 4.2 Streaming ASR public delivery
+
+| ID | P | 状态 | 任务 | 完成标准 |
 |---|---|---|---|---|
-| ASR-U01 | P2 | Deferred | SenseVoiceSmall utterance、5 分钟缓冲和停止后解码 | 产品重新确认优先级并明确句级交互收益 |
-| ASR-U02 | P2 | Deferred | FireRedASR2 多来源安装和 utterance UX | ASR-U01 通过上限、cancel、失败和 session 隔离验证 |
+| ASR-M04 | P1 | External gate | Zipformer Large 公开包内默认资格（内部资格 ASR-M04a 已完成） | 剩余：获得再分发批准；公开候选制品通过离线首次导入、native 初始化、二次启动和升级保留验证；公开发布条件见 §4.4 |
 
-### 4.3 Delivery and maintenance
+### 4.3 M2 speech evidence and default AI diagnosis
+
+| ID | P | 状态 | 任务 | 完成标准 |
+|---|---|---|---|---|
+| TIME-M201 | P0 | Complete for M2 | 契约化绝对时间与质量事件 | 自动化与 H-02 默认真实路径验收通过，见 M2 AC-M2-01；无词级时间戳和扩展设备限制保持明确 |
+| SP-A01 | P0 | Complete for M2 / limited manual review passed | 单一 Silero VAD、安装与进程隔离 | M2 AC-M2-02 / H-01 通过；完整统计、跨场景校准与资源预算归 B-24，不移除未校准来源标记 |
+| ASR-U01 | P1 | Deferred device acceptance / provider integrated | SenseVoiceSmall 可选主 ASR | 本轮下载异常；修复与真实 smoke/资源验收按 B-23 一并处理，不阻塞 M2；历史自动化与原生制品证据保留，公开许可独立跟进 |
+| METRIC-M201 | P0 | Complete for M2 | 版本化客观测量与逐项缺损传播 | M2 AC-M2-03 通过；定义见 Data Model §5.3，完整雷达校准归 B-20 |
+| AI-M201 | P0 | Complete for M2 / real AI E2E passed | 结束后结构化诊断、显式启用和局部恢复 | M2 AC-M2-04 / H-03 通过；可选实时 AI 按 B-19 延后，真实异常组合不冒充已全部人工执行 |
+| REPORT-M201 | P1 | Complete for M2 / UX follow-up in B-22 | 稳定快照、历史被动读取、Partial 重试与共享报告 | M2 AC-M2-05 通过；Report/History 播放及保存恢复正常，内容呈现优化归 B-22；雷达保持未校准 |
+| ASR-U02 | P2 | Deferred | FireRedASR2 多来源安装和 utterance UX | SenseVoiceSmall 实施完成后，产品证据表明第二个 utterance 模型能改变用户结果 |
+
+### 4.4 Delivery and maintenance
 
 | ID | P | 状态 | 任务 | 触发/完成条件 |
 |---|---|---|---|---|
 | PKG-05 | P1 | Planned | 代码签名、checksums 和 release notes | 公开发布前具备凭据并验证来源与完整性 |
 | PKG-06 | P1 | Planned | 扩展支持矩阵 | 每个提升支持等级的平台均有对应 package/smoke 证据 |
 | OPS-01 | P1 | Deferred | 最小 CI/内测取包自动化 | 跨机取包成为反复痛点时增加可移除的手工 Windows workflow |
-| OPS-03 | P1 | Ongoing | 受控运行时与依赖升级 | 只因具体安全或兼容风险升级，并重跑能发现实质回归的验证 |
+| OPS-03 | P1 | Ongoing | 受控运行时与依赖升级 | Node/npm 按 [Development 的 Active LTS 政策](development.md#环境与安装) 跟进；其他运行时与依赖由具体安全或兼容风险触发，验证范围沿用 Development，不另维护升级政策 |
 | OPS-04 | P1 | Planned | 模型生命周期 | 定义 current/deprecated/removed、兼容期和回退 |
 | OPS-06 | P2 | Deferred | 自动更新评估 | 至少两个稳定手工发布后用 ADR 决定是否采用 |
+
+### 4.5 M3 comparison and review
+
+M3 首版已完成可靠指标变化、两侧 Finding/Evidence 复盘与 History → Comparison → Report。D-13 已按 [Data Model §10.1](architecture/data-model.md#101-m3-compatibility) 关闭；验收映射见 [M3 milestone](milestones/m3-comparison-and-review.md)，执行证据及人工/设备限制见 [Current §14](architecture/current.md#14-m3-comparison-and-review)。自动跨录音 Finding 语义变化判断明确延期至 B-25；首版不新增远程比较调用。
+
+### 4.6 语速与停顿测量（独立实验）
+
+第一阶段的离线派生预览与只读核验工具已实现，尚未接入正式报告、对比或远程 AI；实现记录见 [Current §13](architecture/current.md#13-m2-analysis-pipeline)，实验定义见 [Data Model §5.3](architecture/data-model.md#离线流畅度测量预览实验)，操作方法见 [Development](development.md#m2-已保存-vad-区间核验)。
+
+下一步是人工复听、边界标注与新用途的测量放行；有具体误差或覆盖缺口时再决定是否开展参数对照。第二阶段生产接入仍待上述证据明确后细化，不以离线一致性核验代替准确性或 AI 内容质量验收。任务拆分与执行记录见 [Supporting 计划](superpowers/plans/2026-11-09-fluency-measurement.md)；该实验不自动成为 M4 的新增验收门槛，也不重开已关闭的 M2。
 
 ## 5. 里程碑
 
 | 里程碑 | 状态 | 包含 | 结果 |
 |---|---|---|---|
-| M5 Streaming models | In progress | ASR-M01～M04 | Catalog/Factory、选择、单 controller 切换、安装设置入口及内部包内默认资格已完成；公开资格仍受外部门槛约束 |
-| M7 Public delivery | External gate | PKG-05、PKG-06 | 签名、许可和目标平台证据满足公开发布 |
+| M0 Architecture & Requirements Baseline | Complete | Gap、Requirements、Data Model、Training Flow、Speech Contract、Target、Backlog、M1、Consistency Review | M1 有稳定、可追踪的实施边界 |
+| M1 Training Persistence | Implementation complete / default-path manual evidence accepted | R-P01～R-P09 | 默认录音、播放与保存恢复已在本轮 M2 人工验收确认；扩展设备限制见 Current，未单独新增 M1 Closeout |
+| M2 Speech Evidence & AI Diagnosis | **Complete — 2026-09-19** | R-A01～R-A11（R-A10 实机验收明确延期） | [M2 最终验收](milestones/m2-speech-evidence-and-ai-diagnosis.md#acceptance-criteria) 通过，最终回归与制品证据见 Current §13；B-20/B-22/B-23/B-24 不阻塞 Closeout，可进入 M3 |
+| M3 Comparison & Review | First release implemented / automated and packaged verification passed | R-R01～R-R02 首版；语义变化判断 B-25、R-R03/R-R04 deferred | [M3 首版验收](milestones/m3-comparison-and-review.md#acceptance-matrix) 与 [Current §14](architecture/current.md#14-m3-comparison-and-review) 记录实际证据；未新增用户人工验收。趋势、Finding 对话和自动问题变化按 B-16/B-17/B-25 重开，不作为首版完成依赖 |
+| M4 Structured Training | In progress — 当前报告/重练验收与真实 AI 质量待收尾 | R-F01～R-F05、R-F07～R-F08；R-F06 已退出 | 可选主题/场景、框架选择与 Guidance、专项反馈及重练历程已接入；自动框架推荐、报告内换框架分析不再纳入验收。重练/历程已有人工闭环证据；按 [M4 剩余任务](milestones/m4-structured-training.md#remaining-work-and-blockers) 复核当前 UI、诊断失败重试、真实 AI 质量和最终制品，尚未完成阶段验收。 |
+| Streaming ASR public delivery | In progress | ASR-M01～M04（含 M04a 内部资格） | 已完成部分见 §3；剩余公开交付任务及门槛见 §4.2；这是并行交付轨道，不占用产品里程碑编号 |
+| Public desktop delivery | External gate | PKG-05、PKG-06 | 签名、许可和目标平台证据满足公开发布；这是外部门禁，不是 M4 的后续产品里程碑 |
 
 ## 6. 明确不做
 
-- 不重写为 Tauri、WASM、React/Vue 或独立后端。
-- 不为尚未进入产品批次的模型预建 adapter、下载器或 UI。
-- 不把内部七候选结果包装为公开权威 benchmark。
-- 不在没有当前风险时增加审批、审计、遥测、插件、数据库或通用状态框架。
+当前阶段边界见各 milestone：[M1](milestones/m1-training-persistence.md#out-of-scope)、[M2](milestones/m2-speech-evidence-and-ai-diagnosis.md#out-of-scope)、[M3](milestones/m3-comparison-and-review.md#out-of-scope) 与 [M4](milestones/m4-structured-training.md#scope-and-dependencies)；长期暂缓事项与重开条件只由 [Backlog](product/backlog.md#not-now) 维护。不得因排期或文档整理新增产品/技术范围。
 
 ## 7. 外部跟进
 
-- 真实可配置麦克风和接近 4-core/8-GB/3-GB 资格线设备的运行证据。
+- 当前默认真实麦克风主链路已有验收；多采样率/其他可配置麦克风与接近 4-core/8-GB/3-GB 资格线设备的覆盖仍待扩展。
 - Zipformer Large 等模型的公开再分发许可。
 - Windows 签名凭据；macOS/Linux/ARM64 对应构建与 native 模型证据。
 
 ## 8. 维护规则
 
-- Roadmap 只保留未完成工作、依赖、外部门禁和一页已完成基线，不保存逐任务日志。
-- 已完成任务移入“已完成基线”摘要；具体提交、命令和临时结论由 Git 历史承担。
-- 当前实现事实写入[当前架构](architecture/current.md)，产品行为写入[需求基线](requirements/requirements.md)，决策理由写入 [ADR](architecture/adr/README.md)。
-- 新增计划文件只用于尚未开始且需要跨步骤协调的工作；实施完成并吸收最终事实后删除。
+遵循 [唯一文档治理入口](README.md#维护规则)。本文件只保留未完成工作、依赖、外部门禁和已完成基线摘要；逐任务日志由 Git 历史承担。

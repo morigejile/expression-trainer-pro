@@ -56,11 +56,26 @@ test('explicit save publishes normalized appearance atomically', async () => {
   await withUserData((userDataPath) => {
     const appearancePath = path.join(userDataPath, 'appearance.json');
 
-    const saved = saveAppearance(userDataPath, {theme: 'paper', layout: 'focus-hud'});
+    const saved = saveAppearance(userDataPath, {theme: 'coral-glow', layout: 'coach-rail'});
 
-    assert.deepEqual(saved, {schemaVersion: 1, theme: 'paper', layout: 'focus-hud'});
+    assert.deepEqual(saved, {schemaVersion: 1, theme: 'coral-glow', layout: 'coach-rail'});
     assert.deepEqual(JSON.parse(fs.readFileSync(appearancePath, 'utf8')), saved);
     assert.deepEqual(fs.readdirSync(userDataPath), ['appearance.json']);
+  });
+});
+
+test('all formal themes survive a new store read; legacy files are mapped without being rewritten', async () => {
+  await withUserData(userDataPath=>{
+    const file=path.join(userDataPath,'appearance.json');
+    for(const theme of ['graphite','coral-glow','ink-night','frosted-mist']){
+      saveAppearance(userDataPath,{theme,layout:'coach-rail'});
+      assert.equal(loadAppearance(userDataPath).theme,theme);
+    }
+    for(const theme of ['midnight','paper','mist','unknown']){
+      const original=JSON.stringify({schemaVersion:1,theme,layout:'focus-hud'});fs.writeFileSync(file,original);
+      assert.deepEqual(loadAppearance(userDataPath),{schemaVersion:1,theme:'graphite',layout:'coach-rail'});
+      assert.equal(fs.readFileSync(file,'utf8'),original);
+    }
   });
 });
 
@@ -87,7 +102,7 @@ test('atomic save failure preserves the previous file byte for byte', async () =
     assert.throws(
       () => saveAppearance(
         userDataPath,
-        {theme: 'paper', layout: 'focus-hud'},
+        {theme: 'coral-glow', layout: 'coach-rail'},
         {atomicWrite: () => { throw new Error('injected atomic failure'); }}
       ),
       /injected atomic failure/

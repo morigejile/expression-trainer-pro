@@ -1,0 +1,35 @@
+{
+  "kind": "same-assistant-content-review",
+  "reviewedAt": "2026-10-31T06:23:16.092Z",
+  "labels": {
+    "B1": {
+      "defects": [
+        0
+      ]
+    },
+    "B2": {
+      "optional": [
+        0
+      ],
+      "falsePositive": [
+        1
+      ]
+    },
+    "B3": {
+      "defects": [
+        0
+      ],
+      "duplicates": [
+        1
+      ]
+    },
+    "B4": {
+      "defects": [
+        0
+      ],
+      "duplicates": [
+        1
+      ]
+    }
+  }
+}

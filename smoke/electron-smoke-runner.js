@@ -13,7 +13,10 @@ const SMOKE_CANCEL_SESSION_ID = '123e4567-e89b-42d3-a456-426614174001';
 
 const calls = {
   llmFeedback: 0,
-  llmConnection: 0
+  llmConnection: 0,
+  llmReport: 0,
+  llmDiagnosis: 0,
+  llmPlayback: 0
 };
 
 const fakeAsrProvider = createFakeAsrProvider({
@@ -66,43 +69,50 @@ function createRequestCoordinator() {
   };
 }
 
-async function runCoordinatedRequest(
-  coordinator,
-  ownerId,
-  requestType,
-  resultKey,
-  requestFactory
-) {
-  const request = coordinator.begin(ownerId, requestType);
-  try {
-    const value = await requestFactory(request.signal);
-    if (request.signal.aborted) {
-      return { success: false, error: '大模型请求已取消' };
-    }
-    return { success: true, [resultKey]: value };
-  } catch {
-    return { success: false, error: '大模型请求失败，请稍后重试' };
-  } finally {
-    request.finish();
-  }
-}
-
 const fakeLlm = {
+  async sendStructuredDiagnosis(context,profile) {
+    calls.llmDiagnosis += 1;
+    if (profile.model==='i2-failure') throw Object.assign(new Error('Injected network failure'),{code:'network'});
+    if (profile.model==='i2-timeout') throw Object.assign(new Error('Injected timeout'),{code:'timeout'});
+    if (profile.model==='i2-pending') await new Promise(resolve=>{fakeLlm.releaseDiagnosis=resolve;});
+    const {parseStructuredDiagnosisResponse} = require('../lib/structured-diagnosis');
+    const data = {schemaVersion:1,assessment:{status:'analyzable',reason:'受控用例包含可评价的转写。',
+      categories:['organization','argument','delivery','wording'],frameworkAssessable:Boolean(context.analysisTarget),
+      evidenceRefs:context.transcript.segments.slice(0,1).map(segment=>segment.id)},summary:'先说明目标，再给出支持理由。',
+      findings:context.transcript.segments.length ? [{id:'finding-1',category:'organization',observation:'表达可以先说明目标。',
+        interpretation:'先给出重点可以帮助听者理解。',recommendation:'下一次先用一句话说明重点。',
+        evidenceRefs:[context.transcript.segments[0].id]}] : []};
+    if (profile.model==='i2-empty') {data.summary='本次未形成有充分证据的改善建议。';data.findings=[];}
+    if (profile.model==='i2-insufficient') {
+      data.assessment={...data.assessment,status:'insufficient',reason:'受控材料只有试音和问候。',categories:[],frameworkAssessable:false};
+      data.summary='本次材料不足以形成表达诊断。';data.findings=[];
+    }
+    if (profile.model==='i2-limited') {
+      data.assessment={...data.assessment,status:'limited',reason:'受控材料只足以评价措辞。',categories:['wording'],frameworkAssessable:false};
+      for (const finding of data.findings) finding.category='wording';
+    }
+    if (context.analysisTarget && data.assessment.frameworkAssessable) data.frameworkAnalysis = {...context.analysisTarget,
+      findings:data.findings.map(finding => ({...finding,id:'framework-1'}))};
+    if (['sentence','segment'].includes(context.practiceComparison?.scope) && data.findings.length) {
+      // A scoped round has no full-framework Finding. Keep a distinct, local
+      // target so the new-goal/chain test can still exercise a genuine choice.
+      data.findings.push({...data.findings[0],id:'finding-2',category:'wording',
+        observation:'练习片段可使用更具体的措辞。',interpretation:'具体措辞让所选片段更易理解。',recommendation:'下一遍把所选片段中的对象说具体。'});
+    }
+    if (context.practiceComparison) {
+      const previous = context.practiceComparison.previous?.transcript.segments[0];
+      const current = context.transcript.segments[0];
+      data.practiceFeedback = previous && current
+        ? {status:'unchanged',summary:'前后都保留了同一表达目标，可以继续练习清晰开场。',previousEvidenceRefs:[previous.id],currentEvidenceRefs:[current.id]}
+        : {status:'unavailable',summary:'来源证据不可用，暂时无法可靠比较。',previousEvidenceRefs:[],currentEvidenceRefs:[]};
+      data.practiceFeedback.comparability={status:previous && current?'comparable':'unavailable',
+        reason:previous && current?'受控用例两侧有对应目标的转写。':'来源证据不可用。'};
+    }
+    const {frameworkAnalysis,...wire}=data;
+    wire.findingOrder=[...(frameworkAnalysis?.findings || []),...data.findings].map(finding=>finding.id);
+    return parseStructuredDiagnosisResponse(JSON.stringify({...wire,frameworkFindings:frameworkAnalysis?.findings || []}),context,{requireAssessment:true,currentFormat:true});
+  },
   createRequestCoordinator,
-  runCoordinatedRequest,
-
-  async sendFeedback() {
-    calls.llmFeedback += 1;
-    return 'SMOKE_LLM_FEEDBACK';
-  },
-
-  async sendReport() {
-    return 'SMOKE_LLM_REPORT';
-  },
-
-  async sendPlaybackAnalysis() {
-    return [{segmentId: 'segment-1', advice: 'SMOKE_PLAYBACK_ADVICE'}];
-  },
 
   async testConnection() {
     calls.llmConnection += 1;
@@ -152,49 +162,67 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.equal(require.cache[require.resolve('sherpa-onnx-node')], undefined);
   assert.equal(require.cache[require.resolve('../lib/ai-feedback')], undefined);
   await waitForPage(mainWindow, 'index.html');
+  if (process.env.EXPRESSION_TRAINER_PRODUCT_SMOKE) {
+    await require('./training-product-smoke').run({
+      app, mainWindow, BrowserWindow, phase: process.env.EXPRESSION_TRAINER_PRODUCT_SMOKE
+    });
+    return;
+  }
+  if (process.env.EXPRESSION_TRAINER_TRAINING_API_SMOKE) {
+    await require('./training-session-api-smoke').run({
+      app, mainWindow, BrowserWindow, phase: process.env.EXPRESSION_TRAINER_TRAINING_API_SMOKE
+    });
+    return;
+  }
+  await waitUntil('speech model prepared before recording', () => mainWindow.webContents.executeJavaScript(
+    `document.getElementById('training-status')?.dataset.microphoneState !== 'checking'
+      && document.getElementById('training-status')?.textContent.includes('就绪')
+      && !document.getElementById('btn-start')?.disabled`
+  ));
 
   const apiContract = await mainWindow.webContents.executeJavaScript(`(() => {
     const expected = [
       'getLlmProviderSettings', 'saveLlmProviderSettings', 'openSettings',
-      'getLlmProfileSummaries', 'selectLlmProfile', 'onLlmProviderSettingsChanged',
+      'getAppInfo', 'onUtilityOpen', 'trainingCloseDecisionPending',
+      'onLlmProviderSettingsChanged',
       'getAppearance', 'saveAppearance', 'onAppearanceChanged',
       'getRecordingPolicy', 'acknowledgeRecordingPolicy',
-      'openPromptEditor', 'getCustomPrompt', 'saveCustomPrompt', 'closeWindow',
-      'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText', 'analyzeTexts',
-      'getRealtimeFeedback', 'getFinalReport', 'analyzePlayback', 'testLLMConnection',
-      'cancelLLMRequests', 'saveFile', 'exportDiagnostics', 'openSupportLink'
+      'getCustomPrompt', 'saveCustomPrompt',
+      'startASR', 'feedAudio', 'stopASR', 'cancelASR', 'analyzeText',
+      'createTrainingSession', 'finalizeTrainingSession', 'appendTrainingResult',
+      'listTrainingSessions', 'getTrainingSession', 'deleteTrainingSession', 'readTrainingAudio',
+      'testLLMConnection',
+      'cancelLLMRequests', 'exportDiagnostics', 'openSupportLink'
     ];
     return {
       title: document.title,
       missing: expected.filter(name => typeof window.api?.[name] !== 'function'),
+      removedApis: ['analyzeTexts', 'closeWindow', 'saveFile', 'getFinalReport', 'getRealtimeFeedback', 'analyzePlayback', 'getLlmProfileSummaries', 'selectLlmProfile', 'openPromptEditor'].filter(name => name in window.api),
+      removedUi: ['btn-paste','paste-modal','btn-copy-text','btn-save-text','btn-clear',
+        'report-modal','training-record-select','btn-diagnostics',
+        'panel-left','report-local-statistics','stat-fillers','stat-hedges','stat-vague','stat-density',
+        'panel-right','coach-title','feedback-status','feedback-content'].filter(id => document.getElementById(id)),
       missingUi: [
         'user-message', 'user-message-text', 'user-message-action', 'user-message-close',
-        'training-status', 'feedback-status'
+        'training-status'
       ].filter(id => !document.getElementById(id)),
       initialUi: {
         theme: document.documentElement.dataset.theme,
         layout: document.documentElement.dataset.layout,
-        trainingStatus: document.getElementById('training-status')?.textContent.trim(),
-        feedbackStatus: document.getElementById('feedback-status')?.textContent.trim(),
-        vagueClass: document.getElementById('stat-vague')?.className,
-        fillerClass: document.getElementById('stat-fillers')?.className,
-        hedgeClass: document.getElementById('stat-hedges')?.className,
-        densityHelp: document.querySelector('.stat-label[title]')?.getAttribute('title')
+        trainingStatus: document.getElementById('training-status')?.textContent.trim()
       }
     };
   })()`);
   assert.equal(apiContract.title, '宇宙无敌表达训练系统');
   assert.deepEqual(apiContract.missing, []);
+  assert.deepEqual(apiContract.removedApis, []);
+  assert.deepEqual(apiContract.removedUi, []);
   assert.deepEqual(apiContract.missingUi, []);
+  assert.ok(['准备就绪','语音模型已就绪；开始时检查麦克风权限'].includes(apiContract.initialUi.trainingStatus));
   assert.deepEqual(apiContract.initialUi, {
     theme: 'graphite',
     layout: 'coach-rail',
-    trainingStatus: '准备就绪',
-    feedbackStatus: '本地分析可用；AI 建议约每新增 30 字生成',
-    vagueClass: 'stat-value stat-yellow',
-    fillerClass: 'stat-value stat-red',
-    hedgeClass: 'stat-value stat-orange',
-    densityHelp: '有效词数（排除填充词和犹豫词）占总词数的比例'
+    trainingStatus: apiContract.initialUi.trainingStatus
   });
   if (process.platform !== 'darwin') {
     assert.equal(mainWindow.isMenuBarVisible(), false, 'main window must not render a second menu header');
@@ -204,7 +232,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     const received = [];
     const unsubscribe = window.api.onAppearanceChanged(appearance => received.push(appearance));
     const initial = await window.api.getAppearance();
-    const saved = await window.api.saveAppearance({theme: 'paper', layout: 'focus-hud'});
+    const saved = await window.api.saveAppearance({theme: 'coral-glow', layout: 'coach-rail'});
     await new Promise(resolve => setTimeout(resolve, 25));
     unsubscribe();
     const restored = await window.api.saveAppearance({theme: 'graphite', layout: 'coach-rail'});
@@ -214,9 +242,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     initial: {schemaVersion: 1, theme: 'graphite', layout: 'coach-rail'},
     saved: {
       success: true,
-      appearance: {schemaVersion: 1, theme: 'paper', layout: 'focus-hud'}
+      appearance: {schemaVersion: 1, theme: 'coral-glow', layout: 'coach-rail'}
     },
-    received: [{schemaVersion: 1, theme: 'paper', layout: 'focus-hud'}],
+    received: [{schemaVersion: 1, theme: 'coral-glow', layout: 'coach-rail'}],
     restored: {
       success: true,
       appearance: {schemaVersion: 1, theme: 'graphite', layout: 'coach-rail'}
@@ -229,19 +257,19 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     test: await window.api.testLLMConnection({schemaVersion: 2, activeProfileId: 'not-authorized', profiles: []})
   }))()`);
   assert.deepEqual(mainLlmSettingsAccess, {
-    get: {success: false, error: '仅设置窗口可访问完整 LLM 配置'},
-    save: {success: false, error: '仅设置窗口可访问完整 LLM 配置'},
-    test: {success: false, error: '仅设置窗口可访问完整 LLM 配置'}
+    get: {schemaVersion: 3, activeProfileId: null, profiles: []},
+    save: {success: false, errorCode: 'invalid-ipc-input', error: '设置或帮助请求无效。'},
+    test: {success: false, errorCode: 'invalid-ipc-input', error: '设置或帮助请求无效。'}
   });
   await mainWindow.webContents.executeJavaScript(
     `document.getElementById('btn-settings').click()`
   );
-  const settingsWindow = await waitUntil('settings window creation', () => {
-    return BrowserWindow.getAllWindows().find(window => {
-      return !window.isDestroyed() && window.webContents.getURL().endsWith('/settings.html');
-    });
-  });
-  await waitForPage(settingsWindow, 'settings.html');
+  await waitUntil('settings Utility opens in Main', () => mainWindow.webContents.executeJavaScript(
+    `document.getElementById('utility').open && document.getElementById('surface-title').textContent === 'AI分析'
+      && document.querySelector('#utility [data-add]') !== null`
+  ));
+  assert.equal(BrowserWindow.getAllWindows().length, 1, 'Settings must use Main instead of a second window');
+  const settingsWindow = mainWindow;
 
   const originalLlmSettings = await settingsWindow.webContents.executeJavaScript(
     'window.api.getLlmProviderSettings()'
@@ -259,90 +287,62 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.deepEqual(llmSettingsNotification, {saved: {success: true}, notifications: 1});
 
   const smokeProfileSave = await settingsWindow.webContents.executeJavaScript(`window.api.saveLlmProviderSettings({
-    schemaVersion: 2,
+    schemaVersion: 3,
     activeProfileId: 'smoke-profile',
     profiles: [{
       id: 'smoke-profile',
       name: 'Smoke',
       provider: 'deepseek',
-      apiKey: 'smoke-key',
+      hasApiKey: false,
+      credential: {action: 'replace', value: 'smoke-key'},
       model: 'fake-model',
+      autoDiagnosisEnabled: true,
       ollamaUrl: '',
       baseUrl: '',
       customModel: ''
     }]
   })`);
   assert.deepEqual(smokeProfileSave, {success: true});
-
-  const llmProfileIpcState = await mainWindow.webContents.executeJavaScript(`(async () => {
-    const initial = await window.api.getLlmProfileSummaries();
-    const selected = await window.api.selectLlmProfile(initial.activeProfileId);
-    const invalid = await window.api.selectLlmProfile('');
-    return {initial, selected, invalid};
-  })()`);
-  assert.equal(llmProfileIpcState.initial.profiles.length, 1);
-  assert.equal(llmProfileIpcState.initial.profiles[0].active, true);
-  assert.equal(llmProfileIpcState.selected.success, true);
-  assert.equal(llmProfileIpcState.selected.summary.activeProfileId, llmProfileIpcState.initial.activeProfileId);
-  assert.deepEqual(llmProfileIpcState.invalid, {success: false, error: 'Invalid LLM profile ID'});
-  for (const summary of [llmProfileIpcState.initial, llmProfileIpcState.selected.summary]) {
-    assert.doesNotMatch(JSON.stringify(summary), /apiKey|baseUrl|ollamaUrl/);
-  }
-
-  const playbackAnalysisIpcState = await mainWindow.webContents.executeJavaScript(`(async () => {
-    const {activeProfileId} = await window.api.getLlmProfileSummaries();
-    const success = await window.api.analyzePlayback({
-      profileId: activeProfileId,
-      segments: [{id: 'segment-1', text: '我觉得这个方案很好。', startMs: 0, endMs: 1000}]
-    });
-    const missing = await window.api.analyzePlayback({
-      profileId: 'missing-profile',
-      segments: []
-    });
-    return {success, missing};
-  })()`);
-  assert.equal(playbackAnalysisIpcState.success.success, true);
-  assert.deepEqual(playbackAnalysisIpcState.success.analysis.items, [
-    {segmentId: 'segment-1', advice: 'SMOKE_PLAYBACK_ADVICE'}
-  ]);
-  assert.deepEqual(playbackAnalysisIpcState.missing, {
-    success: false,
-    error: '所选模型配置不存在',
-    errorCode: 'invalid-profile-id'
-  });
-  assert.deepEqual(
-    Object.keys(playbackAnalysisIpcState.success.analysis.profile).sort(),
-    ['id', 'model', 'name', 'provider']
-  );
-  assert.doesNotMatch(JSON.stringify(playbackAnalysisIpcState.success.analysis.profile), /apiKey|baseUrl|ollamaUrl|customModel/);
+  const notice=await mainWindow.webContents.executeJavaScript('window.api.getAiDisclosureState()');
+  assert.equal((await mainWindow.webContents.executeJavaScript(`window.api.acknowledgeAiDisclosure({scopeVersion:${JSON.stringify(notice.scopeVersion)}})`)).success,true);
 
   const initialRecordingPolicy = await mainWindow.webContents.executeJavaScript(
     'window.api.getRecordingPolicy()'
   );
   assert.deepEqual(initialRecordingPolicy, {acknowledged: false});
 
+  await mainWindow.webContents.executeJavaScript(`document.getElementById('close-surface').click()`);
+  await waitUntil('settings Utility closes', () => mainWindow.webContents.executeJavaScript(`!document.getElementById('utility').open`));
+
+  await mainWindow.webContents.executeJavaScript(`document.getElementById('btn-help').click()`);
+  await waitUntil('Help Utility opens', () => mainWindow.webContents.executeJavaScript(
+    `document.getElementById('utility').open && document.getElementById('utility').dataset.surface === 'help' && document.getElementById('help-results') !== null`
+  ));
+  await mainWindow.webContents.executeJavaScript(`document.querySelector('#local-nav [data-page="feedback"]').click()`);
+  await waitUntil('Help feedback content loads', () => mainWindow.webContents.executeJavaScript(
+    `document.querySelector('#utility [data-feedback]') !== null`
+  ));
   const helpState = await mainWindow.webContents.executeJavaScript(`(() => {
     const helpButton = document.getElementById('btn-help');
-    const helpModal = document.getElementById('help-modal');
-    helpButton.click();
+    const helpModal = document.getElementById('utility');
     const openState = {
       buttonText: helpButton.textContent.trim(),
-      title: helpModal.querySelector('.modal-header h2').textContent.trim(),
-      open: !helpModal.classList.contains('hidden'),
-      feedbackHeading: document.getElementById('feedback-section-title').textContent.trim(),
-      documentButtonText: document.getElementById('btn-open-feedback-document').textContent.trim(),
-      hasDiagnostics: Boolean(document.getElementById('btn-help-diagnostics')),
+      title: document.getElementById('surface-title').textContent.trim(),
+      open: helpModal.open,
+      feedbackHeading: helpModal.querySelector('.diagnostic h2').textContent.trim(),
+      documentButtonText: helpModal.querySelector('[data-feedback]').textContent.trim(),
+      hasDiagnostics: Boolean(helpModal.querySelector('[data-export]')),
       hasBugForm: Boolean(document.getElementById('bug-description')),
       hasSuggestionForm: Boolean(document.getElementById('suggestion-description'))
     };
-    document.getElementById('btn-close-help').click();
-    return {...openState, closed: helpModal.classList.contains('hidden')};
+    document.getElementById('close-surface').click();
+    return {...openState, closed: !helpModal.open};
   })()`);
   assert.deepEqual(helpState, {
     buttonText: '帮助',
-    title: '帮助与反馈',
+    title: '问题与反馈',
     open: true,
-    feedbackHeading: '问题和建议',
+    feedbackHeading: '问题反馈',
     documentButtonText: '打开问题和建议文档',
     hasDiagnostics: true,
     hasBugForm: false,
@@ -350,42 +350,32 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     closed: true
   });
 
-  const blankPasteState = await mainWindow.webContents.executeJavaScript(`(() => {
-    document.getElementById('btn-paste').click();
-    document.getElementById('btn-analyze-paste').click();
-    const state = {
-      message: document.getElementById('user-message-text').textContent.trim(),
-      settingsActionHidden: document.getElementById('user-message-action').classList.contains('hidden')
-    };
-    document.getElementById('user-message-close').click();
-    document.getElementById('btn-close-paste').click();
-    return {...state, dismissed: document.getElementById('user-message').classList.contains('hidden')};
-  })()`);
-  assert.deepEqual(blankPasteState, {
-    message: '请先粘贴需要分析的逐字稿',
-    settingsActionHidden: true,
-    dismissed: true
-  });
+  const preparingState = await mainWindow.webContents.executeJavaScript(`(() => ({
+    screen: document.body.dataset.screen,
+    state: document.body.dataset.trainingState,
+    startVisible: document.getElementById('btn-start').getBoundingClientRect().height > 0,
+    transcriptHidden: document.getElementById('subtitle-scroll').getBoundingClientRect().height === 0,
+    reportHidden: getComputedStyle(document.getElementById('report-ai-section')).display === 'none'
+  }))()`);
+  assert.deepEqual(preparingState, {screen:'training',state:'preparing',startVisible:true,transcriptHidden:true,reportHidden:true});
 
   assert.deepEqual(mainWindow.getMinimumSize(), [960, 640]);
   const desktopUsability = await mainWindow.webContents.executeJavaScript(`(() => {
-    const buttonIds = ['btn-prompt-editor', 'btn-diagnostics', 'btn-settings'];
+    const buttonIds = ['btn-home', 'btn-history', 'btn-settings'];
     const controls = buttonIds.map(id => {
       const button = document.getElementById(id);
       return {
         id,
-        label: button.getAttribute('aria-label'),
-        text: button.querySelector('.btn-icon-label')?.textContent.trim()
+        text: button.textContent.trim()
       };
     });
-    const densityLabel = document.getElementById('stat-density-label');
     return {
       controls,
-      densityDescription: densityLabel?.getAttribute('title') || '',
       reducedMotionRule: Array.from(document.styleSheets)
         .flatMap(sheet => Array.from(sheet.cssRules))
         .some(rule => rule.conditionText?.includes('prefers-reduced-motion')),
-      visibleTitle: document.querySelector('.app-title')?.textContent.trim(),
+      brandLabel: document.getElementById('btn-home').getAttribute('aria-label'),
+      brandPresent: Boolean(document.querySelector('#btn-home .brand-mark')),
       decorativeMascotPresent: Boolean(document.querySelector('.girl-icon')),
       emojiControls: Array.from(document.querySelectorAll('button')).filter(button => {
         return /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u.test(button.textContent);
@@ -396,18 +386,19 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     };
   })()`);
   assert.deepEqual(desktopUsability.controls, [
-    { id: 'btn-prompt-editor', label: '训练规则', text: '规则' },
-    { id: 'btn-diagnostics', label: '导出诊断信息', text: '诊断' },
-    { id: 'btn-settings', label: '打开设置', text: '设置' }
+    { id: 'btn-home', text: '' },
+    { id: 'btn-history', text: 'history' },
+    { id: 'btn-settings', text: '设置' }
   ]);
-  assert.match(desktopUsability.densityDescription, /有效词数.*总词数/);
   assert.equal(desktopUsability.reducedMotionRule, true);
-  assert.equal(desktopUsability.visibleTitle, '表达训练');
+  assert.equal(desktopUsability.brandLabel, '表达训练，返回准备');
+  assert.equal(desktopUsability.brandPresent, true);
   assert.equal(desktopUsability.decorativeMascotPresent, false);
   assert.deepEqual(desktopUsability.emojiControls, []);
   assert.deepEqual(desktopUsability.unlabeledSvgControls, []);
 
   const visualMotionState = await mainWindow.webContents.executeJavaScript(`(() => {
+    document.querySelector('.utility-menu').open = true;
     const subtitle = document.getElementById('subtitle-scroll');
     const timer = document.getElementById('timer');
     const settings = document.getElementById('btn-settings');
@@ -430,28 +421,20 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
 
   const originalContentSize = mainWindow.getContentSize();
   await mainWindow.webContents.executeJavaScript(`(() => {
+    document.body.dataset.trainingState = 'recording';
     const transcript = document.getElementById('subtitle-scroll');
-    const feedback = document.getElementById('feedback-content');
     const transcriptSpacer = document.createElement('div');
-    const feedbackSpacer = document.createElement('div');
     transcriptSpacer.dataset.smokeSpacer = 'transcript';
-    feedbackSpacer.dataset.smokeSpacer = 'feedback';
     transcriptSpacer.style.height = '1200px';
-    feedbackSpacer.style.height = '900px';
     transcript.append(transcriptSpacer);
-    feedback.append(feedbackSpacer);
     transcript.scrollTop = 57;
-    feedback.scrollTop = 31;
     document.getElementById('timer').textContent = '12:34';
     document.getElementById('training-status').textContent = '布局切换状态保真';
     window.__layoutSmoke = {
       transcript: document.getElementById('subtitle-container'),
-      feedback,
-      insights: document.querySelector('[data-region="insights"]'),
       timer: document.getElementById('timer'),
       trainingStatus: document.getElementById('training-status'),
       transcriptScroll: transcript.scrollTop,
-      feedbackScroll: feedback.scrollTop,
       controlState: ['btn-start', 'btn-pause', 'btn-resume', 'btn-stop', 'btn-report']
         .map(id => document.getElementById(id).className).join('|')
     };
@@ -469,7 +452,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       );
       await waitUntil(`${layout} layout at ${viewport.width}`, async () => {
         const value = await mainWindow.webContents.executeJavaScript('document.documentElement.dataset.layout');
-        return value === layout;
+        return value === 'coach-rail';
       });
       const geometry = await mainWindow.webContents.executeJavaScript(`(() => {
         const rect = selector => {
@@ -477,20 +460,16 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
           return {left: value.left, top: value.top, right: value.right, bottom: value.bottom, width: value.width, height: value.height};
         };
         const transcriptScroll = document.getElementById('subtitle-scroll');
-        const feedbackScroll = document.getElementById('feedback-content');
         return {
           viewport: {width: innerWidth, height: innerHeight},
-          stage: rect('[data-region="stage"]'),
+          stage: rect('#frozen-recording .session-stage'),
           transcript: rect('#subtitle-scroll'),
-          coach: rect('[data-region="coach"]'),
-          insights: rect('[data-region="insights"]'),
+          coachAbsent: !document.querySelector('[data-region="coach"]'),
+          insightsAbsent: !document.querySelector('[data-region="insights"]'),
           nodesPreserved: window.__layoutSmoke.transcript === document.getElementById('subtitle-container')
-            && window.__layoutSmoke.feedback === feedbackScroll
-            && window.__layoutSmoke.insights === document.querySelector('[data-region="insights"]')
             && window.__layoutSmoke.timer === document.getElementById('timer')
             && window.__layoutSmoke.trainingStatus === document.getElementById('training-status'),
-          scrollPreserved: transcriptScroll.scrollTop === window.__layoutSmoke.transcriptScroll
-            && feedbackScroll.scrollTop === window.__layoutSmoke.feedbackScroll,
+          scrollPreserved: transcriptScroll.scrollTop === window.__layoutSmoke.transcriptScroll,
           controlsPreserved: ['btn-start', 'btn-pause', 'btn-resume', 'btn-stop', 'btn-report']
             .map(id => document.getElementById(id).className).join('|') === window.__layoutSmoke.controlState,
           timer: document.getElementById('timer').textContent,
@@ -504,15 +483,9 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
       assert.equal(geometry.controlsPreserved, true);
       assert.equal(geometry.timer, '12:34');
       assert.equal(geometry.trainingStatus, '布局切换状态保真');
-      assert.ok(geometry.transcript.right <= geometry.coach.left + 1, `${layout} transcript must not intersect feedback`);
-      assert.ok(geometry.coach.width >= 300 && geometry.coach.width <= 460, `${layout} coach width must stay bounded`);
-      assert.ok(geometry.coach.top >= 0 && geometry.coach.bottom <= geometry.viewport.height, `${layout} coach must remain visible`);
-      assert.ok(geometry.insights.height < geometry.coach.height, `${layout} insights must remain subordinate to feedback`);
-      if (layout === 'coach-rail') {
-        assert.ok(geometry.insights.top >= geometry.coach.bottom - 1, 'coach-rail insights must sit below feedback');
-      } else if (viewport.width >= 1280) {
-        assert.ok(geometry.coach.top > 0 && geometry.coach.bottom < geometry.viewport.height, 'focus HUD must be inset');
-      }
+      assert.ok(geometry.transcript.left >= geometry.stage.left && geometry.transcript.right <= geometry.stage.right + 1,'Frozen recording transcript stays inside the stage');
+      assert.equal(geometry.coachAbsent,true,'obsolete coaching rail is removed from recording');
+      assert.equal(geometry.insightsAbsent,true,'legacy metric panel is removed from recording');
     }
   }
   await mainWindow.webContents.executeJavaScript(`(() => {
@@ -520,40 +493,24 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     document.getElementById('timer').textContent = '00:00';
     document.getElementById('training-status').textContent = '准备就绪';
     delete window.__layoutSmoke;
+    document.body.dataset.trainingState = 'preparing';
     return window.api.saveAppearance({theme: 'graphite', layout: 'coach-rail'});
   })()`);
   mainWindow.setContentSize(...originalContentSize);
   await delay(40);
 
+  await mainWindow.webContents.executeJavaScript(`document.getElementById('btn-help').click()`);
+  await waitUntil('Help Utility keyboard content ready', () => mainWindow.webContents.executeJavaScript(
+    `document.getElementById('utility').open && document.getElementById('utility').dataset.surface === 'help' && document.getElementById('help-results') !== null`
+  ));
   const modalKeyboardState = await mainWindow.webContents.executeJavaScript(`(() => {
-    const opener = document.getElementById('btn-paste');
-    const modal = document.getElementById('paste-modal');
-    const textarea = document.getElementById('paste-textarea');
-    opener.focus();
-    opener.click();
-    textarea.value = '尚未分析的草稿';
-    textarea.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
-    const closedAfterEscape = modal.classList.contains('hidden');
-    const focusAfterEscape = document.activeElement?.id;
-    opener.click();
-    return {
-      role: modal.getAttribute('role'),
-      ariaModal: modal.getAttribute('aria-modal'),
-      closedAfterEscape,
-      focusAfterEscape,
-      retainedDraft: textarea.value
-    };
+    const opener = document.getElementById('btn-help');
+    const modal = document.getElementById('utility');
+    modal.dispatchEvent(new Event('cancel', {cancelable:true}));
+    return {nativeDialog:modal.tagName === 'DIALOG',closedAfterEscape:!modal.open,
+      focusReturnedToUtilityMenu:document.activeElement === document.querySelector('.utility-menu summary')};
   })()`);
-  assert.deepEqual(modalKeyboardState, {
-    role: 'dialog',
-    ariaModal: 'true',
-    closedAfterEscape: true,
-    focusAfterEscape: 'btn-paste',
-    retainedDraft: '尚未分析的草稿'
-  });
-  await mainWindow.webContents.executeJavaScript(
-    `document.getElementById('btn-close-paste').click()`
-  );
+  assert.deepEqual(modalKeyboardState, {nativeDialog:true,closedAfterEscape:true,focusReturnedToUtilityMenu:true});
 
   const graphWindow = new BrowserWindow({
     show: false,
@@ -586,17 +543,20 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
     const partial = await window.api.feedAudio({
       sessionId,
       sequence: 0,
+      absoluteSampleStart: 0,
       samples: new Float32Array([0.1, 0.2, 0.3])
     });
     const final = await window.api.feedAudio({
       sessionId,
       sequence: 1,
+      absoluteSampleStart: 3,
       samples: new Float32Array([0.1, 0.2, 0.3])
     });
     const stop = await window.api.stopASR({ sessionId });
     const staleFeed = await window.api.feedAudio({
       sessionId,
       sequence: 2,
+      absoluteSampleStart: 6,
       samples: new Float32Array([0.1, 0.2, 0.3])
     });
     return { start, partial, final, stop, staleFeed };
@@ -609,6 +569,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   const exitFeed = await mainWindow.webContents.executeJavaScript(`window.api.feedAudio({
     sessionId: '${SMOKE_EXIT_SESSION_ID}',
     sequence: 0,
+    absoluteSampleStart: 0,
     samples: new Float32Array([0.1, 0.2, 0.3])
   })`);
   const recoveredAsrResult = await mainWindow.webContents.executeJavaScript(`(async () => {
@@ -623,7 +584,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.deepEqual(initialAsrResult, {
     start: {
       ok: true,
-      events: [{ type: 'ready', sessionId: SMOKE_SESSION_ID, sequence: 0 }]
+      events: [{type: 'ready', sessionId: SMOKE_SESSION_ID, sequence: 0, capabilities: {recognitionMode: 'streaming', partialResults: true, tokenTimestamps: false, timingSource: 'unavailable', confidence: false}}]
     },
     partial: {
       ok: true,
@@ -631,7 +592,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
         type: 'partial',
         sessionId: SMOKE_SESSION_ID,
         sequence: 1,
-        text: 'SMOKE_ASR_PARTIAL'
+        text: 'SMOKE_ASR_PARTIAL', acceptedSampleStart: 0, acceptedSampleEnd: 3, timingSource: 'unavailable'
       }]
     },
     final: {
@@ -640,7 +601,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
         type: 'final',
         sessionId: SMOKE_SESSION_ID,
         sequence: 2,
-        text: 'SMOKE_ASR_FINAL'
+        text: 'SMOKE_ASR_FINAL', acceptedSampleStart: 3, acceptedSampleEnd: 6, timingSource: 'unavailable'
       }]
     },
     stop: {
@@ -650,16 +611,16 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
           type: 'final',
           sessionId: SMOKE_SESSION_ID,
           sequence: 3,
-          text: 'SMOKE_ASR_STOP_FINAL'
+          text: 'SMOKE_ASR_STOP_FINAL', timingSource: 'unavailable'
         },
-        { type: 'stopped', sessionId: SMOKE_SESSION_ID, sequence: 4 }
+        {type: 'stopped', sessionId: SMOKE_SESSION_ID, sequence: 4, finalAcceptedSampleCursor: 6, timingSource: 'unavailable',qualityEvents:[{code:'timing-unavailable',startSample:0,endSample:6}]}
       ]
     },
     staleFeed: { ok: true, events: [] }
   });
   assert.deepEqual(exitStart, {
     ok: true,
-    events: [{ type: 'ready', sessionId: SMOKE_EXIT_SESSION_ID, sequence: 0 }]
+    events: [{type: 'ready', sessionId: SMOKE_EXIT_SESSION_ID, sequence: 0, capabilities: {recognitionMode: 'streaming', partialResults: true, tokenTimestamps: false, timingSource: 'unavailable', confidence: false}}]
   });
   assert.deepEqual(exitFeed, {
     ok: false,
@@ -668,7 +629,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   assert.deepEqual(recoveredAsrResult, {
     cancelStart: {
       ok: true,
-      events: [{ type: 'ready', sessionId: SMOKE_CANCEL_SESSION_ID, sequence: 0 }]
+      events: [{type: 'ready', sessionId: SMOKE_CANCEL_SESSION_ID, sequence: 0, capabilities: {recognitionMode: 'streaming', partialResults: true, tokenTimestamps: false, timingSource: 'unavailable', confidence: false}}]
     },
     cancel: {
       ok: true,
@@ -729,6 +690,12 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   await mainWindow.webContents.executeJavaScript(
     `document.getElementById('btn-recording-policy-confirm').click()`
   );
+  await waitUntil('recording onboarding and model preparation complete', () => mainWindow.webContents.executeJavaScript(`(() => {
+    const trainer = window.__recordingSmokeTrainer;
+    return trainer.asrPreparationState === 'ready'
+      && !trainer.firstRunRecordingPolicyPending && !trainer.firstRunRecordingPolicyRunning;
+  })()`));
+  await mainWindow.webContents.executeJavaScript(`document.getElementById('btn-start').click()`);
   await waitUntil('fake recording fixture delivery', async () => {
     return mainWindow.webContents.executeJavaScript(`(() => {
       const trainer = window.__recordingSmokeTrainer;
@@ -738,29 +705,40 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   });
   await mainWindow.webContents.executeJavaScript(`document.getElementById('btn-stop').click()`);
 
-  const playbackSmokeState = await waitUntil('completed recording playback analysis', async () => {
+  const playbackSmokeState = await waitUntil('completed recording saved to Report', async () => {
     return mainWindow.webContents.executeJavaScript(`(async () => {
       const trainer = window.__recordingSmokeTrainer;
       const record = trainer.trainingRecords?.selected();
-      if (!record?.playbackAnalysis
-          || document.getElementById('playback-controls').classList.contains('hidden')
-          || !document.getElementById('feedback-content').textContent.includes('SMOKE_PLAYBACK_ADVICE')) {
-        return null;
-      }
+      if (record?.saveState !== 'saved' || document.body.dataset.screen !== 'report') return null;
       const audioBlob = await fetch(record.audioUrl).then(response => response.blob());
-      return {
-        playbackVisibleAfterStop: true,
-        recordOptionCount: document.getElementById('training-record-select').options.length,
-        modelLabels: Array.from(document.getElementById('playback-model').options, option => option.textContent),
-        analysisStatus: document.getElementById('feedback-status').textContent.trim(),
-        analysisProfileModel: record.playbackAnalysis.profile.model,
-        analysisSegmentIds: record.playbackAnalysis.items.map(item => item.segmentId),
-        audioType: audioBlob.type
-      };
+      return {playbackVisibleAfterStop:getComputedStyle(document.getElementById('playback-controls')).display !== 'none',
+        screen:document.body.dataset.screen, saved:record.saveState === 'saved',
+        reportAbsent:!record.report, playbackAnalysisAbsent:!record.playbackAnalysis,
+        modelLabels:[],
+        audioType:audioBlob.type};
     })()`);
   });
-  assert.equal(playbackSmokeState.analysisProfileModel, 'fake-model');
-  assert.deepEqual(playbackSmokeState.analysisSegmentIds, ['segment-1']);
+  assert.equal(playbackSmokeState.reportAbsent, true);
+  assert.equal(playbackSmokeState.playbackAnalysisAbsent, true);
+  assert.equal(calls.llmReport, 0);
+  assert.equal(calls.llmPlayback, 0, 'retired playback analysis is never requested');
+  await waitUntil('automatic AI diagnosis persisted', () => mainWindow.webContents.executeJavaScript(`(() => {
+    const record = window.__recordingSmokeTrainer.trainingRecords?.selected();
+    return !record?.reportPending && record?.saveState === 'saved'
+      && document.getElementById('report-summary-copy').textContent.includes('先说明目标，再给出支持理由');
+  })()`));
+  assert.equal(calls.llmReport, 0);
+  assert.equal(calls.llmDiagnosis, 1);
+  const savedReport = await mainWindow.webContents.executeJavaScript(`(async () => {
+    const record = window.__recordingSmokeTrainer.trainingRecords.selected();
+    const saved = await window.api.getTrainingSession({requestId:crypto.randomUUID(),sessionId:record.id});
+    return saved.value.results.find(result => result.kind === 'diagnosis');
+  })()`);
+  assert.equal(savedReport.status, 'completed');
+  assert.equal(savedReport.provenance.provider, 'deepseek');
+  assert.equal(savedReport.provenance.model, 'fake-model');
+  assert.ok(Number.isFinite(Date.parse(savedReport.createdAt)));
+  assert.doesNotMatch(JSON.stringify(savedReport.provenance), /apiKey|baseUrl|ollamaUrl|smoke-key/);
   assert.deepEqual(await mainWindow.webContents.executeJavaScript('window.api.getRecordingPolicy()'), {
     acknowledged: true
   });
@@ -770,6 +748,7 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   );
   assert.deepEqual(restoredLlmSettings, {success: true});
   const policyPath = getRecordingPolicyPath(app.getPath('userData'));
+  assert.deepEqual(JSON.parse(fs.readFileSync(policyPath, 'utf8')), {schemaVersion: 2, acknowledged: true});
   const corruptPolicy = '{"acknowledged":';
   fs.writeFileSync(policyPath, corruptPolicy, 'utf8');
   assert.deepEqual(
@@ -782,104 +761,94 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   await mainWindow.webContents.executeJavaScript(
     `document.getElementById('btn-settings').click()`
   );
-  await waitForPage(settingsWindow, 'settings.html');
+  await waitUntil('Settings Utility AI content ready', () => mainWindow.webContents.executeJavaScript(
+    `document.getElementById('utility').open && document.querySelector('#utility [data-add]') !== null`
+  ));
+  await mainWindow.webContents.executeJavaScript(`document.querySelector('#local-nav [data-page="speech"]').click()`);
   if (process.platform !== 'darwin') {
-    assert.equal(settingsWindow.isMenuBarVisible(), false, 'settings window must not render a second menu header');
+    assert.equal(mainWindow.isMenuBarVisible(), false, 'Main Utility must not render a second menu header');
   }
-  const settingsState = await waitUntil('settings page initialization', async () => {
+  const settingsState = await waitUntil('speech Utility initialization', async () => {
     return settingsWindow.webContents.executeJavaScript(`(() => {
-      const provider = document.getElementById('provider');
-      const model = document.getElementById('model');
-      const cards = document.querySelectorAll('.asr-model-card');
-      if (!provider || !model || cards.length !== 3) return null;
+      const cards = document.querySelectorAll('#utility .speech-model');
+      if (document.getElementById('surface-title').textContent !== '语音识别' || cards.length !== 4) return null;
       return {
-        title: document.title,
+        title: document.getElementById('surface-title').textContent,
         hasGetLlmProviderSettings: typeof window.api?.getLlmProviderSettings === 'function',
         theme: document.documentElement.dataset.theme,
         layout: document.documentElement.dataset.layout,
         themeControls: document.querySelectorAll('[name="appearance-theme"]').length,
         layoutControls: document.querySelectorAll('[name="appearance-layout"]').length,
         modelNames: Array.from(cards, card => card.querySelector('h3')?.textContent.trim()),
-        status: document.getElementById('asr-model-status')?.textContent.trim()
+        currentName: document.querySelector('#utility .first-group h3')?.textContent.trim(),
+        currentStatus: document.querySelector('#utility .first-group .active-status, #utility .first-group .speech-model > small')?.textContent.trim()
       };
     })()`);
   });
   assert.deepEqual(settingsState, {
-    title: '设置',
+    title: '语音识别',
     hasGetLlmProviderSettings: true,
     theme: 'graphite',
     layout: 'coach-rail',
-    themeControls: 4,
-    layoutControls: 2,
+    themeControls: 0,
+    layoutControls: 0,
     modelNames: [
       'Paraformer 中英双语',
       'Zipformer Small CTC 中文 INT8',
-      'Zipformer Large CTC 中文 INT8'
+      'Zipformer Large CTC 中文 INT8',
+      'SenseVoiceSmall INT8 多语种'
     ],
-    status: '当前使用：Paraformer 中英双语'
+    currentName: 'Paraformer 中英双语',
+    currentStatus: '未安装'
   });
+  assert.equal(BrowserWindow.getAllWindows().length, 1);
 
   await mainWindow.webContents.executeJavaScript(`(() => {
+    window.__frozenComputed = () => ['#utility','#surface-title','#frozen-report','#frozen-report-heading'].map(selector => {
+      const element = document.querySelector(selector), style = getComputedStyle(element), rect = element.getBoundingClientRect();
+      return {selector,fontFamily:style.fontFamily,fontSize:style.fontSize,fontWeight:style.fontWeight,color:style.color,
+        backgroundColor:style.backgroundColor,backgroundImage:style.backgroundImage,width:rect.width,height:rect.height};
+    });
     window.__appearanceSmoke = {
       transcript: document.getElementById('subtitle-container'),
-      feedback: document.getElementById('feedback-content'),
       insights: document.querySelector('[data-region="insights"]'),
       trainingStatus: document.getElementById('training-status'),
       timer: document.getElementById('timer'),
-      actions: document.querySelector('.action-bar')
+      actions: document.querySelector('.action-bar'),
+      visual: window.__frozenComputed()
     };
   })()`);
   const connectionCallsBeforeAppearance = calls.llmConnection;
-  await settingsWindow.webContents.executeJavaScript(`(() => {
-    const control = document.querySelector('[name="appearance-theme"][value="paper"]');
-    control.checked = true;
-    control.dispatchEvent(new Event('change', {bubbles: true}));
-  })()`);
-  await waitUntil('paper theme selection', async () => {
-    const theme = await mainWindow.webContents.executeJavaScript('document.documentElement.dataset.theme');
-    return theme === 'paper';
-  });
-  await settingsWindow.webContents.executeJavaScript(`(() => {
-    const control = document.querySelector('[name="appearance-layout"][value="focus-hud"]');
-    control.checked = true;
-    control.dispatchEvent(new Event('change', {bubbles: true}));
-  })()`);
-  const synchronizedSettingsAppearance = await waitUntil('settings appearance synchronization', async () => {
-    const [mainState, settingsState] = await Promise.all([
+  const legacyAppearanceSaved = await mainWindow.webContents.executeJavaScript(`window.api.saveAppearance({theme:'paper',layout:'focus-hud'})`);
+  assert.deepEqual(legacyAppearanceSaved, {success:true,appearance:{schemaVersion:1,theme:'graphite',layout:'coach-rail'}});
+  const synchronizedSettingsAppearance = await waitUntil('underlying appearance persists without changing Frozen Utility or report', async () => {
+    const mainState = await
       mainWindow.webContents.executeJavaScript(`(() => ({
         theme: document.documentElement.dataset.theme,
         layout: document.documentElement.dataset.layout,
         transcriptPreserved: window.__appearanceSmoke.transcript === document.getElementById('subtitle-container'),
-        feedbackPreserved: window.__appearanceSmoke.feedback === document.getElementById('feedback-content'),
         insightsPreserved: window.__appearanceSmoke.insights === document.querySelector('[data-region="insights"]'),
         trainingStatusPreserved: window.__appearanceSmoke.trainingStatus === document.getElementById('training-status'),
         timerPreserved: window.__appearanceSmoke.timer === document.getElementById('timer'),
-        actionsPreserved: window.__appearanceSmoke.actions === document.querySelector('.action-bar')
-      }))()`),
-      settingsWindow.webContents.executeJavaScript(`(() => ({
-        theme: document.documentElement.dataset.theme,
-        layout: document.documentElement.dataset.layout,
-        error: document.getElementById('appearance-error').textContent,
-        scrollable: getComputedStyle(document.body).overflowY === 'auto'
-      }))()`)
-    ]);
-    return mainState.theme === 'paper' && settingsState.theme === 'paper'
-      ? {mainState, settingsState}
+        actionsPreserved: window.__appearanceSmoke.actions === document.querySelector('.action-bar'),
+        visualPreserved: JSON.stringify(window.__appearanceSmoke.visual) === JSON.stringify(window.__frozenComputed())
+      }))()`);
+    return mainState.theme === 'graphite' && mainState.layout === 'coach-rail'
+      ? mainState
       : null;
   });
   assert.deepEqual(synchronizedSettingsAppearance, {
-    mainState: {
-      theme: 'paper',
-      layout: 'focus-hud',
+      theme: 'graphite',
+      layout: 'coach-rail',
       transcriptPreserved: true,
-      feedbackPreserved: true,
       insightsPreserved: true,
       trainingStatusPreserved: true,
       timerPreserved: true,
-      actionsPreserved: true
-    },
-    settingsState: {theme: 'paper', layout: 'focus-hud', error: '', scrollable: true}
+      actionsPreserved: true,
+      visualPreserved: true
   });
+  assert.deepEqual(await mainWindow.webContents.executeJavaScript('window.api.getAppearance()'),
+    {schemaVersion:1,theme:'graphite',layout:'coach-rail'});
   assert.equal(calls.llmConnection, connectionCallsBeforeAppearance);
 
   const asrManagementState = await settingsWindow.webContents.executeJavaScript(`(async () => {
@@ -917,112 +886,71 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
   );
   assert.equal(successfulSwitch.ok, true);
   assert.equal(successfulSwitch.state.effectiveModelId, 'zipformer-small-ctc-zh-int8-2025-04-01');
-  settingsWindow.close();
-
-  await mainWindow.webContents.executeJavaScript(
-    `document.getElementById('btn-prompt-editor').click()`
-  );
-  const promptEditorWindow = await waitUntil('prompt editor window creation', () => {
-    return BrowserWindow.getAllWindows().find(window => {
-      return !window.isDestroyed() && window.webContents.getURL().endsWith('/prompt-editor.html');
-    });
-  });
-  await waitForPage(promptEditorWindow, 'prompt-editor.html');
-  if (process.platform !== 'darwin') {
-    assert.equal(promptEditorWindow.isMenuBarVisible(), false, 'prompt editor must not render a second menu header');
-  }
-  assert.equal(
-    promptEditorWindow.webContents.listenerCount('will-prevent-unload') > 0,
-    true,
-    'dirty system-close attempts must have a native confirmation handler'
-  );
-  const promptEditorState = await promptEditorWindow.webContents.executeJavaScript(`(() => {
-    const back = document.getElementById('btn-back').getBoundingClientRect();
-    const heading = document.querySelector('h1').getBoundingClientRect();
-    document.getElementById('goals').value = '尚未保存的目标';
-    window.confirm = () => false;
-    document.getElementById('btn-back').click();
+  await mainWindow.webContents.executeJavaScript(`window.api.openSettings()`);
+  await waitUntil('settings Utility opens', () => mainWindow.webContents.executeJavaScript(
+    `document.getElementById('utility').open && document.querySelector('#local-nav [data-page="preferences"]') !== null`
+  ));
+  await mainWindow.webContents.executeJavaScript(`document.querySelector('#local-nav [data-page="preferences"]').click()`);
+  await waitUntil('preferences open in the same Main Utility', () => mainWindow.webContents.executeJavaScript(
+    `document.getElementById('utility').open && document.getElementById('surface-title').textContent === '分析偏好'
+      && document.querySelector('#utility [data-pref="goals"]') !== null`
+  ));
+  assert.equal(BrowserWindow.getAllWindows().length, 1, 'analysis preferences must use the same Utility');
+  const originalPrompt = await mainWindow.webContents.executeJavaScript('window.api.getCustomPrompt()');
+  const promptEditorState = await mainWindow.webContents.executeJavaScript(`(() => {
+    const close = document.getElementById('close-surface').getBoundingClientRect();
+    const heading = document.getElementById('surface-title').getBoundingClientRect();
+    const goals = document.querySelector('#utility [data-pref="goals"]');
+    goals.value = '尚未保存的目标';
+    goals.dispatchEvent(new Event('input',{bubbles:true}));
+    document.getElementById('close-surface').click();
     return {
-      overlaps: !(back.right <= heading.left || back.left >= heading.right
-        || back.bottom <= heading.top || back.top >= heading.bottom),
-      theme: document.documentElement.dataset.theme,
-      layout: document.documentElement.dataset.layout
+      overlaps: !(close.right <= heading.left || close.left >= heading.right
+        || close.bottom <= heading.top || close.top >= heading.bottom),
+      open: document.getElementById('utility').open,
+      unsavedChoiceShown: !document.getElementById('unsaved').hidden
     };
   })()`);
-  assert.deepEqual(promptEditorState, {
-    overlaps: false,
-    theme: 'paper',
-    layout: 'focus-hud'
-  });
-  await delay(50);
-  assert.equal(promptEditorWindow.isDestroyed(), false, 'declined dirty navigation must keep the editor open');
-  const promptAppearanceSave = await promptEditorWindow.webContents.executeJavaScript(
-    `window.api.saveAppearance({theme: 'midnight', layout: 'coach-rail'})`
-  );
-  assert.deepEqual(promptAppearanceSave, {
-    success: true,
-    appearance: {schemaVersion: 1, theme: 'midnight', layout: 'coach-rail'}
-  });
-  await waitUntil('prompt appearance synchronization', async () => {
-    const [mainTheme, promptTheme] = await Promise.all([
-      mainWindow.webContents.executeJavaScript('document.documentElement.dataset.theme'),
-      promptEditorWindow.webContents.executeJavaScript('document.documentElement.dataset.theme')
-    ]);
-    return mainTheme === 'midnight' && promptTheme === 'midnight';
-  });
-  await promptEditorWindow.webContents.executeJavaScript(
-    `window.api.saveAppearance({theme: 'graphite', layout: 'coach-rail'})`
-  );
-  promptEditorWindow.destroy();
-
-  await mainWindow.webContents.executeJavaScript(`(() => {
-    document.getElementById('btn-paste').click();
-    const textarea = document.getElementById('paste-textarea');
-    textarea.value = '嗯我觉得这个方案很好。';
-    document.getElementById('btn-analyze-paste').click();
+  assert.deepEqual(promptEditorState, {overlaps:false,open:true,unsavedChoiceShown:true});
+  const continuedPreferences = await mainWindow.webContents.executeJavaScript(`(() => {
+    document.getElementById('stay').click();
+    return {open:document.getElementById('utility').open,choiceHidden:document.getElementById('unsaved').hidden,
+      draft:document.querySelector('#utility [data-pref="goals"]').value};
   })()`);
+  assert.deepEqual(continuedPreferences, {open:true,choiceHidden:true,draft:'尚未保存的目标'});
+  assert.deepEqual(await mainWindow.webContents.executeJavaScript('window.api.getCustomPrompt()'), originalPrompt,
+    'continued editing must not silently persist the draft');
+  await mainWindow.webContents.executeJavaScript(`(() => {
+    document.getElementById('close-surface').click();document.getElementById('discard').click();
+    return window.api.saveAppearance({theme:'graphite',layout:'coach-rail'});
+  })()`);
+  assert.equal(await mainWindow.webContents.executeJavaScript('document.getElementById("utility").open'), false);
+  assert.deepEqual(await mainWindow.webContents.executeJavaScript('window.api.getCustomPrompt()'), originalPrompt,
+    'discard must preserve the saved preferences');
+  assert.equal(mainWindow.isDestroyed(), false, 'closing Utility must leave Main open');
 
-  const pasteState = await waitUntil('pasted transcript analysis', async () => {
-    return mainWindow.webContents.executeJavaScript(`(() => {
-      const reportButton = document.getElementById('btn-report');
-      const feedback = document.getElementById('feedback-content').textContent;
-      if (reportButton.classList.contains('hidden') || !feedback.includes('SMOKE_LLM_FEEDBACK')) {
-        return null;
-      }
-      return {
-        subtitle: document.getElementById('subtitle-container').textContent.trim(),
-        fillers: document.getElementById('stat-fillers').textContent,
-        hedges: document.getElementById('stat-hedges').textContent,
-        vague: document.getElementById('stat-vague').textContent,
-        density: document.getElementById('stat-density').textContent,
-        reportVisible: !reportButton.classList.contains('hidden'),
-        copyVisible: !document.getElementById('btn-copy-text').classList.contains('hidden'),
-        saveVisible: !document.getElementById('btn-save-text').classList.contains('hidden'),
-        clearVisible: !document.getElementById('btn-clear').classList.contains('hidden'),
-        feedback
-      };
-    })()`);
-  });
-  assert.deepEqual(pasteState, {
-    subtitle: '嗯我觉得这个方案很好。',
-    fillers: '2',
-    hedges: '1',
-    vague: '1',
-    density: '57%',
-    reportVisible: true,
-    copyVisible: true,
-    saveVisible: true,
-    clearVisible: true,
-    feedback: 'SMOKE_LLM_FEEDBACK'
-  });
-  assert.equal(calls.llmFeedback, 1);
+  await mainWindow.webContents.executeJavaScript(`document.getElementById('btn-history').click()`);
+  await waitUntil('History opens saved session', () => mainWindow.webContents.executeJavaScript(`(() => {
+    const button = document.querySelector('#history-list [data-record-id]');
+    if (!button) return false;
+    button.click(); return true;
+  })()`));
+  await waitUntil('History Report restored without analysis rerun', () => mainWindow.webContents.executeJavaScript(`document.body.dataset.screen === 'report'
+    && !document.getElementById('btn-report-back').classList.contains('hidden')
+    && document.getElementById('report-summary-copy').textContent.includes('先说明目标，再给出支持理由')`));
+  assert.equal(calls.llmReport, 0);
+  assert.equal(calls.llmDiagnosis, 1);
+  assert.equal(calls.llmFeedback, 0);
 
   console.log(`${RESULT_MARKER}${JSON.stringify({
     policyShownBeforeRecording: Boolean(policyShownBeforeRecording),
     playbackVisibleAfterStop: playbackSmokeState.playbackVisibleAfterStop,
-    recordOptionCount: playbackSmokeState.recordOptionCount,
+    reportOpenedAfterStop: playbackSmokeState.screen === 'report',
+    saved: playbackSmokeState.saved,
+    historyReportRestored: true,
     modelLabels: playbackSmokeState.modelLabels,
-    analysisStatus: playbackSmokeState.analysisStatus,
+    manualReportRequests: calls.llmReport,
+    automaticDiagnosisRequests: calls.llmDiagnosis,
     audioType: playbackSmokeState.audioType
   })}`);
   console.log(SUCCESS_MARKER);
@@ -1033,8 +961,16 @@ async function run({ app, asrProvider, BrowserWindow, mainWindow }) {
 }
 
 module.exports = {
+  async fakeSpeechEvidence({audio}) {
+    const sampleCount=(audio.byteLength-44)/2;
+    return {schemaVersion:1,status:'completed',audio:{sampleRateHz:16000,sampleCount},
+      provenance:{engine:'smoke',engineVersion:'1',modelId:'fake-vad',modelVersion:'1',modelSha256:'0'.repeat(64),thresholdVersion:'smoke-v1',normalizationVersion:'speech-segments-v1'},
+      segments:sampleCount ? [{id:'speech-1',startSample:0,endSample:sampleCount}] : [],
+      capabilities:{speechIntervals:true,lexicalTiming:false},quality:{vad:{status:'degraded',reasons:['vad-thresholds-uncalibrated']}}};
+  },
   configureApp,
   fakeAsrProvider,
   fakeLlm,
+  calls,
   run
 };

@@ -108,21 +108,24 @@ test('model Catalog validates a fixed file source without allowing install instr
   assert.throws(() => loadModelCatalog(catalog), /unknown property command/);
 });
 
-test('committed product Catalog contains exactly the three accepted streaming models', () => {
+test('committed product Catalog contains streaming models and the pinned optional SenseVoice model', () => {
   const {loadModelCatalog} = require('../lib/model-catalog');
   const catalog = loadModelCatalog(require('../models/registry.json'));
   assert.equal(catalog.defaultModelId, 'zipformer-large-ctc-zh-int8-2025-06-30');
   assert.deepEqual(catalog.models.map(model => model.modelId), [
     'paraformer-bilingual-zh-en',
     'zipformer-small-ctc-zh-int8-2025-04-01',
-    'zipformer-large-ctc-zh-int8-2025-06-30'
+    'zipformer-large-ctc-zh-int8-2025-06-30',
+    'sensevoice-small-int8-2024-07-17'
   ]);
   assert.deepEqual(catalog.models.map(model => model.providerType), [
     'sherpa.online-paraformer',
     'sherpa.online-ctc',
-    'sherpa.online-ctc'
+    'sherpa.online-ctc',
+    'sherpa.offline-sensevoice'
   ]);
   assert.deepEqual(catalog.models.map(model => model.license.redistribution), [
+    'not-approved',
     'not-approved',
     'not-approved',
     'not-approved'
@@ -136,4 +139,12 @@ test('committed product Catalog contains exactly the three accepted streaming mo
   assert.equal(small.sources[0].sha256, 'b3b309f7ce4a737195fcc6963ea19b0653a7d3401580af5ae0d3e284cbb71f0b');
   assert.equal(large.sources[0].bytes, 127965713);
   assert.equal(large.sources[0].sha256, 'f2ab7a5deb02717801f6a5b26c751b42f8a2db891b07f5b095e6da7442081448');
+  const senseVoice = catalog.models[3];
+  assert.equal(senseVoice.sources[0].bytes, 163002883);
+  assert.equal(senseVoice.sources[0].sha256, '7d1efa2138a65b0b488df37f8b89e3d91a60676e416f515b952358d83dfd347e');
+  assert.equal(senseVoice.sources[0].builtIn, false);
+  assert.deepEqual(senseVoice.files.map(file => [file.role, file.bytes, file.sha256]), [
+    ['model', 239233841, 'c71f0ce00bec95b07744e116345e33d8cbbe08cef896382cf907bf4b51a2cd51'],
+    ['tokens', 315894, 'f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc']
+  ]);
 });

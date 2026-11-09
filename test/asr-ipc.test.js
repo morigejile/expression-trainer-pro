@@ -150,11 +150,13 @@ test('feed copies finite Float32Array chunks through the transitional size cap',
   assert.deepEqual(await router.feed({
     sessionId: 'session-a',
     sequence: 0,
+    absoluteSampleStart: 0,
     samples: currentChunk
   }), { ok: true, events: [partial] });
   assert.deepEqual(await router.feed({
     sessionId: 'session-a',
     sequence: 1,
+    absoluteSampleStart: 4096,
     samples: cappedChunk
   }), { ok: true, events: [] });
 
@@ -162,6 +164,7 @@ test('feed copies finite Float32Array chunks through the transitional size cap',
   assert.equal(received[0].samples instanceof Float32Array, true);
   assert.notEqual(received[0].samples, currentChunk);
   assert.deepEqual(received[0].samples, currentChunk);
+  assert.deepEqual(received.map(command => command.absoluteSampleStart), [0, 4096]);
   assert.equal(received[1].samples.length, 16384);
 });
 
@@ -178,6 +181,7 @@ test('feed rejects malformed, oversized, and non-finite commands before routing'
   });
   const commands = [
     { sessionId: 'session-a', sequence: 0, samples: [0.1] },
+    { sessionId: 'session-a', sequence: 0, samples: new Float32Array(1) },
     { sessionId: 'session-a', sequence: -1, samples: new Float32Array(1) },
     { sessionId: 'session-a', sequence: 0, samples: new Float32Array(0) },
     { sessionId: 'session-a', sequence: 0, samples: new Float32Array(16385) },
@@ -238,6 +242,7 @@ test('well-formed stale session results stay successful no-op envelopes', async 
   assert.deepEqual(await router.feed({
     sessionId: 'stale-session',
     sequence: 0,
+    absoluteSampleStart: 0,
     samples: new Float32Array(1)
   }), { ok: true, events: [] });
   assert.deepEqual(await router.stop({ sessionId: 'stale-session' }), {
@@ -277,6 +282,7 @@ test('provider command exceptions return sanitized errors rather than fabricated
   assert.deepEqual(await router.feed({
     sessionId: 'session-a',
     sequence: 0,
+    absoluteSampleStart: 0,
     samples: new Float32Array(1)
   }), failure({ code: 'asr-feed-failed', message: 'ASR feed failed' }));
   assert.deepEqual(await router.stop({ sessionId: 'session-a' }), failure({

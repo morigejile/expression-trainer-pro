@@ -1,0 +1,148 @@
+{
+  "experiment": "merge-rule-position-v1",
+  "runtime": "v24.20.0",
+  "runnerSha256": "44ea0316f8f1d0254e17eab025c80d9f0533b9059852b4c8e6a687aca29dd126",
+  "baselineManifest": {
+    "path": "benchmark/prompt-evaluation/report-concision-v9/comparison-start.json",
+    "sha256": "16d6fa1eb062d1d606f1cdcd5cc269a11a0376f1e0dc89e350a8d7debd5cb357"
+  },
+  "sources": [
+    {
+      "path": "lib/structured-diagnosis.js",
+      "sha256": "9b4489c0e76c68745214530c8a58b4c157f56c0f40fc9a4fdff72af092d84935",
+      "frozen": "benchmark/prompt-evaluation/report-concision-v9/candidate-reviewed.js"
+    },
+    {
+      "path": "lib/expression-problem-library.js",
+      "sha256": "3a6787f57b664c4fa3973a5bf4f78427885885da29187396aaeb57285e5a7b49",
+      "frozen": "benchmark/prompt-evaluation/diagnosis-units-v1/baseline/sources/expression-problem-library.js"
+    },
+    {
+      "path": "lib/expression-problem-library.generated.json",
+      "sha256": "f947e4c124689b87c0fd116e0f7a83fa22e3b87d7b1aacac31fe3e09468af002",
+      "frozen": "benchmark/prompt-evaluation/diagnosis-units-v1/baseline/sources/expression-problem-library.generated.json"
+    },
+    {
+      "path": "lib/ai-feedback.js",
+      "sha256": "2f0d007567b50011d913190d962deaacdc1e480df933bee6c4097bb6f48c9886",
+      "frozen": "benchmark/prompt-evaluation/diagnosis-units-v1/baseline/sources/ai-feedback.js"
+    },
+    {
+      "path": "lib/analysis-context.js",
+      "sha256": "3a37195f0cf8f70cbcec2b75dd2fc8267925f08ac8321428d8696d769859bac3",
+      "frozen": "benchmark/prompt-evaluation/diagnosis-units-v1/baseline/sources/analysis-context.js"
+    },
+    {
+      "path": "lib/session-analysis.js",
+      "sha256": "960fc16bd952d69dec2be124250c377455b02137bb28d2ccd019122197f347fa",
+      "frozen": "benchmark/prompt-evaluation/diagnosis-units-v1/baseline/sources/session-analysis.js"
+    },
+    {
+      "path": "lib/training-session-data.js",
+      "sha256": "a6e8469c07dd21fb165aa673e35e12d584205b4d704858e55a79a968f376c283",
+      "frozen": "benchmark/prompt-evaluation/diagnosis-units-v1/baseline/sources/training-session-data.js"
+    },
+    {
+      "path": "main.js",
+      "sha256": "86daa076c021ce751ab0e5bc536094a39c5502a4d1a3dd49e9f00fd5327cb2bf",
+      "frozen": "benchmark/prompt-evaluation/diagnosis-units-v1/baseline/sources/main.js"
+    },
+    {
+      "path": "shared/report-selection.js",
+      "sha256": "3990947ec3d6659165cd88ab26046d139ec8a04d9958597ff6c8f56974eedac8",
+      "frozen": "benchmark/prompt-evaluation/diagnosis-units-v1/baseline/sources/report-selection.js"
+    },
+    {
+      "path": "src/structured-report.js",
+      "sha256": "cbeb799599bcc5861c1fe5e9ff963b0096f41c8f306ea6b125fa93251f0f5578",
+      "frozen": "benchmark/prompt-evaluation/diagnosis-units-v1/baseline/sources/structured-report.js"
+    },
+    {
+      "path": "src/frozen-report.js",
+      "sha256": "fb155c5f78b272ba7424651944494d086dc5e10b9797930e2a9249c6f1f235e7",
+      "frozen": "benchmark/prompt-evaluation/report-concision-v9/comparison-sources/src/frozen-report.js"
+    },
+    {
+      "path": "shared/training-frameworks.js",
+      "sha256": "7d7c8b2a572fc37b439d04c9e51729f8d92e7bb32cea1bf9fcc3e1b66517f6d7",
+      "frozen": "benchmark/prompt-evaluation/report-concision-v9/comparison-sources/shared/training-frameworks.js"
+    },
+    {
+      "path": "lib/llm-provider-config.js",
+      "sha256": "0fbc56a9286ee29220a2a661130fae3b611a0352cc7a48b5cd9aeaccff59ee88",
+      "frozen": "benchmark/prompt-evaluation/report-concision-v9/comparison-sources/lib/llm-provider-config.js"
+    },
+    {
+      "path": "scripts/evaluate-diagnosis-quality.js",
+      "sha256": "3c2a005ebee9d89058434652f16d9e5952ee9a5342cb7a6e4aab480ad88289a4",
+      "frozen": "benchmark/prompt-evaluation/report-concision-v9/comparison-sources/scripts/evaluate-diagnosis-quality.js"
+    }
+  ],
+  "trackedDiffSha256": "d3a985e3afb9fc07f4b92dfa6189cefb43162c4424d964fe775dc5ed48a736b3",
+  "movedBlockSha256": "233ade70a316405dc7f0285cb4a90fc2ed39a22450fdffa6e0661b9bf5f53f31",
+  "jobs": [
+    {
+      "sequence": 1,
+      "id": "E05",
+      "variant": "baseline",
+      "repeat": 1
+    },
+    {
+      "sequence": 2,
+      "id": "E05",
+      "variant": "moved",
+      "repeat": 1
+    },
+    {
+      "sequence": 3,
+      "id": "E07",
+      "variant": "moved",
+      "repeat": 1
+    },
+    {
+      "sequence": 4,
+      "id": "E07",
+      "variant": "baseline",
+      "repeat": 1
+    },
+    {
+      "sequence": 5,
+      "id": "E05",
+      "variant": "moved",
+      "repeat": 2
+    },
+    {
+      "sequence": 6,
+      "id": "E05",
+      "variant": "baseline",
+      "repeat": 2
+    },
+    {
+      "sequence": 7,
+      "id": "E07",
+      "variant": "baseline",
+      "repeat": 2
+    },
+    {
+      "sequence": 8,
+      "id": "E07",
+      "variant": "moved",
+      "repeat": 2
+    }
+  ],
+  "controls": {
+    "temperature": 0.2,
+    "max_tokens": 8192,
+    "timeoutMs": 60000,
+    "retries": 0,
+    "jsonOutput": true,
+    "maxCalls": 8
+  },
+  "onlyChange": "Move the exact library.rules.merge plus its paragraph separator from before the cards to the end of the system prompt. No text additions/deletions, version-string change, card filtering, schema/parameter/input changes.",
+  "hypothesis": "Position of existing merge rules affects whether independent issue units are preserved while redundant diagnoses are consolidated.",
+  "criteria": {
+    "E05": "Retain causal-support and immediate-full-rollout-support as independent issues; do not add an equivalent transition issue. Do not invent evidence or facts.",
+    "E07": "One main obstacle: repeated revisions make the opening unclear; do not split equivalent organization/wording diagnoses or assert the final theme is established from this fragment.",
+    "overall": "Judge content, not counts alone. Preserve facts, conditions, actionable advice and independent issues. Any failure remains recorded. Two repeats are preliminary evidence, not a reliability estimate. No extra calls or automatic promotion."
+  }
+}

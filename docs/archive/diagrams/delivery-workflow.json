@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "[Archived 历史快照] 本地交付流程：从改动到内测分发",
+    "output": "delivery-workflow.html",
+    "animation": "trace",
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "local-only", "label": "本地交付", "focus": ["change", "version", "tests", "artifact"], "note": "没有 CI：构建、测试与冒烟都在本机执行。" },
+      { "id": "qualification", "label": "制品资格", "focus": ["artifact", "smokePack", "smokeInstall", "release"], "note": "打包冒烟与首装/升级冒烟决定制品能否分发。" },
+      { "id": "blocking", "label": "阻断与修复", "focus": ["tests", "blockedTests", "smokeInstall", "blockedSmoke", "change"], "note": "任一阻断检查失败即停止分发，修复后重跑。" }
+    ]
+  },
+  "lanes": [
+    { "id": "dev", "label": "开发者 / 发布者" },
+    { "id": "verify", "label": "本地验证" },
+    { "id": "build", "label": "打包" },
+    { "id": "smoke", "label": "制品冒烟" },
+    { "id": "exceptions", "label": "失败与阻断", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "change", "label": "变更", "fromCol": 0, "toCol": 1 },
+    { "id": "verify", "label": "验证与构建", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "qualify", "label": "制品资格", "fromCol": 4, "toCol": 4 },
+    { "id": "release", "label": "内测分发", "fromCol": 5, "toCol": 5, "variant": "dashed" }
+  ],
+  "groups": [
+    { "id": "blocking", "label": "阻断检查", "lane": "exceptions", "fromCol": 2, "toCol": 5, "variant": "security" }
+  ],
+  "mainPath": ["change", "version", "tests", "artifact", "smokePack", "smokeInstall", "release"],
+  "nodes": [
+    { "id": "change", "lane": "dev", "col": 0, "type": "frontend", "label": "改动提交", "sublabel": "英文主题 + 中文正文" },
+    { "id": "version", "lane": "dev", "col": 1, "type": "frontend", "label": "版本与记录", "sublabel": "版本唯一来源", "tag": "交付时才升" },
+    { "id": "tests", "lane": "verify", "col": 2, "type": "security", "label": "回归测试", "sublabel": "npm test", "tag": "阻断" },
+    { "id": "artifact", "lane": "build", "col": 3, "type": "cloud", "label": "构建制品", "sublabel": "Forge + Squirrel", "tag": "win32 x64" },
+    { "id": "smokePack", "lane": "smoke", "col": 4, "type": "backend", "label": "打包冒烟", "sublabel": "smoke:package", "tag": "阻断" },
+    { "id": "smokeInstall", "lane": "smoke", "col": 5, "type": "backend", "label": "首装与升级", "sublabel": "安装冒烟", "tag": "里程碑" },
+    { "id": "release", "lane": "dev", "col": 5, "type": "external", "label": "内测分发", "sublabel": "Setup 安装", "tag": "未签名" },
+    { "id": "blockedTests", "lane": "exceptions", "col": 2, "type": "security", "label": "回归阻断", "sublabel": "不进制品" },
+    { "id": "blockedSmoke", "lane": "exceptions", "col": 5, "type": "security", "label": "冒烟阻断", "sublabel": "先修后重跑" }
+  ],
+  "edges": [
+    { "id": "bump-version", "from": "change", "to": "version", "label": "版本 + 记录", "route": "bottom-channel", "fromSide": "bottom", "toSide": "bottom" },
+    { "id": "run-tests", "from": "version", "to": "tests", "label": "npm test", "variant": "emphasis", "route": "drop", "fromSide": "bottom", "toSide": "top", "labelDy": 11 },
+    { "id": "tests-pass", "from": "tests", "to": "artifact", "label": "通过", "variant": "emphasis", "route": "drop", "fromSide": "bottom", "toSide": "top" },
+    { "id": "make-artifact", "from": "artifact", "to": "smokePack", "label": "输出 Setup", "route": "drop", "fromSide": "bottom", "toSide": "top", "labelDy": 11 },
+    { "id": "pack-smoke-pass", "from": "smokePack", "to": "smokeInstall", "label": "通过", "route": "bottom-channel", "fromSide": "bottom", "toSide": "bottom" },
+    { "id": "install-smoke-pass", "from": "smokeInstall", "to": "release", "label": "验收后分发", "variant": "emphasis", "route": "straight", "fromSide": "top", "toSide": "bottom" },
+    { "id": "tests-fail", "from": "tests", "to": "blockedTests", "label": "失败即阻断", "variant": "security", "role": "error", "route": "drop", "fromSide": "bottom", "toSide": "top" },
+    { "id": "smoke-fail", "from": "smokeInstall", "to": "blockedSmoke", "label": "冒烟失败", "variant": "security", "role": "error", "fromSide": "right", "toSide": "right", "via": [[700, 491], [700, 615]] },
+    { "id": "fix-and-rerun", "from": "blockedTests", "to": "change", "label": "修复后重跑", "variant": "dashed", "role": "return", "route": "return-left", "fromSide": "left", "toSide": "left" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "主路径", "items": ["本地无 CI：构建、测试与冒烟都在本机执行", "make 已包含目录打包，随后跑 smoke:package", "只有安装器真的交付时才升版本并跑完整测试"] },
+    { "dot": "rose", "title": "阻断与边界", "items": ["回归或打包冒烟失败即停止分发", "制品未签名，不代表公开支持", "OPS-01（最小 CI）仍 Deferred，取包自动化尚未实施"] },
+    { "dot": "amber", "title": "只支持向前安装", "items": ["手工运行旧 Setup 可能降级二进制并覆盖共享用户文件", "重新运行当前 Setup 只恢复应用版本", "被旧 schema 覆盖的数据无法由此恢复"] }
+  ]
+}

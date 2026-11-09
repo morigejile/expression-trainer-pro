@@ -1,0 +1,22 @@
+[
+  {
+    "id": "E03",
+    "variant": "review",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json"
+  },
+  {
+    "id": "E06",
+    "variant": "review",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json"
+  },
+  {
+    "id": "E07",
+    "variant": "review",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json"
+  },
+  {
+    "id": "P06-vague",
+    "variant": "review",
+    "source": "benchmark/prompt-evaluation/diagnosis-units-v1/screening/results.json"
+  }
+]

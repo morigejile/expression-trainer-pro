@@ -7,6 +7,7 @@ const registry = require('../models/registry.json');
 const PARA = 'paraformer-bilingual-zh-en';
 const SMALL = 'zipformer-small-ctc-zh-int8-2025-04-01';
 const LARGE = registry.defaultModelId;
+const SENSE = 'sensevoice-small-int8-2024-07-17';
 
 function fixture({service = {}, installed = {}, task = {}} = {}) {
   const calls = [];
@@ -52,7 +53,8 @@ test('state exposes only sanitized Catalog display and runtime fields', async ()
   assert.deepEqual(result.state.models.map(model => [model.modelId, model.status, model.action]), [
     [PARA, 'installed', null],
     [SMALL, 'corrupt', 'reinstall'],
-    [LARGE, 'not-installed', 'install']
+    [LARGE, 'not-installed', 'install'],
+    [SENSE, 'not-installed', 'install']
   ]);
   assert.deepEqual(Object.keys(result.state.models[0]).sort(), [
     'action', 'builtIn', 'current', 'description', 'displayName', 'downloadBytes', 'mode', 'modelId', 'status'
@@ -61,6 +63,18 @@ test('state exposes only sanitized Catalog display and runtime fields', async ()
   for (const forbidden of ['private', 'providerType', 'sources', 'sha256', 'license']) {
     assert.equal(serialized.includes(forbidden), false, forbidden);
   }
+});
+
+test('SenseVoice is selectable with utterance display while the default remains streaming', async () => {
+  const {router, calls} = fixture({installed: {[SENSE]: {modelId: SENSE}}});
+  const {state} = await router.getModelState();
+  const senseVoice = state.models.find(model => model.modelId === SENSE);
+  assert.ok(senseVoice, 'SenseVoice must be exposed in the model picker');
+  assert.equal(senseVoice.mode, 'utterance');
+  assert.equal(senseVoice.action, 'switch');
+  assert.equal(state.models.find(model => model.modelId === LARGE).mode, 'streaming');
+  assert.equal((await router.switchModel({modelId: SENSE})).ok, true);
+  assert.deepEqual(calls.filter(([name]) => name === 'switch'), [['switch', SENSE]]);
 });
 
 test('router exposes exactly four commands and rejects non-exact or unknown model payloads', async () => {

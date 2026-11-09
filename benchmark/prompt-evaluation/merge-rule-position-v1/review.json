@@ -1,0 +1,15 @@
+{
+  "reviewer": "assistant reading all eight actual outputs against the user-confirmed E05/E07 criteria; not independent human acceptance",
+  "scope": "Preliminary single-factor position comparison; no default promotion",
+  "rows": [
+    {"sequence": 1, "id": "E05", "variant": "baseline", "repeat": 1, "findings": 3, "independentIssuesPreserved": true, "duplicateGroups": [["common-1", "common-3"]], "judgment": "因果依据与推广依据分别保留；绝对化措辞项与因果依据项重复。", "contentConcerns": ["建议中的‘主要原因之一’仍暗含影响大小，现有材料不足以支持这一程度；这是建议示例风险，并非已生成的新事实。"]},
+    {"sequence": 2, "id": "E05", "variant": "moved", "repeat": 1, "findings": 3, "independentIssuesPreserved": true, "duplicateGroups": [["common-1", "common-3"]], "judgment": "因果依据与推广依据分别保留；第三条组织反馈重复因果关系缺口。", "contentConcerns": ["第三条解释说需猜测第二句是原因、背景还是并列信息，但原文已用‘因此’表达因果推断；没有论证依据不等于没有表达推断关系。", "‘可能主要来自’仍需要相应证据支持，不能只把‘完全’替换成‘主要’就认为保真。"]},
+    {"sequence": 3, "id": "E07", "variant": "moved", "repeat": 1, "findings": 3, "mainObstaclePreserved": true, "duplicateGroups": [["common-1", "common-2", "common-3"]], "judgment": "同一组改口被分别列为重启、组织、措辞，围绕一个主要障碍产生三条反馈。", "contentConcerns": ["第三条解释称‘使真正的主题迟迟没有出现’，忽略原文已反复提到上线时间与功能；不能把方向不稳定说成主题未出现。", "‘始终没有确定’‘最终仍未形成确定的说法’相对片段证据过强；最终是否选定仍未知。", "观察中的引语含省略号，属于转写摘录而非完整原话；未发现关键选择方向被改换，但仍不宜将截取包装成完整引语。"]},
+    {"sequence": 4, "id": "E07", "variant": "baseline", "repeat": 1, "findings": 1, "mainObstaclePreserved": true, "duplicateGroups": [], "judgment": "围绕反复改口影响开头清晰度反馈一条，并给出选定要点再讲完的动作。", "contentConcerns": ["‘最终没有确定’‘没有形成最终说法’仍把无法确认最终选择说得过于确定；因此单条结果不等于全部内容通过。"]},
+    {"sequence": 5, "id": "E05", "variant": "moved", "repeat": 2, "findings": 3, "independentIssuesPreserved": true, "duplicateGroups": [["common-1", "common-3"]], "judgment": "两个独立论证问题保留，但第三条‘关系没有交代’仍重复因果依据不足。", "contentConcerns": ["‘两件事之间的关系没有交代’混淆了已表达的因果判断与缺少支持该判断的依据；该类偏差在基线也出现，不能全部归因于位置移动。", "补充样本、时间范围的建议具体，但不据此确认所有此类信息都是本题必要条件。"]},
+    {"sequence": 6, "id": "E05", "variant": "baseline", "repeat": 2, "findings": 3, "independentIssuesPreserved": true, "duplicateGroups": [["common-1", "common-3"]], "judgment": "两个独立论证问题保留；第三条组织反馈与因果依据不足重复。", "contentConcerns": ["用‘缺少把事实与结论连接起来的说明’另列组织问题，仍未区分表达关系与论证支撑；与当前已知重复模式一致。"]},
+    {"sequence": 7, "id": "E07", "variant": "baseline", "repeat": 2, "findings": 1, "mainObstaclePreserved": true, "duplicateGroups": [], "judgment": "一条反馈保留主要障碍及具体练习动作，没有靠不报告问题达成少条数。", "contentConcerns": ["‘尚未确定’‘最终没有落到一个要点上’仍超出现有片段对最终选择的证明能力。"]},
+    {"sequence": 8, "id": "E07", "variant": "moved", "repeat": 2, "findings": 2, "mainObstaclePreserved": true, "duplicateGroups": [["common-1", "common-2"]], "judgment": "组织与重启仍是同一开头障碍，两条建议都要求先确定要点再一次讲完。", "contentConcerns": ["摘要与观察中的‘尚未确定’‘未明确选定’仍说得过满；与基线共有，不能称为本次移动新产生的错误。"]}
+  ],
+  "conclusion": "No observed improvement: E05 duplicates persist in both variants; E07 baseline 1/1 findings versus moved 3/2, with redundant diagnoses confirmed semantically. Both independent E05 issues and the E07 main obstacle remain. Candidate outputs include additional wording/interpretation problems, but eight calls cannot establish stable causation or general model reliability."
+}

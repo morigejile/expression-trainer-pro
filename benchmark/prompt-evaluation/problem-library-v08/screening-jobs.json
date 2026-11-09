@@ -1,0 +1,82 @@
+[
+  {
+    "id": "E01",
+    "variant": "baseline"
+  },
+  {
+    "id": "P01-execution",
+    "variant": "baseline"
+  },
+  {
+    "id": "E03",
+    "variant": "baseline"
+  },
+  {
+    "id": "P03-late",
+    "variant": "baseline"
+  },
+  {
+    "id": "E06",
+    "variant": "baseline"
+  },
+  {
+    "id": "P06-vague",
+    "variant": "baseline"
+  },
+  {
+    "id": "P03-independent",
+    "variant": "baseline"
+  },
+  {
+    "id": "E01",
+    "variant": "task"
+  },
+  {
+    "id": "P01-execution",
+    "variant": "task"
+  },
+  {
+    "id": "E03",
+    "variant": "task"
+  },
+  {
+    "id": "E06",
+    "variant": "task"
+  },
+  {
+    "id": "P06-vague",
+    "variant": "task"
+  },
+  {
+    "id": "E01",
+    "variant": "lean"
+  },
+  {
+    "id": "E03",
+    "variant": "lean"
+  },
+  {
+    "id": "E06",
+    "variant": "lean"
+  },
+  {
+    "id": "P06-vague",
+    "variant": "lean"
+  },
+  {
+    "id": "E03",
+    "variant": "merge"
+  },
+  {
+    "id": "P03-late",
+    "variant": "merge"
+  },
+  {
+    "id": "E06",
+    "variant": "merge"
+  },
+  {
+    "id": "P03-independent",
+    "variant": "merge"
+  }
+]

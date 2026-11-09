@@ -1,0 +1,52 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "[Archived 历史快照] 宇宙无敌表达训练 · 当前架构（As-Is）",
+    "output": "architecture.html",
+    "quality_profile": "showcase",
+    "viewBox": [1530, 664],
+    "views": [
+      { "id": "audio-to-text", "label": "音频到文本", "focus": ["mic", "renderer", "preload", "main", "controller", "utility"], "note": "采集在 Renderer，识别推理全部隔离在 utility process 内。" },
+      { "id": "local-analysis", "label": "本地分析与可选 LLM", "focus": ["main", "analysis", "llmapi", "userdata"], "note": "词库分析离线可跑，LLM 只在配置可用时被调用。" },
+      { "id": "model-boundary", "label": "模型信任边界", "focus": ["catalog", "install", "modelstore", "utility"], "note": "Catalog 是唯一白名单，安装由独立短生命周期 utility 完成。" }
+    ]
+  },
+  "components": [
+    { "id": "mic", "type": "external", "label": "系统麦克风", "sublabel": "用户设备", "pos": [50, 120], "size": [150, 76] },
+    { "id": "renderer", "type": "frontend", "label": "Renderer", "sublabel": "src/app.js + Web Audio", "tag": "训练编排 + 运行期 WAV", "pos": [40, 320], "size": [170, 76] },
+    { "id": "preload", "type": "security", "label": "Preload", "sublabel": "preload.js · window.api", "tag": "contextBridge 白名单", "pos": [320, 320], "size": [170, 76] },
+    { "id": "main", "type": "backend", "label": "Main Process", "sublabel": "main.js + IPC Router", "tag": "不加载 Sherpa", "pos": [720, 320], "size": [170, 76] },
+    { "id": "analysis", "type": "backend", "label": "分析编排", "sublabel": "lexicon.js + ai-feedback.js", "tag": "本地规则优先", "pos": [720, 120], "size": [170, 76] },
+    { "id": "llmapi", "type": "external", "label": "云端 LLM", "sublabel": "OpenAI / DeepSeek / Ollama / 自定义", "pos": [1160, 120], "size": [170, 76] },
+    { "id": "controller", "type": "backend", "label": "ASR Controller", "sublabel": "asr-process-controller.js", "tag": "退出后重建", "pos": [1020, 320], "size": [170, 76] },
+    { "id": "utility", "type": "backend", "label": "ASR Utility Process", "sublabel": "asr-utility-process.js", "tag": "Sherpa Provider · sherpa-onnx-node", "pos": [1320, 320], "size": [170, 76] },
+    { "id": "userdata", "type": "database", "label": "userData 配置", "sublabel": "asr-selection / llm-profile / policy", "pos": [320, 520], "size": [180, 76] },
+    { "id": "catalog", "type": "database", "label": "Model Catalog", "sublabel": "models/registry.json", "tag": "schema-v2 白名单", "pos": [720, 520], "size": [170, 76] },
+    { "id": "install", "type": "backend", "label": "Model Install Utility", "sublabel": "model-install-utility-process.js", "tag": "短生命周期 · 可取消", "pos": [1020, 520], "size": [170, 76] },
+    { "id": "modelstore", "type": "database", "label": "模型存储", "sublabel": "appData/expression-trainer-pro-models", "tag": "不可变版本目录", "pos": [1320, 520], "size": [170, 76] }
+  ],
+  "boundaries": [
+    { "kind": "security-group", "label": "contextIsolation:true / nodeIntegration:false", "wraps": ["renderer", "preload"], "pad": 26 }
+  ],
+  "connections": [
+    { "id": "mic-to-renderer", "from": "mic", "to": "renderer", "label": "16 kHz", "variant": "emphasis", "fromSide": "bottom", "toSide": "top", "labelDy": 52 },
+    { "id": "renderer-to-preload", "from": "renderer", "to": "preload", "label": "音频块" },
+    { "id": "preload-to-renderer", "from": "preload", "to": "renderer", "label": "识别事件", "variant": "dashed", "fromSide": "bottom", "toSide": "bottom", "via": [[405, 420], [125, 420]] },
+    { "id": "preload-to-main", "from": "preload", "to": "main", "label": "受控 IPC", "variant": "security" },
+    { "id": "main-to-analysis", "from": "main", "to": "analysis", "label": "final 文本" },
+    { "id": "analysis-to-llm", "from": "analysis", "to": "llmapi", "label": "fetch /chat/completions", "variant": "dashed" },
+    { "id": "main-to-controller", "from": "main", "to": "controller", "label": "ASR 命令" },
+    { "id": "controller-to-utility", "from": "controller", "to": "utility", "label": "postMessage" },
+    { "id": "main-to-userdata", "from": "main", "to": "userdata", "label": "原子读写" },
+    { "id": "main-to-catalog", "from": "main", "to": "catalog", "label": "受信 Catalog", "fromSide": "bottom", "toSide": "top", "labelDy": 24 },
+    { "id": "main-to-install", "from": "main", "to": "install", "label": "fork" },
+    { "id": "install-to-modelstore", "from": "install", "to": "modelstore", "label": "原子激活" },
+    { "id": "modelstore-to-utility", "from": "modelstore", "to": "utility", "label": "active 版本", "variant": "emphasis" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "运行边界", "items": ["单一 Electron 桌面应用，没有服务端与数据库", "ASR 推理隔离在 utility process", "Main 不加载 Sherpa native addon"] },
+    { "dot": "emerald", "title": "信任与数据", "items": ["contextIsolation + 受控 Preload 能力", "录音与逐字稿只存在于 Renderer 内存", "API Key 当前仍明文保存在 userData"] },
+    { "dot": "rose", "title": "模型与降级", "items": ["Catalog 只描述三款受信 streaming 模型", "模型装在 appData 独立目录，不随制品分发", "本地词库离线可用，LLM 只是可选增强"] }
+  ]
+}

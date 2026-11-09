@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "diagram_type": "lifecycle",
+  "meta": {
+    "title": "[Archived 历史快照] 训练会话与界面状态（As-Is）",
+    "output": "lifecycle.html",
+    "viewBox": [1100, 630],
+    "quality_profile": "showcase",
+    "views": [
+      { "id": "recording-rail", "label": "录音主轨迹", "focus": ["idle", "prepare", "recording", "stopping", "ended"], "note": "S0 → S1 → S2 → S4 → S5 的单一主轨迹。" },
+      { "id": "pause-overlay", "label": "暂停叠加态", "focus": ["recording", "paused", "stopping"], "note": "暂停是叠加态，只关闭采集入口，不重建 ASR 会话。" },
+      { "id": "failure-recovery", "label": "失败与恢复", "focus": ["recording", "stopping", "failed", "idle"], "note": "失败关闭后复位录音状态，不污染上一条记录。" }
+    ]
+  },
+  "lanes": [
+    { "id": "main", "label": "录音会话阶段" },
+    { "id": "wait", "label": "叠加态" },
+    { "id": "terminal", "label": "失败与回退" }
+  ],
+  "states": [
+    { "id": "idle", "type": "start", "label": "空闲", "sublabel": "无内容或已清空", "tag": "S0", "lane": "main", "col": 0 },
+    { "id": "prepare", "type": "active", "label": "准备中", "sublabel": "策略确认 + ASR 启动", "tag": "S1", "lane": "main", "col": 1 },
+    { "id": "recording", "type": "active", "label": "录音中", "sublabel": "字幕与本地统计", "tag": "S2", "lane": "main", "col": 2 },
+    { "id": "stopping", "type": "active", "label": "停止中", "sublabel": "flush + 尾部文本", "tag": "S4", "lane": "main", "col": 3 },
+    { "id": "ended", "type": "success", "label": "训练已结束", "sublabel": "回放查看", "tag": "S5", "lane": "main", "col": 4 },
+    { "id": "paused", "type": "waiting", "label": "已暂停", "sublabel": "采集入口关闭", "tag": "S3", "lane": "wait", "col": 0 },
+    { "id": "failed", "type": "failure", "label": "会话失败关闭", "sublabel": "复位并保留上一条", "tag": "可恢复", "lane": "terminal", "col": 1 }
+  ],
+  "transitions": [
+    { "id": "start-click", "from": "idle", "to": "prepare", "label": "点击开始（首次先确认录音策略）", "variant": "security", "route": "straight", "labelDy": -25, "labelDx": -16 },
+    { "id": "ready", "from": "prepare", "to": "recording", "label": "ASR ready + 麦克风就绪", "variant": "emphasis", "route": "straight", "labelDy": -25 },
+    { "id": "pause", "from": "recording", "to": "paused" },
+    { "id": "resume", "from": "paused", "to": "recording", "label": "继续", "fromSide": "right", "toSide": "right", "via": [[480, 307], [480, 157]] },
+    { "id": "stop", "from": "recording", "to": "stopping", "label": "点击结束", "variant": "emphasis", "route": "straight", "labelDy": -25 },
+    { "id": "final-record", "from": "stopping", "to": "ended", "label": "尾部 final 入队", "variant": "emphasis", "route": "straight", "labelDy": -25 },
+    { "id": "capture-fail", "from": "recording", "to": "failed", "label": "送块超限或采集失败", "variant": "security", "fromSide": "left", "toSide": "left", "via": [[320, 157], [320, 479]], "labelDy": -60 },
+    { "id": "tail-fail", "from": "stopping", "to": "failed", "label": "尾部识别失败", "variant": "security", "fromSide": "bottom", "toSide": "right", "via": [[556, 440], [700, 440], [700, 479]] },
+    { "id": "retry", "from": "failed", "to": "idle", "label": "复位后回到空闲", "variant": "security", "fromSide": "bottom", "toSide": "left", "via": [[556, 532], [20, 532], [20, 157]], "labelDy": 20 },
+    { "id": "clear", "from": "ended", "to": "idle", "label": "清空或删光记录", "fromSide": "right", "toSide": "bottom", "via": [[830, 157], [830, 515], [94, 515]], "labelDx": 30 },
+    { "id": "restart", "from": "ended", "to": "prepare", "label": "再次点击开始", "route": "top-channel", "channelY": 60, "fromSide": "top", "toSide": "top" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "隐式组合", "items": ["状态由若干布尔与引用字段组合推出", "暂停与粘贴分析是叠加态", "停止流程 single-flight"] },
+    { "dot": "rose", "title": "失败都能回来", "items": ["启动、采集与尾部失败收敛到同一关闭态", "失败复位并保留上一条记录", "不覆盖上一份成功的回放分析"] }
+  ]
+}

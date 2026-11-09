@@ -1,0 +1,221 @@
+{
+  "experiment": "issue-independence-v1",
+  "runtime": "v24.20.0",
+  "runnerSha256": "c4e67d19f0bd789d8eca6829346b59e0250b63f92617f86b580345fc0abeedcb",
+  "protectedFiles": [
+    {
+      "path": "lib/structured-diagnosis.js",
+      "sha256": "9b4489c0e76c68745214530c8a58b4c157f56c0f40fc9a4fdff72af092d84935"
+    },
+    {
+      "path": "lib/expression-problem-library.js",
+      "sha256": "3a6787f57b664c4fa3973a5bf4f78427885885da29187396aaeb57285e5a7b49"
+    },
+    {
+      "path": "lib/expression-problem-library.generated.json",
+      "sha256": "f947e4c124689b87c0fd116e0f7a83fa22e3b87d7b1aacac31fe3e09468af002"
+    },
+    {
+      "path": "lib/ai-feedback.js",
+      "sha256": "2f0d007567b50011d913190d962deaacdc1e480df933bee6c4097bb6f48c9886"
+    },
+    {
+      "path": "lib/analysis-context.js",
+      "sha256": "3a37195f0cf8f70cbcec2b75dd2fc8267925f08ac8321428d8696d769859bac3"
+    },
+    {
+      "path": "lib/session-analysis.js",
+      "sha256": "960fc16bd952d69dec2be124250c377455b02137bb28d2ccd019122197f347fa"
+    },
+    {
+      "path": "lib/training-session-data.js",
+      "sha256": "a6e8469c07dd21fb165aa673e35e12d584205b4d704858e55a79a968f376c283"
+    },
+    {
+      "path": "main.js",
+      "sha256": "86daa076c021ce751ab0e5bc536094a39c5502a4d1a3dd49e9f00fd5327cb2bf"
+    },
+    {
+      "path": "shared/report-selection.js",
+      "sha256": "3990947ec3d6659165cd88ab26046d139ec8a04d9958597ff6c8f56974eedac8"
+    },
+    {
+      "path": "src/structured-report.js",
+      "sha256": "cbeb799599bcc5861c1fe5e9ff963b0096f41c8f306ea6b125fa93251f0f5578"
+    },
+    {
+      "path": "src/frozen-report.js",
+      "sha256": "fb155c5f78b272ba7424651944494d086dc5e10b9797930e2a9249c6f1f235e7"
+    },
+    {
+      "path": "shared/training-frameworks.js",
+      "sha256": "7d7c8b2a572fc37b439d04c9e51729f8d92e7bb32cea1bf9fcc3e1b66517f6d7"
+    },
+    {
+      "path": "lib/llm-provider-config.js",
+      "sha256": "0fbc56a9286ee29220a2a661130fae3b611a0352cc7a48b5cd9aeaccff59ee88"
+    },
+    {
+      "path": "scripts/evaluate-diagnosis-quality.js",
+      "sha256": "3c2a005ebee9d89058434652f16d9e5952ee9a5342cb7a6e4aab480ad88289a4"
+    },
+    {
+      "path": "benchmark/prompt-evaluation/report-concision-v9/comparison-start.json",
+      "sha256": "16d6fa1eb062d1d606f1cdcd5cc269a11a0376f1e0dc89e350a8d7debd5cb357"
+    },
+    {
+      "path": "benchmark/prompt-evaluation/report-concision-v9/reviewable/results.json",
+      "sha256": "1d4f6094981d1ccadba29d865aefebbc824049049f9cc780239e9ce15f5bd0be"
+    },
+    {
+      "path": "benchmark/prompt-evaluation/merge-rule-position-v1/results.json",
+      "sha256": "da71d84405eaab7183ecd1b22129535c9106cd8d8fd32407f0614d268c0b9fad"
+    },
+    {
+      "path": "benchmark/prompt-evaluation/merge-rule-position-v1/offline-unit-review.md",
+      "sha256": "2e9f7a9f44edd3b1d6f60c23d8d789a712e7f2f8d7c5543a3c913fb840ef9f0b"
+    },
+    {
+      "path": "benchmark/prompt-evaluation/report-concision-v9/reviewable/inputs.json",
+      "sha256": "d96e7e564458ee1585a574e1ee4131b985893da753d15905fa3967417403d2eb"
+    },
+    {
+      "path": "benchmark/prompt-evaluation/problem-library-v08/final/results.json",
+      "sha256": "b5653d8dd3cf6cf54689b69103064a595e1c94379661eeb7f7dd9490bd70f00f"
+    },
+    {
+      "path": "benchmark/prompt-evaluation/diagnosis-units-v1/rubric.md",
+      "sha256": "b9b8123e2fd1ec7365761c6096b3dbcf8864cde9067ae7ce2c9f598668df3179"
+    }
+  ],
+  "trackedDiffSha256": "d3a985e3afb9fc07f4b92dfa6189cefb43162c4424d964fe775dc5ed48a736b3",
+  "hypothesis": "Explicitly checking the obstacle remaining after a substantive repair may improve pairwise independence judgments over an ordinary judgment request.",
+  "onlyFactor": "\n判断时请检查：假定第一条所指的实质问题已经修好，第二条是否仍有原文支持的独立障碍？在 reason 中说明剩余障碍；若没有，说明为何。",
+  "controls": {
+    "model": "deepseek-chat",
+    "temperature": 0.2,
+    "max_tokens": 8192,
+    "jsonOutput": true,
+    "timeoutMs": 60000,
+    "maxCalls": 12,
+    "retries": 0
+  },
+  "specs": [
+    {
+      "pair": "P1",
+      "caseId": "E05",
+      "sourceIndex": 1,
+      "indices": [
+        0,
+        1
+      ],
+      "expected": "independent",
+      "source": "benchmark/prompt-evaluation/report-concision-v9/reviewable/results.json",
+      "rawSha256": "d333cdbc55702d400f61a32ea5ec3fb1de18187ef1f8bee59fad6a39bd5eddd2"
+    },
+    {
+      "pair": "P2",
+      "caseId": "E05",
+      "sourceIndex": 1,
+      "indices": [
+        0,
+        2
+      ],
+      "expected": "duplicate",
+      "source": "benchmark/prompt-evaluation/report-concision-v9/reviewable/results.json",
+      "rawSha256": "d333cdbc55702d400f61a32ea5ec3fb1de18187ef1f8bee59fad6a39bd5eddd2"
+    },
+    {
+      "pair": "P3",
+      "caseId": "E07",
+      "sourceIndex": 5,
+      "indices": [
+        0,
+        1
+      ],
+      "expected": "duplicate",
+      "source": "benchmark/prompt-evaluation/report-concision-v9/reviewable/results.json",
+      "rawSha256": "d3f34543ebf75f0288b53ec66f46f3b30feaa33bdd31d1c56e58960a623c8dc2"
+    }
+  ],
+  "jobs": [
+    {
+      "sequence": 1,
+      "pair": "P1",
+      "variant": "ordinary",
+      "repeat": 1
+    },
+    {
+      "sequence": 2,
+      "pair": "P1",
+      "variant": "residual",
+      "repeat": 1
+    },
+    {
+      "sequence": 3,
+      "pair": "P2",
+      "variant": "residual",
+      "repeat": 1
+    },
+    {
+      "sequence": 4,
+      "pair": "P2",
+      "variant": "ordinary",
+      "repeat": 1
+    },
+    {
+      "sequence": 5,
+      "pair": "P3",
+      "variant": "ordinary",
+      "repeat": 1
+    },
+    {
+      "sequence": 6,
+      "pair": "P3",
+      "variant": "residual",
+      "repeat": 1
+    },
+    {
+      "sequence": 7,
+      "pair": "P1",
+      "variant": "residual",
+      "repeat": 2
+    },
+    {
+      "sequence": 8,
+      "pair": "P1",
+      "variant": "ordinary",
+      "repeat": 2
+    },
+    {
+      "sequence": 9,
+      "pair": "P2",
+      "variant": "ordinary",
+      "repeat": 2
+    },
+    {
+      "sequence": 10,
+      "pair": "P2",
+      "variant": "residual",
+      "repeat": 2
+    },
+    {
+      "sequence": 11,
+      "pair": "P3",
+      "variant": "residual",
+      "repeat": 2
+    },
+    {
+      "sequence": 12,
+      "pair": "P3",
+      "variant": "ordinary",
+      "repeat": 2
+    }
+  ],
+  "criteria": {
+    "labels": "P1 independent, P2/P3 duplicate, per user-confirmed boundaries. Expected labels never sent.",
+    "reasons": "Must explain distinct causal and rollout support for P1, shared causal gap for P2, and shared opening restart for P3. Correct labels without valid reasons are not success.",
+    "fidelity": "Do not infer final topic selection or non-selection in E07; do not invent pilot population or causal evidence in E05.",
+    "limits": "Three seen pairs, fixed order within each pair, two repetitions. Not production report generation, not a stable accuracy estimate. No further calls or default promotion."
+  }
+}

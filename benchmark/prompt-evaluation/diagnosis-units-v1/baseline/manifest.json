@@ -1,0 +1,23 @@
+{
+  "promptVersion": "structured-diagnosis-v8",
+  "libraryVersion": "expression-problem-library-v0.4",
+  "productionDefault": "unchanged",
+  "files": {
+    "lib/structured-diagnosis.js": "540316a73586796d8d3b0667abccdfd8ac8bb985086a1a8ea5b2c0db4111e2c0",
+    "lib/expression-problem-library.js": "3a6787f57b664c4fa3973a5bf4f78427885885da29187396aaeb57285e5a7b49",
+    "lib/expression-problem-library.generated.json": "f947e4c124689b87c0fd116e0f7a83fa22e3b87d7b1aacac31fe3e09468af002",
+    "lib/ai-feedback.js": "2f0d007567b50011d913190d962deaacdc1e480df933bee6c4097bb6f48c9886",
+    "lib/analysis-context.js": "3a37195f0cf8f70cbcec2b75dd2fc8267925f08ac8321428d8696d769859bac3",
+    "lib/session-analysis.js": "960fc16bd952d69dec2be124250c377455b02137bb28d2ccd019122197f347fa",
+    "lib/training-session-data.js": "a6e8469c07dd21fb165aa673e35e12d584205b4d704858e55a79a968f376c283",
+    "main.js": "86daa076c021ce751ab0e5bc536094a39c5502a4d1a3dd49e9f00fd5327cb2bf",
+    "shared/report-selection.js": "3990947ec3d6659165cd88ab26046d139ec8a04d9958597ff6c8f56974eedac8",
+    "src/structured-report.js": "cbeb799599bcc5861c1fe5e9ff963b0096f41c8f306ea6b125fa93251f0f5578"
+  },
+  "priorEvidence": {
+    "benchmark/prompt-evaluation/problem-library-v08/summary.md": "8191a1c394d7804a1e763be99e4213b8bde81e4cf9caa500a8ded2dc81c993fe",
+    "benchmark/prompt-evaluation/problem-library-v08/final/results.json": "b5653d8dd3cf6cf54689b69103064a595e1c94379661eeb7f7dd9490bd70f00f",
+    "benchmark/prompt-evaluation/problem-library-v08/final/inputs.json": "d69898ffa3e912b1c528096c1aac28311fc287f2f937dfed1bdca4a08c5bd172",
+    "benchmark/prompt-evaluation/problem-library-v08/final/prompt-preview.md": "dc37248054438e4532dccf247ec1f0af7cc25d5b1476324b652ca81c39f56ddd"
+  }
+}

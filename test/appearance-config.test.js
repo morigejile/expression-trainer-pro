@@ -16,35 +16,35 @@ test('appearance defaults to graphite coach-rail schema 1', () => {
 });
 
 test('appearance accepts every supported theme without changing layout', () => {
-  for (const theme of ['graphite', 'midnight', 'paper', 'mist']) {
-    assert.deepEqual(normalizeAppearance({schemaVersion: 1, theme, layout: 'focus-hud'}), {
+  for (const theme of ['graphite', 'ink-night', 'coral-glow', 'frosted-mist']) {
+    assert.deepEqual(normalizeAppearance({schemaVersion: 1, theme, layout: 'coach-rail'}), {
       schemaVersion: 1,
       theme,
-      layout: 'focus-hud'
+      layout: 'coach-rail'
     });
   }
 });
 
-test('appearance accepts both supported layouts', () => {
-  assert.equal(normalizeAppearance({theme: 'midnight', layout: 'coach-rail'}).layout, 'coach-rail');
-  assert.equal(normalizeAppearance({theme: 'midnight', layout: 'focus-hud'}).layout, 'focus-hud');
+test('appearance maps retired layouts to the accepted layout', () => {
+  assert.equal(normalizeAppearance({theme: 'ink-night', layout: 'focus-hud'}).layout, 'coach-rail');
+  assert.equal(normalizeAppearance({theme: 'ink-night', layout: 'coach-rail'}).layout, 'coach-rail');
 });
 
 test('appearance rejects unknown values independently', () => {
-  assert.deepEqual(normalizeAppearance({theme: 'neon', layout: 'focus-hud'}), {
+  assert.deepEqual(normalizeAppearance({theme: 'neon', layout: 'coach-rail'}), {
     schemaVersion: 1,
     theme: 'graphite',
-    layout: 'focus-hud'
+    layout: 'coach-rail'
   });
-  assert.deepEqual(normalizeAppearance({theme: 'paper', layout: 'freeform'}), {
+  assert.deepEqual(normalizeAppearance({theme: 'coral-glow', layout: 'freeform'}), {
     schemaVersion: 1,
-    theme: 'paper',
+    theme: 'coral-glow',
     layout: 'coach-rail'
   });
 });
 
 test('appearance rejects non-object input', () => {
-  for (const value of [null, undefined, [], 'paper', 1]) {
+  for (const value of [null, undefined, [], 'coral-glow', 1]) {
     assert.deepEqual(normalizeAppearance(value), {
       schemaVersion: 1,
       theme: 'graphite',
@@ -64,11 +64,11 @@ test('invalid appearance JSON returns defaults without requesting a downgrade', 
 test('future appearance schema remains readable and is marked read-only', () => {
   assert.deepEqual(parseAppearanceJson(JSON.stringify({
     schemaVersion: 99,
-    theme: 'paper',
-    layout: 'focus-hud',
+    theme: 'coral-glow',
+    layout: 'coach-rail',
     futureField: true
   })), {
-    appearance: {schemaVersion: 1, theme: 'paper', layout: 'focus-hud'},
+    appearance: {schemaVersion: 1, theme: 'coral-glow', layout: 'coach-rail'},
     isFutureSchema: true,
     error: null
   });

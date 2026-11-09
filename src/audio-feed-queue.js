@@ -93,6 +93,13 @@
         overruns += 1;
         const error = new Error(`Audio feed queue exceeded ${maxChunks} chunks`);
         error.code = 'audio-overrun';
+        const lost = [...queued, item];
+        if (lost.every(chunk => Number.isSafeInteger(chunk.absoluteSampleStart) && chunk.absoluteSampleStart >= 0 && chunk.samples instanceof Float32Array)) {
+          error.affectedRange = {
+            startSample:Math.min(...lost.map(chunk => chunk.absoluteSampleStart)),
+            endSample:Math.max(...lost.map(chunk => chunk.absoluteSampleStart + chunk.samples.length))
+          };
+        }
         fail(error);
         return false;
       }

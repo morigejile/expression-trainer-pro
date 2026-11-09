@@ -34,6 +34,12 @@
     switch (event.type) {
       case 'ready':
         return { type: 'ready' };
+      case 'quality-event':
+        if (!['timing-unavailable','timing-estimated','audio-overrun','audio-discontinuity','asr-error'].includes(event.code)) return null;
+        if (!(event.startSample === null && event.endSample === null) &&
+            (!Number.isSafeInteger(event.startSample) || !Number.isSafeInteger(event.endSample) ||
+             event.startSample < 0 || event.endSample < event.startSample)) return null;
+        return {type:'quality',code:event.code,startSample:event.startSample,endSample:event.endSample};
       case 'partial':
       case 'final':
         if (typeof event.text !== 'string') return null;

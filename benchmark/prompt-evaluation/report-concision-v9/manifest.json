@@ -1,0 +1,67 @@
+{
+  "actualBaseline": "structured-diagnosis-v8",
+  "finalStage": "reviewable",
+  "note": "Stage directory names do not imply user acceptance. Historical harness baseline=frozen-v7-refined and strictV7Format refer to its legacy format check; the comparison baseline here is v8. v9 drafts are distinguished by frozen source and request hashes, not version label alone.",
+  "stages": [
+    {
+      "stage": "before",
+      "source": "baseline/lib/structured-diagnosis.js",
+      "sourceSha256": "540316a73586796d8d3b0667abccdfd8ac8bb985086a1a8ea5b2c0db4111e2c0",
+      "runtime": "v22.23.0",
+      "requests": 6,
+      "systemHashes": [
+        "ab39e51623e3f43146a68aaa309d786ad4282bed29113abb79e1e7fad8a14635",
+        "765804fdc017ca90397f7c4b125c9f9a4695e47fbf380b3e72eb305177d8037e",
+        "2d186bd47208daac3e5af4f5f7589491073f9db037b16f48bdafc74cbc6b5c61"
+      ]
+    },
+    {
+      "stage": "after",
+      "source": "candidate-first-pass.js",
+      "sourceSha256": "cd4879cebc95b2318d4f7c5edad07cbe578f827cb655f563cb48282c9b9fe5a6",
+      "runtime": "v24.22.1",
+      "requests": 6,
+      "systemHashes": [
+        "22424f1656de32ecb6f816fae8f4fac963f096f4144ca5efebaeea2c2a7d8574",
+        "a9a5d632d47a40b1dcf3d444bf526b96138e4833bf3f886ee2ac0ea8520c422d",
+        "acea66970991f8e0933785d1b93cdafaf9946488e2686595e56d86e74c53fe0c"
+      ]
+    },
+    {
+      "stage": "final",
+      "source": "candidate-second-pass.js",
+      "sourceSha256": "af0466b648e322d7ca0d00a4d513c1303e24730d5b69c8a9658e43abdbc7279e",
+      "runtime": "v24.20.0",
+      "requests": 6,
+      "systemHashes": [
+        "6cf15e0748d2c7c38a15dd6163bb5dfb8647c4d3c73234a24f8ad6939695470e",
+        "ea4e6e764678a72fc7c60c16de330047076d2916ff065024ab01245dcd05ff92",
+        "abf9700d7f5d6a70d537c655cacf5f8cb4262bbe0a53a5c844e1b5f94668e685"
+      ]
+    },
+    {
+      "stage": "accepted-candidate",
+      "source": "candidate-third-pass.js",
+      "sourceSha256": "fc2d6d6e72fd0148124715c4cc004f772088832a43fd4f71f99226d8cd422ba8",
+      "runtime": "v24.20.0",
+      "requests": 6,
+      "systemHashes": [
+        "960aff397281f47f60d45779aadc866af76c6fc7d0d595d7cbdad5b360c3e8b4",
+        "fb9bc85b5755bf246a56297505ad4201aa78073b747281684f3639a8769692d0",
+        "0e56ae34f588423cd6fde7bd986786e3e0285b4fcd2830b5f2244fa1472c8d33"
+      ]
+    },
+    {
+      "stage": "reviewable",
+      "source": "candidate-reviewed.js",
+      "sourceSha256": "9b4489c0e76c68745214530c8a58b4c157f56c0f40fc9a4fdff72af092d84935",
+      "runtime": "v24.20.0",
+      "requests": 6,
+      "systemHashes": [
+        "6a64de998af3d494a42431eb0a31349d6287e88e7b5085d7202be27679689d2b",
+        "1cb7b84e6e9ca90aaf8ef7bf2e916af079e12c940c62799727bd5aac5a543736",
+        "0f5871c8fc6fa608352b7d1d642afbc6d3404737d241d9744e7503fc051dfacf"
+      ]
+    }
+  ]
+}

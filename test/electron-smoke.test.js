@@ -87,9 +87,12 @@ test('real Electron covers core flows and offline 16/44.1/48 kHz buffer graph ad
     assert.deepEqual(JSON.parse(resultLine.slice(RESULT_MARKER.length)), {
       policyShownBeforeRecording: true,
       playbackVisibleAfterStop: true,
-      recordOptionCount: 1,
-      modelLabels: ['fake-model'],
-      analysisStatus: '回放分析 · fake-model',
+      reportOpenedAfterStop: true,
+      saved: true,
+      historyReportRestored: true,
+      modelLabels: [],
+      manualReportRequests: 0,
+      automaticDiagnosisRequests: 1,
       audioType: 'audio/wav'
     });
   } finally {

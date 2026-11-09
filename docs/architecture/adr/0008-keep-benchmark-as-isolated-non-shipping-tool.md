@@ -3,6 +3,8 @@
 - Status: Accepted
 - Date: 2026-08-26
 
+> 编号说明：本文 `D-02` 是旧 Roadmap 的默认 ASR 模型选择任务，非当前 Backlog 同号事项；见[历史任务编号](README.md#历史任务编号)。
+
 ## Context
 
 Phase 2 ASR benchmark 的数据集契约、候选适配器、运行 harness 和结果记录服务于主产品的模型选型与回归验证，但不属于最终用户功能。它们需要与产品代码使用同一版本历史和决策上下文，也不应进入产品运行时或发布制品。

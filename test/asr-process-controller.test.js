@@ -25,6 +25,26 @@ class FakeUtilityProcess extends EventEmitter {
   }
 }
 
+test('cancel interrupts a native stop in flight and a later recording gets a fresh process', async () => {
+  const children = [];
+  const controller = createAsrProcessController({spawn() {
+    const child = new FakeUtilityProcess((message, reply) => {
+      if (message.command !== 'stop' && message.command !== 'cancel') reply(null);
+    });
+    children.push(child); return child;
+  }});
+  await controller.start({sessionId:'utterance',sampleRateHz:16000});
+  const stopping = controller.stop({sessionId:'utterance'});
+  const rejected = assert.rejects(stopping,{code:'asr-cancelled'});
+  const result = await controller.cancel({sessionId:'utterance'});
+  assert.equal(children[0].killed,true);
+  assert.equal(result[0].type,'stopped');
+  await rejected;
+  await controller.start({sessionId:'new',sampleRateHz:16000});
+  assert.equal(children.length,2);
+  await controller.dispose();
+});
+
 test('ASR process controller routes the provider contract through one utility process', async () => {
   const processes = [];
   const controller = createAsrProcessController({

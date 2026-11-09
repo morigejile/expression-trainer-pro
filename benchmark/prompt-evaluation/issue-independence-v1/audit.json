@@ -1,0 +1,27 @@
+{
+  "actualCalls": 12,
+  "completed": 12,
+  "failed": 0,
+  "fullFrozenInputsAndOriginalFeedback": true,
+  "singleFactorOnly": true,
+  "rawAndParsedIdentical": true,
+  "productionAndEarlierEvidenceUnchanged": true,
+  "trackedDiffUnchanged": true,
+  "counts": {
+    "ordinary": {
+      "independent": 4,
+      "duplicate": 2,
+      "uncertain": 0,
+      "failed": 0,
+      "labelMatches": 4
+    },
+    "residual": {
+      "independent": 2,
+      "duplicate": 3,
+      "uncertain": 1,
+      "failed": 0,
+      "labelMatches": 5
+    }
+  },
+  "interpretation": "Label agreement only, not content-quality pass rate; manual reasons and fidelity assessments are separate."
+}

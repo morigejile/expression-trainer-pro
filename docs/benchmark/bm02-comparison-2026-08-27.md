@@ -1,5 +1,7 @@
 # BM-02 三候选简单比较（2026-08-27）
 
+> **身份：Supporting。** 仅证明文中固定日期/环境的测量，不定义当前产品或完成状态；现行 Owner 见 [职责矩阵](../README.md)。旧测量与建议保留原文。
+
 ## 范围与规则
 
 - 数据集：`expression-zh-fleurs/v1`，100 条，1,201,680 ms；manifest SHA-256 `600bf66fe11273e0c34b5f8859f7a59efce6eddf607cf5fa13ad186cb0469593`。

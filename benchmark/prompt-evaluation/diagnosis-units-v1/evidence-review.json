@@ -1,0 +1,2198 @@
+{
+  "kind": "same-assistant-content-review-joined-after-unblinding",
+  "limitations": "Research judgments, not independent human acceptance or program semantic scoring. optional/falsePositive indices represent unwarranted mandatory Findings; overlaps with duplicates are deliberate.",
+  "evidence": [
+    {
+      "group": "screening",
+      "index": 14,
+      "blindId": "B1",
+      "id": "E07",
+      "variant": "scope",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1,
+          2
+        ],
+        "note": "确定要点并完整讲一次可同时消除三条；第三条的犹豫仅可指文字效果，不能推断心理。"
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "organization"
+          },
+          {
+            "id": "common-2",
+            "category": "delivery"
+          },
+          {
+            "id": "common-3",
+            "category": "wording"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "开头先说“我先说上线时间”，随即改口“先说功能”，又说“还是说上线时间”，最后又回到“还是先说功能”。",
+        "原文在短时间内多次重新起句：“我先说上线时间”“先说功能”“还是说上线时间”“还是先说功能”。",
+        "开头连续使用“先说……”“还是说……”“刚才那个先不说”等自我修正式表达。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "screening",
+      "index": 12,
+      "blindId": "B2",
+      "id": "E07",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1
+        ]
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "delivery"
+          },
+          {
+            "id": "common-2",
+            "category": "organization"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "转写中连续出现“我先说上线时间，先说功能，不，还是说上线时间，刚才那个先不说，我们，还是先说功能……”，同一开头被多次重启并撤回。",
+        "整段只有开头选择讲哪一点的反复表述，没有出现确定的要点陈述。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "screening",
+      "index": 6,
+      "blindId": "B3",
+      "id": "P03-independent",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "mapping-limited",
+      "contentReview": {
+        "defects": [
+          0,
+          1
+        ],
+        "note": "主张矛盾与循环冗余独立，不能按同片段合并。"
+      },
+      "rawTypes": [
+        [
+          "ARG-06"
+        ],
+        [
+          "ORG-05",
+          "WRD-06"
+        ]
+      ],
+      "adapted": null,
+      "observations": [
+        "同一句中先说“这周必须发布”，紧接着说“这周绝对不能发布”，两个主张在同一时间条件下直接冲突。",
+        "“发布准备的准备工作，就是发布准备这件事的准备工作，我说的就是发布准备这件事的准备工作”连续三次重述同一说法，没有增加新事实或限定。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "screening",
+      "index": 7,
+      "blindId": "B4",
+      "id": "P03-independent",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0,
+          1
+        ],
+        "note": "两条独立成立。"
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-2",
+            "category": "wording"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "同一句中先说“这周必须发布”，紧接着说“这周绝对不能发布”。",
+        "“发布准备的准备工作，就是发布准备这件事的准备工作，我说的就是发布准备这件事的准备工作”连续重复同一说法。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "screening",
+      "index": 4,
+      "blindId": "B5",
+      "id": "E03",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1
+        ],
+        "note": "回应选择或待决同时解决组织落点；不额外要求每次先给结论。"
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-2",
+            "category": "organization"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "回答只说了“A 的费用低，B 的交付快。两个方案各有优点”，随后以“情况大概就是这样”结束，没有给出选择 A 或 B 的建议，也没有说明尚不能选择时还缺哪些依据。",
+        "回答先并列“A 的费用低，B 的交付快”，再用“两个方案各有优点”概括，最后以“情况大概就是这样”收尾，没有把信息组织到选择结论或待决判断上。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "screening",
+      "index": 9,
+      "blindId": "B6",
+      "id": "E06",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "optional": [
+          0
+        ],
+        "falsePositive": [
+          1
+        ],
+        "note": "错误码分类/鉴权记录与登录排查关联可理解；未恢复已是结果，反思已提供。更细中间结果可深化。"
+      },
+      "rawTypes": [
+        [
+          "STAR-05"
+        ],
+        [
+          "STAR-06"
+        ]
+      ],
+      "adapted": {
+        "common": [],
+        "framework": [
+          {
+            "id": "framework-unit-1",
+            "category": "argument"
+          },
+          {
+            "id": "framework-unit-2",
+            "category": "organization"
+          }
+        ]
+      },
+      "observations": [
+        "行动部分说“先按错误码归类，再逐个核对鉴权依赖的调用记录”，但未说明这些动作与“检查登录链路和失败请求日志”这一任务之间的关联，也未说明核对后发现了什么或如何推进排查。",
+        "结尾说“最终没有在当晚恢复服务”，并给出反思“需要先建立完整的错误记录，再逐项排查”，但没有说明这次排查本身产生了什么可确认的结果或当前状态。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "screening",
+      "index": 5,
+      "blindId": "B7",
+      "id": "E03",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1
+        ],
+        "note": "选择或待决依据属于同一任务回应缺口；未给理由优先级不另报。"
+      },
+      "rawTypes": [
+        [
+          "ARG-01"
+        ],
+        [
+          "ARG-02"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-unit-2",
+            "category": "argument"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "回答只说了“A 的费用低，B 的交付快。两个方案各有优点，情况大概就是这样”，没有表明建议选 A 还是 B，也没有说明尚不能选择以及还缺什么依据。",
+        "“两个方案各有优点”只是概括，A 的费用低和 B 的交付快分别对应哪个方案更符合当前需求，回答没有把优点与选择标准联系起来。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "screening",
+      "index": 0,
+      "blindId": "B8",
+      "id": "E01",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "satisfied": true,
+        "note": "无Finding；摘要提反馈指向略宽属可选深化，非必须纠正。"
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [],
+        "framework": []
+      },
+      "observations": [],
+      "normalizations": []
+    },
+    {
+      "group": "screening",
+      "index": 8,
+      "blindId": "B9",
+      "id": "E06",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "optional": [
+          0,
+          1
+        ],
+        "note": "行动具体且与检查日志可理解对应；追问反思形成过程可深化，不足以列为明确障碍。"
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [],
+        "framework": [
+          {
+            "id": "framework-1",
+            "category": "argument"
+          },
+          {
+            "id": "framework-2",
+            "category": "organization"
+          }
+        ]
+      },
+      "observations": [
+        "s1 说明负责检查登录链路和失败请求日志，s2 说明按错误码归类并逐个核对鉴权依赖的调用记录，但未说明这两步与定位登录异常之间的具体关联。",
+        "s3 先说“最终没有在当晚恢复服务”，紧接着说“这次我意识到，需要先建立完整的错误记录，再逐项排查”，两句之间没有说明反思从何而来。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "screening",
+      "index": 3,
+      "blindId": "B10",
+      "id": "P01-execution",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ]
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "organization"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "原文只交代“可以先试行一个月，再根据团队反馈决定是否继续”，没有说明由谁负责推进试行、反馈通过什么方式收集。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "screening",
+      "index": 1,
+      "blindId": "B11",
+      "id": "E01",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "satisfied": true
+      },
+      "rawTypes": [],
+      "adapted": {
+        "common": [],
+        "framework": []
+      },
+      "observations": [],
+      "normalizations": []
+    },
+    {
+      "group": "screening",
+      "index": 15,
+      "blindId": "B12",
+      "id": "H04",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "satisfied": true
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [],
+        "framework": []
+      },
+      "observations": [],
+      "normalizations": []
+    },
+    {
+      "group": "screening",
+      "index": 11,
+      "blindId": "B13",
+      "id": "P06-vague",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "falsePositive": [
+          1
+        ],
+        "note": "当晚未恢复为实际结果；未提供收获不自动缺陷。"
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [],
+        "framework": [
+          {
+            "id": "framework-1",
+            "category": "argument"
+          },
+          {
+            "id": "framework-2",
+            "category": "organization"
+          }
+        ]
+      },
+      "observations": [
+        "行动部分只说“我们做了一些优化，也协调了相关人员”，没有说明你本人具体做了什么。",
+        "结果只说“最终没有在当晚恢复服务”，没有交代事情后来怎样或你从中得到什么。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "screening",
+      "index": 16,
+      "blindId": "B14",
+      "id": "H04",
+      "variant": "scope",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "satisfied": true
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [],
+        "framework": []
+      },
+      "observations": [],
+      "normalizations": []
+    },
+    {
+      "group": "screening",
+      "index": 10,
+      "blindId": "B15",
+      "id": "P06-vague",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1
+        ],
+        "note": "把概括行动讲具体即可一起解决当前任务关联问题。"
+      },
+      "rawTypes": [
+        [
+          "STAR-04",
+          "ARG-03"
+        ],
+        [
+          "STAR-05"
+        ]
+      ],
+      "adapted": {
+        "common": [],
+        "framework": [
+          {
+            "id": "framework-unit-1",
+            "category": "argument"
+          },
+          {
+            "id": "framework-unit-2",
+            "category": "argument"
+          }
+        ]
+      },
+      "observations": [
+        "行动部分只说“我们做了一些优化，也协调了相关人员”，没有说明本人具体做了什么优化、协调了谁、如何排查。",
+        "“做了一些优化，也协调了相关人员”与“排查登录异常”这一任务之间，没有说明这些动作如何服务于排查或恢复。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "screening",
+      "index": 2,
+      "blindId": "B16",
+      "id": "P01-execution",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ]
+      },
+      "rawTypes": [
+        [
+          "ORG-08"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "organization"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "原文提出“可以先试行一个月，再根据团队反馈决定是否继续”，但没有交代下月试行的具体执行安排，例如由谁牵头、如何收集反馈或试行从哪天开始。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "screening",
+      "index": 13,
+      "blindId": "B17",
+      "id": "E07",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "note": "一条同时覆盖未定要点与重启，不判断声音。"
+      },
+      "rawTypes": [
+        [
+          "DEL-03"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "delivery"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "开头先说“我先说上线时间”，随即改口“先说功能”，又回到“还是说上线时间”，再撤回“刚才那个先不说”，最后又转向“还是先说功能”，多次重启后仍未形成最终要点。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "review",
+      "index": 2,
+      "blindId": "B1",
+      "id": "E07",
+      "variant": "review",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ]
+      },
+      "rawTypes": [
+        [
+          "DEL-03"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "delivery"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "开头先说“我先说上线时间”，随即改口“先说功能”，又回到“还是说上线时间”，再撤回“刚才那个先不说”，最后又转向“还是先说功能”，多次重启后仍未形成最终要点。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "review",
+      "index": 1,
+      "blindId": "B2",
+      "id": "E06",
+      "variant": "review",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "optional": [
+          0
+        ],
+        "falsePositive": [
+          1
+        ]
+      },
+      "rawTypes": [
+        [
+          "STAR-05"
+        ],
+        [
+          "STAR-06"
+        ]
+      ],
+      "adapted": {
+        "common": [],
+        "framework": [
+          {
+            "id": "framework-unit-1",
+            "category": "argument"
+          },
+          {
+            "id": "framework-unit-2",
+            "category": "organization"
+          }
+        ]
+      },
+      "observations": [
+        "行动部分说“先按错误码归类，再逐个核对鉴权依赖的调用记录”，但未说明这些动作与“检查登录链路和失败请求日志”这一任务之间的关联，也未说明核对后发现了什么或如何推进排查。",
+        "结尾说“最终没有在当晚恢复服务”，并给出反思“需要先建立完整的错误记录，再逐项排查”，但没有说明这次排查本身产生了什么可确认的结果或当前状态。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "review",
+      "index": 0,
+      "blindId": "B3",
+      "id": "E03",
+      "variant": "review",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1
+        ]
+      },
+      "rawTypes": [
+        [
+          "ARG-01"
+        ],
+        [
+          "ARG-02"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-unit-2",
+            "category": "argument"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "回答只说了“A 的费用低，B 的交付快。两个方案各有优点，情况大概就是这样”，没有表明建议选 A 还是 B，也没有说明尚不能选择以及还缺什么依据。",
+        "“两个方案各有优点”只是概括，A 的费用低和 B 的交付快分别对应哪个方案更符合当前需求，回答没有把优点与选择标准联系起来。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "review",
+      "index": 3,
+      "blindId": "B4",
+      "id": "P06-vague",
+      "variant": "review",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1
+        ]
+      },
+      "rawTypes": [
+        [
+          "STAR-04",
+          "ARG-03"
+        ],
+        [
+          "STAR-05"
+        ]
+      ],
+      "adapted": {
+        "common": [],
+        "framework": [
+          {
+            "id": "framework-unit-1",
+            "category": "argument"
+          },
+          {
+            "id": "framework-unit-2",
+            "category": "argument"
+          }
+        ]
+      },
+      "observations": [
+        "行动部分只说“我们做了一些优化，也协调了相关人员”，没有说明本人具体做了什么优化、协调了谁、如何排查。",
+        "“做了一些优化，也协调了相关人员”与“排查登录异常”这一任务之间，没有说明这些动作如何服务于排查或恢复。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 26,
+      "blindId": "B1",
+      "id": "H02",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "optional": [
+          0,
+          1
+        ],
+        "note": "普通想法不要求机制与负责人未定的作用；建议引导补未证实关系。"
+      },
+      "rawTypes": [
+        [
+          "ARG-03"
+        ],
+        [
+          "ORG-04"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-unit-2",
+            "category": "organization"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "理由“因为能先了解实际使用问题”只概括了试用的目的，没有说明想了解哪类使用问题，也没有说明试用后依据什么判断是否继续。",
+        "结尾“具体负责人还没定”紧接在“如果预算不够，就先不启动”之后，没有说明负责人未定与试用建议之间的关系。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 18,
+      "blindId": "B2",
+      "id": "P03-late",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1
+        ]
+      },
+      "rawTypes": [
+        [
+          "ORG-01"
+        ],
+        [
+          "ORG-02"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "organization"
+          },
+          {
+            "id": "common-unit-2",
+            "category": "organization"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "先交代 A、B 的费用与交付对比，再叙述周一讨论、周二同步、周三整理意见的过程，最后才说出“我的建议是选 B”。",
+        "“我们先在周一做了讨论，周二又把方案拿出来同步，周三再次整理了意见”连续列出三天的工作安排，但未说明这些讨论如何影响选择。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 29,
+      "blindId": "B3",
+      "id": "H03",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0,
+          1
+        ],
+        "duplicates": [
+          2
+        ]
+      },
+      "rawTypes": [
+        [
+          "ARG-06"
+        ],
+        [
+          "ARG-06"
+        ],
+        [
+          "WRD-06"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-unit-2",
+            "category": "argument"
+          },
+          {
+            "id": "common-unit-3",
+            "category": "wording"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "关于培训频率，先说“我的决定是每周一次”，紧接着说“同时也是每月一次”，并补充“同一时期同一批人的同一种培训”，在同一对象和条件下给出两个不相容的频率。",
+        "关于值班方式，先说“我的决定是全员到岗”，紧接着说“同时也是全员不需要到岗”，并强调“时间和人员范围都不变”。",
+        "两段决定都用“同时也是”把互斥内容直接并列，如“每周一次，同时也是每月一次”“全员到岗，同时也是全员不需要到岗”。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 35,
+      "blindId": "B4",
+      "id": "E07",
+      "variant": "baseline",
+      "repeat": 2,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1
+        ]
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "delivery"
+          },
+          {
+            "id": "common-2",
+            "category": "wording"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "转写中先说“我先说上线时间，先说功能”，随即说“不，还是说上线时间”，接着又说“刚才那个先不说，我们，还是先说功能”。",
+        "同一句中出现“先说……先说……还是说……先不说……还是先说”的连续重复，并夹有“我们”等未完成的起句。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 5,
+      "blindId": "B5",
+      "id": "E03",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1
+        ]
+      },
+      "rawTypes": [
+        [
+          "ARG-01"
+        ],
+        [
+          "ORG-01"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-unit-2",
+            "category": "organization"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "回答只陈述“A 的费用低，B 的交付快。两个方案各有优点”，没有说明建议选 A 还是 B，也没有说明目前不能选择、还缺什么依据。",
+        "回答以“A 的费用低，B 的交付快”开头，随后说“两个方案各有优点，情况大概就是这样”，直到结尾都没有出现选择结论或待决说明。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 32,
+      "blindId": "B6",
+      "id": "E06",
+      "variant": "unified",
+      "repeat": 2,
+      "status": "completed",
+      "contentReview": {
+        "optional": [
+          0
+        ],
+        "falsePositive": [
+          1
+        ],
+        "note": "失败和反思已交代；后续非必需。"
+      },
+      "rawTypes": [
+        [
+          "ARG-07"
+        ],
+        [
+          "STAR-06"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "argument"
+          }
+        ],
+        "framework": [
+          {
+            "id": "framework-unit-2",
+            "category": "organization"
+          }
+        ]
+      },
+      "observations": [
+        "叙述了按错误码归类、核对鉴权依赖调用记录等行动，随后直接说“最终没有在当晚恢复服务”，但没有说明这些排查行动与未恢复之间是什么关系，例如是否定位到原因、是否尝试修复、卡在哪一步。",
+        "结果部分只说了“最终没有在当晚恢复服务”和一条反思，没有交代事情后来怎样，例如故障当前是否已恢复、是否移交他人、后续是否继续排查。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 11,
+      "blindId": "B7",
+      "id": "E06",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "optional": [
+          0
+        ],
+        "factRisk": "建议预设错误记录不完整导致受阻，再给条件退路。"
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [],
+        "framework": [
+          {
+            "id": "framework-1",
+            "category": "argument"
+          }
+        ]
+      },
+      "observations": [
+        "s3 说“最终没有在当晚恢复服务。这次我意识到，需要先建立完整的错误记录，再逐项排查”，但未说明未恢复服务与“先建立完整错误记录”之间的具体联系。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 36,
+      "blindId": "B8",
+      "id": "P03-independent",
+      "variant": "unified",
+      "repeat": 2,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0,
+          1
+        ]
+      },
+      "rawTypes": [
+        [
+          "ARG-06"
+        ],
+        [
+          "WRD-06"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-unit-2",
+            "category": "wording"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "同一句内先说“这周必须发布”，紧接着说“这周绝对不能发布”，两个主张在同一对象、同一时间条件下直接冲突，且没有说明是纠错、条件变化或不同范围。",
+        "“发布准备的准备工作，就是发布准备这件事的准备工作，我说的就是发布准备这件事的准备工作”连续三次重述同一意思，没有增加新事实、限定或推进。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 7,
+      "blindId": "B9",
+      "id": "E04",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1
+        ],
+        "factRisk": "建议称回归测试未完成，原文只是建议完成回归。"
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "organization"
+          },
+          {
+            "id": "common-2",
+            "category": "argument"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "开头先说“这次发布有两项关键缺陷没有修复”，随后用一整句按周一至周四罗列讨论与同步，再提负责人追问进度，最后才说“我建议延期两天”。",
+        "中间部分只列出“周一讨论过，周二又开了会，周三也讨论了，周四还有一次同步”以及“负责人昨天又问了一次进度”，没有说明这些沟通得出了什么结论或为何仍不能按期发布。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 3,
+      "blindId": "B10",
+      "id": "E02",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "satisfied": true
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [],
+        "framework": []
+      },
+      "observations": [],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 34,
+      "blindId": "B11",
+      "id": "E07",
+      "variant": "unified",
+      "repeat": 2,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ]
+      },
+      "rawTypes": [
+        [
+          "DEL-03"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "delivery"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "开头先说“上线时间”，随即改口“先说功能”，又撤回“还是说上线时间”，再改为“还是先说功能”，同一句内多次重启，最终没有确定本段讲哪一点。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 33,
+      "blindId": "B12",
+      "id": "E06",
+      "variant": "baseline",
+      "repeat": 2,
+      "status": "completed",
+      "contentReview": {
+        "optional": [
+          0,
+          2
+        ],
+        "falsePositive": [
+          1
+        ],
+        "duplicates": [
+          2
+        ],
+        "note": "同句情境任务可辨，不要求分句；0和2同一额外追问。"
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "argument"
+          },
+          {
+            "id": "framework-1",
+            "category": "organization"
+          }
+        ],
+        "framework": [
+          {
+            "id": "framework-2",
+            "category": "argument"
+          }
+        ]
+      },
+      "observations": [
+        "s3 只说“最终没有在当晚恢复服务”，随后直接转入反思，没有说明排查是否定位到原因、问题是否仍存在或后续如何处理。",
+        "s1 将“上线后出现登录异常”与“我负责检查登录链路和失败请求的日志”放在同一句中，情境与本人任务未分开表述。",
+        "s3 交代“最终没有在当晚恢复服务”后直接给出反思，没有说明排查是否定位到原因、问题当前状态或后续处理。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 22,
+      "blindId": "B13",
+      "id": "P03-independent",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0,
+          1
+        ]
+      },
+      "rawTypes": [
+        [
+          "ARG-06"
+        ],
+        [
+          "ORG-05"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-unit-2",
+            "category": "organization"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "同一句中先说“这周必须发布”，紧接着说“这周绝对不能发布”，两个主张在同一时间条件下直接冲突。",
+        "“发布准备的准备工作，就是发布准备这件事的准备工作，我说的就是发布准备这件事的准备工作”连续重复同一说法，没有增加事实、限定或推理。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 12,
+      "blindId": "B14",
+      "id": "E07",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1
+        ]
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "delivery"
+          },
+          {
+            "id": "common-2",
+            "category": "organization"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "同一段开头连续出现“我先说上线时间，先说功能，不，还是说上线时间”“还是先说功能”等多次重启，最终没有落到一个确定的说法。",
+        "开头先提“上线时间”，随即转向“功能”，又回到“上线时间”，再回到“功能”，两个话题交替出现且没有说明取舍依据。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 14,
+      "blindId": "B15",
+      "id": "E08",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "satisfied": true
+      },
+      "rawTypes": [],
+      "adapted": {
+        "common": [],
+        "framework": []
+      },
+      "observations": [],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 38,
+      "blindId": "B16",
+      "id": "H03",
+      "variant": "unified",
+      "repeat": 2,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0,
+          1
+        ],
+        "optional": [
+          2
+        ]
+      },
+      "rawTypes": [
+        [
+          "ARG-06"
+        ],
+        [
+          "ARG-06"
+        ],
+        [
+          "ARG-02"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-unit-2",
+            "category": "argument"
+          },
+          {
+            "id": "common-unit-3",
+            "category": "argument"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "关于培训频率，s1 说“我的决定是每周一次，同时也是每月一次”，并明确“同一时期同一批人的同一种培训”，两个频率在同一条件下互不兼容。",
+        "关于值班方式，s2 说“我的决定是全员到岗，同时也是全员不需要到岗”，并补充“时间和人员范围都不变”，两个安排在相同条件下直接冲突。",
+        "两段决定都只给出结论，没有说明为什么选择该频率或该值班方式；s1 和 s2 均未出现选择依据。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 25,
+      "blindId": "B17",
+      "id": "H01",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ]
+      },
+      "rawTypes": [
+        [
+          "ARG-05"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "argument"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "原文由“更换客服话术后，投诉减少了”直接推出“投诉减少唯一是话术调整造成的，其他因素肯定没有影响”，从时间先后和单一观察跳到了排他性因果结论。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 39,
+      "blindId": "B18",
+      "id": "H03",
+      "variant": "baseline",
+      "repeat": 2,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0,
+          1
+        ],
+        "duplicates": [
+          2
+        ],
+        "factRisk": "basis将不需要到岗转述为不到岗，义务与实际出席不同。"
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-2",
+            "category": "argument"
+          },
+          {
+            "id": "common-3",
+            "category": "wording"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "第一段先说培训频率是“每周一次”，紧接着又说“同时也是每月一次”，并强调“同一时期同一批人的同一种培训”。",
+        "第二段先说值班方式是“全员到岗”，随后又说“同时也是全员不需要到岗”，并说明“时间和人员范围都不变”。",
+        "两段都用“同时也是”把相反的说法并列在一起，例如“每周一次，同时也是每月一次”“全员到岗，同时也是全员不需要到岗”。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 6,
+      "blindId": "B19",
+      "id": "E04",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "optional": [
+          0
+        ],
+        "defects": [
+          1
+        ],
+        "duplicates": [
+          0
+        ],
+        "note": "压缩会议即可解决同一背景目标。"
+      },
+      "rawTypes": [
+        [
+          "ARG-02"
+        ],
+        [
+          "ORG-02"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-unit-2",
+            "category": "organization"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "回答用“周一讨论过，周二又开了会，周三也讨论了，周四还有一次同步”以及“负责人昨天又问了一次进度”来铺垫，但没有说明这些讨论形成了什么结论、为什么仍未修复缺陷，也没有把会议和追问与“延期两天”的建议直接连起来。",
+        "四项会议时间点（周一、周二、周三、周四）和负责人追问进度占了两句，而“两项关键缺陷没有修复”与“延期两天修复并回归测试”这两个核心信息只各占一句，背景细节的篇幅明显大于建议本身。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 19,
+      "blindId": "B20",
+      "id": "P03-late",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "optional": [
+          1
+        ]
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "organization"
+          },
+          {
+            "id": "common-2",
+            "category": "argument"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "原文先交代 A 费用低、B 交付快，再叙述周一讨论、周二同步、周三整理意见，最后才说“我的建议是选 B”。",
+        "原文给出“B 的交付快”和“这次更看重交付速度”，但没有说明为什么这次更看重交付速度，也没有说明费用因素为何让位于交付速度。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 0,
+      "blindId": "B21",
+      "id": "E01",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "satisfied": true
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [],
+        "framework": []
+      },
+      "observations": [],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 37,
+      "blindId": "B22",
+      "id": "P03-independent",
+      "variant": "baseline",
+      "repeat": 2,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0,
+          1
+        ],
+        "duplicates": [
+          2
+        ]
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-2",
+            "category": "organization"
+          },
+          {
+            "id": "common-3",
+            "category": "wording"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "同一句中先说“这周必须发布”，紧接着说“这周绝对不能发布”。",
+        "“发布准备的准备工作，就是发布准备这件事的准备工作，我说的就是发布准备这件事的准备工作”连续出现，内容没有增加新事实、条件或推理。",
+        "“发布准备的准备工作”与“发布准备这件事的准备工作”指代层层套叠，未说明具体指哪项准备。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 2,
+      "blindId": "B23",
+      "id": "E02",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "optional": [
+          0
+        ],
+        "note": "上线条件已给，具体标准未证实必需。"
+      },
+      "rawTypes": [
+        [
+          "ARG-03"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "argument"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "原文说“根据反馈决定是否推广”“如果测试未通过，就暂缓上线”，但没有说明反馈指哪些反馈、测试未通过指什么标准或条件。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 27,
+      "blindId": "B24",
+      "id": "H02",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "optional": [
+          0
+        ],
+        "note": "赞成/如果/还没定已区分状态，无须强制分句。"
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "organization"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "同一句里先给出“赞成先小范围试用”及理由，随后接“如果预算不够，就先不启动，具体负责人还没定”。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 15,
+      "blindId": "B25",
+      "id": "E08",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "satisfied": true
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [],
+        "framework": []
+      },
+      "observations": [],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 21,
+      "blindId": "B26",
+      "id": "P06-vague",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1
+        ],
+        "optional": [
+          1
+        ]
+      },
+      "rawTypes": [
+        [
+          "STAR-04",
+          "ARG-03"
+        ],
+        [
+          "STAR-05",
+          "ARG-07"
+        ]
+      ],
+      "adapted": {
+        "common": [],
+        "framework": [
+          {
+            "id": "framework-unit-1",
+            "category": "argument"
+          },
+          {
+            "id": "framework-unit-2",
+            "category": "argument"
+          }
+        ]
+      },
+      "observations": [
+        "排查行动只概括为“我们做了一些优化，也协调了相关人员”，没有说明本人具体做了什么、优化指什么、协调谁做什么。",
+        "“做了一些优化，也协调了相关人员”与“登录异常”之间没有说明这些动作针对什么问题、起到什么作用，最终“没有在当晚恢复服务”与前面行动的关系也不清楚。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 20,
+      "blindId": "B27",
+      "id": "P06-vague",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1
+        ]
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [],
+        "framework": [
+          {
+            "id": "framework-1",
+            "category": "argument"
+          },
+          {
+            "id": "framework-2",
+            "category": "argument"
+          }
+        ]
+      },
+      "observations": [
+        "行动部分只说“我们做了一些优化，也协调了相关人员”，没有说明优化了什么、协调谁做什么。",
+        "“我们做了一些优化，也协调了相关人员”使用“我们”，而前句是“我负责排查”。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 28,
+      "blindId": "B28",
+      "id": "H03",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1
+        ],
+        "collapsedIndependent": true,
+        "note": "两独立矛盾合一，非漏看但独立单位丢失；限定位置不是独立缺陷，摘要也未准确区分同范围限定与不同条件解释。"
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-2",
+            "category": "organization"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "s1 说“我的决定是每周一次，同时也是每月一次”，并补充“这里说的是同一时期同一批人的同一种培训”；s2 说“我的决定是全员到岗，同时也是全员不需要到岗”，并补充“时间和人员范围都不变”。",
+        "s1 先给出“每周一次，同时也是每月一次”，随后才补充“这里说的是同一时期同一批人的同一种培训”；s2 同样先给出“全员到岗，同时也是全员不需要到岗”，再补充“时间和人员范围都不变”。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 10,
+      "blindId": "B29",
+      "id": "E06",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "optional": [
+          0,
+          1
+        ],
+        "factRisk": "建议预设记录不完整导致受阻或低效，可能诱导补因果。"
+      },
+      "rawTypes": [
+        [
+          "ARG-07"
+        ],
+        [
+          "ARG-05"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-unit-2",
+            "category": "argument"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "叙述了具体行动（按错误码归类、核对鉴权依赖调用记录），但直接跳到“最终没有在当晚恢复服务”，没有说明这些行动与未恢复之间是否有可确认的联系，也没有交代排查中观察到了什么。",
+        "结尾反思说“需要先建立完整的错误记录，再逐项排查”，但从“当晚没有恢复服务”到这一反思之间缺少推理桥梁，没有说明为什么这次经历让你得出这个结论。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 8,
+      "blindId": "B30",
+      "id": "E05",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0,
+          1
+        ]
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-2",
+            "category": "argument"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "原文先说“试点组上月订单增加了。同期我们更换了首页”，随后说“因此，可以确定订单增长完全是首页改版带来的”。",
+        "原文由“可以确定订单增长完全是首页改版带来的”直接推出“应该立即全量推广”。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 1,
+      "blindId": "B31",
+      "id": "E01",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "satisfied": true
+      },
+      "rawTypes": [],
+      "adapted": {
+        "common": [],
+        "framework": []
+      },
+      "observations": [],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 23,
+      "blindId": "B32",
+      "id": "P03-independent",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0,
+          1
+        ],
+        "duplicates": [
+          2
+        ]
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-2",
+            "category": "organization"
+          },
+          {
+            "id": "common-3",
+            "category": "wording"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "同一句中先说“这周必须发布”，紧接着说“这周绝对不能发布”。",
+        "“发布准备的准备工作，就是发布准备这件事的准备工作，我说的就是发布准备这件事的准备工作”连续三次重述同一说法。",
+        "“发布准备的准备工作”与“发布准备这件事的准备工作”指代层层嵌套，未说明“准备”具体指什么。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 30,
+      "blindId": "B33",
+      "id": "E03",
+      "variant": "unified",
+      "repeat": 2,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1
+        ]
+      },
+      "rawTypes": [
+        [
+          "ARG-01"
+        ],
+        [
+          "ORG-08"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-unit-2",
+            "category": "organization"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "回答只陈述“A 的费用低，B 的交付快。两个方案各有优点”，没有表明建议选 A 还是 B，也没有说明尚不能选择以及还缺哪些依据。",
+        "结尾“情况大概就是这样”只复述了比较状态，没有落到选择结论或下一步需要确认的事项上。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 31,
+      "blindId": "B34",
+      "id": "E03",
+      "variant": "baseline",
+      "repeat": 2,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1
+        ]
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-2",
+            "category": "organization"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "回答只说明“A 的费用低，B 的交付快。两个方案各有优点”，随后以“情况大概就是这样”结束，没有表明倾向，也没有说明还缺哪些依据。",
+        "回答先并列 A、B 各一项优点，再用“两个方案各有优点”概括，最后以“情况大概就是这样”收尾，没有落到选择或待补依据上。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 13,
+      "blindId": "B35",
+      "id": "E07",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ]
+      },
+      "rawTypes": [
+        [
+          "DEL-03"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "delivery"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "开头连续出现“我先说上线时间，先说功能，不，还是说上线时间，刚才那个先不说，我们，还是先说功能……”，同一表达多次重启，最终没有形成确定的要点。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 9,
+      "blindId": "B36",
+      "id": "E05",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0,
+          2
+        ],
+        "optional": [
+          1
+        ],
+        "duplicates": [
+          1
+        ],
+        "note": "样本幅度等未证明每项必需；作为支撑应合入对应因果或推广缺口。"
+      },
+      "rawTypes": [
+        [
+          "ARG-05"
+        ],
+        [
+          "ARG-03"
+        ],
+        [
+          "ARG-09"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-unit-2",
+            "category": "argument"
+          },
+          {
+            "id": "common-unit-3",
+            "category": "argument"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "原文先说“试点组上月订单增加了。同期我们更换了首页”，随后直接说“因此，可以确定订单增长完全是首页改版带来的”。",
+        "原文只提到“试点组上月订单增加了”和“更换了首页”，没有说明试点组范围、改版具体改了什么，也没有给出订单变化的具体幅度或对比对象。",
+        "原文在因果判断后直接说“应该立即全量推广”，没有说明为什么选择“立即全量”而不是先扩大试点、继续观察或分批推广。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 17,
+      "blindId": "B37",
+      "id": "P01-execution",
+      "variant": "unified",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ]
+      },
+      "rawTypes": [
+        [
+          "ORG-08"
+        ]
+      ],
+      "adapted": {
+        "common": [
+          {
+            "id": "common-unit-1",
+            "category": "organization"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "原文提出“可以先试行一个月，再根据团队反馈决定是否继续”，但没有交代下月试行的具体执行安排，例如由谁负责组织试行、试行期间如何收集反馈或下月需要完成哪些步骤。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 16,
+      "blindId": "B38",
+      "id": "P01-execution",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ]
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "organization"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "原文提出“可以先试行一个月，再根据团队反馈决定是否继续”，但没有交代试行的责任人或反馈的收集方式。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 24,
+      "blindId": "B39",
+      "id": "H01",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1
+        ],
+        "factRisk": "尚不能排除即可消除笼统问题，至少点名一因素可能诱导猜测。"
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-2",
+            "category": "wording"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "原文先说“更换客服话术后，投诉减少了”，随即断言“投诉减少唯一是话术调整造成的，其他因素肯定没有影响”。",
+        "原文用“其他因素肯定没有影响”概括被排除的原因，没有说明“其他因素”指什么。"
+      ],
+      "normalizations": []
+    },
+    {
+      "group": "final",
+      "index": 4,
+      "blindId": "B40",
+      "id": "E03",
+      "variant": "baseline",
+      "repeat": 1,
+      "status": "completed",
+      "contentReview": {
+        "defects": [
+          0
+        ],
+        "duplicates": [
+          1
+        ]
+      },
+      "rawTypes": null,
+      "adapted": {
+        "common": [
+          {
+            "id": "common-1",
+            "category": "argument"
+          },
+          {
+            "id": "common-2",
+            "category": "organization"
+          }
+        ],
+        "framework": []
+      },
+      "observations": [
+        "回答只列出“A 的费用低，B 的交付快”，随后以“两个方案各有优点，情况大概就是这样”收束，没有给出选择 A 或 B 的建议，也没有说明尚不能选择时还缺什么依据。",
+        "回答先并列“A 的费用低，B 的交付快”，结尾用“两个方案各有优点，情况大概就是这样”作概括，没有把信息收束到选择或决策条件上。"
+      ],
+      "normalizations": []
+    }
+  ]
+}

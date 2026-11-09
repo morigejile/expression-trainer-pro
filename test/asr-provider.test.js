@@ -73,19 +73,20 @@ test('Fake provider emits configured feed and stop results as session events', a
   assert.deepEqual(ready, {
     type: 'ready',
     sessionId: 'fake-session',
-    sequence: 0
+    sequence: 0,
+    capabilities: {recognitionMode: 'streaming', partialResults: true, tokenTimestamps: false, timingSource: 'unavailable', confidence: false}
   });
   assert.deepEqual(partial, {
     type: 'partial',
     sessionId: 'fake-session',
     sequence: 1,
-    text: 'draft'
+    text: 'draft', acceptedSampleStart: 0, acceptedSampleEnd: 1, timingSource: 'unavailable'
   });
   assert.deepEqual(final, {
     type: 'final',
     sessionId: 'fake-session',
     sequence: 2,
-    text: 'complete'
+    text: 'complete', acceptedSampleStart: 1, acceptedSampleEnd: 2, timingSource: 'unavailable'
   });
   assert.equal(empty, null);
   assert.deepEqual(provider.stop({ sessionId: 'fake-session' }), [
@@ -93,12 +94,13 @@ test('Fake provider emits configured feed and stop results as session events', a
       type: 'final',
       sessionId: 'fake-session',
       sequence: 3,
-      text: 'tail'
+      text: 'tail', timingSource: 'unavailable'
     },
     {
       type: 'stopped',
       sessionId: 'fake-session',
-      sequence: 4
+      sequence: 4, finalAcceptedSampleCursor: 3, timingSource: 'unavailable',
+      qualityEvents:[{code:'timing-unavailable',startSample:0,endSample:3}]
     }
   ]);
   assert.deepEqual(provider.stop({ sessionId: 'fake-session' }), []);

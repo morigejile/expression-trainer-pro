@@ -1,19 +1,21 @@
-const { app, BrowserWindow, dialog, ipcMain, Menu, screen, shell, utilityProcess } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, screen, shell, utilityProcess } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-const {customWordsToFillers} = require('./lib/custom-prompt-config');
+const {pathToFileURL} = require('node:url');
+const {createTrainingSessionApplication} = require('./lib/training-session-application');
+const {registerTrainingSessionIpc} = require('./lib/training-session-ipc');
 const {createCustomPromptStore} = require('./lib/custom-prompt-store');
 const {formatSafeError} = require('./lib/safe-log');
 const {createDiagnosticSnapshot} = require('./lib/diagnostics');
-const {isAllowedSupportUrl} = require('./shared/support-links');
+const {isTrustedUtilityEvent, registerTrustedUtilityIpc, registerTrainingCloseDecisionIpc} = require('./lib/trusted-utility-ipc');
 const { loadLexicon, analyzeText } = require('./lib/lexicon');
-const {
-  getSelectedLlmProviderSettings,
-  getLlmProfile,
-  summarizeLlmProfiles,
-  selectActiveLlmProfile
-} = require('./lib/llm-provider-config');
+const {createAiAnalysisGate} = require('./lib/ai-analysis-gate');
+const {loadAiDisclosure,acknowledgeAiDisclosure} = require('./lib/ai-disclosure-store');
+const {registerAiDisclosureIpc} = require('./lib/ai-disclosure-ipc');
+const {buildSessionAnalysisInputs} = require('./lib/session-analysis-inputs');
+const {createSpeechEvidenceRunner} = require('./lib/speech-evidence-model');
+const {buildAnalysisContext} = require('./lib/analysis-context');
 const {
   loadLlmProviderSettings,
   saveLlmProviderSettings
@@ -25,6 +27,7 @@ const {
 } = require('./lib/recording-policy-store');
 const {calculateInitialWindowSize} = require('./lib/window-bounds');
 const { createAsrIpcRouter } = require('./lib/asr-ipc');
+const {createAsrRecordingScheduler} = require('./lib/asr-recording-scheduler');
 const { createAsrProcessController } = require('./lib/asr-process-controller');
 const {createAsrSelectionStore} = require('./lib/asr-selection-store');
 const {createModelManager} = require('./lib/model-manager');
@@ -40,11 +43,7 @@ const {registerAsrModelManagementIpc} = require('./lib/asr-model-management-ipc'
 const {createModelInstallController} = require('./lib/model-install-controller');
 const {runManagedModelSmoke} = require('./lib/managed-model-smoke');
 const {
-  requireBoundedText,
-  requireBoundedTextBatch,
-  validateFinalReportPayload,
-  validatePlaybackAnalysisPayload,
-  validateMarkdownSaveRequest
+  requireBoundedText
 } = require('./lib/ipc-input');
 const modelRegistry = require('./models/registry.json');
 const bundledModelArchive = resolveBundledModelArchive({
@@ -56,18 +55,17 @@ const isSquirrelStartup = require('electron-squirrel-startup');
 if (isSquirrelStartup) app.quit();
 
 const isSmokeTest = process.argv.includes('--smoke-test');
+const trainingProductSmokePhase = process.argv.find(arg => arg.startsWith('--training-product-smoke='))?.split('=')[1];
 const isNativeAddonSmokeTest = process.argv.includes('--native-addon-smoke-test');
+const trainingPersistenceSmokePhase = process.argv.find(arg => arg.startsWith('--training-persistence-smoke='))?.split('=')[1];
+const isTrainingPersistenceSmokeTest = trainingPersistenceSmokePhase !== undefined;
 const isManagedModelSmokeTest = process.argv.includes('--managed-model-smoke-test');
 const isBundledDefaultSmokeTest = process.argv.includes('--bundled-default-smoke-test');
 const isOfflineModelSmoke = process.env.EXPRESSION_TRAINER_MODEL_SMOKE_OFFLINE === '1';
-if (isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTest) app.disableHardwareAcceleration();
+if (isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTest || isTrainingPersistenceSmokeTest) app.disableHardwareAcceleration();
 const smokeTest = isSmokeTest ? require('./smoke/electron-smoke-runner') : null;
 const {
   createRequestCoordinator,
-  runCoordinatedRequest,
-  sendFeedback,
-  sendPlaybackAnalysis,
-  sendReport,
   testConnection
 } = isSmokeTest
   ? smokeTest.fakeLlm
@@ -76,7 +74,7 @@ const {
 if (smokeTest) {
   smokeTest.configureApp(app);
 }
-if (isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTest) {
+if (isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTest || isTrainingPersistenceSmokeTest) {
   const userDataPath = process.env.EXPRESSION_TRAINER_SMOKE_USER_DATA;
   if (!userDataPath || !path.isAbsolute(userDataPath)) {
     throw new Error('Smoke mode requires an absolute EXPRESSION_TRAINER_SMOKE_USER_DATA path');
@@ -84,7 +82,13 @@ if (isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTe
   app.setPath('userData', userDataPath);
 }
 
-const usesIsolatedModelRoot = isSmokeTest || isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTest;
+// Acquire after selecting userData and before any migration or storage initialization.
+if (!isSquirrelStartup && !app.requestSingleInstanceLock()) {
+  app.quit();
+  return;
+}
+
+const usesIsolatedModelRoot = isSmokeTest || isNativeAddonSmokeTest || isManagedModelSmokeTest || isBundledDefaultSmokeTest || isTrainingPersistenceSmokeTest;
 const modelRoot = usesIsolatedModelRoot
   ? path.join(app.getPath('userData'), 'models')
   : resolveProductionModelRoot(app.getPath('appData'));
@@ -221,16 +225,32 @@ const asrModelManagement = createAsrModelManagementRouter({
 app.setName('宇宙无敌表达训练');
 
 let mainWindow;
-let settingsWindow;
-let promptEditorWindow;
+const recordingScheduler=createAsrRecordingScheduler({getWebContents:()=>mainWindow?.webContents});
 const llmRequests = createRequestCoordinator();
-let asrShutdownStarted = false;
-let asrShutdownComplete = false;
+const aiAnalysisGate=createAiAnalysisGate({
+  loadSettings:()=>loadLlmProviderSettings(app.getPath('userData')),
+  loadDisclosure:()=>loadAiDisclosure(app.getPath('userData'))
+});
+let credentialInitialization = Promise.resolve();
+async function loadReadyLlmSettings() {
+  await credentialInitialization;
+  return loadLlmProviderSettings(app.getPath('userData'));
+}
+let applicationShutdownStarted = false;
+let applicationShutdownComplete = false;
+let trainingSessions;
 let lastAsrErrorCategory = null;
 
+app.on('second-instance', () => {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.focus();
+  }
+});
+
 function publishAsrModelState(state) {
-  if (settingsWindow && !settingsWindow.isDestroyed()) {
-    settingsWindow.webContents.send('asr-model-state-changed', state);
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.webContents.isDestroyed()) {
+    mainWindow.webContents.send('asr-model-state-changed', state);
   }
 }
 
@@ -242,7 +262,8 @@ async function refreshAsrModelState() {
 registerAsrModelManagementIpc({
   ipcMain,
   router: asrModelManagement,
-  isAllowedSender: sender => settingsWindow?.webContents === sender,
+  isAllowedEvent: event => isTrustedUtilityEvent(event, mainWindow?.webContents,
+    pathToFileURL(path.join(__dirname, 'src', 'index.html')).href),
   publishState: publishAsrModelState
 });
 
@@ -302,16 +323,37 @@ function saveCustomPrompt(data) {
   return customPromptStore.save(app.getPath('userData'), data);
 }
 
+function armTrainingCloseTimer(window) {
+  clearTimeout(window.trainingCloseTimer);
+  // A hung renderer must never turn an unconfirmed save into a silent success.
+  window.trainingCloseTimer = setTimeout(() => {
+    if (mainWindow !== window || window.isDestroyed() || !window.trainingClosePending) return;
+    window.trainingClosePending = false;
+    const choice = dialog.showMessageBoxSync(window, {type:'warning',buttons:['继续等待','退出'],defaultId:0,cancelId:0,
+      message:'尚未确认训练保存完成，退出可能丢失未保存内容。'});
+    if (choice === 1) { window.trainingCloseApproved = true; window.close(); }
+  }, 10000);
+}
+
+let cachedApplicationIcon;
+function applicationIcon() {
+  // Reading through fs also works when the renderer assets are inside ASAR.
+  return cachedApplicationIcon ||= nativeImage.createFromBuffer(fs.readFileSync(path.join(__dirname, 'src/assets/app-icon.png')));
+}
+
 function createMainWindow() {
   const initialSize = calculateInitialWindowSize(screen.getPrimaryDisplay().workAreaSize);
   mainWindow = new BrowserWindow({
+    icon: applicationIcon(),
     width: initialSize.width,
     height: initialSize.height,
     minWidth: 960,
     minHeight: 640,
     backgroundColor: '#000000',
     title: '宇宙无敌表达训练',
-    titleBarStyle: 'hiddenInset',
+    titleBarStyle: process.platform === 'win32' ? 'hidden' : 'hiddenInset',
+    titleBarOverlay: process.platform === 'win32'
+      ? {color: '#00000000', symbolColor: '#756d5b', height: 32} : undefined,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -322,6 +364,15 @@ function createMainWindow() {
   mainWindow.center();
   mainWindow.loadFile(path.join(__dirname, 'src', 'index.html'));
   mainWindow.setFullScreenable(true);
+  mainWindow.on('close', event => {
+    if (mainWindow.trainingCloseApproved || mainWindow.webContents.isDestroyed()) return;
+    event.preventDefault();
+    if (mainWindow.trainingClosePending) return;
+    mainWindow.trainingClosePending = true;
+    mainWindow.trainingCloseDecisionPending = false;
+    mainWindow.webContents.send('training:prepare-close');
+    armTrainingCloseTimer(mainWindow);
+  });
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -331,97 +382,35 @@ function createMainWindow() {
 }
 
 function broadcastAppearance(appearance) {
-  for (const window of [mainWindow, settingsWindow, promptEditorWindow]) {
-    if (window && !window.isDestroyed()) {
-      window.webContents.send('appearance-changed', appearance);
-    }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('appearance-changed', appearance);
   }
 }
 
 function broadcastLlmProviderSettingsChanged() {
-  for (const window of [mainWindow, settingsWindow, promptEditorWindow]) {
-    if (window && !window.isDestroyed()) {
-      window.webContents.send('llm-provider-settings-changed');
-    }
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('llm-provider-settings-changed');
   }
-}
-
-function rejectNonSettingsSender(event) {
-  if (settingsWindow && !settingsWindow.isDestroyed()
-      && settingsWindow.webContents === event.sender) return null;
-  return {success: false, error: '仅设置窗口可访问完整 LLM 配置'};
-}
-
-function createPromptEditorWindow() {
-  if (promptEditorWindow) {
-    promptEditorWindow.focus();
-    return;
-  }
-
-  promptEditorWindow = new BrowserWindow({
-    width: 720,
-    height: 700,
-    resizable: true,
-    backgroundColor: '#1a1a1a',
-    titleBarStyle: 'hiddenInset',
-    parent: mainWindow,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false
-    }
-  });
-
-  promptEditorWindow.loadFile(path.join(__dirname, 'src', 'prompt-editor.html'));
-
-  promptEditorWindow.webContents.on('will-prevent-unload', event => {
-    const choice = dialog.showMessageBoxSync(promptEditorWindow, {
-      type: 'warning',
-      buttons: ['放弃修改并离开', '继续编辑'],
-      defaultId: 1,
-      cancelId: 1,
-      title: '未保存的训练规则',
-      message: '训练规则尚未保存，确定要离开吗？'
-    });
-    if (choice === 0) event.preventDefault();
-  });
-
-  promptEditorWindow.on('closed', () => {
-    promptEditorWindow = null;
-  });
-}
-
-function createSettingsWindow() {
-  if (settingsWindow) {
-    settingsWindow.focus();
-    return;
-  }
-
-  settingsWindow = new BrowserWindow({
-    width: 600,
-    height: 500,
-    resizable: false,
-    backgroundColor: '#1a1a1a',
-    titleBarStyle: 'hiddenInset',
-    parent: mainWindow,
-    modal: true,
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'),
-      contextIsolation: true,
-      nodeIntegration: false
-    }
-  });
-
-  settingsWindow.loadFile(path.join(__dirname, 'src', 'settings.html'));
-
-  settingsWindow.on('closed', () => {
-    settingsWindow = null;
-  });
 }
 
 // App lifecycle
 app.whenReady().then(async () => {
   if (isSquirrelStartup) return;
+  // Keep the window responsive while Chromium persists its first OS key envelope.
+  // Keyless configurations remain usable if the OS key store is unavailable.
+  credentialInitialization = require('./lib/credential-storage').initializeCredentialStorage(app.getPath('userData')).catch(() => {});
+  if (isTrainingPersistenceSmokeTest) {
+    try {
+      await require('./smoke/training-persistence-smoke').run({
+        root: path.join(app.getPath('userData'), 'training'), phase: trainingPersistenceSmokePhase
+      });
+      app.exit(0);
+    } catch (error) {
+      console.error('[training-persistence-smoke] FAILED', formatSafeError(error));
+      app.exit(1);
+    }
+    return;
+  }
   if (isNativeAddonSmokeTest) {
     try {
       await runNativeAddonSmoke();
@@ -451,6 +440,41 @@ app.whenReady().then(async () => {
     }
     return;
   }
+  trainingSessions = createTrainingSessionApplication({
+    root: path.join(app.getPath('userData'), 'training'),
+    analysisOptions:{
+      runSpeechEvidence:isSmokeTest ? smokeTest.fakeSpeechEvidence : createSpeechEvidenceRunner({
+        userDataPath:app.getPath('userData'),modelRoot:path.join(modelRoot,'speech-evidence'),appVersion:app.getVersion(),
+        spawn:entry => utilityProcess.fork(entry,[],{serviceName:'expression-trainer-speech-evidence',stdio:'pipe'})
+      }).run,
+      getDiagnosisProfile:async options => {await credentialInitialization;return aiAnalysisGate.resolve(options);},
+      getAnalysisInputs:(session,options) => buildSessionAnalysisInputs(session,loadCustomPrompt(),options),
+      diagnose:({profile,signal,trigger,...input}) => {
+        const context=buildAnalysisContext(input);
+        aiAnalysisGate.requireUnchanged(profile,{trigger});
+        return (isSmokeTest ? smokeTest.fakeLlm.sendStructuredDiagnosis : require('./lib/ai-feedback').sendStructuredDiagnosis)(context,profile,{signal});
+      }
+    },
+    sourceSnapshot: () => {
+      const modelId = asrProvider.snapshot().effectiveModelId;
+      const model = modelRegistry.models.find(item => item.modelId === modelId);
+      return {appVersion:app.getVersion(), asr:{provider:model?.providerType || null,
+        // All current ASR adapters declare tokenTimestamps:false. Renderer playback
+        // estimates are a different source and must not be attributed to the model.
+        modelId:model?.modelId || null,modelVersion:model?.version || null,timingCapability:'unavailable'}};
+    }
+  });
+  const trainingStartup = await trainingSessions.ready;
+  if (!trainingStartup.ok) console.warn('[training-storage]', trainingStartup.error.code);
+  if (applicationShutdownStarted) return;
+  registerTrainingSessionIpc({
+    ipcMain, application: trainingSessions, getMainWebContents: () => mainWindow?.webContents,
+    mainUrl: pathToFileURL(path.join(__dirname, 'src', 'index.html')).href
+  });
+  registerAiDisclosureIpc({ipcMain,getMainWebContents:()=>mainWindow?.webContents,
+    mainUrl:pathToFileURL(path.join(__dirname,'src','index.html')).href,
+    getState:async options=>{await credentialInitialization;return aiAnalysisGate.getState(options);},
+    acknowledge:options=>acknowledgeAiDisclosure(app.getPath('userData'),options)});
   if (process.platform === 'darwin') {
     Menu.setApplicationMenu(Menu.buildFromTemplate([
       {
@@ -488,7 +512,9 @@ app.whenReady().then(async () => {
   const createdMainWindow = createMainWindow();
 
   if (smokeTest) {
-    smokeTest.run({
+    const runner = trainingProductSmokePhase ? require('./smoke/training-product-smoke') : smokeTest;
+    runner.run({
+      phase:trainingProductSmokePhase,
       app,
       asrProvider,
       BrowserWindow,
@@ -534,56 +560,6 @@ ipcMain.handle('save-appearance', (event, appearance) => {
   }
 });
 
-// LLM Provider 设置
-ipcMain.handle('get-llm-provider-settings', event => {
-  const rejection = rejectNonSettingsSender(event);
-  if (rejection) return rejection;
-  return loadLlmProviderSettings(app.getPath('userData'));
-});
-
-ipcMain.handle('save-llm-provider-settings', (event, settings) => {
-  const rejection = rejectNonSettingsSender(event);
-  if (rejection) return rejection;
-  try {
-    saveLlmProviderSettings(app.getPath('userData'), settings);
-    broadcastLlmProviderSettingsChanged();
-    return { success: true };
-  } catch (error) {
-    if (error.code === 'unsupported-schema-version') {
-      return { success: false, error: '当前版本无法保存更高版本的 LLM Provider 配置' };
-    }
-    throw error;
-  }
-});
-
-ipcMain.handle('get-llm-profile-summaries', () => {
-  return summarizeLlmProfiles(loadLlmProviderSettings(app.getPath('userData')));
-});
-
-ipcMain.handle('select-llm-profile', (event, profileId) => {
-  if (typeof profileId !== 'string' || !profileId.trim() || profileId.length > 128) {
-    return {success: false, error: 'Invalid LLM profile ID'};
-  }
-
-  try {
-    const selected = selectActiveLlmProfile(
-      loadLlmProviderSettings(app.getPath('userData')),
-      profileId
-    );
-    const saved = saveLlmProviderSettings(app.getPath('userData'), selected);
-    broadcastLlmProviderSettingsChanged();
-    return {success: true, summary: summarizeLlmProfiles(saved)};
-  } catch (error) {
-    if (error.code === 'unsupported-schema-version') {
-      return {success: false, error: '当前版本无法保存更高版本的 LLM Provider 配置'};
-    }
-    if (error.code === 'invalid-profile-id') {
-      return {success: false, error: 'Unknown LLM profile ID'};
-    }
-    throw error;
-  }
-});
-
 ipcMain.handle('get-recording-policy', () => {
   return {acknowledged: loadRecordingPolicy(app.getPath('userData')).acknowledged};
 });
@@ -603,48 +579,49 @@ ipcMain.handle('acknowledge-recording-policy', () => {
   }
 });
 
-ipcMain.handle('open-settings', () => {
-  createSettingsWindow();
-});
-
-// Prompt编辑器相关
-ipcMain.handle('open-prompt-editor', () => {
-  createPromptEditorWindow();
-});
-
-ipcMain.handle('get-custom-prompt', () => {
-  return loadCustomPrompt();
-});
-
-ipcMain.handle('save-custom-prompt', (event, data) => {
-  saveCustomPrompt(data);
-  return { success: true };
-});
-
-ipcMain.handle('close-current-window', (event) => {
-  const win = BrowserWindow.fromWebContents(event.sender);
-  if (win) win.close();
-});
-
 // 语音识别相关 - Web Audio方案
 ipcMain.handle('prepare-asr', () => trackAsrResult(asrIpc.prepare()));
 
 ipcMain.handle('start-asr', async (event, command) => {
+  const contents=mainWindow?.webContents;
   const result = await trackAsrResult(asrIpc.start(command));
+  if (result?.ok) recordingScheduler.started(command.sessionId,contents);
   if (isSmokeTest && result?.ok) fallbackManagementState.activeSession = true;
   return result;
 });
 
 app.on('before-quit', event => {
-  if (asrShutdownComplete) return;
+  if (applicationShutdownComplete) return;
   event.preventDefault();
-  if (asrShutdownStarted) return;
-  asrShutdownStarted = true;
-  void Promise.allSettled([asrProvider.dispose(), modelInstallController.dispose()])
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.trainingCloseApproved) {
+    mainWindow.close();
+    return;
+  }
+  if (applicationShutdownStarted) return;
+  applicationShutdownStarted = true;
+  const storageShutdown = trainingSessions?.close().then(result => {
+    if (!result.ok) console.warn('[training-storage]', result.error.code);
+  });
+  void Promise.allSettled([storageShutdown, asrProvider.dispose(), modelInstallController.dispose()])
     .finally(() => {
-      asrShutdownComplete = true;
+      applicationShutdownComplete = true;
       app.quit();
     });
+});
+
+ipcMain.on('training:close-ready', (event, ready) => {
+  if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== mainWindow.webContents.mainFrame) return;
+  clearTimeout(mainWindow.trainingCloseTimer);
+  mainWindow.trainingClosePending = false;
+  mainWindow.trainingCloseDecisionPending = false;
+  if (ready === true) { mainWindow.trainingCloseApproved = true; mainWindow.close(); }
+});
+
+registerTrainingCloseDecisionIpc({
+  ipcMain,
+  getMainWindow: () => mainWindow,
+  mainUrl: pathToFileURL(path.join(__dirname, 'src', 'index.html')).href,
+  armCloseTimer: armTrainingCloseTimer
 });
 
 // 接收渲染进程发来的音频数据
@@ -653,71 +630,28 @@ ipcMain.handle('feed-audio', (event, command) => {
 });
 
 ipcMain.handle('stop-asr', async (event, command) => {
-  const result = await trackAsrResult(asrIpc.stop(command));
-  if (isSmokeTest && result?.ok) fallbackManagementState.activeSession = false;
-  return result;
+  try {
+    const result = await trackAsrResult(asrIpc.stop(command));
+    if (isSmokeTest && result?.ok) fallbackManagementState.activeSession = false;
+    return result;
+  } finally { recordingScheduler.finished(command); }
 });
 
 ipcMain.handle('cancel-asr', async (event, command) => {
-  const result = await trackAsrResult(asrIpc.cancel(command));
-  if (isSmokeTest && result?.ok) fallbackManagementState.activeSession = false;
-  return result;
-});
-
-// LLM 连通性测试
-ipcMain.handle('test-llm-connection', async (event, settings) => {
-  const rejection = rejectNonSettingsSender(event);
-  if (rejection) return rejection;
-  const providerConfig = getSelectedLlmProviderSettings(settings);
-  const request = llmRequests.begin(event.sender.id, 'connection');
   try {
-    return await testConnection(
-      { ...settings, ...providerConfig },
-      { signal: request.signal }
-    );
-  } finally {
-    request.finish();
-  }
-});
-
-ipcMain.handle('cancel-llm-requests', (event) => {
-  llmRequests.cancelAll(event.sender.id);
-  return { success: true };
+    const result = await trackAsrResult(asrIpc.cancel(command));
+    if (isSmokeTest && result?.ok) fallbackManagementState.activeSession = false;
+    return result;
+  } finally { recordingScheduler.finished(command); }
 });
 
 // 词库分析
 ipcMain.handle('analyze-text', (event, text) => {
   const normalizedText = requireBoundedText(text, {label: 'text'});
-  const customPrompt = loadCustomPrompt();
-  return analyzeText(normalizedText, {extraFillers: customWordsToFillers(customPrompt.customWords)});
+  return analyzeText(normalizedText);
 });
 
-// 粘贴逐字稿一次提交整批句子：逐句 invoke 会按句数线性放大 IPC 往返
-ipcMain.handle('analyze-texts', (event, texts) => {
-  const normalizedTexts = requireBoundedTextBatch(texts, {label: 'texts'});
-  const customPrompt = loadCustomPrompt();
-  const extraFillers = customWordsToFillers(customPrompt.customWords);
-  return normalizedTexts.map(text => analyzeText(text, {extraFillers}));
-});
-
-// 文件保存
-ipcMain.handle('save-file', async (event, content, filename) => {
-  const request = validateMarkdownSaveRequest(content, filename);
-  const { dialog } = require('electron');
-  const result = await dialog.showSaveDialog(mainWindow, {
-    title: '保存报告',
-    defaultPath: path.join(app.getPath('desktop'), request.filename),
-    filters: [{ name: 'Markdown', extensions: ['md'] }]
-  });
-
-  if (!result.canceled && result.filePath) {
-    fs.writeFileSync(result.filePath, request.content, 'utf-8');
-    return { success: true, path: result.filePath };
-  }
-  return { success: false };
-});
-
-ipcMain.handle('export-diagnostics', async (event, audioRates) => {
+async function exportDiagnostics(audioRates) {
   const {dialog} = require('electron');
   const controller = asrProvider.snapshot();
   const diagnosticModelId = controller.effectiveModelId || controller.selectedModelId || modelRegistry.defaultModelId;
@@ -743,79 +677,21 @@ ipcMain.handle('export-diagnostics', async (event, audioRates) => {
   if (result.canceled || !result.filePath) return {success: false};
   fs.writeFileSync(result.filePath, `${JSON.stringify(snapshot, null, 2)}\n`, 'utf8');
   return {success: true, path: result.filePath};
-});
+}
 
-ipcMain.handle('open-support-link', async (event, rawUrl) => {
-  if (!isAllowedSupportUrl(rawUrl)) {
-    return {success: false, error: '不支持的反馈目标'};
-  }
-  try {
-    await shell.openExternal(rawUrl);
-    return {success: true};
-  } catch {
-    return {success: false, error: '无法打开问题和建议文档'};
-  }
-});
-
-// AI反馈（传入customPrompt）
-ipcMain.handle('get-realtime-feedback', async (event, text) => {
-  const normalizedText = requireBoundedText(text, {label: 'text'});
-  const settings = loadLlmProviderSettings(app.getPath('userData'));
-  const providerConfig = getSelectedLlmProviderSettings(settings);
-  const customPrompt = loadCustomPrompt();
-  return runCoordinatedRequest(
-    llmRequests,
-    event.sender.id,
-    'realtime',
-    'feedback',
-    (signal) => sendFeedback(
-      normalizedText,
-      { ...settings, ...providerConfig },
-      customPrompt,
-      { signal }
-    )
-  );
-});
-
-ipcMain.handle('get-final-report', async (event, payload) => {
-  const {fullText, stats} = validateFinalReportPayload(payload);
-  const settings = loadLlmProviderSettings(app.getPath('userData'));
-  const providerConfig = getSelectedLlmProviderSettings(settings);
-  const customPrompt = loadCustomPrompt();
-  return runCoordinatedRequest(
-    llmRequests,
-    event.sender.id,
-    'report',
-    'report',
-    (signal) => sendReport(
-      fullText,
-      stats,
-      { ...settings, ...providerConfig },
-      customPrompt,
-      { signal }
-    )
-  );
-});
-
-ipcMain.handle('analyze-playback', async (event, payload) => {
-  const requestPayload = validatePlaybackAnalysisPayload(payload);
-  const settings = loadLlmProviderSettings(app.getPath('userData'));
-  const profile = getLlmProfile(settings, requestPayload.profileId);
-  if (!profile) return {success: false, error: '所选模型配置不存在', errorCode: 'invalid-profile-id'};
-  const customPrompt = loadCustomPrompt();
-  const result = await runCoordinatedRequest(
-    llmRequests,
-    event.sender.id,
-    'playback',
-    'analysis',
-    signal => sendPlaybackAnalysis(requestPayload.segments, profile, customPrompt, {signal})
-  );
-  if (!result.success) return result;
-  return {
-    success: true,
-    analysis: {
-      items: result.analysis,
-      profile: {id: profile.id, name: profile.name, provider: profile.provider, model: profile.model}
-    }
-  };
+registerTrustedUtilityIpc({
+  ipcMain,
+  getMainWebContents: () => mainWindow?.webContents,
+  mainUrl: pathToFileURL(path.join(__dirname, 'src', 'index.html')).href,
+  openUtility: target => mainWindow.webContents.send('utility-open', target),
+  getAppInfo: () => ({name: app.getName(), version: app.getVersion()}),
+  loadSettings: loadReadyLlmSettings,
+  saveSettings: settings => saveLlmProviderSettings(app.getPath('userData'), settings),
+  publishSettings: broadcastLlmProviderSettingsChanged,
+  loadPrompt: loadCustomPrompt,
+  savePrompt: saveCustomPrompt,
+  requests: llmRequests,
+  testConnection,
+  exportDiagnostics,
+  openSupportLink: async url => {await shell.openExternal(url); return {success: true};}
 });

@@ -1,0 +1,25 @@
+{
+  "promptVersion": "structured-diagnosis-v8",
+  "libraryVersion": "expression-problem-library-v0.4",
+  "factors": [
+    "task-necessity",
+    "omit-per-card-practice",
+    "merge-counterexamples",
+    "consolidated-fixed-evidence-rules"
+  ],
+  "selectionReason": "bounded combined candidate; isolated trials did not establish reliable semantic improvements",
+  "promptHashes": {
+    "E01": "ab39e51623e3f43146a68aaa309d786ad4282bed29113abb79e1e7fad8a14635",
+    "E02": "ab39e51623e3f43146a68aaa309d786ad4282bed29113abb79e1e7fad8a14635",
+    "E03": "ab39e51623e3f43146a68aaa309d786ad4282bed29113abb79e1e7fad8a14635",
+    "E04": "ab39e51623e3f43146a68aaa309d786ad4282bed29113abb79e1e7fad8a14635",
+    "E05": "ab39e51623e3f43146a68aaa309d786ad4282bed29113abb79e1e7fad8a14635",
+    "E06": "765804fdc017ca90397f7c4b125c9f9a4695e47fbf380b3e72eb305177d8037e",
+    "E07": "2d186bd47208daac3e5af4f5f7589491073f9db037b16f48bdafc74cbc6b5c61",
+    "E08": "ab39e51623e3f43146a68aaa309d786ad4282bed29113abb79e1e7fad8a14635",
+    "P01-execution": "ab39e51623e3f43146a68aaa309d786ad4282bed29113abb79e1e7fad8a14635",
+    "P03-late": "ab39e51623e3f43146a68aaa309d786ad4282bed29113abb79e1e7fad8a14635",
+    "P06-vague": "765804fdc017ca90397f7c4b125c9f9a4695e47fbf380b3e72eb305177d8037e",
+    "P03-independent": "ab39e51623e3f43146a68aaa309d786ad4282bed29113abb79e1e7fad8a14635"
+  }
+}
