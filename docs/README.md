@@ -8,7 +8,7 @@
 
 阅读顺序：**当前任务 → 下表对应的主文档 → 必要实现 → 有需要才查历史证据**。不默认通读全部文档、归档或实验原始返回。
 
-当前交付范围与未完成项先看 [M4 剩余工作](milestones/m4-structured-training.md#remaining-work-and-blockers)，跨阶段顺序看 [Roadmap](roadmap.md)。主报告的生产状态、质量限制与未接入实验见 [Current §17](architecture/current.md#17-i2-普通报告与真实-ai-接入)；已有阶段验证不能代替当前整体验收。
+当前产品交付范围与未完成项先看 [M4 剩余工作](milestones/m4-structured-training.md#remaining-work-and-blockers)，跨阶段顺序看 [Roadmap](roadmap.md)；语速与停顿测量的独立实验进度见 [Roadmap §4.6](roadmap.md#46-语速与停顿测量独立实验)。主报告的生产状态、质量限制与未接入实验见 [Current §17](architecture/current.md#17-i2-普通报告与真实-ai-接入)；已有阶段验证不能代替当前整体验收。
 
 ## Canonical Map
 
@@ -50,7 +50,7 @@
 
 各结论已链接实际请求、原始返回、失败记录、冻结源码和校验值；只在核对具体判断或复跑时进入这些材料。预览与完整对照展示是派生阅读材料，不是新的规则源，生成方式见 [Development](development.md#问题库与主诊断提示)。部分原始返回和冻结源码被测试、复跑与哈希校验直接引用，不移动、改写或只保留成功结果。
 
-`.superpowers/` 中的旧计划、日志、源码备份和截图是本地历史执行材料；被忽略不代表可删除，其中的命令与待办不作为当前指令。`docs/superpowers/` 当前空目录不承载任务状态。当前规则仍由上面的职责矩阵定义，归档材料按下表追溯。
+`.superpowers/` 中的旧计划、日志、源码备份和截图是本地历史执行材料；被忽略不代表可删除，其中的命令与待办不作为当前指令。`docs/superpowers/` 下的[语速与停顿测量计划](superpowers/plans/2026-11-09-fluency-measurement.md)是 Supporting 执行材料，保留任务拆分、执行记录与待验证项；进度摘要由 Roadmap §4.6 维护，已实现事实、数据定义和操作方法分别回写 Current、Data Model 与 Development。计划不替代 Canonical，也不单独批准生产接入；事实回写后的移除遵循下方维护规则。当前规则仍由上面的职责矩阵定义，归档材料按下表追溯。
 
 ### 已归档评审
 

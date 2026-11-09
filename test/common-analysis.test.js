@@ -22,6 +22,7 @@ function speech() {
 }
 const stats = {totalWords:8,fillers:1,hedges:1,vagueWords:1,excludedCharacters:4,hedgeCharacters:3,duration:10};
 function compute(input) { return require('../lib/common-analysis').computeCommonAnalysis(input); }
+function preview(input) { return require('../lib/common-analysis').computeFluencyPreview(input); }
 function metric(result, id) {
   const found = result.metrics.find(item => item.id === id);
   assert.ok(found, `missing metric ${id}`);
@@ -37,6 +38,101 @@ function unavailable(result, ids, reason) {
 }
 const vadMetrics = ['speech-duration-ms','non-speech-duration-ms','between-speech-gap-count',
   'between-speech-gap-total-ms','between-speech-gap-max-ms','text-rate-per-speech-minute'];
+const previewIds = ['expression-span-ms','text-rate-per-expression-minute','between-speech-gap-percent',
+  'between-speech-gap-rate-per-expression-minute','text-rate-per-speech-minute'];
+
+function fluencyInput() {
+  const value = session(), source = speech();
+  value.transcript.text = '测'.repeat(24);
+  value.transcript.segments = [{id:'text-1',text:value.transcript.text,timingSource:'unavailable'}];
+  source.segments = [[1,3],[3.5,5.5],[7,9]].map(([start,end],i)=>
+    ({id:`speech-${i}`,startSample:start*16000,endSample:end*16000}));
+  source.quality.vad = {status:'degraded',reasons:['vad-thresholds-uncalibrated']};
+  return {session:value,speechEvidence:source};
+}
+
+test('fluency preview derives expression-span rates without changing the V1 report metrics',()=>{
+  const input = fluencyInput(), before = structuredClone(input), common = compute(input);
+  const result = preview(input);
+  assert.equal(result.definitionVersion,'fluency-metrics-v1-experimental');
+  assert.equal(result.schemaVersion,1);
+  assert.equal(result.sessionId,input.session.id);
+  assert.equal(result.inputRevision,1);
+  for(const [id,value] of [['expression-span-ms',8000],['text-rate-per-expression-minute',180],
+    ['between-speech-gap-percent',25],['between-speech-gap-rate-per-expression-minute',15],
+    ['text-rate-per-speech-minute',240]]) {
+    assert.equal(metric(result,id).value,value,id);
+    assert.equal(metric(result,id).status,'available',id);
+  }
+  assert.equal(metric(result,'text-rate-per-expression-minute').unit,'characters/expression-minute');
+  assert.equal(metric(result,'between-speech-gap-rate-per-expression-minute').unit,'occurrences/expression-minute');
+  assert.deepEqual(metric(result,'text-rate-per-expression-minute').evidenceRefs,
+    ['text-1','audio','speech-0','speech-1','speech-2']);
+  assert.deepEqual(result.speechEvidenceQuality,input.speechEvidence.quality.vad);
+  assert.deepEqual(result.speechEvidenceVersion,common.speechEvidenceVersion);
+  assert.equal(common.definitionVersion,'common-metrics-v1');
+  assert.equal(common.metrics.length,15);
+  assert.equal(metric(common,'text-rate-per-recorded-minute').value,144);
+  assert.deepEqual(compute(input),common);
+  assert.deepEqual(input,before);
+  assert.equal(Object.hasOwn(result,'score'),false);
+});
+
+test('fluency preview is invariant to additional leading and trailing non-speech',()=>{
+  const input = fluencyInput(), shifted = structuredClone(input);
+  shifted.session.durationMs = shifted.session.artifact.durationMs = 13000;
+  shifted.session.timing.capturedSampleCount = shifted.session.timing.asrAcceptedSampleCount = 208000;
+  shifted.speechEvidence.audio.sampleCount = 208000;
+  for(const segment of shifted.speechEvidence.segments) {
+    segment.startSample += 16000;
+    segment.endSample += 16000;
+  }
+  assert.deepEqual(preview(shifted).metrics,preview(input).metrics);
+});
+
+test('fluency preview keeps acoustic ratios when transcript coverage or text is unavailable',()=>{
+  for(const mode of ['asr-error','short-asr','no-text']) {
+    const input = fluencyInput();
+    if(mode==='asr-error') input.session.dataQuality.push('asr-error');
+    if(mode==='short-asr') input.session.timing.asrAcceptedSampleCount = 80000;
+    if(mode==='no-text') input.session.transcript = null;
+    const result = preview(input);
+    unavailable(result,['text-rate-per-expression-minute','text-rate-per-speech-minute'],
+      mode==='no-text'?'transcript-unavailable':'asr-incomplete');
+    assert.equal(metric(result,'expression-span-ms').value,8000);
+    assert.equal(metric(result,'between-speech-gap-percent').value,25);
+    assert.equal(metric(result,'between-speech-gap-rate-per-expression-minute').value,15);
+  }
+});
+
+test('fluency preview distinguishes no detected speech from zero internal gaps',()=>{
+  const empty = fluencyInput(); empty.speechEvidence.segments = [];
+  unavailable(preview(empty),previewIds,'no-observed-speech');
+  const contiguous = fluencyInput();
+  contiguous.speechEvidence.segments = [{id:'speech-0',startSample:16000,endSample:48000},
+    {id:'speech-1',startSample:48000,endSample:144000}];
+  const result = preview(contiguous);
+  assert.equal(metric(result,'expression-span-ms').value,8000);
+  assert.equal(metric(result,'between-speech-gap-percent').value,0);
+  assert.equal(metric(result,'between-speech-gap-rate-per-expression-minute').value,0);
+  const single = fluencyInput();
+  single.speechEvidence.segments = [{id:'speech-0',startSample:16000,endSample:144000}];
+  assert.equal(metric(preview(single),'between-speech-gap-percent').value,0);
+});
+
+test('fluency preview inherits audio, source and coverage failures without fabricated values',()=>{
+  for(const [mode,reason] of [['failed','vad-unavailable'],['missing','audio-unavailable'],
+    ['coverage','audio-coverage-incomplete'],['overlap','vad-evidence-invalid']]) {
+    const input = fluencyInput();
+    if(mode==='failed') input.speechEvidence.status='failed';
+    if(mode==='missing') input.session.artifact.state='missing';
+    if(mode==='coverage') input.session.dataQuality.push('audio-discontinuity');
+    if(mode==='overlap') input.speechEvidence.segments[1].startSample=32000;
+    const result = preview(input);
+    unavailable(result,previewIds,reason);
+    assert.ok(result.metrics.every(item=>item.evidenceRefs.length===0));
+  }
+});
 
 test('persisted quality ranges degrade dependent metrics even without a redundant aggregate flag',()=>{
   const input=session();

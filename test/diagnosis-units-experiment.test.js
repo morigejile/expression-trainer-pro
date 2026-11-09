@@ -1,6 +1,8 @@
 'use strict';
 const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const {buildQualityCases}=require('../scripts/evaluate-diagnosis-quality');
+const frozenDiagnosis=require('../scripts/evaluate-diagnosis-quality').loadFrozenBaseline(
+  path.join(__dirname,'../benchmark/prompt-evaluation/diagnosis-units-v1/baseline')).diagnosis;
 const context=(id='E03')=>structuredClone(buildQualityCases().find(x=>x.id===id).context);
 function api(){assert.ok(fs.existsSync(path.join(__dirname,'../benchmark/prompt-evaluation/diagnosis-units-v1/adapter.js')),'unified experimental adapter must exist');return require('../benchmark/prompt-evaluation/diagnosis-units-v1/adapter');}
 function finding(types=['ARG-01'],refs=['s1']){return {types,observation:'明确的表达障碍',basis:'该任务的要求没有完成',recommendation:'补清真实主张',evidenceRefs:refs,example:null,exampleEvidenceRefs:[]};}
@@ -87,7 +89,7 @@ test('adapted findings retain the existing saved-report reader and legacy snapsh
 });
 
 test('unified and local-scope experiments preserve complete v8 user material; scope-only retains old response structure and does not guess a library ID',()=>{
-  const a=api(),ctx=context('E07'),baseline=require('../lib/structured-diagnosis').getStructuredDiagnosisPrompt(ctx);
+  const a=api(),ctx=context('E07'),baseline=frozenDiagnosis.getStructuredDiagnosisPrompt(ctx);
   const unified=a.getUnifiedPrompt(ctx),scope=a.getScopePrompt(ctx);
   assert.equal(unified.user,baseline.user);assert.equal(scope.user,baseline.user);
   const example=JSON.parse(unified.system.match(/\n(\{\n[\s\S]+?\n\})\n/)[1]);assert.ok(Array.isArray(example.discoveries));assert.equal(Object.hasOwn(example,'frameworkFindings'),false);
@@ -103,7 +105,7 @@ test('frozen baseline sources remain byte-for-byte unchanged as production evolv
 
 test('second-call experiment receives original task, transcript, evidence limits and actual candidates',()=>{
   const a=api(),ctx=context('E06'),candidate=response(ctx,[finding(['STAR-04'])]);
-  const p=a.getReviewPrompt(ctx,candidate),base=JSON.parse(require('../lib/structured-diagnosis').getStructuredDiagnosisPrompt(ctx).user),sent=JSON.parse(p.user);
+  const p=a.getReviewPrompt(ctx,candidate),base=JSON.parse(frozenDiagnosis.getStructuredDiagnosisPrompt(ctx).user),sent=JSON.parse(p.user);
   assert.deepEqual(sent.reviewCandidates,candidate);delete sent.reviewCandidates;assert.deepEqual(sent,base);
   assert.match(p.system,/不能|不允许只依据候选/);
 });

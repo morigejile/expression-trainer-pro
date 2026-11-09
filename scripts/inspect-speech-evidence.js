@@ -8,16 +8,17 @@ const {createHash} = require('node:crypto');
 const {DatabaseSync} = require('node:sqlite');
 const {normalizeStart,normalizeTiming,normalizeResult,requireId,MAX_DURATION_MS} = require('../lib/training-session-data');
 const {validateAudio} = require('../lib/training-audio-store');
-const {computeCommonAnalysis,DEFINITION_VERSION} = require('../lib/common-analysis');
+const {computeCommonAnalysis,computeFluencyPreview,DEFINITION_VERSION} = require('../lib/common-analysis');
 const {selectStructuredReport} = require('../src/structured-report');
 
 const METRICS = ['speech-duration-ms','non-speech-duration-ms','between-speech-gap-count',
   'between-speech-gap-total-ms','between-speech-gap-max-ms'];
 const HELP = `Read saved VAD evidence (does not rerun analysis or modify history).
   node scripts/inspect-speech-evidence.js --root <userData/training> --list
-  node scripts/inspect-speech-evidence.js --root <userData/training> --session <id> [--report <snapshot-id>] [--output <directory>]
+  node scripts/inspect-speech-evidence.js --root <userData/training> --session <id> [--report <snapshot-id>] [--output <directory>] [--fluency-preview]
 Default: select the same saved snapshot as Report; --report selects an explicit linked snapshot.
 --output writes UTF-8 .txt and .json outside the training root; existing files are never overwritten.
+--fluency-preview adds experimental expression-span measurements, not fluency scores; no VAD or AI rerun.
 Exit: 0 = inspected (may be unavailable), 1 = invalid input/read error, 2 = audio/metric integrity mismatch.
 `;
 
@@ -87,7 +88,7 @@ function interval(id,kind,startSample,endSample,evidenceRefs) {
     startSeconds:startSample/16000,endSeconds:endSample/16000,durationSeconds:(endSample-startSample)/16000,evidenceRefs};
 }
 
-function inspect(root,saved,reportId) {
+function inspect(root,saved,reportId,withFluencyPreview=false) {
   const {session,results,unreadableResults} = saved;
   const report = selectStructuredReport(reportId
     ? results.filter(run=>run.kind !== 'report-snapshot' || run.id === reportId) : results);
@@ -100,7 +101,8 @@ function inspect(root,saved,reportId) {
     state:audio.verification==='verified' ? 'available' : 'missing'} : null};
   // Use the same dependency/coverage validation and metric definitions as the product.
   const common = computeCommonAnalysis({session:measuredSession,speechEvidence:source});
-  const metricChecks = METRICS.map(id=>{
+  const checkedIds = withFluencyPreview ? [...METRICS,'text-character-count','text-rate-per-speech-minute'] : METRICS;
+  const metricChecks = checkedIds.map(id=>{
     const matches = metricRun.value.metrics.filter(metric=>metric.id === id);
     const savedMetric = matches.length===1 ? matches[0] : null;
     const recomputed = common.metrics.find(metric=>metric.id===id);
@@ -109,7 +111,7 @@ function inspect(root,saved,reportId) {
       (recomputed.status==='available' ? Number.isFinite(savedMetric.value) && Math.abs(savedMetric.value-recomputed.value)<1e-6
         : savedMetric.value===null))};
   });
-  const reason = metricChecks.find(check=>check.recomputed.status!=='available')?.recomputed.reason ?? null;
+  const reason = metricChecks.find(check=>METRICS.includes(check.id) && check.recomputed.status!=='available')?.recomputed.reason ?? null;
   const availability = reason ? 'unavailable' : 'available';
   let speechRegions = null, gaps = null, edgeNonSpeech = null;
   if (!reason) {
@@ -130,6 +132,17 @@ function inspect(root,saved,reportId) {
         last.endSample,source.audio.sampleCount,[last.id,'audio']));
     }
   }
+  let fluencyPreview;
+  if (withFluencyPreview) {
+    fluencyPreview = computeFluencyPreview({session:measuredSession,speechEvidence:source});
+    // Inconsistent saved measurements must remain visible, never silently
+    // replaced with a plausible new preview derived from the same source.
+    if (metricChecks.some(check=>!check.matches)) {
+      fluencyPreview.metrics = fluencyPreview.metrics.map(item=>({...item,status:'unavailable',
+        value:null,reason:'saved-metric-mismatch',evidenceRefs:[]}));
+      fluencyPreview.evidenceRefs = [];
+    }
+  }
   return {schemaVersion:1,kind:'saved-vad-inspection',session:{id:session.id,createdAt:session.createdAt,
     durationMs:session.durationMs,transcriptRevision:session.transcript.revision,sourceSnapshot:session.sourceSnapshot,
     dataQuality:session.dataQuality,timingQualityEvents:session.timing?.qualityEvents ?? []},
@@ -137,6 +150,7 @@ function inspect(root,saved,reportId) {
       analysisRunId:analysisRun.id,inputRevision:snapshot.inputRevision,latestAttempt,unreadableResults},
     availability,reason,audio,rawSourceResult:evidenceRun,
     speechRegions,gaps,edgeNonSpeech,metricDefinitionVersion:common.definitionVersion,metricChecks,
+    ...(withFluencyPreview ? {fluencyPreview} : {}),
     limitations:['Model estimates, not human ground truth. Short pauses may be merged; boundaries may include padding.',
       'Internal gaps exclude leading/trailing non-speech. Non-speech is not necessarily acoustic silence.',
       'Times are on the saved WAV clock, not wall-clock or word alignment. Samples use [start, end).',
@@ -169,6 +183,11 @@ function formatText(data) {
   }
   lines.push('','Saved metric cross-check / 与原报告汇总核对');
   for (const check of data.metricChecks) lines.push(`${check.matches ? 'MATCH' : 'MISMATCH'} ${check.id}: saved=${check.saved?.value ?? 'unknown'}, recomputed=${check.recomputed.value ?? 'unknown'} ${check.recomputed.unit}`);
+  if (data.fluencyPreview) {
+    lines.push('','流畅度测量预览（实验）','以下是检测观察，不代表流畅度评分；无可靠词级对齐，不判断句内停顿位置。');
+    for (const item of data.fluencyPreview.metrics) lines.push(`${item.label}: ${item.status==='available'
+      ? `${item.value.toFixed(3)} ${item.unit}` : `unavailable (${item.reason})`}`);
+  }
   lines.push('','注意：模型区间不是人工真值；短停顿可能合并，边界可能带 padding。',
     '非语音不一定是静音；内部 gap 不含首尾。时间相对已保存 WAV（暂停录音时间不在其中），不是逐字时间戳。',
     '请先试听独立标注，再比较区间；JSON 保留精确 sample 边界、质量限制和原始 Source 快照。');
@@ -196,10 +215,10 @@ function writeOutput(root,directory,data,text) {
 
 function main() {
   const {values} = parseArgs({options:{root:{type:'string'},session:{type:'string'},report:{type:'string'},
-    output:{type:'string'},list:{type:'boolean'},help:{type:'boolean'}},strict:true,allowPositionals:false});
+    output:{type:'string'},list:{type:'boolean'},help:{type:'boolean'},'fluency-preview':{type:'boolean'}},strict:true,allowPositionals:false});
   if (values.help) { process.stdout.write(HELP); return; }
   if (!values.root || Boolean(values.list)===Boolean(values.session) ||
-    (values.list && (values.report || values.output))) throw new Error(HELP);
+    (values.list && (values.report || values.output || values['fluency-preview']))) throw new Error(HELP);
   const root = fs.realpathSync(path.resolve(values.root));
   const saved = readSaved(root,values.session);
   if (values.list) {
@@ -207,7 +226,7 @@ function main() {
     for (const row of saved) process.stdout.write(`${new Date(row.createdAt).toLocaleString()} | ${row.durationMs==null ? '?' : (row.durationMs/1000).toFixed(3)} | ${row.status} | ${row.id} | ${(row.preview ?? '').replace(/[\r\n\t]/g,' ')}\n`);
     return;
   }
-  const data = inspect(root,saved,values.report);
+  const data = inspect(root,saved,values.report,values['fluency-preview']);
   const text = formatText(data);
   if (values.output) {
     const files = writeOutput(root,values.output,data,text);

@@ -1,7 +1,7 @@
 # Expression Trainer Roadmap
 
 > 状态：Active
-> 更新日期：2026-09-20
+> 更新日期：2026-11-09
 > 当前模式：内部开发/测试；公开模型分发、签名和扩展平台支持仍受外部条件约束。
 
 ## 1. 排序原则
@@ -92,6 +92,12 @@ M0 的 Complete 记录上述历史完成事件；[当时的审查](archive/revie
 ### 4.5 M3 comparison and review
 
 M3 首版已完成可靠指标变化、两侧 Finding/Evidence 复盘与 History → Comparison → Report。D-13 已按 [Data Model §10.1](architecture/data-model.md#101-m3-compatibility) 关闭；验收映射见 [M3 milestone](milestones/m3-comparison-and-review.md)，执行证据及人工/设备限制见 [Current §14](architecture/current.md#14-m3-comparison-and-review)。自动跨录音 Finding 语义变化判断明确延期至 B-25；首版不新增远程比较调用。
+
+### 4.6 语速与停顿测量（独立实验）
+
+第一阶段的离线派生预览与只读核验工具已实现，尚未接入正式报告、对比或远程 AI；实现记录见 [Current §13](architecture/current.md#13-m2-analysis-pipeline)，实验定义见 [Data Model §5.3](architecture/data-model.md#离线流畅度测量预览实验)，操作方法见 [Development](development.md#m2-已保存-vad-区间核验)。
+
+下一步是人工复听、边界标注与新用途的测量放行；有具体误差或覆盖缺口时再决定是否开展参数对照。第二阶段生产接入仍待上述证据明确后细化，不以离线一致性核验代替准确性或 AI 内容质量验收。任务拆分与执行记录见 [Supporting 计划](superpowers/plans/2026-11-09-fluency-measurement.md)；该实验不自动成为 M4 的新增验收门槛，也不重开已关闭的 M2。
 
 ## 5. 里程碑
 

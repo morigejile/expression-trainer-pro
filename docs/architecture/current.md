@@ -433,6 +433,8 @@ npm run smoke:package
 
 人工核验已有 VAD 的入口为只读 [`inspect-speech-evidence.js`](../../scripts/inspect-speech-evidence.js)：读取 Report 精确引用的 Source、校验原 WAV，并导出语音区间、内部 gap、首尾非语音的 sample/秒边界与原始快照；用既有 Common Metric 定义核对已保存汇总。正式 Report、模型参数、持久化 Schema 均未改变。操作方法见 [Development](../development.md#m2-已保存-vad-区间核验)。现有粒度足以复核区间/汇总及当前 Finding 的文本、指标、语音区间引用；仍不提供词级对齐或证明 AI 解释在语义上成立，本轮用户反馈确认 AI Diagnosis 正常，不外推所有推理结论。
 
+2026-11-09 增加显式 `--fluency-preview` 离线入口，复用已有 Common 校验与 VAD 区间派生实验测量；定义见 [Data Model §5.3](data-model.md#离线流畅度测量预览实验)。新入口未接正式报告、对比或远程 AI。两条既有 103.536 s / 39.776 s 记录已按原 WAV hash、七项保存测量和关联快照核验并生成预览；另两条无检测语音的记录正确输出不可用跨度/比率，数据库核验前后 hash 未变。这些结果证明派生与只读链路可运行，不新增人工边界准确率、听感或报告质量通过结论；模型缓存大小/hash 与 registry 一致，未重新推理或调参。
+
 本次 Closeout 归档此前未提交的统计输入快照修复、取消/保存刷新修复、HTTP/异常测试及只读 VAD 核验工具，并落盘最终验收决定；本轮未新增实现。M2 正式关闭，人工证据和各项边界只在 [M2 验收矩阵](../milestones/m2-speech-evidence-and-ai-diagnosis.md#acceptance-criteria) 定义。SenseVoice 下载异常与真实 smoke/资源验收（B-23）明确延期；Report UX（B-22）、雷达完整校准（B-20）和扩大 VAD 校准（B-24）为非阻塞后续项，重开条件只见 [Backlog](../product/backlog.md#not-now)。雷达及 VAD 来源的未校准标记保持不变。
 
 ## 14. M3 comparison and review

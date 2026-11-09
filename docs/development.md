@@ -162,6 +162,27 @@ node scripts/inspect-speech-evidence.js --root "$trainingRoot" --session $sessio
 
 该命令只检查保存后的证据与计算一致性；本轮有限人工结论见 [M2 H-01](milestones/m2-speech-evidence-and-ai-diagnosis.md#收尾后的剩余验收输入)，扩大准确率、阈值和资源验证按 Backlog B-24 重开，不因保留此复核方法继续要求 M2 采样。原 [`validate-speech-evidence.js`](../scripts/validate-speech-evidence.js) 继续负责既有语料的有限推理/资源探测，不能替代某条历史 Report 的快照核对。
 
+同一命令可显式附加 `--fluency-preview`，在文本/JSON 中增加[实验测量预览](architecture/data-model.md#离线流畅度测量预览实验)，默认输出不变。例如使用前文的训练目录和 Session ID，并选择新的输出目录：
+
+```powershell
+$previewRoot = Join-Path $env:TEMP ('fluency-preview-' + (Get-Date -Format 'yyyyMMdd-HHmmss'))
+node scripts/inspect-speech-evidence.js --root "$trainingRoot" --session $sessionId --fluency-preview --output "$previewRoot"
+```
+
+预览只复用选定 Report 的精确关联输入，不重新运行 VAD/ASR/AI，不修改数据库、音频或旧报告；会额外核对保存的字符数和检测语音分钟速率。保存不一致时预览不可用且退出码为 2；`--list` 不能同时使用预览。验证改动运行 `node --test test/common-analysis.test.js test/inspect-speech-evidence.test.js`。受限 Windows 沙箱若在临时目录遇到 WAV rename 的 `EPERM`，可仅对测试进程把 `TEMP` / `TMP` 指向工作区内的 Git 忽略临时目录，不修改音频保存实现。
+
+### 本地人工验收页面（独立开发工具）
+
+`scripts/fluency-review.js` 读取上述已导出的精确快照，在 `127.0.0.1` 提供原音频回放、自由试听标记和逐段核对；不打开训练数据库、不运行模型或远程 AI。当前原型选择导出目录中有内部间隔且保存测量一致的记录，按时长从短到长排列，启动时再次核对原 WAV hash。只读导出中的无语音记录仍由命令行核验，不在此试听工具中冒充有间隔样本。
+
+```powershell
+node scripts/fluency-review.js --previews .superpowers/sdd/2026-11-09-fluency-measurement/real-previews --state .superpowers/sdd/2026-11-09-fluency-measurement/human-review.json
+```
+
+打开终端输出的本机地址。先试听并一键标记，再进入逐段核对，分别记录间隔是否存在、是否影响连贯性，以及可选的边界判断和备注。标记时间、整体听感、判断与当前位置自动保存至指定的独立 JSON；刷新可以恢复，也可导出当前草稿。未知/跳过项保持待定，不触发全部确认提示，记录完成不等于测量准确性或报告质量通过。
+
+记录绑定 Session/Report/Source、原音频 hash、区间和时长；来源变化或记录损坏时拒绝启动，不静默清空。每个记录文件由单个服务通过独占 `.lock` 持有，同一服务的多个页面使用 revision 防止旧写入覆盖；正常关闭服务释放锁。异常终止若留下锁，先核实锁中 PID 对应旧服务已经结束，再清理该独立记录文件的残留锁；不删除验收 JSON。测试执行 `node --test test/fluency-review.test.js`，浏览器 QA 使用独立测试记录，不纳入人工验收结论。该工具位于不随安装包发布的 `scripts/`，不属于正式 Report UI。
+
 ## 文档维护
 
 文档职责、身份与历史处理遵循 [唯一文档治理入口](README.md#维护规则)。

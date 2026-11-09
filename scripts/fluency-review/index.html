@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>语速与停顿 · 人工验收</title><link rel="stylesheet" href="/style.css"><script defer src="/review-state.js"></script><script defer src="/app.js"></script></head>
+<body>
+  <header class="topbar"><a class="brand" href="/">好好表达 <span>／ 人工验收</span></a><div class="save-area"><span id="save-status" role="status">正在读取记录…</span><button id="retry-save" class="text-button" hidden>重试保存</button></div></header>
+  <div id="fatal" class="error" role="alert" hidden></div>
+  <div id="app" class="workspace" hidden>
+    <aside class="sidebar">
+      <p class="eyebrow">本轮材料</p><div id="samples" class="sample-list" aria-label="选择录音"></div>
+      <div class="sidebar-note"><strong>先听，再核对</strong><p>你判断听感，页面负责记时间、定位和保存。</p><p>原录音和报告保持原样。</p></div>
+      <button id="export" class="secondary export-button">导出当前记录</button>
+      <p class="subtle local-note">记录自动保存在本机，可随时离开后继续。</p>
+    </aside>
+    <main>
+      <div class="heading"><div><p class="eyebrow">语速与停顿</p><h1 id="sample-title">录音 A</h1></div><span id="duration" class="duration"></span></div>
+      <nav class="steps" aria-label="验收步骤"><button id="step-listen" class="step active"><span>1</span>自由试听</button><button id="step-review" class="step" disabled><span>2</span>逐段核对</button></nav>
+      <section class="player-area"><audio id="audio" controls preload="metadata" aria-label="原始录音播放器"></audio><p id="play-status" class="subtle" role="status">点击播放，开始试听。</p></section>
+      <section id="listen-panel">
+        <h2>听到不顺，就标记一下</h2><p class="intro">先完整听一遍，不必记秒数。忽略录音首尾的等待，留意表达中的中断。</p>
+        <div class="mark-action"><button id="mark" class="primary mark-button">＋ 标记这里有中断</button><span id="current-time" class="time">00:00.0</span><span class="subtle shortcut">也可以按 M</span></div>
+        <div id="markers" class="markers" aria-live="polite"></div>
+        <div class="overall"><h2>你的整体听感</h2><div class="question"><h3>连贯程度</h3><div id="flow-choices" class="choices" role="group" aria-label="整体连贯程度"></div></div><div class="question"><h3>说话速度</h3><div id="speed-choices" class="choices" role="group" aria-label="说话速度感受"></div></div><label class="note-label" for="overall-note">补充说明 <span>选填</span></label><textarea id="overall-note" rows="2" maxlength="2000" placeholder="例如：重复起句、拖音，或某处听不清"></textarea></div>
+        <div class="section-footer"><span class="subtle">听完后，再看检测到的间隔。</span><button id="enter-review" class="primary">进入逐段核对 →</button></div>
+      </section>
+      <section id="review-panel" hidden>
+        <div class="review-heading"><div><p id="gap-counter" class="eyebrow"></p><h2 id="gap-title"></h2></div><span id="review-progress" class="progress-label"></span></div>
+        <div id="gap-list" class="gap-list" aria-label="选择要核对的间隔"></div>
+        <div class="clip-controls"><button id="play-clip" class="primary">▶ 播放这一处</button><button id="more-context" class="secondary">多听一点上下文</button><button id="play-rest" class="text-button">从这里继续听</button></div>
+        <p class="subtle">回放包含间隔前后的语音。检测结果只是参照，以实际听到的内容为准。</p>
+        <div class="review-questions"><div class="question"><h3>这里确实有间隔吗？</h3><div id="presence-choices" class="choices" role="group" aria-label="间隔是否真实存在"></div></div>
+        <div class="question"><h3>对连贯性的影响？</h3><div id="impact-choices" class="choices" role="group" aria-label="间隔对连贯性的影响"></div></div></div>
+        <details class="details"><summary>位置、边界或其他备注 <span>选填</span></summary><div id="boundary-choices" class="choices" role="group" aria-label="间隔边界是否大致准确"></div><label class="note-label" for="gap-note">备注</label><textarea id="gap-note" rows="2" maxlength="2000" placeholder="例如：这里还有轻声，或间隔结束位置不准确"></textarea></details>
+        <div class="review-navigation"><button id="previous" class="secondary">← 上一处</button><button id="skip" class="text-button">暂不判断</button><button id="next" class="primary">下一处 →</button></div>
+        <div id="completion" class="completion" hidden><strong>这条录音已逐处记录。</strong><p>可以切换另一条录音，或回到聊天告诉我“已完成”。我会读取本地结果，继续核对。</p></div>
+        <div id="pending-notice" class="pending-notice" role="status" hidden></div>
+        <details class="details"><summary>回看我在自由试听中的标记</summary><div id="review-markers" class="markers"></div></details>
+      </section>
+      <footer>本轮核对检测位置与实际听感，不生成流畅度总分。</footer>
+    </main>
+  </div>
+</body></html>

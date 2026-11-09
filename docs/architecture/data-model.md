@@ -297,6 +297,21 @@ Common result 的 `localStatsSnapshot` 保存本次采用的词项计数输入�
 
 VAD 是模型观察。当前 `vad-thresholds-uncalibrated` 作为降级原因随 Source 和 Metric 保留；只要音频覆盖完整、区间有效，可显示检测总量与间隔，但不得据此宣称检测了所有短停顿。短静音可能被合并、边界可能带模型 padding；“间隔时长”不能直接解释为“停顿过长”“不流利”或数值评分。D-07 的 M2 有限人工复核已通过，但不据此移除未校准标记；扩大统计校准按 Backlog B-24 重开；雷达量程与完整校准延后至 Backlog B-20，M2 保持上述未校准快照。
 
+#### 离线流畅度测量预览（实验）
+
+`computeFluencyPreview` 仅供显式离线核验调用，结果身份为 `fluency-metrics-v1-experimental`；不写入 MetricRun / Report、不修改 V1 的 15 项测量，也不进入远程主诊断。它复用 Common 对同一音频、转写与 VAD 的校验和基础值。表达跨度 T 为检测语音时长 S 加内部间隔总时长 P，等于首个检测语音起点到最后终点；所有边界沿用原 sample 时钟，不含首尾非语音。字符数 C 沿用本节口径，N 为正内部间隔次数。
+
+| 实验 Metric ID | 单位 / 定义 |
+|---|---|
+| `expression-span-ms` | `ms`；T = S + P，无语音区间时不可用 |
+| `text-rate-per-expression-minute` | `characters/expression-minute`；C × 60000 / T（T 以 ms 计），区别于包含首尾非语音的录音分钟速率 |
+| `between-speech-gap-percent` | `percent`；P / T × 100，保留未取整的测量值 |
+| `between-speech-gap-rate-per-expression-minute` | `occurrences/expression-minute`；N × 60000 / T |
+
+预览同时带入已有 `text-rate-per-speech-minute`，保留其原定义与 VAD 来源/质量限制。无有效跨度时以上预览均不可用；有效单区间的间隔占比与频率可为零。转写缺失或 ASR 不完整只阻断字符速率，不阻断独立有效的声学占比/频率；音频或 VAD 不可用按 Common 依赖降级。两个字符速率是近似文字产出速度，不是局部或音节语速；它们与间隔占比存在数学关联，不分别加权累加成流畅度分数。间隔与具体词句未经可靠对齐，不推断句内停顿位置或卡顿原因。
+
+只读导出在显式预览时额外核对保存的字符数与检测语音分钟速率；若所核对的保存测量与重算不一致，预览全部标为 `saved-metric-mismatch`，不以新计算掩盖旧结果漂移。操作入口见 [Development](../development.md#m2-已保存-vad-区间核验)。本实验没有建立质量阈值或完成新用途的人工听感验收。
+
 ### 5.4 Structured Diagnosis V1
 
 AI 输入是有界的 `AnalysisContext`：同一 Session/revision 的 transcript、可用音频时间事实、Speech Evidence、Common Metrics、分区 quality 和已捕获的分析指令；不附带原始录音、完整设置或凭据。`allowedEvidenceRefs` 由上述真实输入生成；超过输入上限或 revision 不匹配时显式不可用，不静默截断后假装证据完整。可执行边界见 [Analysis Context](../../lib/analysis-context.js)。

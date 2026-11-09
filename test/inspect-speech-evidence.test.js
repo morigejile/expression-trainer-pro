@@ -77,6 +77,7 @@ test('CLI exports exact saved regions, internal gaps and edge non-speech without
   assert.deepEqual(data.edgeNonSpeech.map(g=>[g.kind,g.startSeconds,g.endSeconds]),
     [['leading-non-speech',0,1],['trailing-non-speech',9,10]]);
   assert.equal(data.metricChecks.every(m=>m.matches),true);
+  assert.equal(Object.hasOwn(data,'fluencyPreview'),false);
   assert.equal(data.metricChecks.find(m=>m.id==='non-speech-duration-ms').saved.value,4000);
   assert.deepEqual(data.rawSourceResult.value,f.evidence);
   assert.deepEqual([hash(dbFile),hash(wavFile),fs.readdirSync(f.root)],before);
@@ -84,15 +85,35 @@ test('CLI exports exact saved regions, internal gaps and edge non-speech without
   assert.equal(listed.status,0,listed.stderr); assert.match(listed.stdout,new RegExp(f.session.id));
 });
 
+test('explicit fluency preview reuses exact saved evidence without changing the database or WAV',async t=>{
+  const f=await fixture(t); await f.report('preview'); f.store.close();
+  const db=path.join(f.root,'sessions.sqlite'),wav=path.join(f.root,'audio',`${f.session.id}.wav`);
+  const before=[hash(db),hash(wav),fs.readdirSync(f.root)];
+  const result=f.export('--fluency-preview');
+  assert.equal(result.status,0,result.stderr);
+  assert.equal(result.data.fluencyPreview.definitionVersion,'fluency-metrics-v1-experimental');
+  const metrics=new Map(result.data.fluencyPreview.metrics.map(item=>[item.id,item]));
+  assert.equal(metrics.get('expression-span-ms').value,8000);
+  assert.equal(metrics.get('text-rate-per-expression-minute').value,15);
+  assert.equal(metrics.get('text-rate-per-speech-minute').value,20);
+  assert.equal(metrics.get('between-speech-gap-percent').value,25);
+  assert.equal(metrics.get('between-speech-gap-rate-per-expression-minute').value,7.5);
+  assert.match(result.stdout,/流畅度测量预览/);
+  assert.match(result.stdout,/不代表流畅度评分/);
+  assert.deepEqual([hash(db),hash(wav),fs.readdirSync(f.root)],before);
+  assert.equal(result.data.metricChecks.length,7);
+});
+
 test('CLI follows the displayed Report exact run, ignoring newer orphan evidence and failed retries', async t => {
   const f = await fixture(t);
   await f.report('displayed',f.evidence,'completed');
   await f.report('retry',{schemaVersion:1,status:'failed',segments:[],quality:{vad:{status:'unavailable',reasons:['vad-inference-failed']}}});
   await f.append('orphan','speech-evidence',{...f.evidence,segments:[]});
-  const first = f.export();
+  const first = f.export('--fluency-preview');
   assert.equal(first.status,0,first.stderr);
   assert.equal(first.data.selection.evidenceRunId,'displayed-source');
   assert.equal(first.data.selection.latestAttempt.snapshotId,'retry-report');
+  assert.equal(first.data.fluencyPreview.metrics.find(item=>item.id==='expression-span-ms').value,8000);
   const selected = run('--root',f.root,'--session',f.session.id,'--report','retry-report');
   assert.equal(selected.status,0,selected.stderr);
   assert.match(selected.stdout,/unavailable/);
@@ -111,7 +132,8 @@ test('completed no-speech is distinguishable from failed VAD and incomplete audi
       db.prepare('UPDATE sessions SET quality_json=? WHERE id=?').run('["audio-discontinuity"]',f.session.id); db.close();
     }
     await f.report(mode,source);
-    const result=f.export(); assert.equal(result.status,0,result.stderr);
+    const result=f.export('--fluency-preview'); assert.equal(result.status,0,result.stderr);
+    assert.ok(result.data.fluencyPreview.metrics.every(item=>item.status==='unavailable' && item.value===null));
     if (mode==='no-speech') {
       assert.deepEqual(result.data.gaps,[]);
       assert.deepEqual(result.data.edgeNonSpeech.map(g=>[g.kind,g.durationSeconds]),[['all-non-speech',10]]);
@@ -130,10 +152,23 @@ test('saved metric drift is reported instead of being silently replaced by recom
   const snapshot=JSON.parse(row.snapshot_json);
   snapshot.value.metrics.find(m=>m.id==='between-speech-gap-count').value=99;
   db.prepare('UPDATE results SET snapshot_json=? WHERE id=?').run(JSON.stringify(snapshot),'original-metric'); db.close();
-  const result=f.export();
+  const result=f.export('--fluency-preview');
   assert.equal(result.status,2,result.stderr);
   const check=result.data.metricChecks.find(m=>m.id==='between-speech-gap-count');
   assert.equal(check.matches,false); assert.equal(check.saved.value,99); assert.equal(check.recomputed.value,1);
+  assert.ok(result.data.fluencyPreview.metrics.every(item=>
+    item.status==='unavailable' && item.value===null && item.reason==='saved-metric-mismatch'));
+});
+
+test('fluency preview cross-checks the saved character rate rather than hiding drift in extra metrics',async t=>{
+  const f=await fixture(t); await f.report('rate-drift');
+  const db=new DatabaseSync(path.join(f.root,'sessions.sqlite'));
+  const snapshot=JSON.parse(db.prepare('SELECT snapshot_json FROM results WHERE id=?').get('rate-drift-metric').snapshot_json);
+  snapshot.value.metrics.find(item=>item.id==='text-rate-per-speech-minute').value=999;
+  db.prepare('UPDATE results SET snapshot_json=? WHERE id=?').run(JSON.stringify(snapshot),'rate-drift-metric'); db.close();
+  const result=f.export('--fluency-preview');
+  assert.equal(result.status,2,result.stderr);
+  assert.ok(result.data.fluencyPreview.metrics.every(item=>item.value===null));
 });
 
 test('read-only inspection rejects missing roots, unknown sessions, output into storage and overwrites', async t => {
@@ -142,6 +177,7 @@ test('read-only inspection rejects missing roots, unknown sessions, output into 
   assert.equal(run('--root',missing,'--list').status,1); assert.equal(fs.existsSync(missing),false);
   assert.equal(run('--root',f.root,'--session','does-not-exist').status,1);
   assert.equal(run('--root',f.root,'--session',f.session.id,'--report','does-not-exist').status,1);
+  assert.equal(run('--root',f.root,'--list','--fluency-preview').status,1);
   assert.equal(run('--root',f.root,'--session',f.session.id,'--output',f.root).status,1);
   const first=f.export(); assert.equal(first.status,0,first.stderr);
   const filename=fs.readdirSync(f.output).find(file=>file.endsWith('.json'));
