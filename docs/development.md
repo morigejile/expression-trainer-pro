@@ -58,6 +58,12 @@ v7 → v8 历史对照工具 `scripts/evaluate-diagnosis-quality.js` 读取冻�
 
 合并规则位置、诊断写作分离、问题独立性三个 v9 实验的原 `run.js` 是带哈希的历史执行材料，保留原样，不承诺直接跟随后续生产版本复跑。当前离线复核使用各目录的 `node audit.js --check`，按对应冻结 v9 源重建，不写回结果。未冻结的可变文档只保留来源元数据（`sourceMetadataOnly`），不声称已校验其历史全文；原工作区 diff 的哈希同样仅作当时记录。统一列表的 `node report.js --check` 可只读检查派生预览，避免将当前生产提示混入旧对照。
 
+#### V2 用词与停顿的主诊断对照
+
+[`scripts/fluency-diagnosis-trial.js`](../scripts/fluency-diagnosis-trial.js) 复用现行主诊断的材料和提示，构建原输入、整段节奏指标、命中词上下文和对齐停顿四种试验请求。逐处停顿输入必须先在本地确认转写与音频的对应关系，构建器再核对当前报告的实际间隔、转写位置和上下文。试验允许自然、影响连贯和证据不足三种状态。逐处判断结合前后文，整段比例只提供背景。构建与解析均在本地执行。运行 `node --test test/fluency-diagnosis-trial.test.js test/diagnosis-input.test.js` 验证试验和正式请求边界。
+
+本次对照使用 Git 忽略目录 `.superpowers/sdd/2026-11-09-fluency-measurement/pause-ai-trial/`。在保有原样本与同版提示的工作区可执行该目录的 `run.cjs --verify`，离线重建已通过结构检查的请求及结果，保留首次被拒的原始响应。真实模型对照的结论见 [Current §17](architecture/current.md#v2-用词与停顿的实录对照)。
+
 ### 内测快速交付口径
 
 - 日常迭代只运行与改动直接相关的 focused tests，不为未交付的本地构建虚增应用版本。
@@ -149,7 +155,7 @@ node scripts/inspect-speech-evidence.js --root "$trainingRoot" --session $sessio
 - 终端文本及 UTF-8 `.txt`、`.json`（省略 `--output` 时只输出文本）。目录须在训练存储之外，已有同名文件不覆盖。
 - 原始 Source result、Session/revision/Report/Source/Metric ID、模型 hash、阈值与规范化版本、quality；WAV 路径和已保存 SHA-256 的实际校验结果。
 - `speechRegions`、相邻语音间正长度 `gaps`、独立的 `edgeNonSpeech`。每行含 start/end/duration 的 sample 和秒值；文本时间显示为 `mm:ss.mmm`，精确 sample 以 JSON 为准。内部 gap 不包含首尾非语音，完全无检测语音单列 `all-non-speech`。
-- 与原报告五项 VAD 汇总的逐项核对。只按已有定义重算检查，不覆盖历史指标。VAD 失败、音频缺损或覆盖不足时派生区间为 `null/unavailable`，不能当作零次停顿或整段静音；原始 Source 仍保留。
+- 按报告保存的 V1/V2 定义逐项核对。V1 检查原五项 VAD 汇总，V2 检查语音时长、间隔次数、间隔总时长、跨度和三项相关速率或比例。VAD 失败、音频缺损或覆盖不足时派生区间为 `null/unavailable`，原始 Source 仍可查看。
 
 退出码 `0` 表示读取/导出成功（VAD 本身仍可能 unavailable）；`1` 表示参数、数据库、关联快照或输出错误；`2` 表示录音校验、已保存汇总或结果完整性有分歧。出现 `MISMATCH` 先保留导出并排查，不据此调 VAD 参数。
 

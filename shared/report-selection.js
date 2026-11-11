@@ -4,6 +4,17 @@
   else root.ReportSelection=api;
 })(typeof globalThis !== 'undefined' ? globalThis : this,() => {
   'use strict';
+  const REPORT_METRICS_VERSION = 'common-metrics-v2';
+  const INTERNAL_REPORT_METRICS = ['filler-count','between-speech-gap-total-ms','expression-span-ms'];
+  function* wordMatches(map) {
+    for (const match of map.matchAll(/([1-7])-*/g)) {
+      yield {start:match.index,end:match.index+match[0].length,kinds:Number(match[1])};
+    }
+  }
+  function speechGap(previous, next) {
+    if (!previous || previous.endSample >= next.startSample) return null;
+    return {startSample:previous.endSample,endSample:next.startSample};
+  }
   const CATEGORIES = {organization:'组织与衔接',argument:'论点与论据',delivery:'节奏与停顿',wording:'措辞与口头禅'};
   const frameworks = typeof module === 'object' && module.exports ? require('./training-frameworks') : globalThis.TrainingFrameworks;
   const refs = value => Array.isArray(value) && value.every(ref => typeof ref === 'string');
@@ -103,5 +114,5 @@
     }};
   }
 
-  return {selectStructuredReport,getOrderedFindings,CATEGORIES};
+  return {selectStructuredReport,getOrderedFindings,CATEGORIES,REPORT_METRICS_VERSION,INTERNAL_REPORT_METRICS,wordMatches,speechGap};
 });

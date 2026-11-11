@@ -6,6 +6,27 @@ const compare = (...args) => require('../lib/session-comparison').compareSession
 const metric = (result,id) => result.metrics.find(item=>item.id===id);
 function pair() {return [comparisonSession('a'),comparisonSession('b',{text:'我认为目标很明确',createdAt:'2026-09-20T00:00:00Z'})];}
 
+test('V2 comparison checks new observations and retains internal AI evidence across mixed report versions',()=>{
+  const definitionVersion='common-metrics-v2';
+  const a=comparisonSession('a',{text:'嗯我觉得很好。',definitionVersion});
+  const b=comparisonSession('b',{text:'目标明确。',definitionVersion});
+  b.sourceSnapshot.asr.modelId='different-model';
+  const same=compare([a,b]);
+  assert.equal(same.metrics.length,9);
+  assert.equal(metric(same,'review-word-count').delta,-3);
+  assert.equal(metric(same,'between-speech-gap-percent').status,'normalized');
+  assert.equal(metric(same,'between-speech-gap-rate-per-expression-minute').delta,0);
+  assert.equal(metric(same,'text-rate-per-speech-minute').delta,null);
+  assert.equal(same.baseline.evidence['metric:filler-count'].value,1);
+  assert.equal(same.baseline.findings[0].evidenceAvailable,true);
+  const mixed=compare([comparisonSession('a'),b]);
+  assert.equal(metric(mixed,'review-word-count').baseline,null);
+  assert.equal(metric(mixed,'review-word-count').delta,null);
+  assert.equal(metric(mixed,'filler-count').baseline.value,1);
+  assert.equal(metric(mixed,'filler-count').target,null);
+  assert.equal(metric(mixed,'speech-duration-ms').status,'comparable');
+});
+
 test('comparison fixes chronological roles, references and signed changes without changing saved facts', () => {
   const [a,b]=pair();const before=JSON.stringify([a,b]);
   const result=compare([b,a]);

@@ -78,6 +78,30 @@ test('fluency preview derives expression-span rates without changing the V1 repo
   assert.equal(Object.hasOwn(result,'score'),false);
 });
 
+test('V2 keeps distinct word positions and derives the displayed rhythm measurements from the saved gaps',()=>{
+  const {analyzeText}=require('../lib/lexicon');
+  const {wordMatches,INTERNAL_REPORT_METRICS}=require('../shared/report-selection');
+  const input=fluencyInput();
+  const text='𠮷，我觉得很好，我觉得。';
+  input.session.transcript.text=text;
+  input.session.transcript.segments[0].text=text;
+  const words=analyzeText(text,{extraFillers:['我觉得'],includeWordMatches:true});
+  input.localStats={totalWords:words.totalWords,fillers:2,hedges:2,vagueWords:1,hedgeCharacters:6,wordMatchMap:words.wordMatchMap};
+  const result=compute({...input,definitionVersion:'common-metrics-v2'});
+  assert.deepEqual([...wordMatches(words.wordMatchMap)],[
+    {start:3,end:6,kinds:3},{start:6,end:8,kinds:4},{start:9,end:12,kinds:3}]);
+  assert.deepEqual(result.metrics.filter(item=>!INTERNAL_REPORT_METRICS.includes(item.id)).map(item=>[item.id,item.value]),[
+    ['text-character-count',9],['audio-duration-ms',10000],['review-word-count',3],['hedge-character-percent',67],
+    ['speech-duration-ms',6000],['between-speech-gap-count',2],['text-rate-per-speech-minute',90],
+    ['between-speech-gap-percent',25],['between-speech-gap-rate-per-expression-minute',15]]);
+  assert.equal(metric(result,'filler-count').value,2);
+  assert.equal(metric(result,'expression-span-ms').value,8000);
+  assert.equal(metric(result,'between-speech-gap-total-ms').value,2000);
+  delete input.localStats.wordMatchMap;
+  unavailable(compute({...input,definitionVersion:'common-metrics-v2'}),['review-word-count'],'local-stats-unavailable');
+  assert.equal(compute(input).metrics.length,15);
+});
+
 test('fluency preview is invariant to additional leading and trailing non-speech',()=>{
   const input = fluencyInput(), shifted = structuredClone(input);
   shifted.session.durationMs = shifted.session.artifact.durationMs = 13000;

@@ -260,7 +260,7 @@ M2 V1 复用现有 SQLite results 存储版本化 JSON payload，不新增 Evide
 | Result kind | Payload 与输入绑定 | 版本 / 边界 |
 |---|---|---|
 | `speech-evidence` | Source VAD 快照：`audio` sample 数/采样率、`segments`、`capabilities`、`quality.vad`、`provenance` 和 source 执行 `status` | `schemaVersion = 1`；来源使用 `engine` / `engineVersion` / `modelId` / `modelVersion` / `modelSha256` / `thresholdVersion` / `thresholds` / `normalizationVersion`。未运行或失败时未知值为空，不由当前设置补造 |
-| `common-analysis` | §5.3 的确定性测量与逐项状态，`speechEvidenceRunId` 指向当次 Source result，保留其版本和 quality | `schemaVersion = 1`，`definitionVersion = common-metrics-v1`；`inputRevision` 与当前输入 transcript 一致 |
+| `common-analysis` | §5.3 的确定性测量与逐项状态，`speechEvidenceRunId` 指向当次 Source result，保留其版本和 quality | `schemaVersion = 1`。新报告使用 `common-metrics-v2`，历史 `common-metrics-v1` 按原定义读取。外层和 payload 的 `definitionVersion` 与 Report 的 `metricsVersion` 一致，`inputRevision` 与当前输入 transcript 一致 |
 | `diagnosis` | §5.4 的结构化摘要/Finding 或局部不可用原因；`speechEvidenceRunId`、`metricRunId` 绑定实际输入 | `schemaVersion = 1`；实际提示版本由 provenance.promptVersion 与报告 analysisVersion 记录，新输出字段见 §5.4；历史 `example` 扩展仅按原版本只读兼容；provider/model/profile 与分析指令快照保留在该 result 来源中 |
 | `report-snapshot` | `evidenceRunId`、`metricRunId`、`analysisRunId` 引用本次组合的三个结果；保存 `availability` 和各版本 | `schemaVersion = 1`；雷达未校准时保存 `radar.status = unavailable`、`reason = not-calibrated`、`version = null`，没有数值投影 |
 
@@ -270,11 +270,31 @@ Transcript evidence 继续使用既有稳定 segment ID；payload 内的音频�
 
 新训练事实保存后可生成一次报告；被动 History 读取只读取已保存快照。对 Partial 结果的明确重试追加新的 Source、Metric、Diagnosis 和 Report 结果，保留旧快照，不改写事实。完整历史报告的主动重新分析与快照选择 UI 不由此扩展；升级不触发自动重跑。
 
-### 5.3 Common Metric V1 定义
+### 5.3 Common Metric 定义
 
-`common-metrics-v1` 是对保存事实的纯确定性测量。文字计数为 Unicode 文字与数字字符，排除空白、标点和其他符号；词表命中沿用当次本地统计及自定义词表快照，不以今日词表重新扫描历史。实现入口为 [Common Analysis](../../lib/common-analysis.js)，共享字符口径见 [text statistics](../../shared/text-statistics.js)。
+Common Metric 是对保存事实的确定性测量。文字计数为 Unicode 文字与数字字符，排除空白、标点和其他符号；词表命中沿用当次本地统计及自定义词表快照，不以今日词表重新扫描历史。实现入口为 [Common Analysis](../../lib/common-analysis.js)，共享字符口径见 [text statistics](../../shared/text-statistics.js)。
 
 Common result 的 `localStatsSnapshot` 保存本次采用的词项计数输入，未知时为 null。新训练首次完成事实保存时仅用默认词表计算；`provenance.promptSnapshot.customWords` 固定为空字符串，保留与旧默认词表结果的兼容身份，不读取当前用户配置。Partial 重试优先复用同一 transcript revision 的已有 Common 输入或旧 `metrics` 统计。早期 M2 结果只有自定义词表快照时仍按保存的词表恢复，不迁移或重写旧结果；历史两类证据均缺失时，依赖词项的指标为 unavailable，其余测量和 AI 诊断仍可运行。AI 的训练目标/分析指令可在显式重试时更新，不改变已保存词项统计。
+
+#### 正式报告 V2
+
+`common-metrics-v2` 展示九项指标，沿用下文同名 V1 指标的定义，并使用以下新增口径。
+
+| Metric ID | 单位 / 分母 | 输入与含义 |
+|---|---|---|
+| `review-word-count` | `locations`（处） | 填充词、犹豫词、笼统词按原文位置合并。一处可有多个命中类别，同一个词在不同位置各计一处 |
+| `between-speech-gap-percent` | `percent` | 内部间隔总时长 / 表达跨度 × 100 |
+| `between-speech-gap-rate-per-expression-minute` | `occurrences/expression-minute` | 内部间隔次数 / 表达跨度分钟数 |
+
+其余六项为转写字符数、已保存录音时长、犹豫词字符占比、检测语音时长、内部间隔次数和每检测语音分钟字符数。检测语音分钟字符数需要有效的语音和可计数的完整转写。表达跨度 `expression-span-ms` 等于检测语音时长加内部间隔总时长，排除首尾非语音。跨度与间隔总时长用于计算，`filler-count` 继续用于 AI 及其本地证据，三项均不独立展示。有效单段语音的内部间隔比率可为零。有效检测未发现语音时，语音时长和内部间隔次数为零，依赖正分母的速率或占比不可用。
+
+新词项快照以 `wordMatchMap` 保存每处命中的原文位置与类别。位置按 transcript 的 UTF-16 单元计，空格表示非命中，数字 1～7 的三个位分别表示填充词、犹豫词、笼统词，连字符延续同一个命中，尾随空格省略。报告从绑定的原文取出命中词和上下文。历史统计没有命中位置时不可用，不由三个汇总值推算。已有 V1 报告和该版本下的重试保留 V1。
+
+<a id="53-common-metric-v1-定义"></a>
+
+#### 历史 V1
+
+以下为 `common-metrics-v1` 的 15 项定义。表中仅 V1 使用的独立指标继续用于读取既有快照。
 
 | Metric ID | 单位 / 分母 | 输入与含义 |
 |---|---|---|
@@ -318,7 +338,7 @@ AI 输入是有界的 `AnalysisContext`：同一 Session/revision 的 transcript
 
 远程请求由 [diagnosis-input](../../lib/diagnosis-input.js) 从完整上下文生成精简投影：原文和保留证据的 ID 不变，指标按以下名单筛选后只发送可用值，真实零值保留。不可用指标、空偏好、空背景项、普通报告的练习字段直接省略，不附缺失清单或原因说明。指标只发送 ID、名称、值与单位，省略推导引用和重复状态。重复的 `evidenceMap`、本地会话/报告身份、技术元数据和重复框架定义不发送；框架定义仅在系统提示保留一份。针对性练习仍保留目标、范围和可用前轮原文；来源缺失时保留练习身份，不附缺失原因说明。统一规则禁止推测缺失数据、补零或将缺失视为没有问题。
 
-**主诊断指标评估与收敛规则：**15 项本地测量不等于 15 项必要的 AI 输入。按当前问题库允许的判断能力和测量限制，主诊断最多发送 3 项；自由表达、框架分析及针对性练习采用同一名单，不按关键词临时加回指标。
+**主诊断指标规则。** 自由表达、框架分析及针对性练习采用同一名单，按可用性发送最多 3 项。以下表格保留原 V1 指标的评估口径。V2 的待核查用词、内部间隔比率及命中位置仅供本地复盘。
 
 | 指标（定义见 §5.3） | 数量 | 主诊断发送 | 依据与取舍 |
 |---|---:|---|---|
@@ -328,7 +348,7 @@ AI 输入是有界的 `AnalysisContext`：同一 Session/revision 的 transcript
 | `text-rate-per-recorded-minute` | 1 | 不发送 | 分母包含静音，受转写覆盖影响，不能据此判定实际语速不当 |
 | `speech-duration-ms`、`non-speech-duration-ms`、`between-speech-gap-count`、`between-speech-gap-total-ms`、`between-speech-gap-max-ms`、`text-rate-per-speech-minute` | 6 | 不发送 | VAD 尚未校准且缺可靠词级对齐，不能支持当前主诊断中的精确停顿、局部语速或声音节奏结论；保留其本地复核价值 |
 
-原始 `speech` 区间同步退出远程主诊断，避免从区间重新推算被收敛的指标；不再发送只服务于该证据的 `quality.vad`，也不补充“已省略 VAD”说明。转写不完整、音频覆盖不完整和所提供转写时间为估计值等仍相关的限制继续发送。此规则不禁用基于原文的节奏检查，例如重复起句、文字推进被打断；不改变 ORG-09 的明确时长要求检查。返回校验绑定精简请求的实际证据清单和前后原文，不能引用留在本地但未发送的指标或语音区间。本地完整上下文、15 项定义/计算/展示/对比与历史快照不变，旧报告中的完整指标和语音引用继续按原快照读取。
+原始 `speech` 区间和只服务于该证据的 `quality.vad` 均留在本地。转写不完整、音频覆盖不完整和所提供转写时间为估计值等相关限制继续发送。模型可基于原文检查重复起句、文字推进中断等现象，并按 ORG-09 检查明确时长要求。返回校验绑定精简请求的实际证据清单和前后原文，不能引用留在本地但未发送的指标或语音区间。旧报告中的指标和语音引用继续按原快照读取。
 
 上述评价依据当前实现和问题库边界，不代表 3 项输入的真实 AI 报告质量已经优于 15 项；受控请求/引用/历史兼容检查与真实模型内容验收分开。
 
@@ -432,14 +452,15 @@ Implementation must be idempotent for a repeated finalization request with the s
 
 #### 逐项兼容性
 
-先检查每侧值与引用有效，再判断两侧口径；不能只检查版本字符串相等。默认只接受已知的 V1 schema、Metric ID/单位与 producer 定义，未知版本不猜测兼容；首版不提供自动重算或版本转换。`analyzerVersion` 相同本身也不是质量或可比性保证。
+先按各自保存的 V1/V2 定义验证每侧的值与引用，再判断同一 Metric ID、单位及测量口径是否一致。V2 的内部计算值及 AI 专用计数仍可用于原证据引用，独立比较项按各版本实际展示的指标选择。仅一侧有相应口径时保留原值，差值不可用。未知定义不推测兼容，不自动转换历史值。
 
 | 比较项 | 首版判定 | 可输出的变化与限制 |
 |---|---|---|
 | 录音时长、已保存原文与字符总量 | 有效事实可并列；完整范围和同一计量口径下可展示客观总量差异 | 说明比较的是录音/转写观察；更短、更多字不代表更好。不同 ASR 来源不妨碍读原文，但须标识识别差异可能影响文本 |
-| 词项命中次数 | `definitionVersion`、单位、有效统计输入及当次词表一致；默认词表/匹配规则以已知定义版本识别，自定义词表使用已保存快照判断；缺失身份不采用今日设置补齐 | 可展示总量差异；表达时长/范围不同不能由次数降低推断习惯改善，频率复盘使用下一行已存在的指标 |
+| 词项命中次数、待核查用词 | 相同指标定义、单位、有效统计输入及当次词表一致；自定义词表使用已保存快照判断；缺失身份不采用今日设置补齐 | 可展示同口径总量差异；表达时长或范围不同不能由次数降低推断习惯改善 |
 | 每录音分钟字符数、填充词命中频率、两个字符占比 | 使用 §5.3 已保存的相同分母定义；所依赖文本、词表、音频覆盖均有效。用于解释表达变化时还需已知且兼容的 ASR producer/model 来源；未知或不同来源只并列观察并说明限制 | 明确标为按录音分钟或字符归一化，不把两种分母互换。保留原值与分母依据，不新增第二套历史统计 |
-| VAD 语音/非语音时长、内部间隔次数/总时长/最长间隔 | 完整覆盖且 Source/Metric 链有效；`engine`、`engineVersion`、`modelId`、`modelVersion`、`modelSha256`、`thresholdVersion`、实际 `thresholds` 与 `normalizationVersion` 全部已知且一致 | 可比的是同一检测方法的观察差异；未校准状态始终可见，不据此评价流利度、长停顿或能力。总量受表达长度影响；不为首版增加新的间隔频率指标 |
+| VAD 语音/非语音时长、内部间隔次数/总时长/最长间隔 | 完整覆盖且 Source/Metric 链有效；`engine`、`engineVersion`、`modelId`、`modelVersion`、`modelSha256`、`thresholdVersion`、实际 `thresholds` 与 `normalizationVersion` 全部已知且一致 | 可比的是同一检测方法的观察差异；未校准状态始终可见。总量受表达长度影响 |
+| 内部间隔占比、每表达分钟内部间隔次数 | 同一表达跨度口径及正分母，满足上述 VAD 兼容条件 | 按各次表达跨度比较，不依赖转写来源。占比差使用百分点 |
 | 每检测语音分钟字符数 | 同时满足文本来源、转写覆盖与上一行 VAD 兼容条件，且检测语音分母为正 | 明确“字/检测语音分钟、非逐字对齐”；不能与含静音的“字/录音分钟”相减 |
 | Framework 分析 | 同 framework、同 framework definition 且 analyzer 已有明确兼容依据；首版无兼容转换表时只认已知相同版本 | 不同框架局部不可比；M3 不提前交付 M4 的框架分析 |
 | 雷达 | M2 快照为 `uncalibrated / unavailable` | 保持不可用，不画比较多边形，不把四类 Finding 转为数值轴；完整校准仍归 B-20 |

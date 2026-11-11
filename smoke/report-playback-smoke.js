@@ -13,14 +13,31 @@ async function run({mainWindow,evaluate,wait,click,capture}){
     wav.setUint32(16,16,true);wav.setUint16(20,1,true);wav.setUint16(22,1,true);wav.setUint32(24,16000,true);
     wav.setUint32(28,32000,true);wav.setUint16(32,2,true);wav.setUint16(34,16,true);ascii(36,'data');wav.setUint32(40,buffer.byteLength-44,true);
     const url=URL.createObjectURL(new Blob([buffer],{type:'audio/wav'}));
-    window.__playbackSmoke={record,original:{audioUrl:record.audioUrl,segments:record.segments,fullText:record.fullText,durationMs:record.durationMs},url,theme:document.documentElement.dataset.theme};
+    window.__playbackSmoke={record,original:{audioUrl:record.audioUrl,segments:record.segments,fullText:record.fullText,
+      durationMs:record.durationMs,structuredReport:record.structuredReport},url,theme:document.documentElement.dataset.theme};
     record.audioUrl=url;record.durationMs=120000;
     record.segments=Array.from({length:48},(_,i)=>({id:'playback-smoke-'+i,startMs:i*2000,endMs:(i+1)*2000,timingSource:'estimated',text:'这是第 '+(i+1)+' 段合成转写，用于核对紧凑排版、播放定位和长文阅读，不用于表达质量评估。'}));
     record.fullText=record.segments.map(segment=>segment.text).join('');
-    trainer.refreshPlaybackControls();document.getElementById('report-materials').open=true;
+    const report=record.structuredReport;
+    record.structuredReport={...report,
+      evidenceRun:{...report.evidenceRun,value:{...report.evidenceRun.value,audio:{sampleRateHz:16000,sampleCount:1920000},
+        segments:[{id:'speech-0',startSample:16000,endSample:48000},{id:'speech-1',startSample:80000,endSample:112000}]}},
+      metricRun:{...report.metricRun,value:{...report.metricRun.value,localStatsSnapshot:null,
+        metrics:report.metricRun.value.metrics.map(item=>item.id==='between-speech-gap-count'?{...item,value:1}:item)}}};
+    trainer.refreshPlaybackControls();trainer.renderCurrentReport(record);
+    document.getElementById('report-information').open=true;
+    document.getElementById('report-materials').open=true;
   })()`);
   try{
     await wait('synthetic WAV metadata and seek controls ready',`document.getElementById('recording-player').duration===120 && !document.getElementById('playback-forward').disabled`);
+    await evaluate(`Array.from(document.querySelectorAll('.metric-evidence-list')).find(node=>node.querySelector('summary').textContent==='查看内部间隔').open=true`);
+    const gapButton='button[aria-label^="回放 3"]';
+    await wait('saved interval is available for replay',`Boolean(document.querySelector(${JSON.stringify(gapButton)}))`);
+    assert.equal(await evaluate(`document.querySelector(${JSON.stringify(gapButton)}).getAttribute('aria-label')`),'回放 3–5 秒（2 秒）的前后录音');
+    await evaluate(`document.querySelector(${JSON.stringify(gapButton)}).click()`);
+    await wait('gap playback starts before the selected interval',`(()=>{const audio=document.getElementById('recording-player');return !audio.paused&&audio.currentTime>=2&&audio.currentTime<3;})()`);
+    await wait('gap playback stops with trailing context',`(()=>{const audio=document.getElementById('recording-player');return audio.paused&&audio.currentTime>=6&&audio.currentTime<6.8;})()`);
+    await evaluate(`document.getElementById('recording-player').currentTime=0`);
     await click('#playback-forward');
     await wait('native audio seeks forward five seconds',`document.getElementById('recording-player').currentTime===5`);
     assert.equal(await evaluate(`document.getElementById('recording-player').currentTime`),5);
@@ -108,7 +125,7 @@ async function run({mainWindow,evaluate,wait,click,capture}){
     assert.equal(await evaluate(`document.getElementById('playback-player').checkVisibility()`),false,'collapsed player is not painted or interactive');
     assert.ok(await evaluate(`document.getElementById('report-materials').getBoundingClientRect().height<80`),'collapsed disclosure occupies only its heading');
   }catch(error){await capture('playback-failure');throw error;}finally{
-    await evaluate(`(()=>{const state=window.__playbackSmoke;document.getElementById('recording-player').pause();Object.assign(state.record,state.original);window.__trainingProductTrainer.refreshPlaybackControls();URL.revokeObjectURL(state.url);if(state.theme)document.documentElement.dataset.theme=state.theme;else delete document.documentElement.dataset.theme;delete window.__playbackSmoke;})()`);
+    await evaluate(`(()=>{const state=window.__playbackSmoke,trainer=window.__trainingProductTrainer;document.getElementById('recording-player').pause();Object.assign(state.record,state.original);trainer.refreshPlaybackControls();trainer.renderCurrentReport(state.record);URL.revokeObjectURL(state.url);if(state.theme)document.documentElement.dataset.theme=state.theme;else delete document.documentElement.dataset.theme;delete window.__playbackSmoke;})()`);
     mainWindow.setSize(...originalSize);
   }
 }

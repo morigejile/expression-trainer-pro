@@ -8,7 +8,7 @@
 
 阅读顺序：**当前任务 → 下表对应的主文档 → 必要实现 → 有需要才查历史证据**。不默认通读全部文档、归档或实验原始返回。
 
-当前产品交付范围与未完成项先看 [M4 剩余工作](milestones/m4-structured-training.md#remaining-work-and-blockers)，跨阶段顺序看 [Roadmap](roadmap.md)；语速与停顿测量的独立实验进度见 [Roadmap §4.6](roadmap.md#46-语速与停顿测量独立实验)。主报告的生产状态、质量限制与未接入实验见 [Current §17](architecture/current.md#17-i2-普通报告与真实-ai-接入)；已有阶段验证不能代替当前整体验收。
+当前产品交付范围与未完成项先看 [M4 剩余工作](milestones/m4-structured-training.md#remaining-work-and-blockers)，跨阶段顺序看 [Roadmap](roadmap.md)。语速与停顿测量进度见 [Roadmap §4.6](roadmap.md#46-语速与停顿测量)。主报告的生产状态、质量限制与未接入实验见 [Current §17](architecture/current.md#17-i2-普通报告与真实-ai-接入)。
 
 ## Canonical Map
 
@@ -43,6 +43,7 @@
 
 | 按需查阅 | 资料身份与入口 |
 |---|---|
+| V2 指标、用词上下文及逐处停顿试验 | [实录对照结论](architecture/current.md#v2-用词与停顿的实录对照)，当前主诊断继续使用原输入 |
 | 删除自动框架推荐前的报告比较记录 | [v9 固定材料与判断草案](../benchmark/prompt-evaluation/report-concision-v9/comparison-start.md)：当前源码／配置身份、固定输入与六次匹配结果；判断待用户确认，E04 当前结果待补跑，不代表质量验收通过 |
 | 问题单位、任务标准与生成结构 | [统一列表实验结论](../benchmark/prompt-evaluation/diagnosis-units-v1/summary.md)：开发实验，未替换生产默认；包含独立范围与有界二次复核的失败和限制 |
 | v7 到 v8 的质量对照 | [质量收尾结论](../benchmark/prompt-evaluation/problem-library-v08/summary.md)：当时的版本／内容证据，不代表后续整体质量通过 |

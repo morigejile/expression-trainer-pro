@@ -99,6 +99,29 @@ function descendants(node,predicate) {
 function byClass(node,name) {return descendants(node,child=>child.className.split(' ').includes(name));}
 function container() {return new Document().createElement('div');}
 
+test('V2 shows saved word contexts and exact interval boundaries without exposing internal statistics as rows',()=>{
+  const source=runs(), [evidenceRun,metricRun]=source;
+  const metric=(id,value,unit)=>({id,label:id,value,unit,status:'available'});
+  Object.assign(metricRun.value,{definitionVersion:'common-metrics-v2',localStatsSnapshot:{wordMatchMap:'3-- 1'},
+    metrics:[metric('review-word-count',2,'locations'),metric('filler-count',2,'occurrences'),
+      metric('between-speech-gap-count',1,'occurrences'),metric('between-speech-gap-total-ms',625,'ms'),
+      metric('expression-span-ms',3625,'ms')]});
+  evidenceRun.value.segments.push({id:'speech-1',startSample:58000,endSample:74000});
+  const target=container(),clicked=[];
+  target.appendChild(api().createReportMetrics(target.ownerDocument,{metrics:metricRun.value.metrics,
+    metricRun,evidenceRun,record:{fullText:'我觉得，嗯<script>',audioUrl:'blob:fixture'},onGap:gap=>clicked.push(gap)}));
+  assert.deepEqual(byClass(target,'metric-item').map(node=>node.id),['metric:review-word-count','metric:between-speech-gap-count']);
+  const [hits,gaps]=byClass(target,'metric-evidence-list');
+  for(const details of [hits,gaps]){details.open=true;details.listeners.toggle();}
+  assert.equal(hits.id,'metric:filler-count');
+  assert.deepEqual(descendants(hits,node=>node.tagName==='MARK').map(node=>node.textContent),['我觉得','嗯']);
+  assert.match(hits.textContent,/填充词、犹豫词/);
+  assert.match(hits.textContent,/<script>/);
+  assert.match(gaps.textContent,/3–3\.625 秒（0\.625 秒）/);
+  gaps.querySelector('button').click();
+  assert.deepEqual(clicked,[{startSample:48000,endSample:58000}]);
+});
+
 test('compact metrics retain saved values, all evidence anchors and optional explanations without duplicating counts',()=>{
   const target=container();
   const metrics=[['filler-count',6,'occurrences'],['hedge-count',0,'occurrences'],['vague-word-count',8,'occurrences'],

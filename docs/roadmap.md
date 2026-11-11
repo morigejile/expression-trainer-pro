@@ -93,11 +93,11 @@ M0 的 Complete 记录上述历史完成事件；[当时的审查](archive/revie
 
 M3 首版已完成可靠指标变化、两侧 Finding/Evidence 复盘与 History → Comparison → Report。D-13 已按 [Data Model §10.1](architecture/data-model.md#101-m3-compatibility) 关闭；验收映射见 [M3 milestone](milestones/m3-comparison-and-review.md)，执行证据及人工/设备限制见 [Current §14](architecture/current.md#14-m3-comparison-and-review)。自动跨录音 Finding 语义变化判断明确延期至 B-25；首版不新增远程比较调用。
 
-### 4.6 语速与停顿测量（独立实验）
+### 4.6 语速与停顿测量
 
-第一阶段的离线派生预览与只读核验工具已实现，尚未接入正式报告、对比或远程 AI；实现记录见 [Current §13](architecture/current.md#13-m2-analysis-pipeline)，实验定义见 [Data Model §5.3](architecture/data-model.md#离线流畅度测量预览实验)，操作方法见 [Development](development.md#m2-已保存-vad-区间核验)。
+正式报告与对比已接入 V2 本地观测，支持原文和录音复核。离线预览和只读核验继续可用。定义见 [Data Model §5.3](architecture/data-model.md#正式报告-v2)，实现记录见 [Current §13](architecture/current.md#13-m2-analysis-pipeline)。
 
-已完成一批已展示候选区间的存在性与听感影响人工核对，具体结果与边界见 [Current §13](architecture/current.md#13-m2-analysis-pipeline)。现阶段保留原 VAD 参数；仅在出现具体误差或新用途确需更强能力时补相应漏检/边界证据，再决定参数对照。第二阶段方案需区分客观间隔观察与表达问题，生产接入及真实 AI 内容验收尚未完成，不将本轮有限核对写成全范围测量放行。任务拆分与执行记录见 [Supporting 计划](superpowers/plans/2026-11-09-fluency-measurement.md)；该实验不自动成为 M4 的新增验收门槛，也不重开已关闭的 M2。
+首轮实录 AI 对照已完成，主诊断继续使用现有三项名单。逐处停顿判断需补自然和影响连贯两类的可靠对齐样本，并验证模型能复现人工复听区分。整段指标和用词命中上下文仍供本地复盘。实际结果见 [Current §17](architecture/current.md#v2-用词与停顿的实录对照)。
 
 ## 5. 里程碑
 

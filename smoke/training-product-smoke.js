@@ -391,6 +391,10 @@ async function run({app, mainWindow, BrowserWindow, phase}) {
     if(phase==='offline'){
       await openHistory(ids.at(-1));
       const before=await invoke('getTrainingSession',{requestId:'before-playback-layout',sessionId:ids.at(-1)});
+      const local=before.value.results.find(result=>result.kind==='common-analysis');
+      assert.equal(local.definitionVersion,'common-metrics-v2');
+      assert.equal(typeof local.value.localStatsSnapshot.wordMatchMap,'string');
+      assert.equal(await evaluate(`document.querySelectorAll('#report-summary-metrics > div, #report-analysis-info .metric-item').length`),9);
       await require('./report-playback-smoke').run({mainWindow,evaluate,wait,click,capture});
       assert.deepEqual(await invoke('getTrainingSession',{requestId:'before-playback-layout',sessionId:ids.at(-1)}),before,'playback presentation never rewrites saved facts');
       assert.deepEqual(aiCalls(),initialCalls,'playback controls never request AI');

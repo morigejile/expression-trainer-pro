@@ -8,11 +8,14 @@ const {createHash} = require('node:crypto');
 const {DatabaseSync} = require('node:sqlite');
 const {normalizeStart,normalizeTiming,normalizeResult,requireId,MAX_DURATION_MS} = require('../lib/training-session-data');
 const {validateAudio} = require('../lib/training-audio-store');
-const {computeCommonAnalysis,computeFluencyPreview,DEFINITION_VERSION} = require('../lib/common-analysis');
+const {computeCommonAnalysis,computeFluencyPreview,DEFINITION_VERSION,REPORT_METRICS_VERSION} = require('../lib/common-analysis');
 const {selectStructuredReport} = require('../src/structured-report');
 
 const METRICS = ['speech-duration-ms','non-speech-duration-ms','between-speech-gap-count',
   'between-speech-gap-total-ms','between-speech-gap-max-ms'];
+const REPORT_INTERVAL_METRICS = ['speech-duration-ms','between-speech-gap-count','between-speech-gap-total-ms'];
+const REPORT_DERIVED_METRICS = ['expression-span-ms','between-speech-gap-percent',
+  'between-speech-gap-rate-per-expression-minute','text-rate-per-speech-minute'];
 const HELP = `Read saved VAD evidence (does not rerun analysis or modify history).
   node scripts/inspect-speech-evidence.js --root <userData/training> --list
   node scripts/inspect-speech-evidence.js --root <userData/training> --session <id> [--report <snapshot-id>] [--output <directory>] [--fluency-preview]
@@ -94,14 +97,19 @@ function inspect(root,saved,reportId,withFluencyPreview=false) {
     ? results.filter(run=>run.kind !== 'report-snapshot' || run.id === reportId) : results);
   if (!report) throw new Error('No valid linked Report snapshot found. No orphan results were substituted.');
   const {snapshot,evidenceRun,metricRun,analysisRun,latestAttempt} = report;
-  if (metricRun.value.definitionVersion !== DEFINITION_VERSION) throw new Error('Unsupported saved metric definition version.');
+  const {definitionVersion} = metricRun.value;
+  const revised = definitionVersion === REPORT_METRICS_VERSION;
+  if (!revised && definitionVersion !== DEFINITION_VERSION) throw new Error('Unsupported saved metric definition version.');
   const source = evidenceRun.value;
   const audio = verifyAudio(root,session);
   const measuredSession = {...session,artifact:session.artifact ? {...session.artifact,
     state:audio.verification==='verified' ? 'available' : 'missing'} : null};
   // Use the same dependency/coverage validation and metric definitions as the product.
-  const common = computeCommonAnalysis({session:measuredSession,speechEvidence:source});
-  const checkedIds = withFluencyPreview ? [...METRICS,'text-character-count','text-rate-per-speech-minute'] : METRICS;
+  const common = computeCommonAnalysis({session:measuredSession,speechEvidence:source,definitionVersion});
+  const intervalIds = revised ? REPORT_INTERVAL_METRICS : METRICS;
+  const checkedIds = revised ? [...intervalIds,...REPORT_DERIVED_METRICS]
+    : withFluencyPreview ? [...intervalIds,'text-character-count','text-rate-per-speech-minute'] : intervalIds;
+  if (revised && withFluencyPreview) checkedIds.push('text-character-count');
   const metricChecks = checkedIds.map(id=>{
     const matches = metricRun.value.metrics.filter(metric=>metric.id === id);
     const savedMetric = matches.length===1 ? matches[0] : null;
@@ -111,7 +119,7 @@ function inspect(root,saved,reportId,withFluencyPreview=false) {
       (recomputed.status==='available' ? Number.isFinite(savedMetric.value) && Math.abs(savedMetric.value-recomputed.value)<1e-6
         : savedMetric.value===null))};
   });
-  const reason = metricChecks.find(check=>METRICS.includes(check.id) && check.recomputed.status!=='available')?.recomputed.reason ?? null;
+  const reason = metricChecks.find(check=>intervalIds.includes(check.id) && check.recomputed.status!=='available')?.recomputed.reason ?? null;
   const availability = reason ? 'unavailable' : 'available';
   let speechRegions = null, gaps = null, edgeNonSpeech = null;
   if (!reason) {

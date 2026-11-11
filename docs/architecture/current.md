@@ -422,8 +422,8 @@ npm run smoke:package
 - 时间证据增加有序 quality-event、stopped 汇总及持久 `timing.qualityEvents`；queue overrun 保存可知的排队/拒绝块范围，未知范围保留 null。utterance 识别失败或用户取消收尾时保留已捕获 WAV，ASR 质量标为不可用，不能生成伪转写成功诊断。
 - SenseVoice 使用冻结的可选 Provider，无 partial，最多 4,800,000 Float32 样本。停止时推理；取消能终止正在执行 stop 的识别子进程，下一会话重建。技术默认仍为 Zipformer Large；用户本轮选用并验收的实用主路径为 Zipformer Small CTC 中文 INT8。SenseVoice 本轮下载异常、真实设备/资源验收未完成，按 Backlog B-23 延期。
 - Silero VAD 使用独立 `models/speech-evidence-registry.json`，复用 Model Manager 的固定文件大小/hash 安装与离线缓存；首次分析按需安装到 modelRoot 下的 speech-evidence 目录。独立 utility process 隔离 native 崩溃，并支持硬取消/超时；单个 Main 串行执行 VAD，最多接纳三条分析任务。整个分析预算为 120 秒，AI 请求预算为 60 秒。失败保存 unavailable，已保存事实与可用指标继续可读。
-- Common 的 15 个指标是确定性观测值，不输出表达质量分。`session-analysis-inputs.js` 复用已保存词项输入，首次 finalize 的新训练仅采用默认词表；历史缺失统计不以当前设置补算。VAD 区间明确带未校准限制；缺失/不连续证据按依赖使指标 unknown，不用零填补。AnalysisContext 只携带当前文本、允许的指标/语音区间、质量及分析指令；没有音频字节、Key、endpoint、路径或其他记录。
-- 远程发送前由 `diagnosis-input.js` 按固定名单最多保留字数、录音时长、填充词命中数 3 项可用指标，省略其余指标和语音区间，不附缺失说明；原文、任务、练习上下文及仍相关的质量限制保留。发送与返回校验使用同一份精简快照，本地 15 项结果及历史快照不变；评估、取舍与字段边界见 [Data Model §5.4](data-model.md#54-structured-diagnosis-v1)。
+- Common 为确定性测量。`session-analysis-inputs.js` 复用已保存词项输入，首次 finalize 的新训练采用默认词表；历史缺失统计不以当前设置补算。VAD 区间保留未校准限制，缺失或不连续证据按依赖使指标不可用。AnalysisContext 携带当前文本、允许的指标与语音区间、质量及分析指令。
+- 远程发送前由 `diagnosis-input.js` 按固定名单保留至多三项可用指标（字数、录音时长、填充词命中数），并保留原文、任务、练习上下文及相关质量限制。发送与返回校验使用同一份精简快照。字段边界见 [Data Model §5.4](data-model.md#54-structured-diagnosis-v1)。
 - LLM 配置 schema 3 增加每个 profile 的自动诊断开关；新配置为空、旧配置迁移默认关闭。Main 在实际发起前重新解析精确 active profile，未启用、缺失或删除不会自动选择其他服务。界面披露实际本地/远程目标与发送内容；改变 Provider、模型或地址会清除该 profile 的自动启用状态。
 - 训练中保留本地规则统计，旧隐藏反馈栏、统计侧栏、逐句词语提醒及其状态更新已清除；本地计数、表达密度计算和事实保存保持原路径。报告显示摘要、首项 Finding、可展开的更多发现/指标、证据定位及缺失状态；旧记录的指标展示不再依赖侧栏容器。Finding 的产品语义只见 [Training Flow](../product/training-flow.md)。Processing 在事实保存后可离开到 History，完成不会强制跳回；分析取消/失败可恢复，历史读取保持原快照。
 - 保存期间取消分析后，Renderer 只读取已保存结果，不再调用可能新建任务的分析入口。分析刷新保留尚未写入的结果、统计和失败提示；成功重试同一结果 ID 后才清除待保存状态。
@@ -443,6 +443,8 @@ npm run smoke:package
 2026-11-09 增加显式 `--fluency-preview` 离线入口，复用已有 Common 校验与 VAD 区间派生实验测量；定义见 [Data Model §5.3](data-model.md#离线流畅度测量预览实验)。新入口未接正式报告、对比或远程 AI。两条既有 103.536 s / 39.776 s 记录已按原 WAV hash、七项保存测量和关联快照核验并生成预览；另两条无检测语音的记录正确输出不可用跨度/比率，数据库核验前后 hash 未变。这些结果证明派生与只读链路可运行，不新增人工边界准确率、听感或报告质量通过结论；模型缓存大小/hash 与 registry 一致，未重新推理或调参。
 
 2026-11-10 用户完成独立本地验收页面中的直接核对，标注版本为 revision 134；来源绑定、原 Report/Source ID、间隔列表和 WAV hash 已重新核验，原标注冻结在本机 Git 忽略的实验目录。A 的 8 处均确认存在，其中 3 处自然、5 处影响连贯；B 的 23 处均确认存在，其中 7 处自然、16 处影响连贯；合计 31 处全部填写，无待定。A 的整体听感为“经常中断、语速适中”，B 未填写整体听感，不补推断。B 中两处同为约 0.538 秒的间隔分别标为自然与影响连贯，不能把检测间隔次数等同卡顿次数，也不能仅按时长判问题。本轮是对已展示候选的存在性与听感影响复核，未填写边界标签或独立漏检标记，不外推召回率、毫秒边界精度、跨场景准确率、自动流畅度阈值或 AI 报告质量。现有参数与未校准 provenance 保留；没有基于本批结果立即系统调参，也没有接入生产诊断。
+
+新版报告保存 `common-metrics-v2`，展示九项观测、命中词的原文上下文和内部间隔回放。History、Comparison 和只读核验工具读取各自保存的 V1/V2 定义。新版 VAD 仍使用已保存 Source 的边界和来源，主诊断继续使用原三项指标名单。定义见 [Data Model §5.3](data-model.md#正式报告-v2)，交互见 [Training Flow §7.2](../product/training-flow.md#72-report-workspace-信息结构)。
 
 本次 Closeout 归档此前未提交的统计输入快照修复、取消/保存刷新修复、HTTP/异常测试及只读 VAD 核验工具，并落盘最终验收决定；本轮未新增实现。M2 正式关闭，人工证据和各项边界只在 [M2 验收矩阵](../milestones/m2-speech-evidence-and-ai-diagnosis.md#acceptance-criteria) 定义。SenseVoice 下载异常与真实 smoke/资源验收（B-23）明确延期；Report UX（B-22）、雷达完整校准（B-20）和扩大 VAD 校准（B-24）为非阻塞后续项，重开条件只见 [Backlog](../product/backlog.md#not-now)。雷达及 VAD 来源的未校准标记保持不变。
 
@@ -547,6 +549,18 @@ v11 同时将解释改为可省略、移除表达参考和第二份框架摘要�
 | [问题单位实验](../../benchmark/prompt-evaluation/diagnosis-units-v1/summary.md) | v8 基线与独立实验候选的61次真实请求；统一列表有局部收益也有正常表达误报，二次复核未显示内容收益，未切换默认。原始／适配结果、盲化自评、冻结身份与限制由该结论链接。 |
 | [v7 → v8 质量对照](../../benchmark/prompt-evaluation/problem-library-v08/summary.md) | 51次真实请求及窄格式兼容验证；保留失败、旧 E06 离线重放和模拟持久化证据，格式接受不代表内容通过。 |
 | [问题库首批接入](../../benchmark/prompt-evaluation/problem-library-v03/summary.md) | v7 阶段的32次真实请求、156项定向检查及 E01 误报、E03 重复、E06 缺字段失败；不作为当前生产版本或整体验收声明。 |
+
+#### V2 用词与停顿的实录对照
+
+2026-11-11，复用两条有人工复听标注的真实录音和 `structured-diagnosis-v16`。配置模型为 `deepseek-chat`，8 次实际响应均报 `deepseek-flash`，其中 7 次通过相应结构校验。请求只包含转写、相关测量和候选上下文。原始输入、返回与首次格式失败留存在本地验收目录。
+
+| 对照 | 实际结果 |
+|---|---|
+| 原输入与新增整段指标（检测语音时长、语音分钟字符数、内部间隔占比和频率） | 两条样本都未增加可核对的语速或停顿建议。停顿测试录音在两个版本中均为材料不足 |
+| 原输入与新增词表命中上下文 | 自由表达中的填充词问题在两个版本中均已出现。候选版把转写描述成“能听出”，无法证明有独立收益 |
+| 整段指标与附带对齐候选的逐处判断 | 两条保存转写均为估计时间。对 31 个已人工复听间隔用本机 CTC 时间戳、原文相邻片段和两侧音频重识别交叉检查，3 处通过这轮筛选，且人工均标为影响连贯。首轮返回多余字段被拒，原文中还把其中一处判成自然换段。收紧返回格式与判断口径后，3 处均为证据不足 |
+
+另一种只按间隔两侧裁剪后识别的办法没有找到匹配项。扩大裁剪窗口后仅复现上述 3 处中的 1 处。该批没有可用于对照的自然停顿对齐样本，也未验收漏检、词级边界精度或跨录音表现。主诊断继续使用原三项指标，V2 的新增观测仍用于本地复盘。试验输入与提示构建器及复核方法见 [Development](../development.md#v2-用词与停顿的主诊断对照)。
 
 <details>
 <summary>I2 早期接入与 v6 阶段的历史验证记录</summary>

@@ -22,15 +22,15 @@
     'local-stats-invalid':'词项统计与转写不一致','transcript-unavailable':'没有可用转写',
     'transcript-evidence-invalid':'转写证据无效'
   };
-  const UNITS={characters:'字',occurrences:'次',ms:'毫秒',percent:'%',
+  const UNITS={characters:'字',occurrences:'次',locations:'处',ms:'毫秒',percent:'%',
     'characters/recorded-minute':'字/录音分钟','characters/speech-minute':'字/检测语音分钟',
-    'occurrences/recorded-minute':'次/录音分钟','percentage-points':'个百分点'};
+    'occurrences/recorded-minute':'次/录音分钟','occurrences/expression-minute':'次/表达分钟','percentage-points':'个百分点'};
   const number=value=>Number.isFinite(value)?new Intl.NumberFormat('zh-CN',{maximumFractionDigits:2}).format(value):'不可用';
   const valueText=(value,unit)=>Number.isFinite(value)?`${number(value)} ${UNITS[unit] || unit}`:'不可用';
   const reasonText=reason=>REASONS[reason] || '证据或分析暂不可用';
 
   const context=node?require('../shared/training-context'):globalThis.TrainingContext;
-  const labels={'audio-duration-ms':'录音时长','text-character-count':'转写字符数','filler-count':'填充词命中次数','filler-rate-per-recorded-minute':'填充词命中频率'};
+  const labels={'audio-duration-ms':'录音时长','text-character-count':'转写字符数','filler-count':'填充词命中次数','filler-rate-per-recorded-minute':'填充词命中频率','review-word-count':'待核查用词'};
   const limitations={'vad-uncalibrated':'VAD 检测尚未完整校准；区间差异不表示节奏评分。','asr-observation-only':'识别来源不同或未知，文字差异可能来自识别结果。','totals-not-quality':'总量差异受录音长度与表达范围影响，不表示能力评分。','saved-denominator':'按各自保存的分母比较；不混用字符数、墙钟时长或其他分母。'};
   function renderComparison(container,projection,{onReport=()=>{},onPlay=()=>{},onCollapse=()=>{}}){
     const document=container.ownerDocument,sides=[projection.baseline,projection.target];
@@ -81,7 +81,7 @@
       const materials=originals?el('div'):identity;if(originals)originals.appendChild(materials);
       disclosure(materials,`original-${role}`,'查看原文与录音',body=>{body.appendChild(el('p','source-note',`识别来源：${side.sources.asr?.modelId || '来源未保存'} · ${side.sources.asr?.modelVersion || '版本未保存'}`));const refs=(side.session.transcript?.segments || []).map(segment=>segment.id);if(!refs.length)body.appendChild(el('p',null,side.session.transcript?.text || '暂无可读原文。'));evidence(body,side,['audio',...refs]);});
     }
-    const observations=projection.metrics.filter(metric=>['audio-duration-ms','filler-count'].includes(metric.id)&&metric.delta!==null);
+    const observations=projection.metrics.filter(metric=>['audio-duration-ms','filler-count','review-word-count'].includes(metric.id)&&metric.delta!==null);
     if(observations.length){const section=el('section','report-section');section.appendChild(el('h2',null,'可以观察到的变化'));const insight=el('p','compare-insight');
       for(const metric of observations){const line=el(metric.id==='filler-count'?'em':'span',null,`${labels[metric.id]}从 ${value(metric.baseline.value,metric.unit)} 变为 ${value(metric.target.value,metric.unit)}。`);insight.appendChild(line);insight.appendChild(el('br'));}section.appendChild(insight);section.appendChild(el('p','compare-note','这些是记录中的差异；时长更短或用词更少，不直接等于表达更好。'));container.appendChild(section);}
     const analysis=el('section','report-section comparison-analysis');container.appendChild(analysis);const sectionHead=el('header','section-head');sectionHead.appendChild(el('h2',null,'分析与证据'));sectionHead.appendChild(el('small',null,'按类别查看两侧结果'));analysis.appendChild(sectionHead);

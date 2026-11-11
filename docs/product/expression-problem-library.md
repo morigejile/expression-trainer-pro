@@ -8,7 +8,7 @@
 
 - [Training Flow：框架与证据规则](training-flow.md#framework-v1-definitions-and-evidence-rules)
 - [Training Flow §7.1：材料充分性与表达参考](training-flow.md#71-完整分析与训练重点分层)
-- [Data Model §5.3：Common Metric V1](../architecture/data-model.md#53-common-metric-v1-定义)
+- [Data Model §5.3：Common Metric 定义](../architecture/data-model.md#53-common-metric-定义)
 - [Data Model §5.4：Structured Diagnosis V1](../architecture/data-model.md#54-structured-diagnosis-v1)
 
 ## 1. 分类与证据是不同维度
@@ -44,7 +44,7 @@
 | 输入／能力 | 当前状态与使用边界 |
 |---|---|
 | 转写、训练上下文、Common Metrics、VAD 区间及 quality | 当前 AnalysisContext 已按实际可用性提供；每次使用仍需检查状态。原文分段是定位单位，不能只读单段而忽略前后文 |
-| 15 项 Common Metrics | 当前已有版本化定义。A 中的“事实”指按该定义得到的测量结果，不保证 ASR 语义识别正确，也不证明词语多余或停顿有害 |
+| Common Metrics | A 中的“事实”指按各自保存的定义得到的测量结果，词语和停顿的影响仍需结合上下文 |
 | 词表命中明细 | `lexicon.js` 可返回命中词与分词索引；当前主诊断 AnalysisContext 没有专门携带这组明细。不能把“本地可计算”写成“AI 已收到” |
 | 自定义填充词 | 分析函数支持额外词表；不据此假定每次 AI 输入都包含用户词表、完整命中明细或历史快照 |
 | 字面重复、修正标记、句长等专用候选 | 本稿后文提出的扩展，尚未作为这些专用线索接入。没有线索字段时，仍可从原文作有限语义检查 |

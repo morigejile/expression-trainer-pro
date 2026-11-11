@@ -1331,6 +1331,7 @@ class ExpressionTrainer {
     if (record.structuredReport) {
       this.reportCleanup = StructuredReport.renderStructuredReport(this.reportBody,record.structuredReport,{segments:record.segments,record,api:window.api,
         onEvidence:ref => this.focusReportEvidence(record,ref),
+        onGap:gap => this.playReportGap(record,gap),
         onPractice:(finding,scope,continueChain = false) => {
           const practiceRequest = {sessionId:record.id,reportId:record.structuredReport.snapshot.id,
             findingId:continueChain ? null : finding.id,scope,continueChain};
@@ -1361,15 +1362,32 @@ class ExpressionTrainer {
       const disclosure = document.getElementById(ref.startsWith('metric:') ? 'report-information' : 'report-materials');
       if (disclosure) disclosure.open = true;
     }
-    if (ref.startsWith('metric:')) {document.getElementById(ref)?.scrollIntoView({block:'center',behavior:'smooth'});return;}
+    if (ref.startsWith('metric:')) {
+      const target=document.getElementById(ref);
+      if (target?.tagName==='DETAILS') target.open=true;
+      target?.scrollIntoView({block:'center',behavior:'smooth'});
+      return;
+    }
     const segment=record.segments.find(item=>item.id===ref);
     const speech=record.structuredReport?.evidenceRun?.value?.segments?.find(item=>item.id===ref);
     const startMs=segment?.startMs ?? (speech ? speech.startSample/16 : null);
     if (startMs !== null && Number.isFinite(startMs) && record.audioUrl) {
+      this.reportPlayback?.clearRange();
       this.audioPlayer.currentTime=startMs/1000;
       this.audioPlayer.focus?.();
     }
     if (segment) this.reportAiStatus.textContent=`原文证据：${segment.text}${segment.timingSource==='estimated'?'（播放位置为估计）':''}`;
+  }
+
+  playReportGap(record,{startSample,endSample}) {
+    if (this.currentScreen!=='report' || this.viewingTrainingRecordId!==record.id) return;
+    this.playbackSeekGeneration=(this.playbackSeekGeneration || 0)+1;
+    const source=record.structuredReport.evidenceRun.value;
+    const start=Math.max(0,startSample/16000-1);
+    const end=Math.min(source.audio.sampleCount/16000,endSample/16000+1);
+    const materials=document.getElementById('report-materials');
+    if(materials)materials.open=true;
+    if(!this.reportPlayback?.playRange(start,end))this.showUserMessage('这段录音暂不可回放');
   }
 
   generateReport() { return this.closing ? Promise.resolve(false) : this.trackAnalysis(() => this.generateReportForRecord()); }
@@ -1833,6 +1851,7 @@ class ExpressionTrainer {
   refreshPlaybackControls() {
     const record = this.trainingRecords?.selected() ?? null;
     if (!record || record.id !== this.viewingTrainingRecordId) {
+      this.reportPlayback?.clearRange();
       this.playbackSegmentId = null;
       this.playbackControls?.classList.add('hidden');
       if (this.audioPlayer) {
@@ -1876,6 +1895,7 @@ class ExpressionTrainer {
   togglePlayback() {
     const record = this.trainingRecords?.selected() ?? null;
     if (!record || record.id !== this.viewingTrainingRecordId || !record.audioUrl || !this.audioPlayer || ['missing','corrupt'].includes(record.audioState)) return false;
+    this.reportPlayback?.clearRange();
     if (this.audioPlayer.paused) {
       const playing = this.audioPlayer.play();
       playing?.catch?.(() => this.showUserMessage('录音播放失败，请重试'));
@@ -1913,6 +1933,7 @@ class ExpressionTrainer {
     if(!segment||record.id!==this.viewingTrainingRecordId||this.currentScreen!=='report')return false;
     this.reportPlayback?.selectSegment(segmentId);
     if(record.audioUrl&&Number.isFinite(segment.startMs)){
+      this.reportPlayback?.clearRange();
       const generation=this.playbackSeekGeneration=(this.playbackSeekGeneration||0)+1;
       const seek=()=>{if(this.currentScreen==='report'&&this.viewingTrainingRecordId===record.id&&this.audioPlayer.src===record.audioUrl&&this.playbackSeekGeneration===generation)this.audioPlayer.currentTime=segment.startMs/1000;};
       if(this.audioPlayer.readyState>=1)seek();else this.audioPlayer.addEventListener('loadedmetadata',seek,{once:true});
@@ -1928,7 +1949,7 @@ class ExpressionTrainer {
     const visibleModal = (this.activeModal && !this.activeModal.classList.contains('hidden'))
       || document.querySelector?.('.modal:not(.hidden)');
     if (visibleModal) return;
-    if (event.target?.closest?.('input, textarea, select, button, audio, [contenteditable="true"]')) return;
+    if (event.target?.closest?.('input, textarea, select, button, summary, audio, [contenteditable="true"]')) return;
     if (this.isRecording) {
       event.preventDefault();
       if (this.isPaused) this.resumeRecording();

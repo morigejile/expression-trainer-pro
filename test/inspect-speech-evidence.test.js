@@ -41,9 +41,9 @@ async function fixture(t) {
       definitionVersion:'v1',analyzerVersion:'v1',createdAt:new Date(1800000000000 + counter++).toISOString(),
       evidenceRefs:['text-1'],value});
   }
-  async function report(prefix,source=evidence,diagnosisStatus='unavailable') {
+  async function report(prefix,source=evidence,diagnosisStatus='unavailable',definitionVersion) {
     await append(`${prefix}-source`,'speech-evidence',source,source.status==='completed'?'completed':'unavailable');
-    const common = computeCommonAnalysis({session,speechEvidence:source});
+    const common = computeCommonAnalysis({session,speechEvidence:source,definitionVersion});
     await append(`${prefix}-metric`,'common-analysis',{...common,speechEvidenceRunId:`${prefix}-source`});
     await append(`${prefix}-diagnosis`,'diagnosis',{schemaVersion:1,summary:'fixture',findings:[],
       reason:diagnosisStatus==='completed'?null:'not-enabled',speechEvidenceRunId:`${prefix}-source`,metricRunId:`${prefix}-metric`},diagnosisStatus);
@@ -102,6 +102,19 @@ test('explicit fluency preview reuses exact saved evidence without changing the 
   assert.match(result.stdout,/不代表流畅度评分/);
   assert.deepEqual([hash(db),hash(wav),fs.readdirSync(f.root)],before);
   assert.equal(result.data.metricChecks.length,7);
+});
+
+test('CLI checks the new report denominators and still exports the interval without a diagnosis',async t=>{
+  const f=await fixture(t);
+  await f.report('v2',f.evidence,'unavailable','common-metrics-v2');
+  f.store.close();
+  const result=f.export();
+  assert.equal(result.status,0,result.stderr);
+  assert.equal(result.data.metricDefinitionVersion,'common-metrics-v2');
+  assert.equal(result.data.gaps[0].durationSeconds,2);
+  assert.equal(result.data.metricChecks.every(item=>item.matches),true);
+  assert.equal(result.data.metricChecks.find(item=>item.id==='between-speech-gap-percent').saved.value,25);
+  assert.equal(result.data.metricChecks.some(item=>item.id==='non-speech-duration-ms'),false);
 });
 
 test('CLI follows the displayed Report exact run, ignoring newer orphan evidence and failed retries', async t => {

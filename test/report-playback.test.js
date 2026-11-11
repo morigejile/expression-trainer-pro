@@ -65,6 +65,28 @@ test('media updates do not pull the seek thumb away while the user is dragging',
   const f=fixture(),seek=f.nodes.get('playback-seek');seek.dispatch('pointerdown');seek.value='6';f.audio.currentTime=2;f.audio.dispatch('timeupdate');assert.equal(seek.value,'6');seek.dispatch('pointerup');assert.equal(Number(seek.value),2);
 });
 
+test('gap playback stops at its end while a manual seek or another recording releases that bound',()=>{
+  const {view,audio,nodes,record}=fixture();
+  assert.equal(view.playRange(2,4),true);
+  assert.equal(audio.currentTime,2);
+  nodes.get('playback-segments').children[0].children[0].rect={top:460,bottom:500,height:40};
+  view.setCurrentSegment('one');
+  assert.equal(nodes.get('report-scroll').scrollTop,0,'replaying a gap keeps its evidence list in view');
+  audio.currentTime=3.9;audio.dispatch('timeupdate');
+  assert.equal(audio.paused,false);
+  audio.currentTime=4.1;audio.dispatch('timeupdate');
+  assert.equal(audio.paused,true);
+  assert.equal(view.playRange(2,4),true);
+  const seek=nodes.get('playback-seek');
+  seek.value='7';seek.dispatch('input');audio.dispatch('timeupdate');
+  assert.equal(audio.paused,false);
+  assert.equal(view.playRange(2,4),true);
+  view.setRecord({...record,id:'another'});
+  audio.currentTime=5;audio.dispatch('timeupdate');
+  assert.equal(audio.pauseCalls,1);
+  assert.equal(view.playRange(10,12),false);
+});
+
 test('five-second jumps clamp to the saved recording bounds without changing playback state',()=>{
   const f=fixture(),back=f.nodes.get('playback-backward'),forward=f.nodes.get('playback-forward');
   f.audio.currentTime=3;back.dispatch('click');assert.equal(f.audio.currentTime,0);

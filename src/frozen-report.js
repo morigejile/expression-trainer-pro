@@ -5,6 +5,8 @@
   else root.FrozenReport = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function(context) {
   'use strict';
+  const reportSelection = () => typeof module === 'object' && module.exports
+    ? require('../shared/report-selection') : globalThis.ReportSelection;
   const presentations = new WeakMap();
   function renderIdentity(document,record) {
     const identity=document.getElementById('record-identity');
@@ -24,6 +26,7 @@
   }
   function reportModel(record) {
     const projection = record.structuredReport;
+    const revised = projection?.metricRun?.value.definitionVersion===reportSelection().REPORT_METRICS_VERSION;
     const analysis = projection?.analysisRun;
     const assessment=analysis?.status==='completed' ? analysis.value.assessment : null;
     const summary = assessment?.status==='insufficient' ? null : analysis?.status === 'completed' ? analysis.value.summary : record.report || null;
@@ -47,9 +50,12 @@
       reason,analysisAction:{
         visible:assessment?.status!=='insufficient' && (Boolean(record.reportPending) || !summary || projection?.snapshot?.value?.availability==='partial'),
         label:record.reportPending ? '分析中…' : !summary && ['not-enabled','not-configured','disclosure-required'].includes(reason) ? '分析这一次' : '重试诊断'},metrics:[
-        {id:'audio-duration-ms',label:'表达时长',value:Number.isFinite(record.durationMs) ? record.durationMs : null,unit:'ms'},
-        {id:'text-character-count',label:'转写字数',value:fallback(measured('text-character-count'),'totalWords'),unit:'字'},
-        {label:'填充词',value:fallback(measured('filler-count'),'fillers'),unit:'次'}]};
+        {id:'audio-duration-ms',label:revised?'录音时长':'表达时长',
+          value:revised ? measured('audio-duration-ms') ?? null : Number.isFinite(record.durationMs) ? record.durationMs : null,unit:'ms'},
+        {id:'text-character-count',label:revised?'转写字符数':'转写字数',
+          value:revised ? measured('text-character-count') ?? null : fallback(measured('text-character-count'),'totalWords'),unit:'字'},
+        revised ? {id:'review-word-count',label:'待核查用词',value:measured('review-word-count') ?? null,unit:'处'}
+          : {label:'填充词',value:fallback(measured('filler-count'),'fillers'),unit:'次'}]};
   }
   // Adapt the existing report projection and controls; no analysis or storage
   // work is owned by this presentation module.
@@ -115,7 +121,8 @@
     info.append(...details);
     if(!details.length){
       const reportUI=typeof module==='object' && module.exports ? require('./structured-report') : globalThis.StructuredReport;
-      info.appendChild(reportUI.createReportMetrics(document,{record,metrics:record.structuredReport?.metricRun?.value?.metrics || [],evidenceRun:record.structuredReport?.evidenceRun}));
+      const {metricRun,evidenceRun}=record.structuredReport || {};
+      info.appendChild(reportUI.createReportMetrics(document,{record,metrics:metricRun?.value.metrics || [],evidenceRun,metricRun}));
     }
     for(const basic of info.querySelectorAll('.metric-basics'))basic.remove();
     for (const line of byId('subtitle-container').querySelectorAll('[data-segment-id]')) {

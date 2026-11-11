@@ -13,6 +13,7 @@
       followControls=get('playback-follow-controls'),followSwitch=get('playback-follow'),returnButton=get('playback-return'),
       scrollRegion=get('report-scroll'),materials=get('report-materials');
     let record=null,recordKey=null,segments=null,selectedId=null,currentId=null,playError='',lastVolume=1,scrubbing=false,following=true;
+    let rangeEnd=null,playRequest=0;
     const rows=new Map(),available=()=>Boolean(record?.audioUrl&&!['missing','corrupt'].includes(record.audioState));
     audio.controls=false;audio.hidden=true;
     const node=(tag,className,text)=>{const el=document.createElement(tag);if(className)el.className=className;if(text!==undefined)el.textContent=text;return el;};
@@ -29,7 +30,7 @@
       if(returnButton){returnButton.hidden=following||!usable;returnButton.disabled=!usable||!rows.has(currentId);}
     }
     function revealCurrent(force=false){
-      if(!following||(!force&&audio.paused)||!available()||audio.error||!materials?.open||!scrollRegion?.clientHeight||document.body?.dataset?.frozenUi!=='report')return;
+      if(!following||(!force&&(audio.paused||rangeEnd!==null))||!available()||audio.error||!materials?.open||!scrollRegion?.clientHeight||document.body?.dataset?.frozenUi!=='report')return;
       const row=rows.get(currentId)?.button;if(!row)return;
       const viewport=scrollRegion.getBoundingClientRect(),bounds=row.getBoundingClientRect();
       const heading=get('report-materials-heading')?.getBoundingClientRect().height||0,toolbar=get('report-audio')?.getBoundingClientRect().height||0;
@@ -63,14 +64,37 @@
       audioStatus.textContent=!available()?(record?.audioState==='corrupt'?'录音已损坏，无法回放。':'录音缺失，无法回放。'):audio.error?'录音无法加载或已损坏，无法回放。':playError||(audio.readyState===0?'录音加载中…':'');
       updateRows();syncFollow();clipTranscript();
     }
+    function clearRange() { rangeEnd=null; }
+    function play() {
+      const key=recordKey;
+      const request=++playRequest;
+      playError='';
+      const failed=()=>{
+        if (recordKey!==key || request!==playRequest) return;
+        clearRange();
+        playError='录音播放失败，请重试。';
+        syncMedia();
+      };
+      try { audio.play()?.catch(failed); }
+      catch { failed(); }
+    }
+    function playRange(start,end) {
+      if (!available() || audio.error || !Number.isFinite(start) || !Number.isFinite(end) || start<0) return false;
+      const limit=Number.isFinite(audio.duration)?Math.min(audio.duration,end):end;
+      if (start>=limit) return false;
+      audio.currentTime=start;
+      rangeEnd=limit;
+      play();
+      return true;
+    }
     toggle.addEventListener('click',()=>{
       if(!available()||audio.error)return;
+      clearRange();
       if(!audio.paused){audio.pause();return;}
       if(audio.ended)audio.currentTime=0;
-      const key=recordKey;playError='';
-      try{audio.play()?.catch(()=>{if(recordKey===key){playError='录音播放失败，请重试。';syncMedia();}});}catch{playError='录音播放失败，请重试。';syncMedia();}
+      play();
     });
-    seek.addEventListener('input',()=>{if(available()&&Number.isFinite(audio.duration)&&audio.duration>0){audio.currentTime=Math.max(0,Math.min(audio.duration,Number(seek.value)||0));}});
+    seek.addEventListener('input',()=>{if(available()&&Number.isFinite(audio.duration)&&audio.duration>0){clearRange();audio.currentTime=Math.max(0,Math.min(audio.duration,Number(seek.value)||0));}});
     seek.addEventListener('pointerdown',()=>{scrubbing=true;});
     for(const event of ['pointerup','pointercancel','blur'])seek.addEventListener(event,()=>{scrubbing=false;syncMedia();});
     mute.addEventListener('click',()=>{if(audio.muted||audio.volume===0){audio.muted=false;if(audio.volume===0)audio.volume=lastVolume;}else{lastVolume=audio.volume;audio.muted=true;}});
@@ -78,6 +102,7 @@
     speed.addEventListener('change',()=>{const rate=Number(speed.value);if(rate>=.25&&rate<=2)audio.playbackRate=rate;});
     function jumpBy(seconds){
       if(!available()||audio.error||!Number.isFinite(audio.duration)||audio.duration<=0)return;
+      clearRange();
       audio.currentTime=Math.max(0,Math.min(audio.duration,(Number(audio.currentTime)||0)+seconds));syncMedia();
     }
     backward?.addEventListener('click',()=>jumpBy(-5));forward?.addEventListener('click',()=>jumpBy(5));
@@ -91,8 +116,16 @@
     materials?.addEventListener('toggle',clipTranscript);
     const ResizeObserver=document.defaultView?.ResizeObserver;
     if(ResizeObserver){const observer=new ResizeObserver(clipTranscript);for(const element of [scrollRegion,get('report-audio'),get('report-materials-heading')])if(element)observer.observe(element);}
-    for(const event of ['loadedmetadata','durationchange','timeupdate','seeked','play','pause','ended','volumechange','ratechange','emptied'])audio.addEventListener(event,syncMedia);
-    audio.addEventListener('error',()=>{syncMedia();});
+    audio.addEventListener('timeupdate',()=>{
+      if(rangeEnd!==null && audio.currentTime>=rangeEnd){
+        clearRange();
+        audio.pause();
+      }
+      syncMedia();
+    });
+    for(const event of ['loadedmetadata','durationchange','seeked','play','pause','ended','volumechange','ratechange','emptied'])audio.addEventListener(event,syncMedia);
+    audio.addEventListener('ended',clearRange);
+    audio.addEventListener('error',()=>{clearRange();syncMedia();});
     audio.addEventListener('waiting',()=>{playError='录音加载中…';syncMedia();});
     audio.addEventListener('canplay',()=>{playError='';syncMedia();});
     audio.addEventListener('play',()=>revealCurrent());
@@ -100,7 +133,7 @@
     function setCurrentSegment(id){currentId=id;if(rows.has(id))selectedId=id;updateRows();syncFollow();revealCurrent();}
     function setRecord(next){
       const key=`${next?.id||''}:${next?.audioUrl||''}`,changed=key!==recordKey;
-      if(changed){playError='';scrubbing=false;if(record?.id!==next?.id)following=true;recordKey=key;currentId=null;selectedId=null;}
+      if(changed){clearRange();playError='';scrubbing=false;if(record?.id!==next?.id)following=true;recordKey=key;currentId=null;selectedId=null;}
       const rebuild=changed||segments!==next?.segments;record=next;
       if(rebuild){
         segments=next?.segments;rows.clear();transcript.replaceChildren();
@@ -114,7 +147,7 @@
       }
       syncMedia();updateRows();
     }
-    return {setRecord,setCurrentSegment,selectSegment,syncMedia};
+    return {setRecord,setCurrentSegment,selectSegment,syncMedia,playRange,clearRange};
   }
   return {createReportPlayback,clock};
 });

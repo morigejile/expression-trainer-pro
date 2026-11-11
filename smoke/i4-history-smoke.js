@@ -137,18 +137,19 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
     assert.match(text,/基线/); assert.match(text,/目标/); assert.match(text,/未.*对应|尚未.*对应/);
     assert.doesNotMatch(text,/每百字|[“「]然后[”」]/);
     assert.equal(await evaluate(`[...document.querySelectorAll('#comparison-screen button,#comparison-screen a')].some(e=>/继续练习|练习这一点|换.*记录|选择.*记录/.test(e.textContent))`),false);
-    for (const id of ['filler-count','filler-rate-per-recorded-minute']) {
+    for (const [id,label,unit] of [['review-word-count','待核查用词','处'],
+      ['between-speech-gap-rate-per-expression-minute','每表达分钟内部语音间隔次数','次/表达分钟']]) {
       const metric=projection.metrics.find(value=>value.id===id); assert.ok(metric);
       const row = await evaluate(`document.querySelector('[data-metric-id="${id}"]')?.textContent`);
-      assert.ok(row,`rendered saved metric ${id}`); assert.match(row,/填充词/);
-      if (id.includes('rate')) assert.match(row,/次\s*[／/]\s*录音分钟/);
+      assert.ok(row,`rendered saved metric ${id}`);
+      assert.ok(row.includes(label) && row.includes(unit),row);
       for (const value of [metric.baseline,metric.target]) if(value?.available && Number.isFinite(value.value)) {
         assert.ok(row.includes(new Intl.NumberFormat('zh-CN',{maximumFractionDigits:2}).format(value.value)),`metric row displays saved ${value.value}`);
       }
     }
   };
   const restoreComparison = async projection => {
-    await evaluate(`document.querySelector('[data-detail-key="original-baseline"]').open=true;document.querySelector('[data-detail-key="finding-baseline-wording-0"]').open=true;document.querySelector('[data-detail-key="metric-filler-rate-per-recorded-minute"]').open=true`);
+    await evaluate(`document.querySelector('[data-detail-key="original-baseline"]').open=true;document.querySelector('[data-detail-key="finding-baseline-wording-0"]').open=true;document.querySelector('[data-detail-key="metric-review-word-count"]').open=true`);
     await wait('Comparison details populated',`document.querySelector('[data-detail-key="original-baseline"] blockquote')`);
     const scroll = await evaluate(`(()=>{document.getElementById('comparison-scroll').scrollTop=550;return document.getElementById('comparison-scroll').scrollTop})()`);
     assert.ok(scroll>0,'Comparison uses its regional scrolling');
@@ -160,7 +161,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
       await wait('returns to same Comparison',`document.body.dataset.screen==='comparison' && !${trainer}.comparison.loading`);
       assert.deepEqual(await evaluate(`${trainer}.comparison.context.projection.baseline.snapshot`),projection.baseline.snapshot);
       assert.deepEqual(await evaluate(`${trainer}.comparison.context.projection.target.snapshot`),projection.target.snapshot);
-      for (const key of ['original-baseline','finding-baseline-wording-0','metric-filler-rate-per-recorded-minute']) assert.equal(await evaluate(`document.querySelector('[data-detail-key="${key}"]').open`),true);
+      for (const key of ['original-baseline','finding-baseline-wording-0','metric-review-word-count']) assert.equal(await evaluate(`document.querySelector('[data-detail-key="${key}"]').open`),true);
       assert.equal(await evaluate(`document.getElementById('comparison-scroll').scrollTop`),scroll,'Report return restores regional scroll');
       assert.equal(await evaluate('document.activeElement.dataset.comparisonReport'),role,'Report return restores opener focus');
     }
@@ -250,7 +251,16 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
       const [evidence,metric,analysis,snapshot]=runs;
       metric.value.speechEvidenceRunId=evidence.id;analysis.value.speechEvidenceRunId=evidence.id;analysis.value.metricRunId=metric.id;
       snapshot.value.evidenceRunId=evidence.id;snapshot.value.metricRunId=metric.id;snapshot.value.analysisRunId=analysis.id;
-      if(wording)analysis.value.findings.push({id:'i4-wording',category:'wording',observation:later?'I4 新快照的措辞观察':'衔接动作时可以减少重复词',interpretation:'结合当次原文核对表达边界。',recommendation:'第二步直接从动作开始。',example:id===aId?'我们先说明目标，再解释行动安排。':null,evidenceRefs:[saved.transcript.segments[0].id]});
+      if(wording){
+        const finding={id:'i4-wording',category:'wording',observation:later?'I4 新快照的措辞观察':'衔接动作时可以减少重复词',
+          interpretation:'结合当次原文核对表达边界。',recommendation:'第二步直接从动作开始。',
+          example:id===aId?'我们先说明目标，再解释行动安排。':null,evidenceRefs:[saved.transcript.segments[0].id]};
+        const index=analysis.value.findings.findIndex(item=>item.id===finding.id);
+        if(index===-1){
+          analysis.value.findings.push(finding);
+          analysis.value.findingOrder?.push(finding.id);
+        } else analysis.value.findings[index]=finding;
+      }
       const normalize=require('../lib/training-session-data').normalizeResult;
       database(false,db=>{
         const insert=db.prepare('INSERT INTO results(id,session_id,created_at,snapshot_json) VALUES(?,?,?,?)');

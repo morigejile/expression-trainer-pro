@@ -71,7 +71,8 @@ async function fixture(t, provider = 'custom', {speechAvailable=false,framework=
       provenance:{engine:'fixture',engineVersion:'1',modelId:'fixture-vad',modelVersion:'1',modelSha256:'a'.repeat(64),
         thresholdVersion:'fixture-v1',normalizationVersion:'intervals-v1'},
       quality:{vad:{status:'degraded',reasons:['vad-thresholds-uncalibrated']}},
-      segments:[{id:'speech-0',startSample:1600,endSample:9600}]} : {schemaVersion:1,status:'unavailable',segments:[],
+      segments:[{id:'speech-0',startSample:0,endSample:4000},{id:'speech-1',startSample:12000,endSample:16000}]} :
+      {schemaVersion:1,status:'unavailable',segments:[],
       quality:{vad:{status:'unavailable',reasons:['vad-model-unavailable']}}},
     getDiagnosisProfile:() => resolveAutomaticDiagnosisProfile(settings),
     getAnalysisInputs:(session,options) => buildSessionAnalysisInputs(session,prompt,options),
@@ -97,8 +98,7 @@ async function fixture(t, provider = 'custom', {speechAvailable=false,framework=
   audio.write('data',36);audio.writeUInt32LE(32000,40);
   return {app,settings,received,requestReceived,open,prompt,mode:value=>{responseMode=value;},
     command:(operation,fields={},target=app)=>invoke(target,operation,{sessionId,...fields}),
-    async complete() {
-      const text='我认为需要先明确目标，再安排具体行动。';
+    async complete(text='我认为需要先明确目标，再安排具体行动。') {
       const saved=await invoke(app,'finalize',{sessionId,input:{completedAt:'2026-09-19T00:00:01Z',durationMs:1000,audio,
         transcript:{text,segments:[{id:'segment-1',text,timingSource:'unavailable'}]}}});
       assert.equal(saved.ok,true);
@@ -165,7 +165,7 @@ test('invalid cross-group order fails without hiding the saved report or dispatc
 
 test('three remote metrics retain exact ownership while all local metrics and speech survive HTTP and restart',async t=>{
   const f=await fixture(t,'custom',{speechAvailable:true});
-  const saved=await f.complete();
+  const saved=await f.complete('嗯，我觉得这个目标很好。');
   const report=selectStructuredReport(saved.results);
   assert.equal(report.snapshot.value.availability,'complete');
   assert.deepEqual(report.snapshot.value.radar,{status:'unavailable',reason:'not-calibrated',version:null});
@@ -180,10 +180,17 @@ test('three remote metrics retain exact ownership while all local metrics and sp
   for (const ref of finding.evidenceRefs) assert.ok(visible.has(ref) && context.allowedEvidenceRefs.includes(ref));
   assert.equal(Object.hasOwn(context,'evidenceMap'),false);
   assert.deepEqual(context.metrics.map(x=>x.id),['metric:text-character-count','metric:audio-duration-ms','metric:filler-count']);
+  assert.equal(context.metrics.find(metric=>metric.id==='metric:filler-count').value,2);
   assert.equal(Object.hasOwn(context,'speech'),false);
   assert.equal(Object.hasOwn(context,'quality'),false);
-  assert.equal(report.metricRun.value.metrics.length,15);
-  assert.deepEqual(report.evidenceRun.value.segments,[{id:'speech-0',startSample:1600,endSample:9600}]);
+  assert.equal(report.metricRun.definitionVersion,'common-metrics-v2');
+  assert.equal(report.metricRun.value.definitionVersion,'common-metrics-v2');
+  assert.equal(report.snapshot.value.metricsVersion,'common-metrics-v2');
+  assert.equal(report.metricRun.value.metrics.length,12);
+  assert.equal(report.metricRun.value.metrics.find(metric=>metric.id==='review-word-count').value,4);
+  assert.equal(report.metricRun.value.metrics.find(metric=>metric.id==='between-speech-gap-percent').value,50);
+  assert.deepEqual(report.evidenceRun.value.segments,[{id:'speech-0',startSample:0,endSample:4000},
+    {id:'speech-1',startSample:12000,endSample:16000}]);
   assert.equal(report.analysisRun.provenance.profileId,'approved');
   assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v16');
   assert.equal(report.analysisRun.provenance.problemLibraryVersion,'expression-problem-library-v0.6');
@@ -196,19 +203,19 @@ test('three remote metrics retain exact ownership while all local metrics and sp
 
 test('HTTP diagnoses cannot cite excluded metrics or raw intervals that still exist locally',async t=>{
   const f=await fixture(t,'custom',{speechAvailable:true});
-  f.mode('excluded-ref:metric:hedge-count');
+  f.mode('excluded-ref:metric:review-word-count');
   const saved=await f.complete(),initial=selectStructuredReport(saved.results);
   const excluded=initial.metricRun.value.metrics.filter(x=>!['text-character-count','audio-duration-ms','filler-count'].includes(x.id)).map(x=>`metric:${x.id}`);
-  assert.equal(excluded.length,12);
+  assert.equal(excluded.length,9);
   for(const [index,ref] of [...excluded,'speech-0'].entries()){
     f.mode(`excluded-ref:${ref}`);
     if(index)assert.equal((await f.command('analyze',{retry:true})).ok,true);
     const current=(await f.command('get')).value;
     assert.equal(selectStructuredReport(current.results).analysisRun.value.reason,'invalid-response');
-    assert.equal(selectStructuredReport(current.results).metricRun.value.metrics.length,15);
+    assert.equal(selectStructuredReport(current.results).metricRun.value.metrics.length,12);
     assert.equal(f.received.at(-1).context.allowedEvidenceRefs.includes(ref),false);
   }
-  assert.equal(f.received.length,13,'one request per attempt, no repair request');
+  assert.equal(f.received.length,10,'one request per attempt, no repair request');
 });
 
 test('insufficient-material assessment survives real HTTP, immutable persistence and restart as a successful result',async t=>{
