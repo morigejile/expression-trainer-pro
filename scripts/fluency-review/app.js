@@ -1,7 +1,7 @@
 'use strict';
 const $=id=>document.getElementById(id);
 const audio=$('audio');
-let samples=[],state={},activeId='',stage='listen',revision=0,datasetKey='',dirty=0,saved=0,saving=false,timer,clipEnd=null;
+let samples=[],state={},activeId='',stage='review',revision=0,datasetKey='',dirty=0,saved=0,saving=false,timer,clipEnd=null;
 const format=time=>{const ticks=Math.round(Math.max(0,time||0)*10);return `${String(Math.floor(ticks/600)).padStart(2,'0')}:${((ticks%600)/10).toFixed(1).padStart(4,'0')}`;};
 const sample=()=>samples.find(item=>item.id===activeId),row=()=>state[activeId];
 const gap=()=>sample().gaps[row().cursor];
@@ -66,10 +66,10 @@ function render() {
     button.setAttribute('aria-pressed',String(button.dataset.id===activeId));
     const item=samples.find(item=>item.id===button.dataset.id),record=state[item.id];
     const counts=summarizeJudgments(item.gaps,record.judgments);
-    button.querySelector('small').textContent=counts.recorded?`已确认 ${counts.decided}/${item.gaps.length}${counts.uncertain?` · 待定 ${counts.uncertain}`:''}`:`${Math.round(item.duration)} 秒 · ${item.id==='A'?'建议先听':'随后再听'}`;
+    button.querySelector('small').textContent=counts.recorded?`已确认 ${counts.decided}/${item.gaps.length}${counts.uncertain?` · 待定 ${counts.uncertain}`:''}`:`${Math.round(item.duration)} 秒 · ${item.gaps.length} 处待核对`;
   }
   $('listen-panel').hidden=stage!=='listen';$('review-panel').hidden=stage!=='review';
-  $('step-listen').classList.toggle('active',stage==='listen');$('step-review').classList.toggle('active',stage==='review');$('step-review').disabled=!record.blindComplete;
+  $('step-listen').classList.toggle('active',stage==='listen');$('step-review').classList.toggle('active',stage==='review');
   options('flow-choices','flow',[['smooth','顺畅'],['occasional','偶有中断'],['frequent','经常中断'],['unsure','不确定']],'sample');
   options('speed-choices','speed',[['slow','偏慢'],['suitable','适中'],['fast','偏快'],['unsure','不确定']],'sample');
   if(document.activeElement!==$('overall-note'))$('overall-note').value=record.note;
@@ -78,6 +78,7 @@ function render() {
     const item=gap(),counts=summarizeJudgments(current.gaps,record.judgments);
     $('gap-counter').textContent=`第 ${record.cursor+1} 处 / 共 ${current.gaps.length} 处`;
     $('gap-title').textContent=`${format(item.start)}—${format(item.end)}`;
+    $('gap-observation').textContent=`检测结果：这段语音间隔约 ${(item.end-item.start).toFixed(2)} 秒。请复听确认是否准确，以及是否影响连贯性。`;
     $('review-progress').textContent=`已确认 ${counts.decided}/${current.gaps.length}${counts.uncertain?` · 待定 ${counts.uncertain}`:''}`;
     const list=$('gap-list');list.replaceChildren();
     current.gaps.forEach((item,index)=>{
@@ -99,8 +100,8 @@ function render() {
 }
 
 function chooseSample(id) {
-  stop();activeId=id;stage=row().blindComplete?'review':'listen';audio.src=sample().audioUrl;
-  $('play-status').textContent='点击播放，开始试听。';$('current-time').textContent='00:00.0';render();
+  stop();activeId=id;stage='review';audio.src=sample().audioUrl;
+  $('play-status').textContent='点击“播放这一处”，直接核对检测结果。';$('current-time').textContent='00:00.0';render();
 }
 function moveNext() {
   stop();if(row().cursor<sample().gaps.length-1){row().cursor++;changed();render();}
@@ -124,7 +125,7 @@ $('mark').addEventListener('click',mark);
 document.addEventListener('keydown',event=>{if(event.key.toLowerCase()==='m' && stage==='listen' && !['INPUT','TEXTAREA','SELECT'].includes(document.activeElement.tagName)){event.preventDefault();mark();}});
 $('overall-note').addEventListener('input',event=>{row().note=event.target.value;changed();});
 $('gap-note').addEventListener('input',event=>{const item=judgment();item.note=event.target.value;row().judgments[gap().id]=item;changed();});
-$('enter-review').addEventListener('click',()=>{stop();row().blindComplete=true;stage='review';changed();render();});
+$('enter-review').addEventListener('click',()=>{stop();stage='review';render();});
 $('step-listen').addEventListener('click',()=>{stop();stage='listen';render();});
 $('step-review').addEventListener('click',()=>{stop();stage='review';render();});
 $('play-clip').addEventListener('click',()=>replay(2));

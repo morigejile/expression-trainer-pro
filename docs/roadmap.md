@@ -97,7 +97,7 @@ M3 首版已完成可靠指标变化、两侧 Finding/Evidence 复盘与 History
 
 第一阶段的离线派生预览与只读核验工具已实现，尚未接入正式报告、对比或远程 AI；实现记录见 [Current §13](architecture/current.md#13-m2-analysis-pipeline)，实验定义见 [Data Model §5.3](architecture/data-model.md#离线流畅度测量预览实验)，操作方法见 [Development](development.md#m2-已保存-vad-区间核验)。
 
-下一步是人工复听、边界标注与新用途的测量放行；有具体误差或覆盖缺口时再决定是否开展参数对照。第二阶段生产接入仍待上述证据明确后细化，不以离线一致性核验代替准确性或 AI 内容质量验收。任务拆分与执行记录见 [Supporting 计划](superpowers/plans/2026-11-09-fluency-measurement.md)；该实验不自动成为 M4 的新增验收门槛，也不重开已关闭的 M2。
+已完成一批已展示候选区间的存在性与听感影响人工核对，具体结果与边界见 [Current §13](architecture/current.md#13-m2-analysis-pipeline)。现阶段保留原 VAD 参数；仅在出现具体误差或新用途确需更强能力时补相应漏检/边界证据，再决定参数对照。第二阶段方案需区分客观间隔观察与表达问题，生产接入及真实 AI 内容验收尚未完成，不将本轮有限核对写成全范围测量放行。任务拆分与执行记录见 [Supporting 计划](superpowers/plans/2026-11-09-fluency-measurement.md)；该实验不自动成为 M4 的新增验收门槛，也不重开已关闭的 M2。
 
 ## 5. 里程碑
 

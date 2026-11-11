@@ -179,7 +179,7 @@ node scripts/inspect-speech-evidence.js --root "$trainingRoot" --session $sessio
 node scripts/fluency-review.js --previews .superpowers/sdd/2026-11-09-fluency-measurement/real-previews --state .superpowers/sdd/2026-11-09-fluency-measurement/human-review.json
 ```
 
-打开终端输出的本机地址。先试听并一键标记，再进入逐段核对，分别记录间隔是否存在、是否影响连贯性，以及可选的边界判断和备注。标记时间、整体听感、判断与当前位置自动保存至指定的独立 JSON；刷新可以恢复，也可导出当前草稿。未知/跳过项保持待定，不触发全部确认提示，记录完成不等于测量准确性或报告质量通过。
+打开终端输出的本机地址，默认直接展示检测到的间隔位置和时长。点击“播放这一处”回放前后语音，分别记录间隔是否存在、是否影响连贯性，以及可选的边界判断和备注；自由试听与一键标记保留为可选方式。直接核对、切换录音或切换页面不写入独立试听完成标记，也不自动填写人工判断。标记时间、整体听感、判断与当前位置自动保存至指定的独立 JSON；刷新可以恢复，也可导出当前草稿。未知/跳过项保持待定，不触发全部确认提示，记录完成不等于测量准确性或报告质量通过。
 
 记录绑定 Session/Report/Source、原音频 hash、区间和时长；来源变化或记录损坏时拒绝启动，不静默清空。每个记录文件由单个服务通过独占 `.lock` 持有，同一服务的多个页面使用 revision 防止旧写入覆盖；正常关闭服务释放锁。异常终止若留下锁，先核实锁中 PID 对应旧服务已经结束，再清理该独立记录文件的残留锁；不删除验收 JSON。测试执行 `node --test test/fluency-review.test.js`，浏览器 QA 使用独立测试记录，不纳入人工验收结论。该工具位于不随安装包发布的 `scripts/`，不属于正式 Report UI。
 

@@ -90,49 +90,56 @@ ASR 产品层以 `models/registry.json` 作为唯一 schema-v2 Catalog，不依�
 
 ```mermaid
 flowchart LR
-  Mic[系统麦克风]
-  LLM[OpenAI / DeepSeek / Ollama / Custom]
-  Model[(appData/expression-trainer-pro-models\n版本目录 + active pointer)]
-  UserData[(userData/llm-provider-settings.json\nrecording-policy.json\nappearance/asr-selection/custom-prompt JSON\nlegacy settings.json)]
+  Mic["系统麦克风"]
+  LLM["OpenAI / DeepSeek / Ollama / Custom"]
+  Model[("appData/expression-trainer-pro-models<br/>ASR / speech-evidence 模型")]
+  UserData[("userData 配置<br/>llm-provider-settings.json / ai-disclosure.json<br/>recording-policy.json / appearance.json<br/>asr-selection.json / custom-prompt.json<br/>legacy settings.json")]
+  DB[("userData/training<br/>SQLite + managed WAV")]
 
-  subgraph Electron[Expression Trainer / Electron]
-    R[Renderer\nUI + Web Audio + 训练状态\n有界 WAV 缓冲/History/Report\nsrc/app.js]
-    P[Preload\nwindow.api\npreload.js]
-    M[Main Process\n窗口 + 文件 + IPC Router\nmain.js]
-    C[ASR Controller\n请求关联 + 退出/重建]
-    A[Utility Process\nSelected Sherpa Provider\nsherpa-onnx-node]
-    X[Lexicon\nlib/lexicon.js]
-    F[LLM\nlib/ai-feedback.js + prompts.js]
-    T[Training Application\nRepository + Audio Store\nSession Analysis + Common + Context]
-    V[VAD Utility Process\nSilero / Sherpa]
-    DB[(userData/training\nSQLite + managed WAV)]
+  subgraph Electron["Expression Trainer / Electron"]
+    R["Renderer · src/app.js<br/>UI / Web Audio / 训练状态<br/>有界 WAV 缓冲 / History / Report / 回放"]
+    P["Preload · preload.js<br/>window.api / 受控 IPC"]
+    subgraph Main["Main Process"]
+      M["main.js<br/>窗口 / 文件 / IPC Router / 服务组合"]
+      C["ASR Controller<br/>请求关联 / 退出与重建"]
+      X["本地词库分析<br/>lib/lexicon.js"]
+      T["Training Application<br/>Repository / Audio Store<br/>Session Analysis / Common Metrics"]
+      G["AI 配置与告知门禁<br/>lib/ai-analysis-gate.js<br/>读取当前配置 / 启用检查 / 发送前复核"]
+      F["LLM 客户端与结构化诊断<br/>lib/ai-feedback.js<br/>lib/structured-diagnosis.js"]
+    end
+    A["ASR Utility Process<br/>Selected Sherpa Provider / sherpa-onnx-node"]
+    V["VAD Utility Process<br/>Silero / Sherpa"]
   end
 
   Mic --> R
-  R -->|sessionId + sequence + Float32Array\n逐块 invoke| P
-  P --> M
+  R -->|"ASR 生命周期 / sessionId / sequence<br/>Float32Array 逐块 invoke"| P
+  R -->|"Session 保存、读取与回放 / 有界 WAV<br/>本地统计文本 / 设置与告知命令"| P
+  R -->|"诊断命令<br/>requestId / sessionId / retry / trigger"| P
+  P -->|"受信任来源与参数校验"| M
   M --> C
   C -->|structured clone| A
   Model --> A
   A --> C
   C --> M
-  M -->|安全 envelope + 规范事件| P
+  M -->|"安全 envelope / 规范事件 / 脱敏配置<br/>训练快照与受控音频读取"| P
   P --> R
-  R -->|逐句 invoke| P
-  R -->|profile ID + 片段文本/时间\n不含音频| P
   M --> X
   X --> M
-  M --> F
-  F -->|fetch| LLM
+  M -->|"连接测试：固定测试文本"| F
   M <--> UserData
   M --> T
   T <--> DB
-  T --> V
+  T -->|"已保存 WAV / 推理任务"| V
+  V -->|"版本化语音区间 / quality / provenance"| T
   Model --> V
-  T --> F
+  T <-->|"当前配置选择 / AI 告知与启用门禁<br/>Main 注入的回调"| G
+  G --> UserData
+  T -->|"已保存事实与精确证据引用<br/>经门禁构造分析上下文"| F
+  F -->|"Main 内精简请求 / fetch<br/>文本、指标与必要上下文，不含原始音频"| LLM
+  F -->|"严格解析后的诊断 / 失败状态"| T
 ```
 
-Main 负责 Electron 控制面、词库分析、小型 userData JSON 原子文件 I/O 和 LLM 请求编排；ASR 初始化与同步 decode 已移入单个 utility process。
+Main 负责 Electron 控制面、训练存储、词库分析、小型 userData JSON 原子文件 I/O 和 LLM 请求编排；ASR 初始化与同步 decode、VAD 推理分别在独立 utility process 中执行。Renderer 的诊断命令只定位已保存的 Session 并声明重试与触发方式，不提交 profile ID 或分析用的片段文本/时间；Main 读取真实保存输入、选择当前有效配置并复核告知/启用边界。`lib/analysis-context.js` 构造本地完整上下文，`lib/diagnosis-input.js` 生成实际发送和返回校验使用的精简投影；提示与响应校验由 `lib/structured-diagnosis.js` 承担。已保存密钥仅在 Main 内解密使用，不回传 Renderer。详细边界见 §5.7、§13、§17。
 
 ## 5. 模块职责
 
@@ -162,7 +169,7 @@ Main 负责 Electron 控制面、词库分析、小型 userData JSON 原子文�
 - 管理窗口、应用生命周期、IPC handlers、词库、对话框和小型 userData JSON；设置使用同目录临时文件、fsync 和 rename 原子写。
 - 通过配置模块规范化和单向迁移旧 schema；损坏文件保留原文，LLM future disk schema 拒绝读取与降级保存。
 - ASR 命令通过 Router/Controller 返回安全 envelope；Main 不加载 Sherpa，utility 退出后在下一次 start 重建。
-- 本地分析、有超时的 LLM fetch 和回放输入校验均在 Main 执行；同类新 LLM 请求取消旧请求。
+- 本地分析、有超时的 LLM fetch 和结构化诊断引用校验均在 Main 执行；同类新 LLM 请求取消旧请求。
 - Fake ASR/LLM 只在显式 smoke 参数和隔离 `userData` 下组合，普通启动不进入该路径。
 
 ### 5.4 ASR Provider / session、managed provider 与 Factory
@@ -434,6 +441,8 @@ npm run smoke:package
 人工核验已有 VAD 的入口为只读 [`inspect-speech-evidence.js`](../../scripts/inspect-speech-evidence.js)：读取 Report 精确引用的 Source、校验原 WAV，并导出语音区间、内部 gap、首尾非语音的 sample/秒边界与原始快照；用既有 Common Metric 定义核对已保存汇总。正式 Report、模型参数、持久化 Schema 均未改变。操作方法见 [Development](../development.md#m2-已保存-vad-区间核验)。现有粒度足以复核区间/汇总及当前 Finding 的文本、指标、语音区间引用；仍不提供词级对齐或证明 AI 解释在语义上成立，本轮用户反馈确认 AI Diagnosis 正常，不外推所有推理结论。
 
 2026-11-09 增加显式 `--fluency-preview` 离线入口，复用已有 Common 校验与 VAD 区间派生实验测量；定义见 [Data Model §5.3](data-model.md#离线流畅度测量预览实验)。新入口未接正式报告、对比或远程 AI。两条既有 103.536 s / 39.776 s 记录已按原 WAV hash、七项保存测量和关联快照核验并生成预览；另两条无检测语音的记录正确输出不可用跨度/比率，数据库核验前后 hash 未变。这些结果证明派生与只读链路可运行，不新增人工边界准确率、听感或报告质量通过结论；模型缓存大小/hash 与 registry 一致，未重新推理或调参。
+
+2026-11-10 用户完成独立本地验收页面中的直接核对，标注版本为 revision 134；来源绑定、原 Report/Source ID、间隔列表和 WAV hash 已重新核验，原标注冻结在本机 Git 忽略的实验目录。A 的 8 处均确认存在，其中 3 处自然、5 处影响连贯；B 的 23 处均确认存在，其中 7 处自然、16 处影响连贯；合计 31 处全部填写，无待定。A 的整体听感为“经常中断、语速适中”，B 未填写整体听感，不补推断。B 中两处同为约 0.538 秒的间隔分别标为自然与影响连贯，不能把检测间隔次数等同卡顿次数，也不能仅按时长判问题。本轮是对已展示候选的存在性与听感影响复核，未填写边界标签或独立漏检标记，不外推召回率、毫秒边界精度、跨场景准确率、自动流畅度阈值或 AI 报告质量。现有参数与未校准 provenance 保留；没有基于本批结果立即系统调参，也没有接入生产诊断。
 
 本次 Closeout 归档此前未提交的统计输入快照修复、取消/保存刷新修复、HTTP/异常测试及只读 VAD 核验工具，并落盘最终验收决定；本轮未新增实现。M2 正式关闭，人工证据和各项边界只在 [M2 验收矩阵](../milestones/m2-speech-evidence-and-ai-diagnosis.md#acceptance-criteria) 定义。SenseVoice 下载异常与真实 smoke/资源验收（B-23）明确延期；Report UX（B-22）、雷达完整校准（B-20）和扩大 VAD 校准（B-24）为非阻塞后续项，重开条件只见 [Backlog](../product/backlog.md#not-now)。雷达及 VAD 来源的未校准标记保持不变。
 
