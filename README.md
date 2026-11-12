@@ -2,9 +2,18 @@
   <img src="src/assets/app-icon.png" width="80" height="80" alt="好好表达应用图标">
 </p>
 
-# 好好表达
+<h1 align="center">好好表达</h1>
 
-**说一遍，看清问题，再练一遍。**
+<p align="center"><strong>说一遍，看清问题，再练一遍。</strong></p>
+<p align="center">Windows x64 · 本地转写 · 可选 AI 分析</p>
+
+<p align="center">
+  <strong><a href="#快速开始">安装与使用</a></strong> ·
+  <a href="#界面预览">界面预览</a> ·
+  <a href="#核心能力">核心能力</a> ·
+  <a href="#数据与隐私">数据与隐私</a> ·
+  <a href="#项目文档">项目文档</a>
+</p>
 
 好好表达是一款面向中文口语表达的桌面训练应用。通过录音及转写，结合逐字稿、录音回放和分析报告看问题，再选择一个目标继续练习。
 
@@ -12,7 +21,15 @@
 
 > **Windows x64 安装包已完成打包，可通过 `.exe` 安装程序安装使用。** 目前主要在 Windows 11 x64 上开发与验证。
 
-[适用场景](#适用场景) · [核心能力](#核心能力) · [快速开始](#快速开始) · [数据与隐私](#数据与隐私) · [当前限制](#当前限制) · [项目文档](#项目文档)
+## 界面预览
+
+| 首页 · 默认外观 | PREP 练习 · 录音与转写 |
+| --- | --- |
+| [![默认外观的首页](docs/screenshots/home.png)](docs/screenshots/home.png) | [![PREP 练习的录音与转写界面](docs/screenshots/recording.png)](docs/screenshots/recording.png) |
+| **首页 · 珊瑚霞光** | **AI 分析设置** |
+| [![珊瑚霞光外观的首页](docs/screenshots/home-coral.png)](docs/screenshots/home-coral.png) | [![AI 分析设置和示例模型配置](docs/screenshots/ai-settings.png)](docs/screenshots/ai-settings.png) |
+
+点击图片查看原尺寸。录音转写和模型配置使用示例数据。
 
 ## 适用场景
 
@@ -136,6 +153,9 @@
 
 ## 开发与贡献
 
+<details>
+<summary>展开源码运行与打包命令</summary>
+
 应用主要使用 Electron、Sherpa-ONNX、SQLite 与原生 JavaScript 构建。
 
 ### 从源码运行
@@ -163,6 +183,8 @@ npm run smoke:package:win # 检查 NSIS 构建产物
 Windows 安装包输出到 `dist/windows-nsis/`，文件名为 `ExpressionTrainer-Setup-<版本>-x64.exe`。
 
 修改前请阅读 [AGENTS.md](AGENTS.md) 和[文档入口](docs/README.md)，按改动范围执行[开发文档](docs/development.md)规定的检查。提交问题或改动时，说明用途、影响和实际验证结果；完整回归、模型评测与安装升级验证按对应触发条件执行。
+
+</details>
 
 ## 项目文档
 
