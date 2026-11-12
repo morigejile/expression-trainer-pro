@@ -83,7 +83,7 @@ body[data-frozen-ui="training"] .subtitle-line :is(.filler,.hedge,.vague,.strong
 #transport-actions :is(#btn-resume,#btn-stop) .icon{fill:currentColor;stroke:none}
 #transport-time #timer{font-size:13px;line-height:1.8;color:#80715d;font-weight:400;font-variant-numeric:tabular-nums;margin-left:6px}
 body[data-frozen-ui="report"] .report-header{display:grid;grid-template-columns:minmax(0,1fr) auto;column-gap:16px;align-items:start;width:100%;margin:0;padding:0;border:0;background:none}
-body[data-frozen-ui="report"] .report-header h1{grid-column:1;grid-row:1}
+body[data-frozen-ui="report"] .report-header h1{grid-column:1;grid-row:1;overflow-wrap:anywhere;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
 body[data-frozen-ui="report"] .report-header .record-identity{grid-column:1 / -1;grid-row:2}
 body[data-frozen-ui="report"] .report-header #btn-report-back{grid-column:2;grid-row:1;justify-self:end;margin:0;white-space:nowrap}
 body[data-frozen-ui="report"] #frozen-report-context:empty{display:none}

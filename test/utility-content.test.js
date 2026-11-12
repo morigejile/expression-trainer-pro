@@ -81,6 +81,7 @@ test('first-use quick start can be skipped and its setup actions never run befor
   const fixture=view(),calls=[];
   help(fixture,'start',{firstRun:true,onDismiss:()=>calls.push('skip'),onSettings:page=>calls.push(page),onHelp:page=>calls.push(page)});
   assert.match(fixture.parent.textContent,/欢迎使用好好表达/);
+  assert.match(fixture.parent.textContent,/接入 AI 大模型后，报告会结合原话.*按建议再练一轮/);
   assert.deepEqual(calls,[]);
   click(fixture.parent.querySelector('[data-setting="speech"]'));
   click(fixture.parent.querySelector('[data-setting="ai"]'));
@@ -92,14 +93,15 @@ test('first-use quick start can be skipped and its setup actions never run befor
   assert.doesNotMatch(fixture.parent.textContent,/欢迎使用好好表达/);
 });
 
-test('DeepSeek manual is complete offline and opens only explicit official links',()=>{
+test('AI setup guide covers available providers offline and opens only explicit official links',()=>{
   const fixture=view(),calls=[];
   help(fixture,'deepseek',{onExternal:url=>calls.push(url),onSettings:page=>calls.push(page)});
-  assert.match(fixture.parent.textContent,/API 密钥.*deepseek-flash/s);
-  assert.match(fixture.parent.textContent,/测试连接不保存配置/);
+  assert.match(fixture.parent.textContent,/找到优先改进的问题.*回看判断依据.*带着目标重练.*选择服务并准备配置/s);
+  assert.match(fixture.parent.textContent,/自定义兼容服务，例如通义千问（阿里云百炼）、豆包（火山方舟）、Kimi（月之暗面）.*配置示例 · DeepSeek.*deepseek-flash/s);
+  assert.doesNotMatch(fixture.parent.textContent,/OpenAI|Ollama/);
   assert.match(fixture.parent.textContent,/启动AI分析.*首次.*告知/s);
-  assert.match(fixture.parent.textContent,/401.*402.*429/s);
-  assert.equal(fixture.parent.querySelectorAll('table').length,2);
+  assert.match(fixture.parent.textContent,/核对完整请求地址和所选模型是否支持该接口/);
+  assert.equal(fixture.parent.querySelectorAll('table').length,3);
   assert.equal(fixture.parent.querySelectorAll('iframe').length,0);
   assert.equal(fixture.parent.querySelectorAll('script').length,0);
   assert.deepEqual(calls,[]);

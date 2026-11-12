@@ -12,11 +12,11 @@ async function run({app,mainWindow,BrowserWindow,phase}){
  try{
   if(phase==='onboarding'){
    await ready('快速开始');
-   assert.match(await evaluate(`document.getElementById('content').textContent`),/欢迎使用好好表达/);
+   assert.match(await evaluate(`document.getElementById('content').textContent`),/欢迎使用好好表达.*接入 AI 大模型后，报告会结合原话/s);
    assert.equal(await evaluate(`localStorage.getItem('expression-trainer.help-seen')`),null);
    assert.equal(await evaluate(`(()=>{const area=document.getElementById('content').getBoundingClientRect(),buttons=[...document.querySelectorAll('.quick-start-actions button')];return buttons.length===3&&buttons.every(button=>{const rect=button.getBoundingClientRect();return rect.top>=area.top&&rect.bottom<=area.bottom;});})()`),true,'all setup shortcuts are visible before scrolling');
    await capture('first-use-welcome');
-   await click('[data-help="deepseek"]');await ready('DeepSeek 配置指南');
+   await click('[data-help="deepseek"]');await ready('AI 分析配置指南');
    await click('[data-setting="ai"]');await ready('AI分析');
    await click('[data-add]');
    await evaluate(`(()=>{const input=document.querySelector('[data-field="name"]');input.value='保留草稿';input.dispatchEvent(new Event('input',{bubbles:true}));})()`);
@@ -24,18 +24,18 @@ async function run({app,mainWindow,BrowserWindow,phase}){
    await wait(`!document.getElementById('unsaved').hidden`);
    await click('#stay');
    assert.equal(await evaluate(`document.querySelector('[data-field="name"]').value`),'保留草稿');
-   await click('[data-help="deepseek"]');await click('#discard');await ready('DeepSeek 配置指南');
+   await click('[data-help="deepseek"]');await click('#discard');await ready('AI 分析配置指南');
   }else{
    await wait(`localStorage.getItem('expression-trainer.help-seen')==='1'`);
    await new Promise(done=>setTimeout(done,150));
    assert.equal(await evaluate(`document.getElementById('utility').open`),false,'dismissed welcome does not repeat after restart');
    await click('#btn-help');await ready('快速开始');
    assert.equal(await evaluate(`Boolean(document.querySelector('[data-dismiss]'))`),false);
-   await click('[data-help="deepseek"]');await ready('DeepSeek 配置指南');
+   await click('[data-help="deepseek"]');await ready('AI 分析配置指南');
   }
   const text=await evaluate(`document.getElementById('content').textContent`);
-  assert.match(text,/deepseek-flash/);assert.match(text,/测试连接不保存配置/);assert.match(text,/401.*402.*429/s);
-  assert.equal(await evaluate(`document.querySelectorAll('.help-manual table').length`),2);
+  assert.match(text,/找到优先改进的问题.*通义千问.*豆包.*Kimi.*配置示例 · DeepSeek.*deepseek-flash/s);
+  assert.equal(await evaluate(`document.querySelectorAll('.help-manual table').length`),3);
   assert.equal(await evaluate(`document.querySelectorAll('dialog[open]').length`),1);
   assert.equal(await evaluate(`document.querySelectorAll('iframe').length`),0);
   assert.equal(opened.length,0,'reading the manual never opens a browser');

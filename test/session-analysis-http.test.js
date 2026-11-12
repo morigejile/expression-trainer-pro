@@ -37,7 +37,7 @@ async function fixture(t, provider = 'custom', {speechAvailable=false,framework=
       response.end('private upstream detail fixture-secret');
       return;
     }
-    const diagnosis = {schemaVersion:1,assessment:{status:'analyzable',reason:'转写包含观点与行动。',
+    const diagnosis = {schemaVersion:1,practiceTitle:'先明确目标再安排行动',assessment:{status:'analyzable',reason:'转写包含观点与行动。',
       categories:['organization','argument','delivery','wording'],frameworkAssessable:Boolean(context.analysisTarget),
       evidenceRefs:[context.transcript.segments[0].id]},summary:'建议补充支持观点的具体例子。',findings:[{
       id:'finding-1',category:'argument',observation:'表达提出了先明确目标的主张。',
@@ -51,7 +51,7 @@ async function fixture(t, provider = 'custom', {speechAvailable=false,framework=
       diagnosis.assessment={status:'insufficient',reason:'只有试音和问候，没有展开表达内容。',
         categories:[],frameworkAssessable:false,evidenceRefs:[context.transcript.segments[0].id]};
       diagnosis.summary='本次材料不足以形成表达诊断。';diagnosis.findings=[];
-      diagnosis.frameworkFindings=[];
+      diagnosis.frameworkFindings=[];diagnosis.practiceTitle=null;
     }
     diagnosis.findingOrder=[...diagnosis.frameworkFindings,...diagnosis.findings].map(f=>f.id);
     if(responseMode.startsWith('excluded-ref:'))diagnosis.findings[0].evidenceRefs=[responseMode.slice('excluded-ref:'.length)];
@@ -97,6 +97,7 @@ async function fixture(t, provider = 'custom', {speechAvailable=false,framework=
   audio.writeUInt32LE(16000,24);audio.writeUInt32LE(32000,28);audio.writeUInt16LE(2,32);audio.writeUInt16LE(16,34);
   audio.write('data',36);audio.writeUInt32LE(32000,40);
   return {app,settings,received,requestReceived,open,prompt,mode:value=>{responseMode=value;},
+    list:(target=app)=>invoke(target,'list'),
     command:(operation,fields={},target=app)=>invoke(target,operation,{sessionId,...fields}),
     async complete(text='我认为需要先明确目标，再安排具体行动。') {
       const saved=await invoke(app,'finalize',{sessionId,input:{completedAt:'2026-09-19T00:00:01Z',durationMs:1000,audio,
@@ -129,6 +130,7 @@ for (const provider of ['custom','ollama']) test(`${provider} protocol preserves
   const restored=(await f.command('get',{},reopened)).value;
   assert.deepEqual(restored.results,saved.results);
   assert.equal(selectStructuredReport(restored.results).analysisRun.id,diagnosis.id);
+  assert.equal((await f.list(reopened)).value[0].practiceTitle,'先明确目标再安排行动');
   assert.equal(f.received.length,1);
 });
 
@@ -192,7 +194,7 @@ test('three remote metrics retain exact ownership while all local metrics and sp
   assert.deepEqual(report.evidenceRun.value.segments,[{id:'speech-0',startSample:0,endSample:4000},
     {id:'speech-1',startSample:12000,endSample:16000}]);
   assert.equal(report.analysisRun.provenance.profileId,'approved');
-  assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v16');
+  assert.equal(report.analysisRun.provenance.promptVersion,'structured-diagnosis-v17');
   assert.equal(report.analysisRun.provenance.problemLibraryVersion,'expression-problem-library-v0.6');
   assert.equal((await f.command('analyze',{retry:true})).value.id,report.snapshot.id,'complete report is not reanalyzed');
   await f.app.close();

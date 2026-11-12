@@ -42,7 +42,7 @@ npm run smoke:package
 
 ### 问题库与主诊断提示
 
-应用内 DeepSeek 指南的内容源是 [用户配置手册](guides/deepseek-first-use.md)。修改后运行 `node scripts/generate-user-guide.js` 生成随应用携带的 `src/deepseek-guide.js`；`node scripts/generate-user-guide.js --check` 和 `test/user-guide.test.js` 检查两者一致。不要直接编辑生成文件。指南纯文案修改不触发模型调用或打包；渲染、首次引导、导航或外部链接边界改变时，检查对应 `utility-content`、`utility-navigation`、`transcript`、`trusted-utility-ipc` 用例，并运行 `training-product-electron` 中的 first-use 专项。
+应用内 AI 分析配置指南的内容源是 [用户配置手册](guides/deepseek-first-use.md)。修改后运行 `node scripts/generate-user-guide.js` 生成随应用携带的 `src/deepseek-guide.js`；`node scripts/generate-user-guide.js --check` 和 `test/user-guide.test.js` 检查两者一致。不要直接编辑生成文件。指南纯文案修改不触发模型调用或打包；渲染、首次引导、导航或外部链接边界改变时，检查对应 `utility-content`、`utility-navigation`、`transcript`、`trusted-utility-ipc` 用例，并运行 `training-product-electron` 中的 first-use 专项。
 
 [问题库](product/expression-problem-library.md)的规则与卡片是唯一编辑源；改动后执行 `node scripts/generate-problem-library.js` 更新生成产物，`node scripts/generate-problem-library.js --check` 验证一致。运行时不读取整份 Markdown。
 

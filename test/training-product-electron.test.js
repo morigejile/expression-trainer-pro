@@ -77,7 +77,7 @@ test('I5 Frozen Settings and Help use guarded real IPC, preserve workspace state
   const userData=isolatedData(t);runPhase(userData,'i5');runPhase(userData,'i5-read');
 });
 
-test('first-use welcome skips once and the offline DeepSeek guide remains available after restart',{timeout:120000},t=>{
+test('first-use welcome skips once and the offline AI setup guide remains available after restart',{timeout:120000},t=>{
   const userData=isolatedData(t);runPhase(userData,'onboarding');runPhase(userData,'onboarding-read');
 });
 

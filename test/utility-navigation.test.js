@@ -34,14 +34,15 @@ test('AI setup links to the manual, protects a draft and restores the manual as 
  const f=fixture();f.api.getLlmProviderSettings=async()=>({schemaVersion:3,activeProfileId:null,profiles:[]});
  await f.ui.open('settings','ai');
  const link=f.document.getElementById('content').all().find(el=>el.attrs['data-help']==='deepseek');
- assert.ok(link);assert.match(link.textContent,/配置指南/);
+ assert.ok(link);assert.equal(link.textContent,'AI 分析配置指南');
  f.ui.state.edit(null);f.ui.state.update('name','未保存的配置');
  link.listeners.click();assert.equal(f.ui.surface,'settings');assert.equal(f.ui.state.draft.name,'未保存的配置');
  assert.equal(f.document.getElementById('unsaved').hidden,false);
  f.document.getElementById('discard').listeners.click();await new Promise(done=>setImmediate(done));
  assert.equal(f.ui.surface,'help');assert.equal(f.ui.page,'deepseek');
- assert.equal(f.document.getElementById('surface-title').textContent,'DeepSeek 配置指南');
- assert.ok(f.document.getElementById('local-nav').all().some(el=>el.attrs['data-page']==='deepseek'));
+ assert.equal(f.document.getElementById('surface-title').textContent,'AI 分析配置指南');
+ const navItem=f.document.getElementById('local-nav').all().find(el=>el.attrs['data-page']==='deepseek');
+ assert.equal(navItem.textContent,'AI 分析配置指南');
 });
 
 test('Appearance keeps native radios and focus during saving, failure and retry; other drafts are protected',async()=>{

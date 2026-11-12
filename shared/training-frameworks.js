@@ -28,9 +28,9 @@
   };
   const prompts = {
     topic:[
-      {id:'meeting-free-day',label:'每周无会日',text:'你是否赞成每周安排一天不举行会议？说明理由。'},
-      {id:'learning',label:'学习新技能',text:'学习一项新技能时，应该先实践还是先系统学习？'},
-      {id:'retrospective',label:'团队定期复盘',text:'你是否建议团队固定安排复盘时间？为什么？'},
+      {id:'meeting-free-day',label:'每周无会日',title:'每周是否应设一天无会议日',text:'你是否赞成每周安排一天不举行会议？说明理由。'},
+      {id:'learning',label:'学习新技能',title:'学新技能先实践还是先系统学习',text:'学习一项新技能时，应该先实践还是先系统学习？'},
+      {id:'retrospective',label:'团队定期复盘',title:'团队是否应固定安排复盘',text:'你是否建议团队固定安排复盘时间？为什么？'},
       {id:'habit',label:'一个值得推荐的习惯',text:'你会推荐别人养成什么习惯？用具体例子说明。'},
       {id:'unexpected',label:'处理突发问题的经历',text:'讲一次你处理突发问题的经历，以及你从中得到的经验。'},
       {id:'release',label:'是否推迟项目上线',text:'项目上线前仍有问题尚未解决，你是否建议延期？说明你的判断。'}
@@ -50,5 +50,9 @@
     return version != null && version !== value.version ? null : JSON.parse(JSON.stringify(value));
   }
   function getPromptOptions(kind) { return JSON.parse(JSON.stringify(prompts[kind] || [])); }
-  return {getFramework,getPromptOptions};
+  function getBankTopicTitle(text) {
+    const topic = prompts.topic.find(item => item.text === text);
+    return topic?.title ?? topic?.label;
+  }
+  return {getFramework,getPromptOptions,getBankTopicTitle};
 });

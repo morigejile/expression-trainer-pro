@@ -4,7 +4,7 @@
   else root.TrainingContext = api;
 })(typeof globalThis !== 'undefined' ? globalThis : this, function() {
   'use strict';
-  const {getFramework} = typeof module !== 'undefined' && module.exports ? require('./training-frameworks') : globalThis.TrainingFrameworks;
+  const {getFramework,getBankTopicTitle} = typeof module !== 'undefined' && module.exports ? require('./training-frameworks') : globalThis.TrainingFrameworks;
   const MAX_PROMPT_LENGTH = 2000;
   function normalizeTrainingPrompt(prompt) {
     const invalid = () => { throw Object.assign(new Error('Invalid training context'), {code:'INVALID_SESSION'}); };
@@ -55,5 +55,26 @@
       prompt.scenario && `场景：${prompt.scenario.text}`].filter(Boolean).join(' · ');
     return prompt ? `${mode} · ${prompt.kind === 'scenario' ? '场景' : '主题'}：${prompt.text}` : mode;
   }
-  return {MAX_PROMPT_LENGTH, normalizeTrainingContext, normalizeTrainingPrompt, getPromptParts, formatTrainingContext};
+  function normalizePracticeTitle(value) {
+    if (typeof value !== 'string') return null;
+    const title = value.trim();
+    return title.length > 0 && title.length <= 40 && !/[\r\n\u2028\u2029]/u.test(title) ? title : null;
+  }
+  function getPracticeTitle(record) {
+    const prompt = record.trainingPrompt;
+    const topic = prompt?.schemaVersion === 2 ? prompt.topic : prompt?.kind === 'topic' ? prompt : null;
+    if (topic?.text) {
+      return (topic.source === 'bank' ? getBankTopicTitle(topic.text) : null) ?? topic.text;
+    }
+    const projected = normalizePracticeTitle(record.practiceTitle);
+    if (projected) return projected;
+    for (const run of record.results || []) {
+      if (run.kind !== 'diagnosis' || run.status !== 'completed') continue;
+      const title = normalizePracticeTitle(run.value?.practiceTitle);
+      if (title) return title;
+    }
+    return '未命名练习';
+  }
+  return {MAX_PROMPT_LENGTH, normalizeTrainingContext, normalizeTrainingPrompt, getPromptParts, formatTrainingContext,
+    getPracticeTitle, normalizePracticeTitle};
 });

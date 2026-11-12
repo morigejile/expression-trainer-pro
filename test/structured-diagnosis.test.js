@@ -25,6 +25,17 @@ function parse(value,input = context()) {
 function apiResponse(content) { return {ok:true,status:200,async json() { return {choices:[{message:{content}}]}; }}; }
 const profile = {provider:'openai',apiKey:'test-secret-key',model:'fixture-model'};
 
+test('the existing diagnosis request can return a title without making diagnosis depend on it',async()=>{
+  const data={...assessed(),frameworkFindings:[],findingOrder:['finding-1']};
+  for(const [title,expected] of [['  项目上线进度  ','项目上线进度'],[null,undefined],['多行\n标题',undefined],[42,undefined]]){
+    const result=await require('../lib/ai-feedback').sendStructuredDiagnosis(context(),profile,{
+      fetchImpl:async()=>apiResponse(JSON.stringify({...data,practiceTitle:title}))
+    });
+    assert.equal(result.practiceTitle,expected);
+    assert.equal(result.summary,data.summary);
+  }
+});
+
 function assessed(data=response(),overrides={}) {
   return {...data,assessment:{status:'analyzable',reason:'有可理解的表达内容。',
     categories:['organization','argument','delivery','wording'],frameworkAssessable:false,
@@ -310,7 +321,7 @@ test('prompt examples teach parallel Finding arrays and remain consumable by the
       if (practice) source.practiceComparison={status:'unavailable'};
       const {system}=getStructuredDiagnosisPrompt(source);
       const template=JSON.parse(system.match(/\n(\{\n[\s\S]+?\n\})\n/)[1]);
-      assert.deepEqual(Object.keys(template).sort(),['schemaVersion','assessment','summary','findings',
+      assert.deepEqual(Object.keys(template).sort(),['schemaVersion','practiceTitle','assessment','summary','findings',
         'frameworkFindings','findingOrder',...(practice?['practiceFeedback']:[])].sort());
       assert.equal(Object.hasOwn(template,'frameworkSummary'),false);
       // Replace only the declared placeholder citations with supplied source IDs.

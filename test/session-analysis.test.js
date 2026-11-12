@@ -51,13 +51,14 @@ test('new diagnosis provenance records the problem library without changing old 
   const {createSessionAnalysis}=require('../lib/session-analysis');
   const {store,id}=await fixture(t);
   const analyzer=createSessionAnalysis({store,getDiagnosisProfile:()=>({profile:{id:'synthetic',provider:'local',model:'fake'}}),
-    diagnose:async()=>({schemaVersion:1,summary:'仅验证来源记录',findings:[]})});
+    diagnose:async()=>({schemaVersion:1,practiceTitle:'先明确目标再行动',summary:'仅验证来源记录',findings:[]})});
   const first=await analyzer.start(id);
   const saved=await store.get(id);
   const run=saved.results.find(x=>x.kind==='diagnosis');
   assert.equal(run.provenance.problemLibraryVersion,'expression-problem-library-v0.6');
-  assert.equal(run.provenance.promptVersion,'structured-diagnosis-v16');
+  assert.equal(run.provenance.promptVersion,'structured-diagnosis-v17');
   assert.deepEqual(run.value.findings,[]);
+  assert.equal(store.list()[0].practiceTitle,'先明确目标再行动');
   const before=structuredClone(saved.results);
   assert.equal((await analyzer.start(id)).id,first.id);
   assert.deepEqual((await store.get(id)).results,before);

@@ -68,16 +68,20 @@ test('moved report controls survive the same projection but cannot leak to anoth
     remove(){if(this.parent){this.parent.children=this.parent.children.filter(child=>child!==this);this.parent=null;}},
     querySelector(selector){return this.querySelectorAll(selector)[0] || null;},
     querySelectorAll(selector){const names=selector.split(',').map(s=>s.trim().slice(1));return this.children.flatMap(child=>[...(names.includes(child.className)?[child]:[]),...child.querySelectorAll(selector)]);}});
-  const nodes=new Map(['report-summary-copy','report-summary-metrics','report-analysis-info','report-body','subtitle-container','record-identity'].map(id=>[id,makeNode()]));
+  const nodes=new Map(['report-summary-copy','report-summary-metrics','report-analysis-info','report-body','subtitle-container','record-identity','practice-title'].map(id=>[id,makeNode()]));
   const document={getElementById:id=>nodes.get(id),createElement:()=>makeNode()};
   const body=nodes.get('report-body'),info=nodes.get('report-analysis-info');
   const root=makeNode('structured-report'),control=makeNode('report-metrics'),metric=makeNode('metric-details');
   control.append(metric);root.append(control);body.append(root);
-  const a={id:'A',createdAt:'2026-10-11',segments:[],structuredReport:{analysisRun:{status:'unavailable',value:{reason:'not-enabled'}}}};
+  const a={id:'A',createdAt:'2026-10-11',segments:[],trainingPrompt:{source:'bank',kind:'topic',text:'你是否赞成每周安排一天不举行会议？说明理由。'},
+    structuredReport:{analysisRun:{status:'unavailable',value:{reason:'not-enabled'}}}};
   present(document,a);assert.equal(info.querySelector('.report-metrics'),control);
+  assert.equal(nodes.get('practice-title').textContent,'每周是否应设一天无会议日');
+  assert.match(nodes.get('record-identity').children.at(-1).textContent,/说明理由/);
   present(document,a);assert.equal(info.querySelector('.report-metrics'),control,'same projection retains its actual control and listeners');
   body.replaceChildren();
   present(document,{id:'B',createdAt:'2026-10-11',segments:[]});
+  assert.equal(nodes.get('practice-title').textContent,'未命名练习');
   assert.notEqual(info.querySelector('.report-metrics'),control,'another legacy record uses its own saved metrics');
   assert.ok(info.querySelector('.word-statistics'),'fallback metrics work without a legacy sidebar slot');
   control.append(metric);root.append(control);body.append(root);present(document,a);

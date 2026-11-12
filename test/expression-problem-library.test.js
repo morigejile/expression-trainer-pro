@@ -65,7 +65,7 @@ test('only the selected framework is included; explicit analysis target wins; lo
 test('production prompt assembles rules, dynamic cards, evidence limits, optional practice and existing output without review examples',()=>{
   library();
   const {getStructuredDiagnosisPrompt,DIAGNOSIS_PROMPT_VERSION}=require('../lib/structured-diagnosis');
-  assert.equal(DIAGNOSIS_PROMPT_VERSION,'structured-diagnosis-v16');
+  assert.equal(DIAGNOSIS_PROMPT_VERSION,'structured-diagnosis-v17');
   const source=context('star');
   const prompt=getStructuredDiagnosisPrompt(source);
   const sections=['【1 共同判断规则】','【2 本次通用检查卡】','【3 所选框架专项检查卡】','【4 本次证据与质量限制】','【6 结构化输出要求】'];

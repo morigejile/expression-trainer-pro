@@ -102,13 +102,12 @@ npm start
 
 | 服务类型 | 需要准备什么 |
 |---|---|
-| OpenAI / DeepSeek | 对应服务的模型名称与 API Key；内置服务地址由应用固定，费用及可用性以服务方为准 |
-| Ollama | 可连接的本机或自建 Ollama 服务，以及已准备好的模型 |
-| 自定义兼容服务 | OpenAI-compatible 服务地址、模型名称及所需凭据 |
+| DeepSeek | 模型名称和 API 密钥，服务地址由应用填入 |
+| 自定义兼容服务，例如通义千问（阿里云百炼）、豆包（火山方舟）、Kimi（月之暗面） | 所选平台提供的兼容 Chat Completions 请求地址、模型名称和 API 密钥 |
 
 自动分析默认关闭。配置完成后，可以在报告中手动分析；若希望录音结束后自动分析，需单独打开「启动AI分析」。首次实际使用 AI 时，按界面提示确认数据范围。
 
-首次配置可跟随 [DeepSeek 配置指南](docs/guides/deepseek-first-use.md)完成。应用内「帮助 → DeepSeek 配置指南」提供同一份手册，正文可离线阅读。
+[AI 分析配置指南](docs/guides/deepseek-first-use.md)介绍通用配置流程，并以 DeepSeek 演示填写方法。应用内「帮助 → AI 分析配置指南」提供同一份手册，正文可离线阅读。
 
 获得 AI 报告后，先结合原文和录音判断建议；如有值得练习的问题，从该问题进入「重新练习」，带着目标再讲一遍完整表达。前后材料不足以可靠判断时，反馈会说明限制。
 
@@ -159,7 +158,7 @@ npm run smoke:package # 检查对应打包制品
 | 想了解什么 | 从这里开始 |
 |---|---|
 | 文档分工与当前定义 | [文档入口与职责矩阵](docs/README.md) |
-| 第一次配置 AI | [DeepSeek 配置指南](docs/guides/deepseek-first-use.md) |
+| 第一次配置 AI | [AI 分析配置指南](docs/guides/deepseek-first-use.md) |
 | 产品目标、边界与验收要求 | [产品需求](docs/product/requirements.md) |
 | 用户流程、报告与练习交互 | [训练流程](docs/product/training-flow.md) |
 | 当前实现与验证范围 | [当前架构](docs/architecture/current.md) · [支持矩阵](docs/support-matrix.md) |

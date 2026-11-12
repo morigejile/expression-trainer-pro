@@ -2,7 +2,7 @@
 
 本页是唯一的文档职责与治理入口。用户安装和使用见根 [README](../README.md)。先按问题找到 Owner；同一个文件可以承担相邻职责，但同一规则只能有一个主定义。
 
-用户操作手册：[DeepSeek 首次使用配置](guides/deepseek-first-use.md)（Supporting；按当前界面与官方接口说明提供操作步骤，不重定义产品规则）。
+用户操作手册：[AI 分析配置指南](guides/deepseek-first-use.md)（Supporting；按当前界面与官方接口说明提供操作步骤，不重定义产品规则）。
 
 ## 从当前任务开始
 

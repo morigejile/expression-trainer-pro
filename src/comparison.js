@@ -72,7 +72,7 @@
       const role=index?'target':'baseline',identity=el('div');identities.appendChild(identity);
       const parts=context.getPromptParts(side.session.trainingPrompt),mode=side.session.trainingMode==='free'?'自由表达':side.session.trainingMode==='structured'?context.formatTrainingContext({...side.session,trainingPrompt:null}):'训练方式未保存';
       identity.appendChild(el('small',null,index?'目标记录 · 较晚一次':'基线记录 · 较早一次'));
-      identity.appendChild(el('h2',null,parts.topic?.text || mode));
+      identity.appendChild(el('h2',null,context.getPracticeTitle(side.session)));
       identity.appendChild(el('p',null,`${new Date(side.session.createdAt).toLocaleString()} · ${value(side.evidence.audio.endMs,'ms')}`));
       identity.appendChild(el('p',null,[mode,parts.scenario?.text,side.session.practice?`针对性练习第 ${side.session.practice.round} 轮`:null].filter(Boolean).join(' · ')));
       if(side.session.practice)identity.appendChild(el('p',null,`练习范围：${{sentence:'句子',segment:'片段',full:'完整表达'}[side.session.practice.scope]} · 目标：${side.session.practice.goal.observation}`));

@@ -7,7 +7,7 @@
     const ms=item.audioDurationMs;
     const duration=Number.isFinite(ms)&&ms>=0?`${String(Math.floor(ms/60000)).padStart(2,'0')}:${String(Math.floor(ms/1000)%60).padStart(2,'0')}`:'录音时长不可用';
     const state=item.deletionPending?'删除未完成':({completed:'报告可查看',incomplete:'未完成',corrupt:'记录损坏',recording:'录音中',finalizing:'保存中'}[item.status] || '记录状态未知');
-    return {title:parts.topic?.text || mode,mode,date:new Date(item.createdAt).toLocaleString(),duration,state,
+    return {title:context.getPracticeTitle(item),mode,date:new Date(item.createdAt).toLocaleString(),duration,state,
       context:[parts.scenario?.text,item.practice?`针对性练习第 ${item.practice.round} 轮 · ${item.practice.goal.observation}`:null].filter(Boolean).join(' · ')};
   }
   function renderRow(document,item,{comparison,onOpen,onDelete}){

@@ -61,7 +61,6 @@
       byId('btn-history').setAttribute('aria-current',screen === 'history' ? 'page' : 'false');
       byId('frozen-recording').classList.toggle('is-paused',state === 'paused');
       byId('recording-state-label').textContent=state === 'paused' ? '已暂停' : '录音中';
-      byId('report-header').querySelector('h1').textContent=screen === 'report' ? '这一次表达。' : '训练报告';
       if (record && screen === 'report') root.FrozenReport.present(document,record);
       if (screen === 'report' && record?.id !== reportId) {
         byId('report-materials').open=false;byId('report-information').open=false;reportId=record?.id;

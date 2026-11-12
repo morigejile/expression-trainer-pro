@@ -109,9 +109,13 @@ test('comparison renders hostile content literally and expands side-qualified ev
   const a=comparisonSession('a'),b=comparisonSession('b');
   const hostile='<img src=x onerror=alert(1)>';
   a.results[2].value.findings[0].observation=hostile;
+  a.results[2].value.practiceTitle=hostile;
+  b.trainingPrompt={source:'bank',kind:'topic',text:'你是否建议团队固定安排复盘时间？为什么？'};
   const projection=compareSessions([a,b]);const document=new Document();const container=document.createElement('main');
   let played;
   renderComparison(container,projection,{onPlay:(role,ref)=>{played={role,ref};}});
+  assert.deepEqual(document.getElementById('comparison-identities').querySelectorAll('h2').map(heading=>heading.textContent),
+    [hostile,'团队是否应固定安排复盘']);
   const category=container.querySelector('[data-detail-key="finding-baseline-wording-0"]');category.open=true;category.listeners.get('toggle')();
   assert.ok(container.textContent.includes(hostile));assert.equal(container.querySelectorAll('img').length,0);
   assert.match(container.textContent,/尚未自动建立问题对应关系/);

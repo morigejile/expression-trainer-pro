@@ -9,6 +9,11 @@
     ? require('../shared/report-selection') : globalThis.ReportSelection;
   const presentations = new WeakMap();
   function renderIdentity(document,record) {
+    const title=document.getElementById('practice-title');
+    if (title) {
+      title.textContent=context.getPracticeTitle(record);
+      title.setAttribute('title',title.textContent);
+    }
     const identity=document.getElementById('record-identity');
     if (!identity) return;
     const date=new Date(record.createdAt);

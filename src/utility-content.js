@@ -71,7 +71,7 @@
     if(options.firstRun){
       const welcome=element(document,'section','first-use-welcome');
       welcome.appendChild(element(document,'h2',null,'欢迎使用好好表达'));
-      welcome.appendChild(element(document,'p',null,'先准备语音识别，再按需配置 AI，完成第一次表达。可以暂时跳过，随时从帮助继续；查看引导不会开启录音或自动分析。'));
+      welcome.appendChild(element(document,'p',null,'先准备语音识别，就能开始练习。接入 AI 大模型后，报告会结合原话帮你找到值得改进的地方，你也可以按建议再练一轮。'));
       welcome.appendChild(button(document,'暂时跳过','dismiss','',options.onDismiss,'secondary-control'));
       parent.appendChild(welcome);
     }
@@ -79,7 +79,7 @@
     for(const[title,key,page,callback]of [
       ['准备语音识别','setting','speech',options.onSettings],
       ['配置 AI','setting','ai',options.onSettings],
-      ['DeepSeek 配置指南','help','deepseek',options.onHelp]
+      ['AI 分析配置指南','help','deepseek',options.onHelp]
     ])actions.appendChild(button(document,title,key,page,typeof callback==='function'?()=>callback(page):null,'secondary-control'));
     parent.appendChild(actions);
     const steps = element(document, 'ol', 'steps');

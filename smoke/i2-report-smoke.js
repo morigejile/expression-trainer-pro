@@ -2,6 +2,7 @@
 const assert=require('node:assert/strict');
 const fs=require('node:fs');
 const path=require('node:path');
+const {DIAGNOSIS_PROMPT_VERSION}=require('../lib/structured-diagnosis');
 
 async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capture,saveProfile,recordOnce,openHistory,calls,aiCalls}) {
   const automatic=phase.includes('auto'),fixture=path.join(app.getPath('userData'),'i2-fixture.json');
@@ -71,7 +72,7 @@ async function run({app,mainWindow,BrowserWindow,phase,evaluate,wait,invoke,capt
   assert.equal(await evaluate(`document.querySelector('.finding-details').open`),true);
   assert.equal(await evaluate(`document.querySelectorAll('.example,.framework-reanalysis,.radar-unavailable,#btn-reanalyze,#playback-model').length`),0);
   assert.equal(await evaluate(`['getRealtimeFeedback','getFinalReport','analyzePlayback'].some(name=>name in window.api)`),false);
-  assert.equal(original.results.at(-2).provenance.promptVersion,'structured-diagnosis-v12');
+  assert.equal(original.results.at(-2).provenance.promptVersion,DIAGNOSIS_PROMPT_VERSION);
   assert.equal(Object.hasOwn(original.results.at(-2).value.findings[0],'example'),false);
   // Each new model fixture uses a new recording; a complete saved report is never silently regenerated.
   for(const [model,reason]of [['i2-failure','network'],['i2-timeout','timeout']]) {

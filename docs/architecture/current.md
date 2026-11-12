@@ -524,9 +524,9 @@ Main 新增独立 `ai-disclosure.json` 的原子持久化和统一请求门禁�
 
 结构化诊断在真实发送前核对告知和精确选中的有效配置。手动请求与自动启用分开；配置保存处撤销服务/实际模型/地址变更后的自动启用，回环地址判断实际 endpoint。自定义服务的旧双模型字段读取实际 `customModel || model`。同 Session 的自动本地整理与手动分析串行衔接，保留同类去重和取消，不让自动关闭状态吞掉主动请求。连接测试只发送固定测试文本，不发送训练内容。
 
-普通报告以保存的精确快照展示真实摘要、通用与框架 Finding、可展开的原文/语音/指标证据、建议及必要解释；通用与框架整体判断合入唯一摘要，原训练身份保持不变。新诊断使用 `structured-diagnosis-v16`，扩展契约与旧记录兼容由 [Data Model §5.4](data-model.md#54-structured-diagnosis-v1) 定义，不新增 SQLite/Session schema，不自动改写或重新分析旧结果。重试失败仍保留成功快照，空 Finding 不补样例；等待、未配置、未告知、自动关闭、失败与超时来自真实任务或结果。Finding 入口沿用现有真实 Preparing。后台收尾只刷新忙碌布局，不取消另一记录的告知、不夺回页面。
+普通报告以保存的精确快照展示真实摘要、通用与框架 Finding、可展开的原文/语音/指标证据、建议及必要解释；通用与框架整体判断合入唯一摘要，原训练身份保持不变。新诊断使用 `structured-diagnosis-v17`，扩展契约与旧记录兼容由 [Data Model §5.4](data-model.md#54-structured-diagnosis-v1) 定义，不新增 SQLite/Session schema，不自动改写或重新分析旧结果。重试失败仍保留成功快照，空 Finding 不补样例；等待、未配置、未告知、自动关闭、失败与超时来自真实任务或结果。Finding 入口沿用现有真实 Preparing。后台收尾只刷新忙碌布局，不取消另一记录的告知、不夺回页面。
 
-主报告使用 `structured-diagnosis-v16`／问题库 v0.6，沿用单次诊断请求。[问题库](../product/expression-problem-library.md)是内容维护源，生成脚本与一致性检查见 [Development](../development.md#问题库与主诊断提示)。v0.5 已对齐跨组排序与停止生成表达参考；v13／v0.6 进一步移除运行时无关的开发、展示与历史兼容说明，明确框架教学内容不是必填清单、材料评价示例值不是默认结论。v16 放宽摘要与第一条问题的固定绑定，允许基于已成立发现综合概括，摘要规则由 Training Flow §7.1 维护。48 个问题条目、问题判定与排序规则、响应契约未变，历史来源版本不回写，未因此完成新的真实 AI 质量验收。运行时按共同规则、通用卡、所选框架卡、证据限制、条件练习规则和输出契约组装；文档保留完整练习方向，生产卡只发送适用、检查、排除、证据及相邻边界，不逐卡发送练习处方。33＋15 个编号保留；声音禁评／仅观察卡、缺时长的时长要求卡和局部练习的完整框架卡按现有能力／范围过滤，不按关键词或本地候选缺失排除语义检查，不截断原文。
+主报告使用 `structured-diagnosis-v17`／问题库 v0.6，沿用单次诊断请求。v17 在同一次响应中为无题练习生成可选内容标题，历史、报告与对比共享标题。[问题库](../product/expression-problem-library.md)是内容维护源，生成脚本与一致性检查见 [Development](../development.md#问题库与主诊断提示)。v0.5 已对齐跨组排序与停止生成表达参考；v13／v0.6 进一步移除运行时无关的开发、展示与历史兼容说明，明确框架教学内容不是必填清单、材料评价示例值不是默认结论。v16 放宽摘要与第一条问题的固定绑定，允许基于已成立发现综合概括，摘要规则由 Training Flow §7.1 维护。48 个问题条目、问题判定与排序规则沿用 v16，历史来源版本不回写，未因此完成新的真实 AI 质量验收。运行时按共同规则、通用卡、所选框架卡、证据限制、条件练习规则和输出契约组装；文档保留完整练习方向，生产卡只发送适用、检查、排除、证据及相邻边界，不逐卡发送练习处方。33＋15 个编号保留；声音禁评／仅观察卡、缺时长的时长要求卡和局部练习的完整框架卡按现有能力／范围过滤，不按关键词或本地候选缺失排除语义检查，不截断原文。
 
 Main 要求材料评价范围及练习可比性，解析时执行范围／状态与严格引用约束；Report 明示材料不足／有限分析，保留本地事实与旧快照。产品行为由 [Training Flow §7.1 / §10](../product/training-flow.md#71-完整分析与训练重点分层) 定义；当前响应契约、版本来源及历史补全回执的读取兼容由 [Data Model §5.4](data-model.md#54-structured-diagnosis-v1) 定义。旧回执仅用于读取既有快照，当前生产不进行字段补全或生成新回执。
 
@@ -605,7 +605,7 @@ I4 阶段的验证使用隔离 userData、确定性采集与 Fake ASR/LLM，实�
 
 ## 20. I5 Settings / Help 完整接入
 
-首次帮助继续复用 `ExpressionTrainer.showFirstRunHelp()` 和已有 `expression-trainer.help-seen` 本地标记；不新增 store、IPC 或权限。快速开始在首次状态显示欢迎与「暂时跳过」，关闭／Escape／跳过复用现有关闭流程记录已展示状态；已有录音告知和 AI 门禁保持独立。Frozen Utility 新增「DeepSeek 配置指南」帮助子页，快速开始与 AI 设置均有入口，设置草稿由既有 guarded 流程保护。
+首次帮助继续复用 `ExpressionTrainer.showFirstRunHelp()` 和已有 `expression-trainer.help-seen` 本地标记；不新增 store、IPC 或权限。快速开始在首次状态显示欢迎与「暂时跳过」，关闭／Escape／跳过复用现有关闭流程记录已展示状态；已有录音告知和 AI 门禁保持独立。Frozen Utility 新增「AI 分析配置指南」帮助子页，快速开始与 AI 设置均有入口，设置草稿由既有 guarded 流程保护。
 
 `docs/guides/deepseek-first-use.md` 是用户手册内容源，`scripts/generate-user-guide.js` 生成随包的 `src/deepseek-guide.js`；`src/help-guide.js` 只通过文本节点、段落、列表及表格呈现，不插入 HTML，也不依赖网络或包外 Markdown。DeepSeek 官方链接沿用受信任 `open-support-link` IPC，`shared/support-links.js` 按完整 URL 白名单放行，读取正文不会打开浏览器或调用 AI。一致性、状态和真实 Electron 验证结果见本节后续记录；它们不代表外部 DeepSeek 的报告质量或打包安装验收。
 

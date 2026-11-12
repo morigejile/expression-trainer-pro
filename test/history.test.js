@@ -12,6 +12,14 @@ test('History content and delete controls dispatch independent actions using act
   const opened=[],deleted=[],row=renderRow(document(),item('a'),{onOpen:id=>opened.push(id),onDelete:id=>deleted.push(id)});
   await row.children[1].click();assert.deepEqual(deleted,['a']);assert.deepEqual(opened,[]);await row.children[0].click();assert.deepEqual(opened,['a']);assert.match(row.textContent,/PREP/);assert.doesNotMatch(row.textContent,/自由表达|→/);
 });
+test('History names bank questions, preserves custom topics, and uses saved content titles',()=>{
+  const question='你是否建议团队固定安排复盘时间？为什么？';
+  const record={...item('a'),practiceTitle:'项目进展'};
+  assert.equal(describe({...record,trainingPrompt:{source:'bank',kind:'topic',text:question}}).title,'团队是否应固定安排复盘');
+  assert.equal(describe({...record,trainingPrompt:{source:'user',kind:'topic',text:question}}).title,question);
+  assert.equal(describe({...record,trainingPrompt:null}).title,'项目进展');
+  assert.equal(describe({...record,trainingPrompt:null,practiceTitle:null}).title,'未命名练习');
+});
 test('single deletion uses the accessible trash sprite while failed rows keep a retry name',()=>{
   for(const deletionPending of [false,true]){
     const row=renderRow(document(),{...item('a'),deletionPending},{onOpen(){},onDelete(){}}),button=row.children[1];

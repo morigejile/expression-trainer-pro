@@ -352,7 +352,7 @@ AI 输入是有界的 `AnalysisContext`：同一 Session/revision 的 transcript
 
 上述评价依据当前实现和问题库边界，不代表 3 项输入的真实 AI 报告质量已经优于 15 项；受控请求/引用/历史兼容检查与真实模型内容验收分开。
 
-新主诊断使用 `structured-diagnosis-v16`，沿用 v12 响应契约：`schemaVersion=1`、唯一的整体 `summary`、`assessment`、通用 `findings`、所选框架的 `frameworkFindings` 和跨组顺序 `findingOrder`，针对性练习另含 `practiceFeedback`。每个 Finding 必须包含唯一 `id`、受控 `category`、`observation`、`recommendation` 和至少一个真实 `evidenceRefs`；`interpretation` 可省略，提供时必须为 1～1200 字符的非空字符串，只补充必要影响或限定。新响应不接受 `frameworkSummary`、`example`、`exampleEvidenceRefs` 或自动推荐字段。其他未知字段、未知引用、重复 ID 或无效类型仍拒绝；没有充分证据时 Findings 可以为空。类别与排序规则见 [Training Flow §7.1](../product/training-flow.md#71-完整分析与训练重点分层)，边界实现见 [Structured Diagnosis](../../lib/structured-diagnosis.js)。
+新主诊断使用 `structured-diagnosis-v17`，在既有响应契约中增加可选 `practiceTitle`：`schemaVersion=1`、唯一的整体 `summary`、`assessment`、通用 `findings`、所选框架的 `frameworkFindings` 和跨组顺序 `findingOrder`，针对性练习另含 `practiceFeedback`。每个 Finding 必须包含唯一 `id`、受控 `category`、`observation`、`recommendation` 和至少一个真实 `evidenceRefs`；`interpretation` 可省略，提供时必须为 1～1200 字符的非空字符串，只补充必要影响或限定。未设主题时可在同一次响应中返回基于本次转写的单行 `practiceTitle`（最多 40 个字符），无法可靠命名时返回 null。缺失或无效的标题字段会被忽略，合法标题随 `diagnosis.value` 保存，历史列表从已有结果投影标题，无需更改 Session 或 SQLite schema。新响应不接受 `frameworkSummary`、`example`、`exampleEvidenceRefs` 或自动推荐字段。其他未知字段、未知引用、重复 ID 或无效类型仍拒绝；没有充分证据时 Findings 可以为空。类别与排序规则见 [Training Flow §7.1](../product/training-flow.md#71-完整分析与训练重点分层)，边界实现见 [Structured Diagnosis](../../lib/structured-diagnosis.js)。
 
 `findingOrder` 按展示顺序包含两组全部 Finding ID，每个恰好一次；没有问题时必须为 `[]`。新响应缺失顺序、重复、遗漏或引用不存在的 ID 均拒绝，走既有失败重试路径，不发起修复请求或补造顺序。解析后原样保存到不可变 `diagnosis.value.findingOrder`，不改变两组 Finding 的身份、内容或证据。报告读取和渲染共用该顺序；历史缺失字段时沿用通用后接专项的原顺序，不补写或自动重算。扩展不增加 SQLite/Session schema；结构校验不能证明重要程度判断正确。
 
