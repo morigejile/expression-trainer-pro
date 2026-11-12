@@ -23,11 +23,17 @@
 
 ## 界面预览
 
-| 首页 · 默认外观 | PREP 练习 · 录音与转写 |
-| --- | --- |
-| [![默认外观的首页](docs/screenshots/home.png)](docs/screenshots/home.png) | [![PREP 练习的录音与转写界面](docs/screenshots/recording.png)](docs/screenshots/recording.png) |
-| **首页 · 珊瑚霞光** | **AI 分析设置** |
-| [![珊瑚霞光外观的首页](docs/screenshots/home-coral.png)](docs/screenshots/home-coral.png) | [![AI 分析设置和示例模型配置](docs/screenshots/ai-settings.png)](docs/screenshots/ai-settings.png) |
+<p align="center">
+  <a href="docs/screenshots/home.png"><img src="docs/screenshots/home.png" width="48%" alt="首页 · 默认外观"></a>
+  <a href="docs/screenshots/recording.png"><img src="docs/screenshots/recording.png" width="48%" alt="PREP 练习 · 录音与转写"></a><br>
+  <sub>首页 · 默认外观　/　PREP 练习 · 录音与转写</sub>
+</p>
+
+<p align="center">
+  <a href="docs/screenshots/home-coral.png"><img src="docs/screenshots/home-coral.png" width="48%" alt="首页 · 珊瑚霞光"></a>
+  <a href="docs/screenshots/ai-settings.png"><img src="docs/screenshots/ai-settings.png" width="48%" alt="AI 分析设置"></a><br>
+  <sub>首页 · 珊瑚霞光　/　AI 分析设置</sub>
+</p>
 
 点击图片查看原尺寸。录音转写和模型配置使用示例数据。
 
