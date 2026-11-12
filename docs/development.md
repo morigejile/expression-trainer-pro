@@ -14,9 +14,9 @@ npm --version
 npm ci
 ```
 
-项目跟随 Node.js 的最新 **Active LTS**，并固定该 Node 发行版官方捆绑的 npm；npm 没有独立 LTS 轨道，因此不单独追逐 npm 最新 major。每次 Node LTS 基线升级都先更新三处 canonical 版本，再执行干净 `npm ci`、完整 Node/Electron 测试、Forge package/make、packaged native-load smoke；未通过前不提升基线。Node Current 只有进入 Active LTS 后才纳入升级。
+项目跟随 Node.js 的最新 **Active LTS**，并固定该 Node 发行版官方捆绑的 npm；npm 没有独立 LTS 轨道，因此不单独追逐 npm 最新 major。每次 Node LTS 基线升级都先更新三处 canonical 版本，再执行干净 `npm ci`、完整 Node/Electron 测试、NSIS 构建和 packaged native-load smoke；未通过前不提升基线。Node Current 只有进入 Active LTS 后才纳入升级。
 
-项目使用 `.npmrc` 的 `strict-allow-scripts=true`，并在 `package.json#allowScripts` 只精确允许 Electron 43.4.1 下载和 Squirrel 5.4.4 的 7-Zip 架构选择脚本。后者随 Squirrel maker 移除时一并删除；依赖或 install-script 策略变化时重新验证干净安装，不增加通配白名单。
+项目使用 `.npmrc` 的 `strict-allow-scripts=true` 和 `package.json#allowScripts` 的精确版本规则。旧 Forge 命令允许 `electron-winstaller@5.4.4` 的 7-Zip 架构选择脚本，NSIS 无需执行 electron-builder 间接依赖的 `electron-winstaller@5.4.0` 脚本。依赖或 install-script 策略变化时重新验证干净安装。
 
 ## 常用命令
 
@@ -25,20 +25,20 @@ npm test
 npm run benchmark:dry-run
 npm start
 npm run dev
-npm run package
-npm run make
-npm run smoke:package
+npm run dist:win
+npm run smoke:package:win
 ```
 
 - `npm test` 使用 Node 内置 test runner，覆盖产品核心、Electron smoke 和仍在维护的 benchmark harness。
 - `benchmark:dry-run` 只验证合成 fixture、manifest、候选注册与路径边界，不运行真实模型。
 - `start` 启动普通应用；`dev` 同时打开 DevTools。
-- `package`/`make` 只生成当前 Tier 1 的 Windows x64 目录制品与 Squirrel 安装制品；输出位于 Git 忽略的 `out/`。
-- `smoke:package` 在 `out/` 中验证打包后的 Fake ASR 产品流、UtilityProcess 中的 Sherpa native load、完整相邻 DLL 和外部模型目录边界；它不下载模型。
+- `dist:win` 使用 `electron-builder.win.json` 生成 Windows x64 NSIS 单文件安装程序，路径为 `dist/windows-nsis/ExpressionTrainer-Setup-<version>-x64.exe`。
+- `smoke:package:win` 检查同次生成的 `win-unpacked/`，覆盖合成录音和 Fake ASR/AI 产品流、SQLite/WAV/报告重启读取、Utility Process 中的 Sherpa native load、完整相邻 DLL 和模型载荷边界。验证已安装目录可执行 `node scripts/verify-packaged-app.js "<安装目录>"`。
+- 旧 Forge/Squirrel 命令 `package`、`make` 和 `smoke:package` 继续使用 `out/`。`smoke:first-install`、`smoke:upgrade`、`make:internal-model` 和 `smoke:bundled-default` 也仍走旧链路。
 
 `smoke/` 是随包验证支持代码，会进入当前安装包但只在显式 smoke 参数和隔离 `userData` 下执行；普通启动不得进入 Fake 模式。`test/`、`benchmark/`、`scripts/` 和 `docs/` 不进入安装包。
 
-内部快速迭代默认只运行与改动直接相关的 focused tests。完整 `npm test` 只在 Roadmap 里程碑收尾运行；`benchmark:dry-run` 只在 Benchmark、model registry/candidate、adapter 或 manifest/schema 变化时运行；`npm audit` 只在依赖变化时运行；`npm ci`、package/make 和 packaged smoke 只在依赖、打包、native、安装相关改动或里程碑验收时运行。
+内部快速迭代默认只运行与改动直接相关的 focused tests。完整 `npm test` 只在 Roadmap 里程碑收尾运行；`benchmark:dry-run` 只在 Benchmark、model registry/candidate、adapter 或 manifest/schema 变化时运行；`npm audit` 只在依赖变化时运行；`npm ci`、打包和 packaged smoke 只在依赖、打包、native、安装相关改动或里程碑验收时运行。
 
 ### 问题库与主诊断提示
 
@@ -67,14 +67,14 @@ v7 → v8 历史对照工具 `scripts/evaluate-diagnosis-quality.js` 读取冻�
 ### 内测快速交付口径
 
 - 日常迭代只运行与改动直接相关的 focused tests，不为未交付的本地构建虚增应用版本。
-- 需要本地安装器时执行 `npm run make`，然后执行 `npm run smoke:package`；`make` 已包含目录打包，无需预先单独运行 `package`。
-- 只有安装器实际交付给内测用户时，才同步 `package.json`/lockfile 版本、更新 CHANGELOG，并运行完整测试、Forge make 和 packaged smoke。
-- `smoke:first-install` 和 `smoke:upgrade` 只在依赖、Forge/Squirrel、native bundle、Model Manager、首次安装或升级/卸载边界变化时运行，不进入每次内测构建。
+- 需要本地安装器时执行 `npm run dist:win`，然后执行 `npm run smoke:package:win`。
+- 只有安装器实际交付给内测用户时，才同步 `package.json`/lockfile 版本、更新 CHANGELOG，并运行完整测试、NSIS 构建和 packaged smoke。
+- 安装器或数据路径变更时验证实际安装、启动及更新后的数据读取。旧 Squirrel 专用的 `smoke:first-install` 和 `smoke:upgrade` 用于复测旧安装链路。
 - 当跨机获取最新安装器成为反复痛点时，再实施 Roadmap `OPS-01`：仅增加手工触发的 Windows 构建、packaged smoke 和短期 workflow artifact，不创建 tag/GitHub Release，不引入 Forge Publisher、签名或自动更新。若跨机取包需求消失，则移除该临时 workflow。
 
 ## 版本与发布清单
 
-`package.json#version` 是应用、Electron `app.getVersion()` 和 Forge/Squirrel 制品版本的唯一 canonical 来源；`package-lock.json` 根包版本必须与之相同。源码注释、README 标题和产品代际名称不定义 SemVer。模型使用 registry 中独立的 `id/version`，应用升级不隐式切换模型。
+`package.json#version` 是应用、Electron `app.getVersion()` 和安装制品版本的唯一 canonical 来源；`package-lock.json` 根包版本必须与之相同。源码注释、README 标题和产品代际名称不定义 SemVer。模型使用 registry 中独立的 `id/version`，应用升级不隐式切换模型。
 
 版本遵循 SemVer：不兼容的用户数据或公开契约变化升 major，向后兼容能力升 minor，修复与内部交付闭环升 patch。当前仍是内部测试，只有实际生成并验收的版本才写入 [CHANGELOG](../CHANGELOG.md)，不为每个开发提交虚增版本。
 
@@ -107,7 +107,7 @@ npm run make:internal-model
 npm run smoke:bundled-default
 ```
 
-普通 `npm run package` / `npm run make` 仍不携带模型。internal 模式不可公开发布，不能绕过 product registry 的 `redistribution` 状态或公开 release checklist；完整公开路径取代这项内部验证或不再需要验证包内默认模型时，应删除该模式。
+NSIS 制品与普通 Forge/Squirrel 制品均不携带模型。internal 模式不可公开发布，不能绕过 product registry 的 `redistribution` 状态或公开 release checklist；完整公开路径取代这项内部验证或不再需要验证包内默认模型时，应删除该模式。
 
 ## Benchmark 边界
 
@@ -124,7 +124,7 @@ BM-04 已完成七候选验证，ADR-0009 据此选择 Zipformer Large 作为技
 
 ## 发布边界
 
-仓库已有 Windows x64 Electron Forge/Squirrel package/make 配置和 packaged smoke。当前产物仍是未签名内部测试制品，不代表公开支持；已验证的安装、升级、卸载、平台和硬件范围统一维护在[支持矩阵](support-matrix.md)，未完成工作的优先级统一维护在 [Roadmap](roadmap.md)。
+Windows x64 NSIS 产物用于内部测试。已验证的安装、升级、卸载、平台和硬件范围统一维护在[支持矩阵](support-matrix.md)，未完成工作的优先级统一维护在 [Roadmap](roadmap.md)。
 
 ## 诊断导出
 

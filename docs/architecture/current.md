@@ -64,7 +64,7 @@ M1 增量：[训练存储与产品集成](current.md#10-m1-training-storage-foun
 | 本地分析 | `lib/lexicon.js` + `data/emotion-lexicon.json` + `shared/expression-rules.js` | 146 个情绪词；16 个填充词、14 个犹豫词、20 组笼统词映射由 Renderer/Main 共用；未启用数据不放入活跃 `data/` 目录 |
 | LLM | Node 原生 `fetch`，OpenAI/DeepSeek/Ollama/自定义 OpenAI-compatible | 在 Main 中发请求；连接测试与结构化诊断有独立超时，支持 AbortSignal、按 Renderer 取消和严格结构化响应验证；诊断请求不含音频 |
 | 设置 | `userData/appearance.json`、`userData/asr-selection.json`、`userData/llm-provider-settings.json`、`userData/recording-policy.json`、legacy `userData/settings.json`、`userData/custom-prompt.json` | Appearance、ASR 选择、多 LLM profile 与录音策略确认各自持久化且互不覆盖；录音策略文件只保存确认布尔值，训练内容另存 SQLite/受管 WAV；小文件原子发布；API Key 系统加密存储（§5.7） |
-| 构建/测试 | Node test + Electron smoke + Electron Forge 7.5/Squirrel | `package`/`make` 固定 Windows x64；packaged smoke 覆盖 Fake 产品流、utility-only Sherpa native load、完整 DLL unpack 和外部模型目录；尚无 CI |
+| 构建/测试 | Node test + Electron smoke + electron-builder/NSIS | Windows x64 单文件安装程序；packaged smoke 覆盖 Fake 产品流、Utility Process 中的 Sherpa native load、相邻 DLL 与模型边界；尚无 CI |
 
 开发工具精确版本见[开发与验证](../development.md)；已验证平台、制品和硬件边界见[支持矩阵](../support-matrix.md)。
 
@@ -80,11 +80,11 @@ ASR 产品层以 `models/registry.json` 作为唯一 schema-v2 Catalog，不依�
 
 ### 3.3 Packaging、安装与升级
 
-`forge.config.js` 是唯一打包配置，当前只构建 Windows x64 Squirrel；native Sherpa bundle 保持 ASAR unpack，模型位于 `appData/expression-trainer-pro-models`。内部制品已验证安装、真实模型首次准备、强制离线二次启动、1.0.0→1.0.1 前向升级和卸载数据保留，终端用户无需开发工具。系统图标由 `src/assets/brand-mark.svg` 派生为 `app-icon.png / .ico`，通过 Main 的窗口图标、Packager 的可执行文件图标和 Squirrel 的 `setupIcon` 接入；本次图标接线不改变应用身份或数据路径，安装版与快捷方式图标尚未重新验证。
+`electron-builder.win.json` 定义 Windows x64 NSIS 单文件安装程序。向导支持选择安装目录，并创建名为「好好表达」的桌面和开始菜单快捷方式，避免与旧 Squirrel 快捷方式同名。程序入口仍为 `ExpressionTrainer.exe`，图标沿用 `src/assets/app-icon.ico`。应用以 ASAR 打包，Sherpa 的 Windows x64 预编译 Node-API 插件和相邻 DLL 全部解包，原生推理仍在 ASR Utility Process 内运行。打包器按目标 Electron/架构检查生产依赖的重建需求。
 
-受支持更新路径是向前安装。手工运行旧完整 Setup 可能降级应用二进制，并可能用旧 schema 覆盖共享用户文件；重新运行当前 Setup 只能恢复应用版本，不能恢复已被覆盖的数据。该已知边界保留在支持文档，不为内部阶段增加 updater 框架。
+NSIS 沿用应用原有的 `productName` 和数据路径。设置、SQLite、受管录音和报告仍由应用存放在 `userData`，模型仍位于 `appData/expression-trainer-pro-models`。NSIS 有自己的安装记录，首次从 Squirrel 迁移可能并存两个安装项。实际安装和升级证据见[支持矩阵](../support-matrix.md)。
 
-显式内部构建可从 Git 外的绝对归档路径读取 Catalog 默认模型，校验精确字节数和 SHA-256，只把固定 `asr-models/<modelId>/<version>/<archive>` 加入 Forge `extraResource`。普通 `package`/`make` 仍不携带模型；Main 只从 `process.resourcesPath` 派生受信任包内归档位置，ModelManager 复用既有安装事务后激活。运行时始终从 `appData/expression-trainer-pro-models` 加载。
+旧 `forge.config.js` 用于复测 Squirrel 制品。其显式内部构建可从 Git 外的绝对归档路径读取 Catalog 默认模型，校验精确字节数和 SHA-256，只把固定 `asr-models/<modelId>/<version>/<archive>` 加入 Forge `extraResource`。Main 只从 `process.resourcesPath` 派生受信任包内归档位置，ModelManager 复用既有安装事务后激活。运行时始终从 `appData/expression-trainer-pro-models` 加载。
 
 ## 4. C4 Level 2：当前容器/运行边界
 
@@ -270,7 +270,7 @@ Settings/Prompt Renderer 通过 Preload 调用 Main 中的 userData JSON store�
 
 ## 7. 部署与安装现状
 
-- Forge 7.5/Squirrel 只构建 Windows x64；当前没有 publish script 或 CI。
+- 交付入口为 electron-builder/NSIS Windows x64；当前没有 publish script 或 CI。
 - `smoke/` 只在显式参数和隔离 `userData` 下执行；`test/`、`benchmark/`、`scripts/` 和 `docs/` 不进入制品。
 - 普通制品不携带模型；内部制品可从 Git 外的 Catalog 固定归档导入默认模型，但运行时仍只从 `appData/expression-trainer-pro-models` 加载。
 - 开发命令见[开发与验证](../development.md)，已验证制品与升级边界见[支持矩阵](../support-matrix.md)，未完成的公开交付工作见 [Roadmap](../roadmap.md)。

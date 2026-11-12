@@ -1,7 +1,7 @@
 # 平台与硬件支持矩阵
 
-> 状态：PKG-04 install/upgrade lifecycle baseline
-> 更新日期：2026-08-31
+> 状态：Windows x64 NSIS 交付，保留 PKG-03/04 的 Squirrel 历史证据
+> 更新日期：2026-11-12
 > 适用阶段：内部开发/测试；只有完成对应制品验证后才形成公开支持承诺
 
 ## 1. 首个 Tier 1 目标
@@ -11,7 +11,7 @@
 | OS | Windows 11 25H2 或更新的仍受支持版本 | 当前开发机为 Windows 11 Home x64，build 26200；Microsoft 将 build 26200 对应到 25H2 |
 | 架构 | x64 | Electron smoke、Sherpa native-load、七候选 benchmark 均在 Windows x64 完成 |
 | 应用运行时 | Electron 43.4.1 / sherpa-onnx-node 1.13.3 | lockfile、Electron smoke、D-03 与模型准备证据 |
-| 安装形态 | Electron Forge/Squirrel Windows x64 制品 | PKG-03 已执行静默安装、真实 Paraformer 准备/native 初始化和强制离线二次启动；PKG-04 已验证 1.0.0→1.0.1 升级、数据保留、当前版本恢复与卸载策略 |
+| 安装形态 | electron-builder/NSIS Windows x64 单文件安装程序 | NSIS 本轮验证与旧 Squirrel 证据见下文 |
 
 选择 Windows x64 是维护资源与现有证据的收敛，不代表 Electron 或 Sherpa 只能运行在该平台。Electron 官方说明 v23 起要求 Windows 10 或更高版本；项目进一步选择仍在 Microsoft 服务期内且与当前 build 一致的 Windows 11 25H2+。Electron 43 是最后提供 Windows x86 预构建的系列，因此本项目不为短期兼容增加 x86 制品和验证成本。
 
@@ -25,7 +25,7 @@
 
 | 等级 | 平台 | 当前含义 |
 |---|---|---|
-| Tier 1 target | Windows 11 25H2+ x64 | 未签名内部制品已有安装、真实模型和升级/卸载证据；签名、真实设备与公开支持口径仍待完成 |
+| Tier 1 target | Windows 11 25H2+ x64 | 当前为内部测试目标；安装、模型、设备和升级证据按制品分别记录 |
 | Experimental | Windows on ARM64 | Electron 可提供目标架构，但 Sherpa native addon、Forge 制品、麦克风和模型未验证 |
 | Experimental | macOS x64/arm64 | 未验证 native addon、权限、公证、音频设备和制品；不阻塞 Windows 路线 |
 | Experimental | Linux x64/arm64 | 未验证发行版依赖、Wayland/X11、native addon、音频设备和制品；不阻塞 Windows 路线 |
@@ -45,7 +45,17 @@ Experimental 表示源码可能可移植，但项目不承诺可安装、可识�
 
 这是一条待验证下限，不是已证明的性能承诺。当前实测开发机为 Intel Core Ultra 9 185H（16 核/22 线程）、约 32 GB RAM、Windows 11 build 26200，明显高于资格线；BM-02 只证明该环境下 Paraformer 平均 RTF 为 0.0540。PKG-03 在该高配机完成了技术闭环，但不外推最低性能；接近资格线设备上的真实录音、初始化、RTF、峰值 RAM 与 UI 响应继续作为非阻塞环境待办，不达标时优先上调资格线。
 
-## 4. 提升为可发布 Tier 1 的条件
+## 4. 安装制品证据
+
+### NSIS
+
+- Windows x64 目录制品通过 packaged smoke。验证了 ASAR 载荷边界、Sherpa 插件和相邻 DLL、合成录音与 Fake ASR/AI、报告生成、SQLite/WAV 保存及重启读取。
+- 使用包内生产 ASR Utility Process、独立目录中的 Zipformer Large 模型副本和仓库中的中文录音样本，完成离线真实转写。
+- 在本机通过静默模式安装同一源码生成的 1.0.0 测试基线，核对了自选目录和两类快捷方式。再运行 1.0.1 安装器，原路径的应用版本完成升级，隔离数据中的设置、SQLite、WAV 和模型标记文件校验值一致，报告可以重启读取。
+- 已安装的 1.0.1 在 PATH 仅含 Windows 系统目录时通过 packaged smoke。卸载后测试程序、安装记录和快捷方式已移除，隔离数据的校验值保持一致。
+- 签名、干净目标机、交互式安装向导逐屏操作、物理麦克风、真实远端 AI 和旧 Squirrel 训练历史的实际迁移仍待验收。
+
+### Forge/Squirrel 历史基线
 
 - [x] Windows x64 Forge package/make 在干净环境可重复；
 - [x] 制品启动并通过 Electron smoke，utility process 可加载 native addon；
@@ -56,6 +66,8 @@ Experimental 表示源码可能可移植，但项目不承诺可安装、可识�
 
 ## 5. 升级与降级边界
 
-支持的更新路径是向前安装当前或更新版本。PKG-04 实测手工运行旧版完整 Squirrel Setup 会以退出码 0 将应用二进制从 1.0.1 降回 1.0.0；旧安装器无法由新版本追溯加固。设置、自定义规则和模型位于安装目录外，安装器降级及卸载过程本身没有删除这些数据。CONV-03 迁移后的 `llm-provider-settings.json` 不与旧应用写入的 `settings.json` 共用目标；旧应用仍可能按旧 schema 覆盖 `custom-prompt.json` 等共享文件。若误运行旧 Setup，重新运行当前 Setup 可恢复当前应用版本，不能恢复已经被旧应用覆盖的共享数据。
+后续 NSIS 更新使用同一安装记录。首次从 Squirrel 切换时，NSIS 会建立独立安装记录；自选目录应使用单独的应用目录。两种安装形态沿用相同的应用数据路径，可能同时出现在 Windows 应用列表中。
+
+旧 Squirrel 的受支持更新路径是向前安装当前或更新版本。PKG-04 实测手工运行旧版完整 Squirrel Setup 会以退出码 0 将应用二进制从 1.0.1 降回 1.0.0；旧安装器无法由新版本追溯加固。设置、自定义规则和模型位于安装目录外，安装器降级及卸载过程本身没有删除这些数据。CONV-03 迁移后的 `llm-provider-settings.json` 不与旧应用写入的 `settings.json` 共用目标；旧应用仍可能按旧 schema 覆盖 `custom-prompt.json` 等共享文件。若误运行旧 Setup，重新运行当前 Setup 可恢复当前应用版本，不能恢复已经被旧应用覆盖的数据。
 
 本矩阵只记录平台、硬件、安装与制品证据。配置 schema 兼容性由 requirements、current architecture 和对应迁移测试维护，不在支持矩阵重复承诺。

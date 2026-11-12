@@ -27,6 +27,7 @@ const NON_RUNTIME_FILES = new Set([
   '.nvmrc',
   'CHANGELOG.md',
   'README.md',
+  'electron-builder.win.json',
   'forge.config.js',
   'package-lock.json'
 ]);

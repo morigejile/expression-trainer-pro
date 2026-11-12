@@ -1,6 +1,6 @@
 # ADR-0007: 使用 Electron Forge 形成发布制品
 
-- Status: Accepted
+- Status: Superseded（Windows 安装制品已切换为 [electron-builder/NSIS](../current.md#33-packaging安装与升级)，Forge 保留用于旧链路复测）
 - Date: 2026-08-19
 - Accepted: 2026-08-29
 

@@ -20,7 +20,7 @@ ADR 记录“为什么”，架构文档记录“是什么”。索引是决策�
 | [0004](0004-manage-models-separately.md) | 模型与应用解耦，由 Model Manager 管理 | Accepted | 模型安装须校验并原子激活；更新失败保留上一可用版本；公开分发前审查许可 |
 | [0005](0005-select-default-asr-model-by-benchmark.md) | 通过 benchmark 选择默认中文 ASR 模型 | Superseded | 默认模型与产品化决策由 [ADR-0009](0009-productize-multiple-asr-models.md) 替代 |
 | [0006](0006-move-asr-out-of-main.md) | 将 ASR 初始化与推理移出 Electron Main | Accepted | Main 协调生命周期；ASR/native 推理位于单个 utility process，传输队列保持有界 |
-| [0007](0007-package-with-electron-forge.md) | 使用 Electron Forge 形成发布制品 | Accepted | Forge 统一制品配置；安装、升级和平台资格按 [Support Matrix](../../support-matrix.md) 验证 |
+| [0007](0007-package-with-electron-forge.md) | 使用 Electron Forge 形成发布制品 | Superseded | Windows 交付切换为 [electron-builder/NSIS](../current.md#33-packaging安装与升级)；安装和升级证据见[支持矩阵](../../support-matrix.md) |
 | [0008](0008-keep-benchmark-as-isolated-non-shipping-tool.md) | 将 Benchmark 保留为同仓库隔离的非发布开发工具 | Accepted | 产品运行时及发布制品不得依赖 `benchmark/`；仅保留模型选择与复评所需的开发工具 |
 | [0009](0009-productize-multiple-asr-models.md) | 产品化多 ASR 模型并采用 Zipformer Large 默认 | Accepted | 公开内置模型需许可获批；先交付 streaming，再交付 utterance |
 | [0010](0010-persist-training-sessions-with-sqlite-and-files.md) | 使用 SQLite 与受管文件持久化训练 Session | Accepted | 实现见 [Current §10](../current.md#10-m1-training-storage-foundation)；完整产品接入按 [M1](../../milestones/m1-training-persistence.md#acceptance-criteria) 验收 |

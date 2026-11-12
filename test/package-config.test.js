@@ -67,6 +67,7 @@ test('package payload excludes development-only trees but keeps runtime assets',
   assert.equal(ignore('/local-models/default.onnx'), true);
   assert.equal(ignore('/.nvmrc'), true);
   assert.equal(ignore('/.npmrc'), true);
+  assert.equal(ignore('/electron-builder.win.json'), true);
   assert.equal(ignore('/forge.config.js'), true);
   assert.equal(ignore('/package-lock.json'), true);
   assert.equal(ignore('/README.md'), true);
@@ -99,6 +100,24 @@ test('first packaging closure targets only Windows x64 Squirrel', () => {
   assert.equal(forgeConfig.makers.length, 1);
   assert.equal(forgeConfig.makers[0].name, '@electron-forge/maker-squirrel');
   assert.deepEqual(forgeConfig.makers[0].platforms, ['win32']);
+});
+
+test('Windows installer uses NSIS and keeps the Sherpa bundle and user data separate', () => {
+  const manifest = require('../package.json');
+  assert.match(manifest.scripts['dist:win'] || '', /electron-builder --config electron-builder\.win\.json --win --x64 --publish never/);
+  const config = require('../electron-builder.win.json');
+  assert.deepEqual(config.win.target, [{target: 'nsis', arch: ['x64']}]);
+  assert.equal(config.asar, true);
+  assert.ok(config.asarUnpack.includes('node_modules/sherpa-onnx-win-x64/**'));
+  assert.equal(config.npmRebuild, true);
+  assert.equal(config.nsis.oneClick, false);
+  assert.equal(config.nsis.allowToChangeInstallationDirectory, true);
+  assert.notEqual(config.nsis.shortcutName, manifest.productName);
+  assert.equal(config.nsis.createDesktopShortcut, true);
+  assert.equal(config.nsis.createStartMenuShortcut, true);
+  assert.equal(config.nsis.deleteAppDataOnUninstall, false);
+  assert.equal(config.nsis.differentialPackage, false);
+  assert.equal(config.extraResources, undefined);
 });
 
 test('ordinary packages remain model-free', () => {

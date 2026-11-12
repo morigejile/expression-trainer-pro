@@ -15,8 +15,10 @@
     "test": "node --test",
     "package": "electron-forge package --platform=win32 --arch=x64",
     "make": "electron-forge make --platform=win32 --arch=x64",
+    "dist:win": "electron-builder --config electron-builder.win.json --win --x64 --publish never",
     "make:internal-model": "node scripts/make-internal-model.js",
     "smoke:package": "node scripts/verify-packaged-app.js",
+    "smoke:package:win": "node scripts/verify-packaged-app.js dist/windows-nsis/win-unpacked",
     "smoke:first-install": "node scripts/verify-first-install.js",
     "smoke:bundled-default": "node scripts/verify-bundled-default.js",
     "smoke:upgrade": "node scripts/verify-upgrade.js",
@@ -34,13 +36,15 @@
   "license": "MIT",
   "allowScripts": {
     "electron@43.4.1": true,
+    "electron-winstaller@5.4.0": false,
     "electron-winstaller@5.4.4": true
   },
   "devDependencies": {
     "@electron-forge/cli": "7.5.0",
     "@electron-forge/maker-squirrel": "7.5.0",
     "@electron/rebuild": "3.6.0",
-    "electron": "43.4.1"
+    "electron": "43.4.1",
+    "electron-builder": "26.18.0"
   },
   "dependencies": {
     "electron-squirrel-startup": "1.0.1",

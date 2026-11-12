@@ -1,0 +1,52 @@
+{
+  "appId": "com.expression-trainer.desktop",
+  "publish": null,
+  "directories": {
+    "output": "dist/windows-nsis"
+  },
+  "files": [
+    "main.js",
+    "preload.js",
+    "package.json",
+    "LICENSE",
+    "data/emotion-lexicon.json",
+    "lib/**/*",
+    "shared/**/*",
+    "smoke/**/*",
+    "src/**/*",
+    "models/registry.json",
+    "models/speech-evidence-registry.json",
+    "!**/*.{gguf,onnx,ort,pt,pth,safetensors,tflite,tar.bz2,tar.gz,sqlite,sqlite-*,wav}"
+  ],
+  "asar": true,
+  "asarUnpack": [
+    "node_modules/sherpa-onnx-win-x64/**"
+  ],
+  "npmRebuild": true,
+  "toolsets": {
+    "winCodeSign": "1.1.0"
+  },
+  "win": {
+    "executableName": "ExpressionTrainer",
+    "icon": "src/assets/app-icon.ico",
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ]
+  },
+  "nsis": {
+    "artifactName": "ExpressionTrainer-Setup-${version}-${arch}.exe",
+    "installerIcon": "src/assets/app-icon.ico",
+    "uninstallerIcon": "src/assets/app-icon.ico",
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "shortcutName": "好好表达",
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "deleteAppDataOnUninstall": false,
+    "differentialPackage": false
+  }
+}
