@@ -84,6 +84,8 @@ ASR 产品层以 `models/registry.json` 作为唯一 schema-v2 Catalog，不依�
 
 NSIS 沿用应用原有的 `productName` 和数据路径。设置、SQLite、受管录音和报告仍由应用存放在 `userData`，模型仍位于 `appData/expression-trainer-pro-models`。NSIS 有自己的安装记录，首次从 Squirrel 迁移可能并存两个安装项。实际安装和升级证据见[支持矩阵](../support-matrix.md)。
 
+带 ASR 的 NSIS 预览包把获准分发的 Zipformer Large 归档放在 `resources/asr-models/`。首次启动时，Model Manager 在本机校验归档并导入模型目录，后续直接复用已导入的模型。
+
 旧 `forge.config.js` 用于复测 Squirrel 制品。其显式内部构建可从 Git 外的绝对归档路径读取 Catalog 默认模型，校验精确字节数和 SHA-256，只把固定 `asr-models/<modelId>/<version>/<archive>` 加入 Forge `extraResource`。Main 只从 `process.resourcesPath` 派生受信任包内归档位置，ModelManager 复用既有安装事务后激活。运行时始终从 `appData/expression-trainer-pro-models` 加载。
 
 ## 4. C4 Level 2：当前容器/运行边界

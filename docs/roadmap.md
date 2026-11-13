@@ -31,7 +31,7 @@ flowchart LR
   U1 --> U2[ASR-U02 FireRedASR2]
 ```
 
-M1 持久化及 M2 稳定快照已构成后续基础。M2 已完成最终 Closeout，默认真实录音/播放/恢复、有限 VAD/Evidence 和真实 AI E2E 验收通过，详见 M2 矩阵。SenseVoice 下载及实机验收按 B-23 延期，不再作为 M2 → M3 的门禁；M3 首版指标与证据复盘已实现并通过自动化/制品验证，边界见 Current §14。ASR-M04 公开再分发许可、签名及扩展设备/平台资格仍独立跟进。
+M1 持久化及 M2 稳定快照已构成后续基础。M2 已完成最终 Closeout，默认真实录音/播放/恢复、有限 VAD/Evidence 和真实 AI E2E 验收通过，详见 M2 矩阵。SenseVoice 下载及实机验收按 B-23 延期，不再作为 M2 → M3 的门禁；M3 首版指标与证据复盘已实现并通过自动化/制品验证，边界见 Current §14。签名及扩展设备/平台资格继续按发布条件跟进。
 
 ## 3. 已完成基线
 
@@ -64,7 +64,7 @@ M0 的 Complete 记录上述历史完成事件；[当时的审查](archive/revie
 
 | ID | P | 状态 | 任务 | 完成标准 |
 |---|---|---|---|---|
-| ASR-M04 | P1 | External gate | Zipformer Large 公开包内默认资格（内部资格 ASR-M04a 已完成） | 剩余：获得再分发批准；公开候选制品通过离线首次导入、native 初始化、二次启动和升级保留验证；公开发布条件见 §4.4 |
+| ASR-M04 | P1 | External gate | Zipformer Large 公开包内默认资格（内部资格 ASR-M04a 已完成） | 该版本已获随应用公开再分发授权，范围见 `models/registry.json`。公开制品验证见[支持矩阵](support-matrix.md)，其他发布条件见 §4.4。 |
 
 ### 4.3 M2 speech evidence and default AI diagnosis
 
@@ -118,7 +118,7 @@ M3 首版已完成可靠指标变化、两侧 Finding/Evidence 复盘与 History
 ## 7. 外部跟进
 
 - 当前默认真实麦克风主链路已有验收；多采样率/其他可配置麦克风与接近 4-core/8-GB/3-GB 资格线设备的覆盖仍待扩展。
-- Zipformer Large 等模型的公开再分发许可。
+- 随公开制品附带的其他模型需确认各自的再分发许可，授权状态见产品模型清单。
 - Windows 签名凭据；macOS/Linux/ARM64 对应构建与 native 模型证据。
 
 ## 8. 维护规则

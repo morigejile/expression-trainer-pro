@@ -127,7 +127,7 @@ test('committed product Catalog contains streaming models and the pinned optiona
   assert.deepEqual(catalog.models.map(model => model.license.redistribution), [
     'not-approved',
     'not-approved',
-    'not-approved',
+    'approved',
     'not-approved'
   ]);
 

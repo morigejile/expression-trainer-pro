@@ -71,7 +71,7 @@ BM-03 又在同一冻结的 100 条普通话样本、Sherpa-ONNX 1.13.3、CPU、
 - [x] 多模型组件、安装、切换、UI、错误、测试和发布设计已获批准。
 - [ ] 三款 streaming 生产 Provider、安装和切换路径通过聚焦自动化及真实模型资格验证。
 - [ ] Windows x64 公开候选通过首次断网导入和升级保留验证。
-- [ ] Zipformer Large 再分发许可状态变为 `approved` 后，才允许公开带模型制品。
+- [x] 维护者已确认此版本 Zipformer Large 可随好好表达安装包公开再分发。授权范围见 `models/registry.json`。
 - [ ] 第二批发布前完成两款 utterance 的有界缓冲、真实模型和 UX 验证。
 
 只有以下情况重开默认模型决策：固定模型或 Sherpa 版本改变；冻结数据上的相对结论发生实质变化；产品取消 streaming 默认要求；目标硬件或内存预算变化；Zipformer Large 的许可或可获得性阻止公开交付。

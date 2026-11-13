@@ -87,8 +87,8 @@
       ],
       "license": {
         "sourceUrl": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-ctc/zipformer-ctc-models.html",
-        "notice": "官方发布资产未包含可确认的模型再分发授权。",
-        "redistribution": "not-approved"
+        "notice": "项目维护者于 2026-11-12 确认已获得将此版本模型随好好表达安装包公开再分发的授权。",
+        "redistribution": "approved"
       }
     },
     {

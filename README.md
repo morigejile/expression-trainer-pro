@@ -75,7 +75,7 @@
 
 ### 1. 启动应用
 
-1. 获取本项目提供的 Windows x64 安装包 `ExpressionTrainer-Setup-<版本>-x64.exe`。
+1. 前往 [GitHub Releases](https://github.com/morigejile/-/releases)，下载 Windows x64 完整安装包 `ExpressionTrainer-Setup-<版本>-x64-with-ASR.exe`。
 2. 运行安装程序，按提示完成安装。
 3. 打开应用，准备麦克风并按下方步骤配置语音识别。
 
@@ -85,13 +85,12 @@
 
 ### 2. 准备本地语音识别
 
-1. 打开右上角「···」→「设置」→「语音识别」。
-2. 已有模型显示「使用中」时，可沿用当前模型；否则先安装一个可用模型，再选择使用。
-3. 等待下载、校验和加载完成，再开始录音。
+1. 完整安装包内置默认的 Zipformer Large 中文语音模型。首次打开应用时会离线导入，等模型准备完成后即可开始录音。
+2. 如需查看或切换模型，打开右上角「···」→「设置」→「语音识别」。已有可用模型可继续使用，其他模型可按需下载。
 
 当前提供 Zipformer Small、Zipformer Large 和 Paraformer 流式识别模型，技术默认是 Zipformer Large。SenseVoice 为可选整段识别模型，其下载与实机验收仍有待完成项。
 
-首次安装模型需要网络和磁盘空间。模型不随源码仓库提供，Windows 默认缓存位置为：
+首次导入模型需要磁盘空间，下载可选模型需要联网。Windows 默认缓存位置为：
 
 ```text
 %APPDATA%\expression-trainer-pro-models
