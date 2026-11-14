@@ -7,7 +7,9 @@ const { parsePcmWav } = require('../lib/dataset-manifest');
 const REQUIRED_FILE_ROLES = {
   paraformer: ['tokens', 'encoder', 'decoder'],
   'zipformer-ctc': ['tokens', 'model'],
+  'zipformer-transducer': ['tokens', 'encoder', 'decoder', 'joiner'],
   'fire-red-asr-ctc': ['tokens', 'model'],
+  'fire-red-asr-aed': ['tokens', 'encoder', 'decoder'],
   'qwen3-asr': ['conv-frontend', 'encoder', 'decoder', 'tokenizer-config', 'tokenizer-merges', 'tokenizer-vocab'],
   sensevoice: ['tokens', 'model']
 };
@@ -117,6 +119,25 @@ function buildConfig(candidate) {
       }
     };
   }
+  if (candidate.family === 'zipformer-transducer' && candidate.mode === 'streaming') {
+    return {
+      kind: 'online',
+      native: {
+        featConfig: { sampleRate: candidate.sampleRateHz, featureDim: 80 },
+        modelConfig: {
+          ...base,
+          transducer: {
+            encoder: fileFor(candidate, 'encoder'),
+            decoder: fileFor(candidate, 'decoder'),
+            joiner: fileFor(candidate, 'joiner')
+          }
+        },
+        decodingMethod: 'greedy_search',
+        maxActivePaths: 4,
+        enableEndpoint: true
+      }
+    };
+  }
   if (candidate.family === 'sensevoice' && candidate.mode === 'utterance') {
     return {
       kind: 'offline',
@@ -135,6 +156,22 @@ function buildConfig(candidate) {
       native: {
         featConfig: { sampleRate: candidate.sampleRateHz, featureDim: 80 },
         modelConfig: { ...base, fireRedAsrCtc: { model: fileFor(candidate, 'model') } }
+      }
+    };
+  }
+  if (candidate.family === 'fire-red-asr-aed' && candidate.mode === 'utterance') {
+    return {
+      kind: 'offline',
+      native: {
+        featConfig: { sampleRate: candidate.sampleRateHz, featureDim: 80 },
+        modelConfig: {
+          ...base,
+          fireRedAsr: {
+            encoder: fileFor(candidate, 'encoder'),
+            decoder: fileFor(candidate, 'decoder')
+          }
+        },
+        decodingMethod: 'greedy_search'
       }
     };
   }

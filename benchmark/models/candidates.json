@@ -85,6 +85,35 @@
       ]
     },
     {
+      "id": "zipformer-large-transducer-zh-int8-2025-06-30",
+      "displayName": "Zipformer Large Transducer Chinese INT8",
+      "family": "zipformer-transducer",
+      "mode": "streaming",
+      "status": "verified",
+      "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30.tar.bz2",
+      "upstreamVersion": "2025-06-30",
+      "license": {
+        "model": { "status": "unverified", "reason": "Internal evaluation; model redistribution has not been assessed.", "source": "https://k2-fsa.github.io/sherpa/onnx/pretrained_models/online-transducer/zipformer-transducer-models.html" },
+        "code": { "spdx": "Apache-2.0", "location": "https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE" },
+        "redistribution": "not-approved"
+      },
+      "evidence": {
+        "source": { "status": "verified", "checkedAt": "2026-11-13T07:49:56.025Z" },
+        "license": { "status": "unverified", "checkedAt": "2026-11-13T07:49:56.025Z" },
+        "files": { "status": "verified", "reason": "The 132,634,597-byte official archive matched SHA-256 5a2832047ea1f97dd0dc595b816c230c4bafad65cfc0341fa57517cadc50afd0; extracted runtime files were SHA-256 verified.", "verifiedAt": "2026-11-13T07:49:56.025Z" },
+        "nativeLoad": { "status": "passed", "reason": "Sherpa-ONNX 1.13.3 on Windows x64 initialized and transcribed a verified FLEURS sample with partial and final text.", "recordedAt": "2026-11-13T07:50:03.038Z" }
+      },
+      "sampleRateHz": 16000,
+      "numThreads": 2,
+      "provider": "cpu",
+      "files": [
+        { "relativePath": "sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30/encoder.int8.onnx", "role": "encoder", "bytes": 161141793, "sha256": "5ac51e27981bb4dab01bb9be4958453ba50c3b61c063ddda0eab23fd3671aa4f" },
+        { "relativePath": "sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30/decoder.onnx", "role": "decoder", "bytes": 5165083, "sha256": "06522ad63cec0fdf6809f4e1db9bb4f7d710c34582e3b35db62ac60eccafac7e" },
+        { "relativePath": "sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30/joiner.int8.onnx", "role": "joiner", "bytes": 1033416, "sha256": "b34584dc6f561089e1d747fedebb3765f2caa72c927ef54d7ca55e5ae40a814b" },
+        { "relativePath": "sherpa-onnx-streaming-zipformer-zh-int8-2025-06-30/tokens.txt", "role": "tokens", "bytes": 20628, "sha256": "6193c7ea1c96d0d9a1e9652789b40d13a8a913d834a5451e93158f5a09fd6652" }
+      ]
+    },
+    {
       "id": "fire-red-asr2-ctc-zh-en-int8-2026-02-25",
       "displayName": "FireRedASR2 CTC Chinese-English INT8",
       "family": "fire-red-asr-ctc",
@@ -109,6 +138,34 @@
       "files": [
         { "relativePath": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25/model.int8.onnx", "sha256": "ca3dbabd82170110cc0b343c2890866d449984bc9cd92b9a18371ff80a81bb99", "bytes": 775861420, "role": "model" },
         { "relativePath": "sherpa-onnx-fire-red-asr2-ctc-zh_en-int8-2026-02-25/tokens.txt", "sha256": "1bc613de2112d257e61a349c3e72d1b1a9cf19c33d3ca954197ad2171e5ea07b", "bytes": 79172, "role": "tokens" }
+      ]
+    },
+    {
+      "id": "fire-red-asr2-aed-zh-en-int8-2026-02-26",
+      "displayName": "FireRedASR2 AED Chinese-English INT8",
+      "family": "fire-red-asr-aed",
+      "mode": "utterance",
+      "status": "verified",
+      "sourceUrl": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-fire-red-asr2-zh_en-int8-2026-02-26.tar.bz2",
+      "upstreamVersion": "2026-02-26",
+      "license": {
+        "model": { "status": "unverified", "reason": "Internal evaluation; model redistribution has not been assessed.", "source": "https://k2-fsa.github.io/sherpa/onnx/FireRedAsr/pretrained.html" },
+        "code": { "spdx": "Apache-2.0", "location": "https://github.com/k2-fsa/sherpa-onnx/blob/master/LICENSE" },
+        "redistribution": "not-approved"
+      },
+      "evidence": {
+        "source": { "status": "verified", "checkedAt": "2026-11-13T08:33:30.923Z" },
+        "license": { "status": "unverified", "checkedAt": "2026-11-13T08:33:30.923Z" },
+        "files": { "status": "verified", "reason": "The 838,589,068-byte official archive matched SHA-256 43015b3f1643a5688b4821e8ed323473d38b798c4ec291471fe00df1bcfc4f1c; extracted runtime files were SHA-256 verified.", "verifiedAt": "2026-11-13T08:33:30.923Z" },
+        "nativeLoad": { "status": "passed", "reason": "Sherpa-ONNX 1.13.3 on Windows x64 initialized and transcribed a verified FLEURS sample with final text.", "recordedAt": "2026-11-13T08:33:30.923Z" }
+      },
+      "sampleRateHz": 16000,
+      "numThreads": 2,
+      "provider": "cpu",
+      "files": [
+        { "relativePath": "sherpa-onnx-fire-red-asr2-zh_en-int8-2026-02-26/encoder.int8.onnx", "role": "encoder", "bytes": 817286833, "sha256": "54048d66b6e8f3c80ea7ce95efe794587b0fd81d7271651d0decd3803852ae82" },
+        { "relativePath": "sherpa-onnx-fire-red-asr2-zh_en-int8-2026-02-26/decoder.int8.onnx", "role": "decoder", "bytes": 417291928, "sha256": "b840ce7196ae4a14d05ae84bbf56082b6b61ccec5610fda907dddbcea37354ff" },
+        { "relativePath": "sherpa-onnx-fire-red-asr2-zh_en-int8-2026-02-26/tokens.txt", "role": "tokens", "bytes": 79172, "sha256": "1bc613de2112d257e61a349c3e72d1b1a9cf19c33d3ca954197ad2171e5ea07b" }
       ]
     },
     {

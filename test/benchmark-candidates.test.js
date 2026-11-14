@@ -200,7 +200,9 @@ test('committed registry represents all downloaded candidates as hash-verified w
       ['paraformer-bilingual-zh-en-control', 'verified'],
       ['zipformer-small-ctc-zh-int8-2025-04-01', 'verified'],
       ['zipformer-large-ctc-zh-int8-2025-06-30', 'verified'],
+      ['zipformer-large-transducer-zh-int8-2025-06-30', 'verified'],
       ['fire-red-asr2-ctc-zh-en-int8-2026-02-25', 'verified'],
+      ['fire-red-asr2-aed-zh-en-int8-2026-02-26', 'verified'],
       ['sensevoice-small-int8-2024-07-17', 'verified'],
       ['qwen3-asr-0-6b-int8-2026-03-25', 'verified'],
       ['sensevoice-small-int8-2025-09-09', 'verified']

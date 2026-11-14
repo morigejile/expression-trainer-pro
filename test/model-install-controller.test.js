@@ -3,6 +3,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {EventEmitter} = require('node:events');
+const {readFileSync} = require('node:fs');
+const {runInNewContext} = require('node:vm');
 
 class FakeInstallProcess extends EventEmitter {
   constructor() {
@@ -13,6 +15,41 @@ class FakeInstallProcess extends EventEmitter {
   postMessage(message) { this.messages.push(message); }
   kill() { this.killed = true; this.emit('exit', 0); return true; }
 }
+
+test('install utility registers the verified version before it reports success', async () => {
+  const modelId = 'sensevoice-small-int8-2024-07-17';
+  const result = new Promise(resolve => {
+    const parentPort = {
+      on(_name, handler) {
+        setImmediate(() => handler({data: {id: 'model-install', command: 'install'}}));
+      },
+      postMessage: resolve
+    };
+    const modulePath = require.resolve('../lib/model-install-utility-process');
+    const imports = {
+      electron: {net: {}},
+      '../models/registry.json': {},
+      './asr-utility-config': {resolveManagedAsrOptions: () => ({modelId})},
+      './model-manager': {
+        createModelManager: () => ({
+          async install(id, options) {
+            assert.equal(id, modelId);
+            assert.equal(options.activate, true);
+          }
+        })
+      }
+    };
+    runInNewContext(readFileSync(modulePath, 'utf8'), {
+      require: name => imports[name],
+      process: {argv: [], parentPort, exit() {}},
+      AbortController,
+      setImmediate
+    }, {filename: modulePath});
+  });
+  const reply = await result;
+  assert.equal(reply.id, 'model-install');
+  assert.equal(reply.ok, true);
+});
 
 test('install controller runs one short-lived task and publishes normalized progress', async () => {
   const {createModelInstallController} = require('../lib/model-install-controller');

@@ -8,7 +8,9 @@ const SHA256 = /^[a-f0-9]{64}$/;
 const CANDIDATE_ID = /^[a-z0-9][a-z0-9-]*$/;
 const HTTPS_URL = /^https:\/\//;
 const ISO_TIMESTAMP = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
-const FAMILIES = new Set(['paraformer', 'zipformer-ctc', 'fire-red-asr-ctc', 'sensevoice', 'qwen3-asr']);
+const STREAMING_FAMILIES = new Set(['paraformer', 'zipformer-ctc', 'zipformer-transducer']);
+const UTTERANCE_FAMILIES = new Set(['fire-red-asr-ctc', 'fire-red-asr-aed', 'sensevoice', 'qwen3-asr']);
+const FAMILIES = new Set([...STREAMING_FAMILIES, ...UTTERANCE_FAMILIES]);
 const MODES = new Set(['streaming', 'utterance']);
 const PROVIDERS = new Set(['cpu']);
 const STATUSES = new Set(['verified', 'pending']);
@@ -88,8 +90,8 @@ function validateCandidate(candidate, index) {
   assertSafeInteger(candidate.numThreads, `${name}.numThreads`, 1);
   if (!PROVIDERS.has(candidate.provider)) fail(`${name}.provider is invalid`);
   if (!Array.isArray(candidate.files)) fail(`${name}.files must be an array`);
-  if ((candidate.family === 'paraformer' || candidate.family === 'zipformer-ctc') && candidate.mode !== 'streaming') fail(`${name}.mode must be streaming for ${candidate.family}`);
-  if ((candidate.family === 'sensevoice' || candidate.family === 'fire-red-asr-ctc' || candidate.family === 'qwen3-asr') && candidate.mode !== 'utterance') fail(`${name}.mode must be utterance for ${candidate.family}`);
+  if (STREAMING_FAMILIES.has(candidate.family) && candidate.mode !== 'streaming') fail(`${name}.mode must be streaming for ${candidate.family}`);
+  if (UTTERANCE_FAMILIES.has(candidate.family) && candidate.mode !== 'utterance') fail(`${name}.mode must be utterance for ${candidate.family}`);
   if (candidate.status === 'verified') {
     if (candidate.files.length === 0) fail(`${name}.files must not be empty for verified candidates`);
     if (candidate.pending !== undefined) fail(`${name}.pending is only allowed for pending candidates`);

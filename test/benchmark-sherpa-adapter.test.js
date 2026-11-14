@@ -79,6 +79,8 @@ function withFixture(run) {
       candidate({ id: 'paraformer-bilingual-zh-en-control', family: 'paraformer', mode: 'streaming', version: '2024-03-10', files: makeFiles('paraformer', ['encoder', 'decoder', 'tokens']) }),
       candidate({ id: 'zipformer-small-ctc-zh-int8-2025-04-01', family: 'zipformer-ctc', mode: 'streaming', version: '2025-04-01', files: makeFiles('zipformer', ['model', 'tokens', 'bpe-vocab']) }),
       candidate({ id: 'zipformer-large-ctc-zh-int8-2025-06-30', family: 'zipformer-ctc', mode: 'streaming', version: '2025-06-30', files: makeFiles('zipformer-large', ['model', 'tokens']) }),
+      candidate({ id: 'zipformer-large-transducer-zh-int8-2025-06-30', family: 'zipformer-transducer', mode: 'streaming', version: '2025-06-30', files: makeFiles('zipformer-transducer', ['encoder', 'decoder', 'joiner', 'tokens']) }),
+      candidate({ id: 'fire-red-asr2-aed-zh-en-int8-2026-02-26', family: 'fire-red-asr-aed', mode: 'utterance', version: '2026-02-26', files: makeFiles('fire-red-aed', ['encoder', 'decoder', 'tokens']) }),
       candidate({ id: 'fire-red-asr2-ctc-zh-en-int8-2026-02-25', family: 'fire-red-asr-ctc', mode: 'utterance', version: '2026-02-25', files: makeFiles('fire-red-asr2', ['model', 'tokens']) }),
       candidate({ id: 'sensevoice-small-int8-2024-07-17', family: 'sensevoice', mode: 'utterance', version: '2024-07-17', files: makeFiles('sensevoice', ['model', 'tokens']) }),
       candidate({
@@ -123,6 +125,56 @@ function fakeSherpa() {
 }
 
 const sample = { audioFile: 'sample.wav', sampleRateHz: 16000, channels: 1 };
+
+test('Zipformer Transducer uses the online transducer files and emits partials', async () => {
+  const { createBenchmarkAdapter } = require('../benchmark/lib/adapter');
+  await withFixture(async (resources) => {
+    const sherpa = fakeSherpa();
+    const adapter = createBenchmarkAdapter({
+      candidateId: 'zipformer-large-transducer-zh-int8-2025-06-30',
+      ...resources,
+      sherpa: sherpa.binding
+    });
+    await adapter.init();
+    const partials = [];
+    const finals = [];
+    await adapter.transcribe(sample, {
+      onPartial: ({ text }) => partials.push(text),
+      onFinal: ({ text }) => finals.push(text)
+    });
+    const config = sherpa.state.onlineConfig;
+    for (const role of ['encoder', 'decoder', 'joiner']) {
+      assert.equal(path.basename(config.modelConfig.transducer[role]), role + '.bin');
+    }
+    assert.equal(config.decodingMethod, 'greedy_search');
+    assert.deepEqual(partials, ['在线部分']);
+    assert.deepEqual(finals, ['在线终稿']);
+    await adapter.dispose();
+  });
+});
+
+test('FireRedASR2 AED uses the offline encoder and decoder and emits only final text', async () => {
+  const { createBenchmarkAdapter } = require('../benchmark/lib/adapter');
+  await withFixture(async (resources) => {
+    const sherpa = fakeSherpa();
+    const adapter = createBenchmarkAdapter({
+      candidateId: 'fire-red-asr2-aed-zh-en-int8-2026-02-26',
+      ...resources,
+      sherpa: sherpa.binding
+    });
+    await adapter.init();
+    const finals = [];
+    await adapter.transcribe(sample, {
+      onPartial: () => assert.fail('offline AED emitted a partial'),
+      onFinal: ({ text }) => finals.push(text)
+    });
+    const config = sherpa.state.offlineConfig.modelConfig.fireRedAsr;
+    assert.equal(path.basename(config.encoder), 'encoder.bin');
+    assert.equal(path.basename(config.decoder), 'decoder.bin');
+    assert.deepEqual(finals, ['离线终稿']);
+    await adapter.dispose();
+  });
+});
 
 test('Paraformer adapter uses the online config and emits partial plus final text', async () => {
   const { createSherpaAdapter } = require('../benchmark/adapters/sherpa');
