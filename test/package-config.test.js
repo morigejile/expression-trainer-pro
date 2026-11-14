@@ -78,6 +78,7 @@ test('package payload excludes development-only trees but keeps runtime assets',
   assert.equal(ignore('/lib/model-install-utility-process.js'), false);
   assert.equal(ignore('/models/registry.json'), false);
   assert.equal(ignore('/models/speech-evidence-registry.json'), false);
+  assert.equal(ignore('/models/punctuation-registry.json'), false);
   assert.equal(ignore('/lib/speech-evidence-worker.js'), false);
   assert.equal(ignore('/smoke/electron-smoke-runner.js'), false);
   assert.equal(ignore('/src/index.html'), false);
@@ -106,6 +107,7 @@ test('Windows installer uses NSIS and keeps the Sherpa bundle and user data sepa
   const manifest = require('../package.json');
   assert.match(manifest.scripts['dist:win'] || '', /electron-builder --config electron-builder\.win\.json --win --x64 --publish never/);
   const config = require('../electron-builder.win.json');
+  assert.ok(config.files.includes('models/punctuation-registry.json'));
   assert.deepEqual(config.win.target, [{target: 'nsis', arch: ['x64']}]);
   assert.equal(config.asar, true);
   assert.ok(config.asarUnpack.includes('node_modules/sherpa-onnx-win-x64/**'));

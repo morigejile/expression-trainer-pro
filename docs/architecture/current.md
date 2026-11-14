@@ -182,7 +182,9 @@ Main 只持有 `AsrProcessController`；实际 session wrapper、managed provide
 
 三款 Provider 均只支持一个并发识别流，使用 16 kHz mono Float32 输入、CPU、2 threads 和 greedy search。Paraformer 从 encoder、decoder、tokens role 创建 recognizer；Zipformer 从 model、tokens 及可选 BPE role 创建 online CTC recognizer。adapter `feed()` 同步 decode 并返回 `{text,isFinal}` / `null`，`stop()` flush 最后的未确认文本。重复 `initialize()` 复用 recognizer，session start 创建新 stream。`lib/fake-asr-provider.js` 通过同一 session wrapper 用于普通测试与 Electron smoke；没有通用插件系统或依赖注入容器。
 
-`src/app.js` 把当前 session 的 `final` 事件经 `mergeFinalText()` 去重后合并；非空尾部文本进入逐字稿、分析统计和后续报告。`stopRecording()` 等待尾部 final 的本地分析完成后再开放报告操作；失败时仍复位录音状态和 UI。
+Zipformer Small/Large 在 ASR utility 内处理端点和录音收尾的 `final` 文本。CT-Transformer 只允许插入标点，出现改字、删字或拆开数字的结果时保留原文。数字格式化覆盖明确的数量、小数、百分比和四位年份，保留概数和歧义表达。标点权重由 [独立目录](../../models/punctuation-registry.json) 下发并由 Model Manager 校验，缓存缺失时后台下载。下载或推理失败时仍可转写并格式化数字。临时字幕直接使用 ASR 的 `partial`。
+
+`src/app.js` 合并当前 session 的 `final` 文本，非空尾部文本进入逐字稿、分析统计和后续报告。`stopRecording()` 等待尾部 final 的本地分析完成后再开放报告操作；失败时仍复位录音状态和 UI。新报告按实际保存的转写计字符数，数字格式转换可能改变字符数和相关速率。历史报告继续读取已保存快照。
 
 ### 5.5 Lexicon / `lib/lexicon.js`
 

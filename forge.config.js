@@ -38,7 +38,7 @@ function ignoreDevelopmentOnly(filePath) {
   const root = parts[0];
   if (DEVELOPMENT_ONLY_ROOTS.has(root)) return true;
   if (isModelPayloadPath(normalizedPath)) return true;
-  if (root === 'models' && !['models', 'models/registry.json', 'models/speech-evidence-registry.json'].includes(normalizedPath)) return true;
+  if (root === 'models' && !['models', 'models/registry.json', 'models/speech-evidence-registry.json', 'models/punctuation-registry.json'].includes(normalizedPath)) return true;
   if (NON_RUNTIME_FILES.has(normalizedPath)) return true;
   return root === 'node_modules' && ['.bin', 'electron', 'electron-nightly'].includes(parts[1]);
 }

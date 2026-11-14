@@ -1,0 +1,39 @@
+{
+  "schemaVersion": 2,
+  "defaultModelId": "ct-transformer-punctuation",
+  "models": [
+    {
+      "modelId": "ct-transformer-punctuation",
+      "version": "2024-04-12-int8",
+      "displayName": "CT-Transformer 中文标点",
+      "description": "本地转写标点恢复模型。",
+      "providerType": "sherpa.offline-punctuation",
+      "minAppVersion": "1.0.1",
+      "downloadBytes": 64717756,
+      "sources": [
+        {
+          "type": "archive",
+          "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/punctuation-models/sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12-int8.tar.bz2",
+          "sha256": "c0d5aa5f8eeb686032345e180bedf39319dc2e0556781c6264bcadba8328a6e1",
+          "bytes": 64717756,
+          "format": "tar.bz2",
+          "rootDirectory": "sherpa-onnx-punct-ct-transformer-zh-en-vocab272727-2024-04-12-int8",
+          "builtIn": false
+        }
+      ],
+      "files": [
+        {
+          "relativePath": "model.int8.onnx",
+          "sha256": "65a3fb9f5ad7bfb96bf69e0dc4481df97f6ee60513c1d94ce981ba6effd524b1",
+          "bytes": 75519198,
+          "role": "model"
+        }
+      ],
+      "license": {
+        "sourceUrl": "https://k2-fsa.github.io/sherpa/onnx/punctuation/pretrained_models.html",
+        "notice": "从 Sherpa-ONNX 官方发布源单独安装。",
+        "redistribution": "not-approved"
+      }
+    }
+  ]
+}

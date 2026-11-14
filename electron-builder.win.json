@@ -16,6 +16,7 @@
     "src/**/*",
     "models/registry.json",
     "models/speech-evidence-registry.json",
+    "models/punctuation-registry.json",
     "!**/*.{gguf,onnx,ort,pt,pth,safetensors,tflite,tar.bz2,tar.gz,sqlite,sqlite-*,wav}"
   ],
   "asar": true,
